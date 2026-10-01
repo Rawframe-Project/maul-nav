@@ -134,17 +134,17 @@ static const HandSquare s_row[5] = {{20, 20, 40, 40, {0}, 0},
                                     {80, 20, 100, 40, {0}, 0},
                                     {100, 20, 120, 40, {0}, 0}};
 
-// The fewest nodes with which the walk along the row from 10.5 to 25 m is
-// found.
-static int32_t FewestNodes(const mnavNavmesh* navmesh, const mnavQueryFilter* filter)
+// The fewest nodes with which a walk is found.
+static int32_t FewestNodes(const mnavNavmesh* navmesh, const mnavQueryFilter* filter, double x0,
+                           double z0, double x1, double z1)
 {
-    for (int32_t nodes = 1; nodes <= 64; ++nodes)
+    for (int32_t nodes = 1; nodes <= 256; ++nodes)
     {
         mnavQueryDef def = mnavDefaultQueryDef();
         def.limits.nodes = nodes;
         mnavQuery* query = nullptr;
         CHECK(mnavCreateQuery(&def, &query) == mnav_success, "query");
-        mnavPath path = Walk(query, navmesh, filter, 10.5, 7.5, 25.0, 7.5);
+        mnavPath path = Walk(query, navmesh, filter, x0, z0, x1, z1);
         mnavDestroyQuery(query);
         if (path.end == mnav_pathFound)
         {
@@ -177,16 +177,6 @@ static void TestCheapTeleportsKeepTheSearchExact(void)
     CHECK(path.end == mnav_pathFound && path.linkCount == 0 && path.cost == 14.5 &&
               path.pointCount == 2,
           "the walk");
-    // Teleports the agent may not use do not weaken the heuristic: the walk
-    // needs as few nodes as with no teleport at all.
-    mnavQueryFilter walker = mnavDefaultQueryFilter();
-    walker.kinds &= ~((uint64_t)1 << mnav_linkTeleport);
-    int32_t withLink = FewestNodes(navmesh, &walker);
-    mnavDestroyNavmesh(navmesh);
-    navmesh = Make(s_row, 5);
-    (void)AddLink(navmesh, 5.5, 29.5, 0.01f, mnav_linkTeleport, false);
-    CHECK(FewestNodes(navmesh, &walker) == withLink && withLink == 5,
-          "the same few nodes beside a cheap teleport");
     // A teleport of cost 0 still leaves an exact search.
     mnavDestroyNavmesh(navmesh);
     navmesh = Make(s_row, 5);
@@ -197,10 +187,40 @@ static void TestCheapTeleportsKeepTheSearchExact(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestLeftOutKindsDoNotWeakenTheSearch(void)
+{
+    // Corner to corner across a 4 by 4 grid of squares from (5, 5) to
+    // (25, 25): a heuristic scaled near 0 would open nearly every portal.
+    // A teleport of cost 0.01 the agent may not use leaves the search as
+    // narrow as without it.
+    HandSquare grid[16];
+    for (int32_t i = 0; i < 16; ++i)
+    {
+        int32_t x = 20 + (i % 4) * 20;
+        int32_t z = 20 + (i / 4) * 20;
+        grid[i] = (HandSquare){x, z, x + 20, z + 20, {0}, 0};
+    }
+    mnavQueryFilter walker = mnavDefaultQueryFilter();
+    walker.kinds &= ~((uint64_t)1 << mnav_linkTeleport);
+    mnavNavmesh* navmesh = Make(grid, 16);
+    int32_t without = FewestNodes(navmesh, &walker, 6.0, 6.0, 24.0, 24.0);
+    mnavDestroyNavmesh(navmesh);
+    navmesh = Make(grid, 16);
+    mnavLinkDef def = {{24.0, 0.0, 6.0}, {6.0, 0.0, 24.0}, 0.5f, 0.01f, mnav_linkTeleport, false};
+    mnavLinkId id;
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+          "teleport added");
+    int32_t beside = FewestNodes(navmesh, &walker, 6.0, 6.0, 24.0, 24.0);
+    printf("FEWEST without=%d beside=%d\n", without, beside);
+    CHECK(without > 0 && beside == without, "as few nodes beside the teleport");
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     TestJumpingAGap();
     TestTwoWaysAndDetached();
     TestCheapTeleportsKeepTheSearchExact();
+    TestLeftOutKindsDoNotWeakenTheSearch();
     return s_failures == 0 ? 0 : 1;
 }
