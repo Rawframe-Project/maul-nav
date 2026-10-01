@@ -198,3 +198,5 @@ format.
   (Dijkstra from every goal over an mnavGrid with the grid path's steps
   and costs) and mnavFlowAt (a cell's cost to the nearest goal and its
   next cell).
+- bench/bench_main.c times flow fields over 512 by 512 cells with
+  walls: about 24 ms a build for one goal, 27 ms for four.

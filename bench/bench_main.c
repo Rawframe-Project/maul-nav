@@ -7,12 +7,14 @@
 // tiles that enter and leave and committing each step, for ten laps;
 // then finds paths
 // on the whole terrain; then steers 1,000 agents through a doorway 4 m wide
-// with avoidance. Prints the best of five runs in microseconds,
+// with avoidance; then builds flow fields over a grid of 512 by 512 cells.
+// Prints the best of five runs in microseconds,
 // with counts and bytes, which do not depend on the machine.
 
 #include "maul-nav/avoidance.h"
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/flow.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
@@ -427,6 +429,51 @@ static void Doorway(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+// A flow field over 512 by 512 cells of 0.5 m: a wall in every eighth
+// row with a gap that moves along, and 1 in 16 other cells dearer; one
+// goal in a corner, then four goals.
+static void Flow(void)
+{
+    enum
+    {
+        SIDE = 512
+    };
+    static mnavAreaType areas[SIDE * SIDE];
+    for (int32_t y = 0; y < SIDE; ++y)
+    {
+        for (int32_t x = 0; x < SIDE; ++x)
+        {
+            bool wall = y % 8 == 4 && (x + y * 5) % SIDE >= 24;
+            areas[y * SIDE + x] = wall ? mnav_areaNone : ((x * 7 + y * 3) % 16 == 0 ? 2u : 1u);
+        }
+    }
+    mnavGrid grid = {areas, SIDE, SIDE, 0.5f};
+    mnavQueryFilter filter = mnavDefaultQueryFilter();
+    filter.costs[2] = 3.0f;
+    mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
+    def.allocator = (mnavAllocator){Alloc, Free, NULL};
+    def.cells = SIDE * SIDE;
+    mnavFlowField* field = NULL;
+    Check(mnavCreateFlowField(&def, &field), "flow field");
+    const mnavCell goals[4] = {{0, 0}, {511, 511}, {0, 511}, {511, 0}};
+    for (int32_t count = 1; count <= 4; count += 3)
+    {
+        double best = 1e30;
+        for (int32_t run = 0; run < RUNS; ++run)
+        {
+            double start = Seconds();
+            Check(mnavBuildFlowField(field, &grid, &filter, goals, count), "build");
+            double took = Seconds() - start;
+            best = took < best ? took : best;
+        }
+        mnavFlow far;
+        Check(mnavFlowAt(field, (mnavCell){256, 256}, &far), "read");
+        printf("flow: %d by %d cells, %d goal(s), %.0f us per build, middle costs %.1f\n", SIDE,
+               SIDE, count, best * 1e6, far.cost);
+    }
+    mnavDestroyFlowField(field);
+}
+
 int main(void)
 {
     Bake();
@@ -434,6 +481,7 @@ int main(void)
     Stream(LINKS);
     Paths();
     Doorway();
+    Flow();
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
         free(s_tiles[t]);

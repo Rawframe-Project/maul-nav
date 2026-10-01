@@ -245,6 +245,12 @@ static void TestChecks(void)
     const mnavCell goal = {1, 1};
     CHECK(mnavFlowAt(field, goal, &flow) == mnav_errorInvalid, "nothing built");
     CHECK(mnavBuildFlowField(field, &grid, nullptr, &goal, 1) == mnav_errorLimit, "too many cells");
+    grid.width = 101;
+    grid.height = 1;
+    CHECK(mnavBuildFlowField(field, &grid, nullptr, &goal, 1) == mnav_errorInvalid, "goal off");
+    const mnavCell first = {0, 0};
+    CHECK(mnavBuildFlowField(field, &grid, nullptr, &first, 1) == mnav_errorLimit,
+          "one cell past the limit");
     grid.width = 10;
     grid.height = 10;
     CHECK(mnavBuildFlowField(field, &grid, nullptr, &goal, 1) == mnav_success &&
