@@ -29,6 +29,19 @@ the grid path (mnav-0005) already has areas, filters and a step rule.
   `mnav_errorLimit`, and a failed build leaves no grid to read.
 - Blocked goals and goals in areas the filter leaves out are dropped.
 
+- **Regions and budgets:** a field covers a region of its grid, the
+  cells outside as blocked, checked against the cell limit;
+  `mnavBeginFlowField` and `mnavContinueFlowField` do the work in steps
+  of a cell budget, with the same result for any budgets.
+- **Repairs:** `mnavUpdateFlowField` takes the new goals and the cells
+  whose areas changed; the cells whose next-cell chains ran through a
+  removed goal, a changed cell or a changed corner are reset and
+  searched again, lowered costs spread from new goals and changed
+  cells, and every touched cell and its neighbours take the next cell a
+  build chooses (the neighbour giving the cost exactly, lowest by cost
+  then index). Costs are the fixed point of the neighbours' offers, so
+  the repaired field is the rebuilt one, bit for bit.
+
 ## Consequences
 
 - One build costs about one grid search over the reachable cells, and

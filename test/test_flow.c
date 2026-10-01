@@ -456,6 +456,140 @@ static void TestSteps(void)
     mnavDestroyFlowField(field);
 }
 
+static uint32_t s_seed = 7u;
+
+static uint32_t Next(uint32_t bound)
+{
+    s_seed = s_seed * 1664525u + 1013904223u;
+    return (s_seed >> 8) % bound;
+}
+
+// How many cells of a region two fields give different ways.
+static int32_t Differ(const mnavFlowField* a, const mnavFlowField* b, mnavFlowRegion r)
+{
+    int32_t differ = 0;
+    for (int32_t y = r.y; y < r.y + r.height; ++y)
+    {
+        for (int32_t x = r.x; x < r.x + r.width; ++x)
+        {
+            mnavFlow p = At(a, x, y);
+            mnavFlow q = At(b, x, y);
+            differ += memcmp(&p, &q, sizeof(p)) != 0 ? 1 : 0;
+        }
+    }
+    return differ;
+}
+
+// Random goal moves and area changes, each repaired in random budgets,
+// against a field built afresh after each.
+static void RepairHistory(const mnavFlowRegion* region, uint32_t seed)
+{
+    RandomAreas(seed);
+    s_seed = seed;
+    mnavGrid grid = Grid();
+    mnavQueryFilter filter = Costs();
+    mnavFlowRegion r = region != nullptr ? *region : (mnavFlowRegion){0, 0, WIDTH, HEIGHT};
+    mnavFlowField* repaired = Make(WIDTH * HEIGHT);
+    mnavFlowField* built = Make(WIDTH * HEIGHT);
+    mnavCell goals[6] = {{3, 3}, {40, 30}, {20, 10}, {0, 0}, {47, 0}, {10, 30}};
+    int32_t goalCount = 3;
+    bool ended = false;
+    CHECK(mnavBeginFlowField(repaired, &grid, &filter, region, goals, goalCount) == mnav_success &&
+              mnavContinueFlowField(repaired, &grid, INT32_MAX, &ended) == mnav_success,
+          "built first");
+    int32_t wrong = 0;
+    for (int32_t round = 0; round < 80; ++round)
+    {
+        mnavCell changed[12];
+        int32_t changedCount = 0;
+        uint32_t what = Next(4);
+        if (what != 1)
+        {
+            changedCount = 1 + (int32_t)Next(what == 3 ? 12 : 3);
+            for (int32_t i = 0; i < changedCount; ++i)
+            {
+                // Near the last change half the time, so changes meet.
+                changed[i] = i > 0 && Next(2) == 0
+                                 ? (mnavCell){(changed[i - 1].x + 1) % WIDTH, changed[i - 1].y}
+                                 : (mnavCell){(int32_t)Next(WIDTH), (int32_t)Next(HEIGHT)};
+                uint32_t a = Next(10);
+                s_areas[changed[i].y * WIDTH + changed[i].x] =
+                    a < 3u ? mnav_areaNone : (mnavAreaType)(a < 6u ? 1u : a - 4u);
+            }
+        }
+        if (what != 0)
+        {
+            goalCount = (int32_t)Next(7);
+            for (int32_t i = 0; i < goalCount; ++i)
+            {
+                goals[i] = (mnavCell){(int32_t)Next(WIDTH), (int32_t)Next(HEIGHT)};
+            }
+        }
+        int32_t budget = 1 + (int32_t)Next(400);
+        CHECK(mnavUpdateFlowField(repaired, &grid, goals, goalCount, changed, changedCount) ==
+                  mnav_success,
+              "repair begun");
+        ended = false;
+        while (!ended)
+        {
+            CHECK(mnavContinueFlowField(repaired, &grid, budget, &ended) == mnav_success, "step");
+        }
+        CHECK(mnavBeginFlowField(built, &grid, &filter, region, goals, goalCount) == mnav_success &&
+                  mnavContinueFlowField(built, &grid, INT32_MAX, &ended) == mnav_success,
+              "built afresh");
+        wrong += Differ(repaired, built, r) != 0 ? 1 : 0;
+    }
+    printf("repairs over %d by %d: %d of 80 differ\n", r.width, r.height, wrong);
+    CHECK(wrong == 0, "every repair gives the field a build gives");
+    mnavDestroyFlowField(repaired);
+    mnavDestroyFlowField(built);
+}
+
+static void TestRepairChecks(void)
+{
+    memset(s_areas, 1, sizeof(s_areas));
+    mnavGrid grid = Grid();
+    mnavFlowField* field = Make(WIDTH * HEIGHT);
+    const mnavCell goal = {4, 4};
+    const mnavCell off = {WIDTH, 0};
+    CHECK(mnavUpdateFlowField(field, &grid, &goal, 1, nullptr, 0) == mnav_errorInvalid,
+          "nothing begun");
+    CHECK(mnavBeginFlowField(field, &grid, nullptr, nullptr, &goal, 1) == mnav_success &&
+              mnavUpdateFlowField(field, &grid, &goal, 1, nullptr, 0) == mnav_errorStale,
+          "work not ended");
+    CHECK(mnavContinueFlowField(field, &grid, INT32_MAX, nullptr) == mnav_success, "ended");
+    mnavGrid other = grid;
+    other.width = WIDTH - 1;
+    CHECK(mnavUpdateFlowField(field, &other, &goal, 1, nullptr, 0) == mnav_errorInvalid &&
+              mnavUpdateFlowField(field, &grid, &off, 1, nullptr, 0) == mnav_errorInvalid &&
+              mnavUpdateFlowField(field, &grid, &goal, 1, &off, 1) == mnav_errorInvalid &&
+              mnavUpdateFlowField(field, &grid, nullptr, 1, nullptr, 0) == mnav_errorInvalid &&
+              mnavUpdateFlowField(field, &grid, &goal, 1, nullptr, 1) == mnav_errorInvalid &&
+              mnavUpdateFlowField(field, &grid, &goal, -1, nullptr, 0) == mnav_errorInvalid &&
+              mnavUpdateFlowField(field, &grid, &goal, 1, &goal, -1) == mnav_errorInvalid &&
+              mnavUpdateFlowField(nullptr, &grid, &goal, 1, nullptr, 0) == mnav_errorInvalid &&
+              mnavUpdateFlowField(field, nullptr, &goal, 1, nullptr, 0) == mnav_errorInvalid,
+          "the checks");
+    mnavFlow flow;
+    CHECK(mnavFlowAt(field, goal, &flow) == mnav_success, "a refused repair keeps the field");
+    // Nothing changed: the same field, ended at once.
+    bool ended = false;
+    CHECK(mnavUpdateFlowField(field, &grid, &goal, 1, nullptr, 0) == mnav_success &&
+              mnavFlowAt(field, goal, &flow) == mnav_errorStale &&
+              mnavContinueFlowField(field, &grid, 1, &ended) == mnav_success && ended &&
+              At(field, 10, 4).next.x == 9,
+          "a repair of nothing");
+    mnavDestroyFlowField(field);
+}
+
+static void TestRepairs(void)
+{
+    RepairHistory(nullptr, 3u);
+    RepairHistory(nullptr, 99u);
+    const mnavFlowRegion r = {5, 4, 33, 25};
+    RepairHistory(&r, 12u);
+}
+
 int main(void)
 {
     TestAgainstGridPaths();
@@ -465,5 +599,7 @@ int main(void)
     TestChecks();
     TestRegion();
     TestSteps();
+    TestRepairs();
+    TestRepairChecks();
     return s_failures == 0 ? 0 : 1;
 }

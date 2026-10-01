@@ -433,6 +433,57 @@ static void Doorway(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+// Times one repair of a field.
+static double Repair(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
+                     const mnavCell* changed, int32_t changedCount)
+{
+    double start = Seconds();
+    Check(mnavUpdateFlowField(field, grid, goals, 4, changed, changedCount), "repair");
+    Check(mnavContinueFlowField(field, grid, INT32_MAX, NULL), "repaired");
+    return Seconds() - start;
+}
+
+// Repairs of the four-goal field: a cell in the middle blocked and opened
+// again, a corner goal moved a cell and back, and a wall's gap closed and
+// opened again.
+static void FlowRepairs(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals)
+{
+    mnavAreaType* areas = (mnavAreaType*)grid->areas;
+    mnavCell moved[4] = {goals[0], goals[1], goals[2], goals[3]};
+    mnavCell gap[24];
+    int32_t row = 252;
+    int32_t first = (512 - (row * 5) % 512) % 512;
+    for (int32_t i = 0; i < 24; ++i)
+    {
+        gap[i] = (mnavCell){(first + i) % 512, row};
+    }
+    const mnavCell middle = {256, 250};
+    double cell = 1e30;
+    double goal = 1e30;
+    double wall = 1e30;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        for (int32_t k = 0; k < 2; ++k)
+        {
+            areas[middle.y * 512 + middle.x] = k == 0 ? mnav_areaNone : 1u;
+            double took = Repair(field, grid, moved, &middle, 1);
+            cell = took < cell ? took : cell;
+            moved[0] = (mnavCell){1 - k, 0};
+            took = Repair(field, grid, moved, NULL, 0);
+            goal = took < goal ? took : goal;
+            for (int32_t i = 0; i < 24; ++i)
+            {
+                areas[gap[i].y * 512 + gap[i].x] = k == 0 ? mnav_areaNone : 1u;
+            }
+            took = Repair(field, grid, moved, gap, 24);
+            wall = took < wall ? took : wall;
+        }
+    }
+    printf("flow repairs: a cell %.0f us, a corner goal moved %.0f us, a gap closed or opened "
+           "%.0f us\n",
+           cell * 1e6, goal * 1e6, wall * 1e6);
+}
+
 // A flow field over 512 by 512 cells of 0.5 m: a wall in every eighth
 // row with a gap that moves along, and 1 in 16 other cells dearer; one
 // goal in a corner, then four goals.
@@ -475,6 +526,7 @@ static void Flow(void)
         printf("flow: %d by %d cells, %d goal(s), %.0f us per build, middle costs %.1f\n", SIDE,
                SIDE, count, best * 1e6, far.cost);
     }
+    FlowRepairs(field, &grid, goals);
     mnavDestroyFlowField(field);
 }
 

@@ -233,3 +233,6 @@ format.
 - Flow fields over a region of a grid, built in budgeted steps:
   mnavFlowRegion, mnavBeginFlowField and mnavContinueFlowField;
   mnavDebugFlowField takes the grid's cell size from the field.
+- mnavUpdateFlowField repairs a flow field after goals or cell areas
+  change, searching only the cells whose ways change; the result is the
+  field a rebuild gives, bit for bit.

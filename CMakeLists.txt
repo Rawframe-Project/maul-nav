@@ -60,6 +60,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/hash.c
     src/funnel.c
     src/flow.c
+    src/flow_repair.c
     src/grid.c
     src/modifiers.c
     src/height_patch.c

@@ -132,6 +132,35 @@ extern "C"
                                                              const mnavGrid* grid, int32_t cells,
                                                              bool* endedOut);
 
+    /// Begins repairing the field after its goals or the areas of some of
+    /// its grid's cells changed (mnav-0007): only the cells whose ways
+    /// change are searched again, and when the work ends the field is the
+    /// one mnavBeginFlowField would make with the new goals and areas, bit
+    /// for bit. The cells whose ways ran through what changed are reset in
+    /// this call; mnavContinueFlowField does the rest by its budget.
+    ///
+    /// @param field        The field; its work must have ended.
+    /// @param grid         The grid the field was begun on, of the same
+    ///                     size and cell size, its areas already changed;
+    ///                     read until the work ends.
+    /// @param goals        The goal cells now, in grid places.
+    /// @param goalCount    How many, at least 0.
+    /// @param changed      The cells whose areas changed since the field
+    ///                     was last begun or repaired; each once or more,
+    ///                     those outside the region ignored.
+    /// @param changedCount How many, at least 0.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
+    /// a count, a negative count, nothing begun, a grid of another size or
+    /// cell size or with no areas, or a goal or changed cell outside the
+    /// grid; `mnav_errorStale` while work on the field has not ended.
+    /// @par Thread safety
+    /// Safe from any thread; the field is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavUpdateFlowField(mnavFlowField* field,
+                                                           const mnavGrid* grid,
+                                                           const mnavCell* goals, int32_t goalCount,
+                                                           const mnavCell* changed,
+                                                           int32_t changedCount);
+
     /// Builds the field for a whole grid and a set of goal cells: begins as
     /// mnavBeginFlowField and continues to the end.
     ///
