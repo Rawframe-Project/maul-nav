@@ -101,6 +101,10 @@ static void Open(mnavSearch* s, int32_t from, const mnavSearchNode* key, mnavPos
                  double linkCost)
 {
     mnavQuery* query = s->query;
+    if (s->inside != nullptr && s->inside[key->slot] == 0 && !s->beyond)
+    {
+        return;
+    }
     const mnavSearchNode* parent = &query->nodes[from];
     bool offMesh = key->tag == MNAV_TAG_OFFMESH;
     // Where the walk in the parent's polygon goes, and where the node
@@ -308,7 +312,7 @@ static bool Nearer(const mnavQuery* query, int32_t a, int32_t b)
 
 // The heuristic's scale: the cheapest included area's cost, or less for
 // a kind of link the filter crosses that costs less per meter (mnav-0005).
-static double Scale(const mnavNavmesh* navmesh, const mnavQueryFilter* filter)
+double mnavHeuristicScale(const mnavNavmesh* navmesh, const mnavQueryFilter* filter)
 {
     double scale = mnavCheapest(filter);
     for (int32_t k = 0; k < MNAV_LINK_KINDS; ++k)
@@ -356,7 +360,7 @@ mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
                       navmesh,
                       navmesh->commits,
                       &query->filter,
-                      Scale(navmesh, &query->filter),
+                      mnavHeuristicScale(navmesh, &query->filter),
                       end,
                       (int32_t)endPolygon.slot - 1,
                       (int32_t)endPolygon.polygon,
@@ -366,7 +370,10 @@ mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
                       false,
                       true,
                       0,
-                      MNAV_NO_NODE};
+                      MNAV_NO_NODE,
+                      nullptr,
+                      false,
+                      {-1, -1, -1, -1}};
     query->nodes[0] = (mnavSearchNode){start,
                                        start,
                                        start,
@@ -385,6 +392,90 @@ mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
     query->nodeCount = 1;
     query->heapCount = 1;
     return mnav_success;
+}
+
+void mnavConfineSearch(mnavQuery* query, const uint8_t* inside, bool beyond, bool noEnd)
+{
+    mnavSearch* s = &query->search;
+    s->inside = inside;
+    s->beyond = beyond;
+    if (noEnd)
+    {
+        s->endSlot = -1;
+        s->cheapest = 0.0;
+        query->nodes[0].remaining = 0.0;
+    }
+}
+
+void mnavAimSearch(mnavQuery* query, mnavPos3 end, int32_t endSlot, int32_t endPolygon,
+                   const int32_t goal[4])
+{
+    mnavSearch* s = &query->search;
+    for (int32_t i = 0; i < 4; ++i)
+    {
+        s->goal[i] = goal[i];
+    }
+    s->end = end;
+    s->endSlot = endSlot;
+    s->endPolygon = endPolygon;
+    for (int32_t i = 0; i < query->heapCount; ++i)
+    {
+        mnavSearchNode* node = &query->nodes[query->heap[i]];
+        node->remaining = Distance(node->at, end) * s->cheapest;
+    }
+}
+
+// The rank of node index v among the sorted indices.
+static int32_t RankOf(const int32_t* sorted, int32_t count, int32_t v)
+{
+    int32_t low = 0;
+    int32_t high = count - 1;
+    while (low < high)
+    {
+        int32_t middle = low + (high - low) / 2;
+        low = sorted[middle] < v ? middle + 1 : low;
+        high = sorted[middle] < v ? high : middle;
+    }
+    return low;
+}
+
+void mnavRestartSearch(mnavQuery* query, int32_t n)
+{
+    // The way to n, its node indices sorted, in the heap's memory: a
+    // lowered cost may give a node a parent made after it.
+    int32_t* sorted = query->heap;
+    int32_t count = 0;
+    for (int32_t at = n; at != MNAV_NO_NODE; at = query->nodes[at].parent)
+    {
+        int32_t i = count++;
+        while (i > 0 && sorted[i - 1] > at)
+        {
+            sorted[i] = sorted[i - 1];
+            i -= 1;
+        }
+        sorted[i] = at;
+    }
+    // The k-th smallest index is at least k, so moving the nodes up in
+    // that order never writes over one still to move.
+    memset(query->table, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
+    for (int32_t k = 0; k < count; ++k)
+    {
+        mnavSearchNode node = query->nodes[sorted[k]];
+        node.parent =
+            node.parent == MNAV_NO_NODE ? MNAV_NO_NODE : RankOf(sorted, count, node.parent);
+        node.heap = MNAV_NO_NODE;
+        query->nodes[k] = node;
+        query->table[mnavFindNode(query, node.slot, node.polygon, node.tag, node.low)] = k;
+    }
+    int32_t last = RankOf(sorted, count, n);
+    mnavSearch* s = &query->search;
+    query->nodeCount = count;
+    query->heapCount = 1;
+    query->heap[0] = last;
+    query->nodes[last].heap = 0;
+    query->nodes[last].remaining = Distance(query->nodes[last].at, s->end) * s->cheapest;
+    s->found = MNAV_NO_NODE;
+    s->best = last;
 }
 
 // Whether a search began and may go on on this navmesh: no commit to it
@@ -425,8 +516,18 @@ mnavResult mnavContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, int32_
             s->found = n;
             continue;
         }
+        const mnavSearchNode* node = &query->nodes[n];
+        if (node->tag == s->goal[2] && node->slot == s->goal[0] && node->polygon == s->goal[1] &&
+            node->low == s->goal[3])
+        {
+            s->found = n;
+            continue;
+        }
         s->best = Nearer(query, n, s->best) ? n : s->best;
-        Expand(s, n);
+        if (s->inside == nullptr || s->inside[node->slot] != 0)
+        {
+            Expand(s, n);
+        }
     }
     *endedOut = Ended(query);
     return mnav_success;

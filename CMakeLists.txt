@@ -62,6 +62,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/modifiers.c
     src/height_patch.c
     src/heightfield.c
+    src/hierarchy.c
     src/holes.c
     src/input.c
     src/navmesh.c
@@ -121,6 +122,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(bake2d)
     maul_add_test(grid)
     maul_add_test(flow)
+    maul_add_test(hierarchy)
     maul_add_test(avoidance)
     maul_add_test(orca WHITEBOX)
     maul_add_test(obstacle WHITEBOX)

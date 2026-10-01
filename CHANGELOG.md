@@ -200,3 +200,8 @@ format.
   next cell).
 - bench/bench_main.c times flow fields over 512 by 512 cells with
   walls: about 24 ms a build for one goal, 27 ms for four.
+- Hierarchical paths (mnav-0008): hierarchy.h with mnavHierarchy,
+  mnavBuildHierarchy (clusters of tiles, a transition per run of tile
+  links leaving a cluster, edges by searches confined to a cluster) and
+  mnavFindHierarchicalPath (A* over the transitions, refined step by
+  step within one cluster at a time into an ordinary path).

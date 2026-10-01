@@ -100,6 +100,13 @@ typedef struct mnavSearch
     // The node nearest the end so far, and the end's node once found.
     int32_t best;
     int32_t found;
+    // A confined search's tiles, a flag per slot, or NULL for all; with
+    // beyond set, nodes outside are opened but never expanded.
+    const uint8_t* inside;
+    bool beyond;
+    // A node whose closing ends the search, its tag -1 for none: slot,
+    // polygon, tag and low, as a node's (mnav-0008).
+    int32_t goal[4];
 } mnavSearch;
 
 struct mnavQuery
@@ -140,5 +147,25 @@ struct mnavQuery
 // would go.
 uint32_t mnavFindNode(const mnavQuery* query, int32_t slot, int32_t polygon, int32_t tag,
                       int32_t low);
+
+// Confines the search just begun to the slots flagged in inside; with
+// beyond, nodes outside are opened but never expanded; with no end, the
+// search is Dijkstra's and never reaches the end, so that it runs until
+// its open list empties (mnav-0008).
+void mnavConfineSearch(mnavQuery* query, const uint8_t* inside, bool beyond, bool noEnd);
+
+// Aims the search at another point: the end point, and the end polygon's
+// slot and index, or -1 for an end never reached; and at the node whose
+// closing ends it, goal's tag -1 for none (mnav-0008).
+void mnavAimSearch(mnavQuery* query, mnavPos3 end, int32_t endSlot, int32_t endPolygon,
+                   const int32_t goal[4]);
+
+// Starts the search over from node n, as it was reached: keeps only the
+// nodes on its way, closed, and opens n alone (mnav-0008).
+void mnavRestartSearch(mnavQuery* query, int32_t n);
+
+// The search heuristic's scale: the cheapest included area's cost, or less
+// for a kind of link the filter crosses that costs less per meter.
+double mnavHeuristicScale(const mnavNavmesh* navmesh, const mnavQueryFilter* filter);
 
 #endif // MAUL_NAV_SRC_QUERY_H
