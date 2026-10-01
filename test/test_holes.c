@@ -129,6 +129,144 @@ static void TestTiedBridgesTakeTheLowestOutlineVertex(void)
     CHECK(memory.used == 0, "everything released");
 }
 
+// A set from an outline square of side size and the given holes, each a
+// square of side 2 by its lowest-left corner, all of region 1.
+static mnavContourSet SquareWithHoles(mnavMemory* memory, int32_t size, const int32_t* corners,
+                                      int32_t holeCount)
+{
+    mnavContourSet set = {0};
+    int32_t vertexCount = 4 + 4 * holeCount;
+    CHECK(mnavReserve(memory, (void**)&set.vertices, &set.vertexCapacity, 0, vertexCount,
+                      sizeof(mnavContourVertex), alignof(mnavContourVertex)) == mnav_success,
+          "vertices");
+    CHECK(mnavReserve(memory, (void**)&set.contours, &set.capacity, 0, 1 + holeCount,
+                      sizeof(mnavContour), alignof(mnavContour)) == mnav_success,
+          "contours");
+    const int32_t outline[8] = {0, 0, 0, size, size, size, size, 0};
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        set.vertices[k] = (mnavContourVertex){outline[2 * k], 0, outline[2 * k + 1], 0, 0};
+    }
+    set.contours[set.count++] = (mnavContour){0, 4, 1, 1, false};
+    for (int32_t h = 0; h < holeCount; ++h)
+    {
+        int32_t x = corners[2 * h];
+        int32_t z = corners[2 * h + 1];
+        // Wound the other way from the outline.
+        const int32_t ring[8] = {x, z, x + 2, z, x + 2, z + 2, x, z + 2};
+        for (int32_t k = 0; k < 4; ++k)
+        {
+            set.vertices[4 + 4 * h + k] =
+                (mnavContourVertex){ring[2 * k], 0, ring[2 * k + 1], 0, 0};
+        }
+        set.contours[set.count++] = (mnavContour){4 + 4 * h, 4, 1, 1, true};
+    }
+    set.vertexCount = vertexCount;
+    return set;
+}
+
+// Pairs of edges of a contour that cross at a point inside both.
+static int32_t ProperCrossings(const mnavContourSet* set, int32_t contour)
+{
+    const mnavContourVertex* v = set->vertices + set->contours[contour].first;
+    int32_t n = set->contours[contour].count;
+    int32_t crossings = 0;
+    for (int32_t i = 0; i < n; ++i)
+    {
+        for (int32_t j = i + 1; j < n; ++j)
+        {
+            const mnavContourVertex* a = &v[i];
+            const mnavContourVertex* b = &v[(i + 1) % n];
+            const mnavContourVertex* c = &v[j];
+            const mnavContourVertex* d = &v[(j + 1) % n];
+            int64_t abc =
+                (int64_t)(b->x - a->x) * (c->z - a->z) - (int64_t)(c->x - a->x) * (b->z - a->z);
+            int64_t abd =
+                (int64_t)(b->x - a->x) * (d->z - a->z) - (int64_t)(d->x - a->x) * (b->z - a->z);
+            int64_t cda =
+                (int64_t)(d->x - c->x) * (a->z - c->z) - (int64_t)(a->x - c->x) * (d->z - c->z);
+            int64_t cdb =
+                (int64_t)(d->x - c->x) * (b->z - c->z) - (int64_t)(b->x - c->x) * (d->z - c->z);
+            crossings += ((abc < 0 && abd > 0) || (abc > 0 && abd < 0)) &&
+                         ((cda < 0 && cdb > 0) || (cda > 0 && cdb < 0));
+        }
+    }
+    return crossings;
+}
+
+static void TestBridgeAvoidsAWaitingHole(void)
+{
+    // The first hole's nearest corner, (20, 0), lies behind the second
+    // hole; the bridge must go elsewhere and nothing may cross.
+    const int32_t corners[4] = {14, 4, 16, 1};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = SquareWithHoles(&memory, 20, corners, 2);
+    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
+    CHECK(set.count == 1 && set.droppedHoles == 0, "both holes bridged");
+    CHECK(ProperCrossings(&set, 0) == 0, "no edges cross");
+    CHECK(TwiceArea(&set, 0) == 800 - 16, "the square less both holes");
+    mnavReleaseContours(&memory, &set);
+}
+
+static void TestManyHolesNeverCross(void)
+{
+    // A grid of 25 holes: later bridges must not cross earlier ones,
+    // which are part of the outline by then.
+    int32_t corners[50];
+    for (int32_t i = 0; i < 25; ++i)
+    {
+        corners[2 * i] = 2 + 5 * (i % 5) + (i / 5) % 2;
+        corners[2 * i + 1] = 2 + 5 * (i / 5) + (i % 5) % 3;
+    }
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = SquareWithHoles(&memory, 30, corners, 25);
+    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
+    CHECK(set.count == 1 && set.droppedHoles == 0, "every hole bridged");
+    CHECK(ProperCrossings(&set, 0) == 0, "no edges cross");
+    CHECK(TwiceArea(&set, 0) == 1800 - 25 * 8, "the square less every hole");
+    mnavReleaseContours(&memory, &set);
+}
+
+static void TestBridgeNeverCrossesAnEarlierBridge(void)
+{
+    // Found by a search: the last hole's nearest candidate lies across a
+    // bridge made earlier, which is part of the outline by then.
+    const int32_t corners[6] = {16, 5, 15, 1, 12, 9};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = SquareWithHoles(&memory, 20, corners, 3);
+    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
+    CHECK(set.count == 1 && set.droppedHoles == 0, "every hole bridged");
+    CHECK(ProperCrossings(&set, 0) == 0, "no edges cross");
+    mnavReleaseContours(&memory, &set);
+}
+
+static void TestSecondBridgeTakesTheCopyFacingIt(void)
+{
+    // Both holes are nearest to corner (0, 0), 65 squared cells away,
+    // nearer than to each other: after the first bridge (0, 0) appears
+    // twice, and the second hole, below that bridge, must leave from the
+    // copy between the -Z wall and the bridge.
+    const int32_t corners[4] = {1, 8, 8, 1};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = SquareWithHoles(&memory, 40, corners, 2);
+    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
+    CHECK(set.count == 1 && set.droppedHoles == 0, "both holes bridged");
+    const mnavContourVertex* v = set.vertices + set.contours[0].first;
+    int32_t n = set.contours[0].count;
+    bool facing = false;
+    for (int32_t k = 0; k < n; ++k)
+    {
+        const mnavContourVertex* prev = &v[(k + n - 1) % n];
+        const mnavContourVertex* next = &v[(k + 1) % n];
+        if (v[k].x == 0 && v[k].z == 0 && next->x == 8 && next->z == 1)
+        {
+            facing = prev->x == 40 && prev->z == 0;
+        }
+    }
+    CHECK(facing, "the bridge to (8, 1) leaves after the -Z wall");
+    mnavReleaseContours(&memory, &set);
+}
+
 static void TestHoleWithoutOutlineIsDropped(void)
 {
     mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
@@ -195,6 +333,10 @@ int main(void)
     TestHolesMergeIntoOneContour();
     TestTiedBridgesTakeTheLowestOutlineVertex();
     TestHoleWithoutOutlineIsDropped();
+    TestBridgeAvoidsAWaitingHole();
+    TestSecondBridgeTakesTheCopyFacingIt();
+    TestManyHolesNeverCross();
+    TestBridgeNeverCrossesAnEarlierBridge();
     TestLevelMergesEveryHole();
     return s_failures == 0 ? 0 : 1;
 }
