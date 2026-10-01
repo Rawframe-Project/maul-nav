@@ -44,6 +44,7 @@ static mnavNavmesh* Load(void)
 {
     BakeWorld();
     mnavBakeDef def = mnavDefaultBakeDef();
+    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
@@ -106,11 +107,21 @@ static void TestNavmesh(const mnavNavmesh* navmesh)
               fabsf(moved.vertices[0].y - (first.y - 2.0f)) < 1e-3f &&
               fabsf(moved.vertices[0].z - (first.z + 50.0f)) < 1e-3f,
           "relative to the origin");
-    // One tile only.
+    // One tile only, at either end of the range.
     mnavDebugBuffer one = Buffer((mnavPos3){0.0, 0.0, 0.0});
     CHECK(mnavDebugNavmesh(navmesh, 1, 1, 1, 1, &one) == mnav_success &&
               Count(&one, mnav_debugTileBounds, -1) == 8 && one.vertexCount < b.vertexCount,
           "one tile");
+    one = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 0, 0, &one) == mnav_success &&
+              Count(&one, mnav_debugTileBounds, -1) == 8,
+          "the first tile");
+    // Room for every index but not every vertex: still too small.
+    mnavDebugBuffer tight = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    tight.vertexCapacity = b.vertexCount - 1;
+    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 1, 1, &tight) == mnav_errorCapacity &&
+              tight.vertexCount == b.vertexCount,
+          "one vertex short");
     mnavDebugBuffer bad = Buffer((mnavPos3){0.0, 0.0, 0.0});
     bad.lineCount = -1;
     CHECK(mnavDebugNavmesh(navmesh, 0, 0, 1, 1, &bad) == mnav_errorInvalid, "a bad count");
@@ -125,7 +136,8 @@ static void TestNavmesh(const mnavNavmesh* navmesh)
 
 static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
 {
-    mnavLinkDef both = {{5.0, 0.0, 5.0}, {9.0, 0.0, 5.0}, 1.0f, 1.0f, mnav_linkJump, true};
+    // Its start half a meter above the floor, which it snaps down to.
+    mnavLinkDef both = {{5.0, 0.5, 5.0}, {9.0, 0.0, 5.0}, 1.0f, 1.0f, mnav_linkJump, true};
     mnavLinkDef away = {{5.0, 0.0, 9.0}, {500.0, 0.0, 9.0}, 1.0f, 1.0f, mnav_linkDrop, false};
     mnavLinkId a;
     mnavLinkId c;
@@ -147,6 +159,16 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
                   : top;
     }
     CHECK(top > 0.9f && top < 1.2f, "the arc's rise");
+    mnavLinkState state;
+    CHECK(mnavGetLink(navmesh, a, &state) == mnav_success && state.attached &&
+              b.vertices[0].y == (float)state.start.y && state.start.y < 0.4,
+          "from the snapped start");
+    // A removal staged and not committed: still drawn.
+    CHECK(mnavStageLinkRemoval(navmesh, c) == mnav_success, "removal staged");
+    b = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    CHECK(mnavDebugLinks(navmesh, &b) == mnav_success && b.lineCount == 2 * 2 * 8,
+          "a link going at the next commit");
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success, "query");
@@ -171,6 +193,15 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
               b.triangleCount >= 3 * path.polygonCount &&
               Count(&b, mnav_debugCorridor, path.polygonCount - 1) > 0,
           "the corridor's fills, tagged by place");
+    // With a tile of the corridor removed, its polygons are skipped.
+    int32_t whole = b.triangleCount;
+    CHECK(mnavStageTileRemoval(navmesh, 1, 1) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "a tile removed");
+    b = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    CHECK(mnavDebugCorridor(navmesh, path.polygons, path.polygonCount, &b) == mnav_success &&
+              b.triangleCount > 0 && b.triangleCount < whole,
+          "the gone tile's polygons skipped");
     mnavPolygonId never = {9999, 1, 0};
     CHECK(mnavDebugCorridor(navmesh, &never, 1, &b) == mnav_errorInvalid, "an id never handed out");
     mnavDestroyQuery(query);
