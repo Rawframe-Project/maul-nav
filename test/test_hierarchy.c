@@ -106,7 +106,7 @@ static float BakeWorld(float shift)
 static mnavNavmesh* Load(bool backward)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierModifiers;
+    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t i = 0; i < TILES * TILES; ++i)
@@ -334,17 +334,39 @@ static uint64_t PairsHash(const mnavNavmesh* navmesh, mnavQuery* query, mnavHier
     return hash;
 }
 
+// Stages the area on polygons along z from x0 to x1, and commits.
+static void Paint(mnavNavmesh* navmesh, double x0, double x1, double z, mnavAreaType area)
+{
+    for (double x = x0; x < x1; x += 2.0)
+    {
+        mnavNearest n = On(navmesh, x, z);
+        CHECK(mnavStageArea(navmesh, n.polygon, area) == mnav_success, "staged");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+}
+
+// Updates one hierarchy and builds the other; whether they agree, and
+// the update's report.
+static bool Agree(mnavHierarchy* updated, mnavHierarchy* fresh, mnavQuery* query,
+                  mnavNavmesh* navmesh, const mnavQueryFilter* filter, mnavHierarchyReport* out)
+{
+    mnavHierarchyReport built;
+    bool ok = mnavUpdateHierarchy(updated, query, navmesh, out) == mnav_success &&
+              mnavBuildHierarchy(fresh, query, navmesh, filter, &built) == mnav_success;
+    return ok && out->transitions == built.transitions && out->edges == built.edges &&
+           PairsHash(navmesh, query, updated) == PairsHash(navmesh, query, fresh);
+}
+
 static void TestUpdates(void)
 {
-    // Area 3 costs 5 under this filter. Changing areas in one tile
-    // searches its cluster's entries again only, and gives the graph and
-    // paths a build gives; new links build it all again.
+    // Area 3 costs 5 under this filter and area 4 is left out.
     mnavNavmesh* navmesh = Load(false);
     mnavQuery* query = Query(1024);
     mnavHierarchy* updated = Hierarchy(2);
     mnavHierarchy* fresh = Hierarchy(2);
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     filter.costs[3] = 5.0f;
+    filter.areas &= ~((uint64_t)1 << 4);
     mnavHierarchyReport built;
     mnavHierarchyReport report;
     CHECK(mnavBuildHierarchy(updated, query, navmesh, &filter, &built) == mnav_success &&
@@ -353,38 +375,79 @@ static void TestUpdates(void)
     CHECK(mnavUpdateHierarchy(updated, query, navmesh, &report) == mnav_success &&
               report.searches == 0,
           "nothing to update");
-    for (double x = 70.0; x < 90.0; x += 2.0)
-    {
-        mnavNearest n = On(navmesh, x, 100.0);
-        CHECK(mnavStageArea(navmesh, n.polygon, 3) == mnav_success, "staged");
-    }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
-    mnavHierarchyReport again;
-    CHECK(mnavUpdateHierarchy(updated, query, navmesh, &report) == mnav_success &&
-              mnavBuildHierarchy(fresh, query, navmesh, &filter, &again) == mnav_success,
-          "updated and built");
-    printf("update searched %d of %d\n", report.searches, again.searches);
-    CHECK(report.searches > 0 && report.searches * 4 < again.searches &&
-              report.edges == again.edges && report.transitions == again.transitions,
-          "a few searches, the same graph");
-    CHECK(PairsHash(navmesh, query, updated) == PairsHash(navmesh, query, fresh), "the same paths");
+    // Areas changed in one tile: only its cluster's entries searched.
+    Paint(navmesh, 70.0, 90.0, 100.0, 3);
+    CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) && report.searches > 0 &&
+              report.searches * 4 < built.searches,
+          "a few searches, the same graph and paths");
+    int32_t first = report.searches;
+    // Again elsewhere: only the new change searched, as by a hierarchy
+    // that saw only that change.
+    Paint(navmesh, 150.0, 170.0, 200.0, 3);
+    mnavHierarchyReport alone;
+    CHECK(mnavUpdateHierarchy(fresh, query, navmesh, &alone) == mnav_success &&
+              Agree(updated, fresh, query, navmesh, &filter, &report) &&
+              report.searches == alone.searches && report.searches > 0,
+          "only the new change searched");
+    printf("updates searched %d and %d of %d\n", first, report.searches, built.searches);
     // A link: built again.
     mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, true};
     mnavLinkId id;
     CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
           "linked");
-    CHECK(mnavUpdateHierarchy(updated, query, navmesh, &report) == mnav_success &&
-              report.searches == report.transitions && report.transitions == again.transitions + 2,
+    CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
+              report.searches == report.transitions && report.transitions == built.transitions + 2,
           "built again for a link");
+    // The ground the link lands on left out: built again, one transition
+    // gone.
+    Paint(navmesh, 38.0, 42.0, 66.0, 4);
+    CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
+              report.searches == report.transitions && report.transitions == built.transitions + 1,
+          "built again for a landing");
+    // The link removed, then another with another cost in its place,
+    // with no update between: built again all the same.
+    CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+          "unlinked");
+    def.cost = 40.0f;
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+          "linked again");
+    CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
+              report.searches == report.transitions,
+          "built again for a link's cost");
+    // A tile replaced by another, with a block on it: built again.
+    mnavBakeDef bakeDef = mnavDefaultBakeDef();
+    mnavBaker* baker = nullptr;
+    uint8_t* bytes = malloc(CAPACITY);
+    size_t size = 0;
+    Box(170.0f, 170.0f, 180.0f, 180.0f, mnav_areaNone);
+    CHECK(mnavCreateBaker(&bakeDef, &baker).result == mnav_success &&
+              mnavBakeTile2D(baker, s_outlines, s_outlineCount, 5, 5, nullptr) == mnav_success &&
+              mnavCopyBakedTile(baker, bytes, CAPACITY, &size) == mnav_success &&
+              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "a tile replaced");
+    s_outlineCount -= 1;
+    CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
+              report.searches == report.transitions,
+          "built again for a tile");
+    // A tile removed: built again.
+    CHECK(mnavStageTileRemoval(navmesh, 7, 7) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "a tile removed");
+    CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
+              report.searches == report.transitions,
+          "built again without a tile");
     mnavNavmesh* other = Load(false);
     CHECK(mnavUpdateHierarchy(updated, query, other, &report) == mnav_errorInvalid &&
               mnavUpdateHierarchy(nullptr, query, navmesh, &report) == mnav_errorInvalid,
           "another navmesh, or none");
     mnavDestroyNavmesh(other);
+    mnavDestroyBaker(baker);
     mnavDestroyHierarchy(fresh);
     mnavDestroyHierarchy(updated);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
+    free(bytes);
 }
 
 static void TestNegativePlaces(void)
