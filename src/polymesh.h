@@ -18,6 +18,9 @@
 #define MNAV_POLYGON_VERTICES 6
 // No vertex or no polygon.
 #define MNAV_NO_INDEX 0xFFFFu
+// The region of a polygon built from more than one region; contours
+// never carry it.
+#define MNAV_MIXED_REGION 0u
 
 // A convex polygon, counter-clockwise seen from above like the rings.
 // neighbors[k] is the polygon across the edge from vertices[k] to the next
@@ -58,11 +61,20 @@ typedef struct mnavPolyMesh
     int32_t failedRings;
 } mnavPolyMesh;
 
-// Builds the polygon mesh of a tile of tileCells cells from its merged
-// contours. Returns mnav_errorLimit past maxVertices vertices or
-// maxPolygons polygons.
+// Builds the polygons of a tile of tileCells cells from its merged
+// contours, not yet linked. Returns mnav_errorLimit past maxVertices
+// vertices or maxPolygons polygons.
 mnavResult mnavBuildPolyMesh(mnavMemory* memory, const mnavContourSet* set, int32_t tileCells,
                              int32_t maxVertices, int32_t maxPolygons, mnavPolyMesh* mesh);
+
+// Merges polygons of one area pairwise into convex polygons of at most
+// MNAV_POLYGON_VERTICES vertices, the pair with the longest shared edge
+// first, the first pair in order on ties, until no pair can merge.
+// Returns the number left at the front of polygons.
+int32_t mnavMergePolygons(const mnavMeshVertex* vertices, mnavPolygon* polygons, int32_t count);
+
+// Fills each polygon's neighbors and sides, the last step of the mesh.
+mnavResult mnavLinkPolyMesh(mnavMemory* memory, mnavPolyMesh* mesh);
 
 void mnavReleasePolyMesh(mnavMemory* memory, mnavPolyMesh* mesh);
 

@@ -203,9 +203,7 @@ static void Merge(mnavPolygon* a, const mnavPolygon* b, int32_t ea, int32_t eb)
     a->count = (uint8_t)n;
 }
 
-// Merges the ring's polygons, the pair with the longest shared edge
-// first, the first pair in order on ties, until no pair can merge.
-static int32_t MergeRing(const mnavMeshVertex* vertices, mnavPolygon* polygons, int32_t count)
+int32_t mnavMergePolygons(const mnavMeshVertex* vertices, mnavPolygon* polygons, int32_t count)
 {
     for (;;)
     {
@@ -354,7 +352,7 @@ static mnavResult AddRing(Builder* builder, const mnavContourSet* set, const mna
     }
     if (result == mnav_success)
     {
-        count = MergeRing(builder->mesh->vertices, builder->polygons, count);
+        count = mnavMergePolygons(builder->mesh->vertices, builder->polygons, count);
     }
     for (int32_t p = 0; p < count && result == mnav_success; ++p)
     {
@@ -445,6 +443,10 @@ static mnavResult Link(mnavMemory* memory, mnavPolyMesh* mesh)
         {
             first[v] = -1;
         }
+        for (int32_t p = 0; p < mesh->polygonCount; ++p)
+        {
+            memset(mesh->polygons[p].neighbors, 0xFF, sizeof(mesh->polygons[p].neighbors));
+        }
         int32_t edgeCount = ListEdges(mesh, first, edges);
         MatchEdges(mesh, first, edges);
         for (int32_t e = 0; e < edgeCount; ++e)
@@ -496,6 +498,16 @@ static void MarkSides(mnavPolyMesh* mesh)
     }
 }
 
+mnavResult mnavLinkPolyMesh(mnavMemory* memory, mnavPolyMesh* mesh)
+{
+    mnavResult result = Link(memory, mesh);
+    if (result == mnav_success)
+    {
+        MarkSides(mesh);
+    }
+    return result;
+}
+
 mnavResult mnavBuildPolyMesh(mnavMemory* memory, const mnavContourSet* set, int32_t tileCells,
                              int32_t maxVertices, int32_t maxPolygons, mnavPolyMesh* mesh)
 {
@@ -518,14 +530,6 @@ mnavResult mnavBuildPolyMesh(mnavMemory* memory, const mnavContourSet* set, int3
     for (int32_t c = 0; c < set->count && result == mnav_success; ++c)
     {
         result = AddRing(&builder, set, &set->contours[c]);
-    }
-    if (result == mnav_success)
-    {
-        result = Link(memory, mesh);
-    }
-    if (result == mnav_success)
-    {
-        MarkSides(mesh);
     }
     ReleaseRing(&builder);
     mnavRelease(memory, builder.chain, (size_t)mesh->vertexCapacity, sizeof(int32_t),

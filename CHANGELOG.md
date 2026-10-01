@@ -54,3 +54,11 @@ format.
   longest shared edges, and linked to the polygons across each edge or
   marked with the tile side it lies on. A ring that cannot be finished
   keeps its triangles and is counted (N18).
+- Removing tile-border vertices (internal): a vertex where two regions
+  meet only because of the border around the tile is removed when its
+  polygons keep more than 2 edges, share one area, leave at most 2
+  edges at it unshared and the outline keeps its shape; the hole is
+  triangulated, merged and checked before any polygon changes, and a
+  vertex that cannot be replaced stays flagged (N19). Linking polygons
+  is now its own step after removal, and ear clipping refuses ears with
+  a ring vertex inside them.
