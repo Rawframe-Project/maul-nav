@@ -75,19 +75,14 @@ static int64_t RoundDivide(int64_t n, int64_t d)
     return n >= 0 ? (n + d / 2) / d : -((-n + d / 2) / d);
 }
 
-// n / d rounded down; d is positive.
-static int32_t FloorDivide(int32_t n, int32_t d)
-{
-    return n >= 0 ? n / d : -((-n + d - 1) / d);
-}
-
 // The floor's height at a point in sixteenths, near reference; the
 // reference itself, counted, when the patch has none within the radius.
+// Detail positions are never negative, as mesh vertices are not.
 static int32_t Height(Builder* builder, int32_t x, int32_t z, int32_t reference)
 {
     uint16_t h = 0;
-    if (mnavPatchHeight(&builder->patch, FloorDivide(x, SUBCELLS), FloorDivide(z, SUBCELLS),
-                        reference, builder->settings.radius, &h))
+    if (mnavPatchHeight(&builder->patch, x / SUBCELLS, z / SUBCELLS, reference,
+                        builder->settings.radius, &h))
     {
         return h;
     }

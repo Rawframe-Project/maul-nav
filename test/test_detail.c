@@ -229,6 +229,38 @@ static void TestSharedEdgeIsSampledAlike(void)
     mnavReleaseCompactField(&setup.memory, &setup.field);
 }
 
+static void TestTiesKeepTheFirstFromTheLexicalEnd(void)
+{
+    // A ridge two cells long on the square's +X edge, which runs from
+    // (3, 3) to (3, 0) in polygon order: its two samples stray equally
+    // far, and once one is kept the other is within the error. The edge
+    // is sampled from its lexically first end, (3, 0), so the sample
+    // nearer it is kept, whichever polygon samples the edge.
+    static Field hand;
+    hand = (Field){0};
+    for (int32_t z = 0; z < WIDTH; ++z)
+    {
+        for (int32_t x = 0; x < WIDTH; ++x)
+        {
+            int32_t h = x == 3 && (z == 1 || z == 2) ? 6 : 4;
+            AddSpan(&hand, x, z, h - 1, h, mnav_areaWalkable);
+        }
+    }
+    static Setup setup;
+    Prepare(&setup, &hand);
+    Rects rects;
+    InitRects(&rects);
+    AddRect(&rects, 0, 0, 3, 3);
+    mnavDetailMesh detail;
+    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
+                              (mnavDetailSettings){16, 16, 1, 0}, &detail) == mnav_success,
+          "built");
+    CHECK(detail.parts[0].vertexCount == 5 && HasVertex(&detail, 0, 48, BASE + 6, 16),
+          "the sample nearer (3, 0)");
+    mnavReleaseDetailMesh(&setup.memory, &detail);
+    mnavReleaseCompactField(&setup.memory, &setup.field);
+}
+
 static void TestNoHeightsFallBackAndCount(void)
 {
     static Field hand;
@@ -402,6 +434,7 @@ int main(void)
     TestFlatSquare();
     TestBumpOnAnEdgeIsSampled();
     TestSharedEdgeIsSampledAlike();
+    TestTiesKeepTheFirstFromTheLexicalEnd();
     TestNoHeightsFallBackAndCount();
     TestLevelDetailIsPinned();
     return s_failures == 0 ? 0 : 1;
