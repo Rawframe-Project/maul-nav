@@ -7,6 +7,7 @@
 #include "allocator.h"
 #include "navmesh.h"
 #include "test_harness.h"
+#include "tile.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
@@ -324,9 +325,114 @@ static void TestDestroyGivesEverythingBack(void)
     CHECK(s_held == 0, "all given back");
 }
 
+// A tile of one square polygon from cell (x0, 0) to (x1, 10) at its
+// place, its four corners at the heights given, -X side first: (x0, 0),
+// (x0, 10), (x1, 10), (x1, 0). Edges on the tile's sides carry them.
+static size_t HandTile(uint8_t* out, int32_t place, int32_t x0, int32_t x1, const int32_t* y)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBakeCells cells;
+    CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
+    mnavMeshVertex vertices[4] = {{(uint16_t)x0, (uint16_t)(32768 + y[0]), 0},
+                                  {(uint16_t)x0, (uint16_t)(32768 + y[1]), 10},
+                                  {(uint16_t)x1, (uint16_t)(32768 + y[2]), 10},
+                                  {(uint16_t)x1, (uint16_t)(32768 + y[3]), 0}};
+    mnavPolygon polygon = {
+        {0, 1, 2, 3, 0xFFFF, 0xFFFF}, {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF}, {0}, 4, 1, 0};
+    polygon.sides[0] = x0 == 0 ? 1 : 0;
+    polygon.sides[2] = x1 == def.tileCells ? 3 : 0;
+    polygon.sides[3] = 4;
+    uint8_t removable[4] = {0};
+    mnavPolyMesh mesh = {vertices, removable, 4, 4, &polygon, 1, 1, def.tileCells, 0};
+    mnavDetailVertex detailVertices[4];
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        detailVertices[k] =
+            (mnavDetailVertex){vertices[k].x * 16, vertices[k].y, vertices[k].z * 16};
+    }
+    mnavDetailPart part = {0, 0, 4, 2};
+    mnavDetailTriangle triangles[2] = {{{0, 1, 2}, 0}, {{0, 2, 3}, 0}};
+    mnavDetailMesh detail = {&part, 1, detailVertices, 4, 4, triangles, 2, 2, 0, 0, 0};
+    mnavTileInfo info = {mnavGetVersion(),
+                         0,
+                         place,
+                         0,
+                         def.tileCells,
+                         def.cellSize,
+                         def.cellHeight,
+                         cells.agentHeight,
+                         cells.agentRadius,
+                         cells.agentStep,
+                         def.origin};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    CHECK(mnavEncodeTile(&memory, &info, &mesh, &detail, &bytes, &size) == mnav_success, "encoded");
+    memcpy(out, bytes, size);
+    mnavReleaseTileBytes(&memory, bytes, size);
+    return size;
+}
+
+// The links between hand tiles (0, 0) and (1, 0) facing each other, the
+// left one's +X edge at heights left, the right one's -X edge at right.
+static int32_t HandLinks(const int32_t* left, const int32_t* right)
+{
+    static uint8_t a[1024];
+    static uint8_t b[1024];
+    const int32_t flatLeft[4] = {0, 0, left[1], left[0]};
+    const int32_t flatRight[4] = {right[0], right[1], 0, 0};
+    size_t sizeA = HandTile(a, 0, 100, 128, flatLeft);
+    size_t sizeB = HandTile(b, 1, 0, 20, flatRight);
+    mnavNavmesh* navmesh = Make();
+    CHECK(mnavStageTile(navmesh, a, sizeA).result == mnav_success &&
+              mnavStageTile(navmesh, b, sizeB).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "hand tiles committed");
+    int32_t links = Links(navmesh, 0, 0);
+    CHECK(links == Links(navmesh, 1, 0) && Symmetric(navmesh), "both ways");
+    mnavDestroyNavmesh(navmesh);
+    return links;
+}
+
+static void TestLinksNeedHeightsWithinAStepAtBothEnds(void)
+{
+    // The agent's step is 6 cell heights. Heights are (z = 0, z = 10).
+    const int32_t flat[2] = {0, 0};
+    const int32_t step[2] = {6, 6};
+    const int32_t past[2] = {7, 7};
+    const int32_t rising[2] = {0, 7};
+    CHECK(HandLinks(flat, flat) == 1, "level edges link");
+    CHECK(HandLinks(flat, step) == 1, "exactly a step apart links");
+    CHECK(HandLinks(flat, past) == 0, "past a step does not");
+    CHECK(HandLinks(flat, rising) == 0, "close at one end only does not");
+    CHECK(HandLinks(rising, rising) == 1, "the same slope links");
+}
+
+static void TestSlotAboutToWrapIsRetired(void)
+{
+    mnavNavmesh* navmesh = Make();
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "one");
+    navmesh->slots[0].generation = UINT32_MAX;
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "again");
+    mnavTileId id;
+    CHECK(mnavGetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 2 && id.generation == 1,
+          "a new slot");
+    CHECK(navmesh->slots[0].retired && navmesh->slots[0].tile == nullptr, "the old one retired");
+    CHECK(mnavStageTileRemoval(navmesh, 0, 0) == mnav_success &&
+              StageAt(navmesh, 1) == mnav_success && mnavCommit(navmesh) == mnav_success,
+          "slot 2 freed, another tile");
+    // Slot 2 freed by the removal goes to the new tile two generations on,
+    // so the removed tile's ids stay stale; slot 1 stays retired.
+    CHECK(mnavGetTile(navmesh, 1, 0, &id) == mnav_success && id.slot == 2 && id.generation == 3,
+          "the lowest free slot, never the retired one");
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     BakeWorld();
+    TestLinksNeedHeightsWithinAStepAtBothEnds();
+    TestSlotAboutToWrapIsRetired();
     TestStagedTilesAppearAtCommit();
     TestNeighborsLinkBothWays();
     TestReplacingAndRemovingMakeIdsStale();
