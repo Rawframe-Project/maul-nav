@@ -70,6 +70,7 @@ static mnavTriangleMesh World(void)
 static mnavNavmesh* Load(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
+    def.tier = mnav_tierModifiers;
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     mnavTriangleMesh world = World();
@@ -140,7 +141,7 @@ static void TestHeights(const mnavNavmesh* navmesh)
           "bad arguments");
 }
 
-static void TestWalls(const mnavNavmesh* navmesh)
+static void TestWalls(mnavNavmesh* navmesh)
 {
     // West of the block from x = 30, which the navmesh keeps a radius from.
     mnavQuery* query = Query(4096);
@@ -168,6 +169,39 @@ static void TestWalls(const mnavNavmesh* navmesh)
                   mnav_success &&
               wall.found && wall.distance < 2.0,
           "the polygon's own edges as walls");
+    // A small radius needs few nodes.
+    mnavQuery* few = Query(16);
+    CHECK(mnavFindWallDistance(few, navmesh, nullptr, n.polygon, n.point, 3.0, &wall) ==
+                  mnav_success &&
+              !wall.limited,
+          "a small radius, a small search");
+    mnavDestroyQuery(few);
+    // Across the tile side at x = 32, an area the filter leaves out: the
+    // side is a wall.
+    mnavNearest near = On(navmesh, 30.0, 25.0);
+    mnavPolygonId across[16];
+    mnavFound found;
+    CHECK(mnavFindPolygons(navmesh, nullptr, (mnavPos3){32.5, 1.6, 25.0},
+                           (mnavVec3){0.4f, 1.0f, 6.0f}, across, 16, &found) == mnav_success &&
+              found.count > 0 && found.count <= 16,
+          "the polygons beyond the side");
+    for (int32_t i = 0; i < found.count; ++i)
+    {
+        CHECK(mnavStageArea(navmesh, across[i], 3) == mnav_success, "painted");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    mnavQueryFilter without = mnavDefaultQueryFilter();
+    without.areas &= ~((uint64_t)1 << 3);
+    CHECK(mnavFindWallDistance(query, navmesh, &without, near.polygon, near.point, 6.0, &wall) ==
+                  mnav_success &&
+              wall.found && fabs(wall.point.x - 32.0) < 1e-6 &&
+              fabs(wall.distance - (32.0 - near.point.x)) < 1e-6,
+          "the tile side as a wall");
+    for (int32_t i = 0; i < found.count; ++i)
+    {
+        CHECK(mnavStageArea(navmesh, across[i], mnav_areaWalkable) == mnav_success, "painted back");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     mnavQuery* tiny = Query(2);
     CHECK(mnavFindWallDistance(tiny, navmesh, nullptr, n.polygon, n.point, 60.0, &wall) ==
                   mnav_success &&
