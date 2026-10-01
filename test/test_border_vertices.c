@@ -192,6 +192,25 @@ static void TestPolygonsTouchingOnlyAtTheVertexStay(void)
     Finish(&memory, &set, &mesh);
 }
 
+static void TestVertexAtTheEndOfASlitStays(void)
+{
+    // Four triangles fanned round (5, 5) from (10, 5) to (15, 5): the
+    // outline runs in along a slit to (5, 5) and out again, so the chain's
+    // ends are in line with the vertex but both on one side of it.
+    const int32_t points[24] = {5, 5, 10, 5, 5, 0,  5, 5, 5, 0,  0,  5,
+                                5, 5, 0,  5, 5, 10, 5, 5, 5, 10, 15, 5};
+    const int32_t counts[4] = {3, 3, 3, 3};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = Rings(&memory, points, counts, 4);
+    Flag(&set, 5, 5);
+    mnavPolyMesh mesh;
+    CHECK(mnavBuildPolyMesh(&memory, &set, 20, 100, 100, &mesh) == mnav_success, "built");
+    int64_t area = TwiceArea(&mesh);
+    CHECK(mnavRemoveBorderVertices(&memory, &mesh, 100) == mnav_success, "ran");
+    CHECK(HasVertex(&mesh, 5, 5) && TwiceArea(&mesh) == area, "the vertex and the area stay");
+    Finish(&memory, &set, &mesh);
+}
+
 static void TestCornerOfTheOutlineStays(void)
 {
     // A square and a triangle meeting at x = 5; the outline turns at
@@ -320,6 +339,7 @@ int main(void)
     TestDifferentAreasStay();
     TestPolygonsTouchingOnlyAtTheVertexStay();
     TestCornerOfTheOutlineStays();
+    TestVertexAtTheEndOfASlitStays();
     TestRampLevelLosesItsBorderVertex();
     return s_failures == 0 ? 0 : 1;
 }
