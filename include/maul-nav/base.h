@@ -62,7 +62,7 @@ extern "C"
         // The call did what was asked.
         mnav_success = 0,
         // An argument is invalid: a null pointer where one is required, a
-        // value out of range.
+        // value out of range, data that is malformed.
         mnav_errorInvalid = -1,
         // A caller buffer is too small for the result, or the allocator
         // failed.
@@ -73,6 +73,9 @@ extern "C"
         // A coordinate is finite but lies past what the library can
         // represent in the frame it belongs to.
         mnav_errorRange = -4,
+        // Data was written in a format version this library does not
+        // read.
+        mnav_errorVersion = -5,
     };
 
     // A library version: major, minor and patch.

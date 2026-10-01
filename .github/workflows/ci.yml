@@ -108,3 +108,28 @@ jobs:
         # The static library's size, reported, not gated (family record
         # 0013).
         run: stat -c '%s bytes' build/libmaul-nav.a
+
+  # Each fuzz target runs for one minute on every push, over the bytes
+  # programs load and hand the library, from its seed.
+  fuzz:
+    name: fuzz
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compilers
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q clang-20 ninja-build
+      - name: Build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -D${PREFIX}_FUZZ=ON \
+            -D${PREFIX}_WERROR=ON
+          cmake --build build
+      - name: Run
+        run: |
+          mkdir -p corpus-fuzz_tile
+          build/test_tile --seed corpus-fuzz_tile/level.tile
+          for target in build/fuzz_*; do
+            mkdir -p "corpus-$(basename $target)"
+            "$target" -max_total_time=60 "corpus-$(basename $target)"
+          done

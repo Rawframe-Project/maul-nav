@@ -22,6 +22,7 @@ option(MAUL_NAV_WERROR "Treat compiler warnings as errors" OFF)
 option(MAUL_NAV_SANITIZE "Instrument with AddressSanitizer and UBSan" OFF)
 option(MAUL_NAV_TSAN "Instrument with ThreadSanitizer" OFF)
 option(MAUL_NAV_COVERAGE "Instrument for gcov coverage" OFF)
+option(MAUL_NAV_FUZZ "Build the libFuzzer targets (Clang)" OFF)
 
 # Every executable (tests, benchmarks, tools) lands in the top of the
 # build tree, so scripts and CI find them in one place.
@@ -61,6 +62,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/region.c
     src/scalar.c
     src/sort.c
+    src/tile.c
     src/triangulate.c)
 maul_configure_library(maul-nav)
 # floor, ceil, fabs and sqrt, the exactly rounded functions the library
@@ -85,7 +87,27 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)
+    maul_add_test(tile WHITEBOX)
     maul_add_header_tests()
+endif()
+
+# The fuzz targets: test/fuzz_<area>.c, run as fuzz_<area> <corpus dir>,
+# over the bytes programs load and hand the library. test_tile --seed
+# <file> writes fuzz_tile's seed.
+if(MAUL_NAV_FUZZ)
+    # The library is instrumented too: its coverage guides libFuzzer, and
+    # the sanitizers watch its code, not only the targets'.
+    target_compile_options(maul-nav PRIVATE -fsanitize=fuzzer-no-link,address,undefined)
+    target_link_options(maul-nav PUBLIC -fsanitize=address,undefined)
+    foreach(area tile)
+        add_executable(fuzz_${area} test/fuzz_${area}.c)
+        target_link_libraries(fuzz_${area} PRIVATE maul-nav)
+        # The targets reach the library's own functions.
+        target_include_directories(fuzz_${area} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+        maul_apply_flags(fuzz_${area})
+        target_compile_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
+        target_link_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
+    endforeach()
 endif()
 
 if(MAUL_NAV_BUILD_BENCH AND EXISTS ${PROJECT_SOURCE_DIR}/bench/bench_main.c)

@@ -86,3 +86,15 @@ format.
   vertices (counted); each insertion restores the Delaunay property
   round the new vertex, and only samples in changed triangles are
   measured again (N20).
+- mnav_errorVersion: data written in a format version this library does
+  not read.
+- The tile format (internal): a baked tile's polygon and detail meshes
+  as little-endian integers behind a versioned header with the
+  generator's version, the bake's input fingerprint and a payload
+  hash; nothing derivable is stored. The loader reads field by field,
+  checks every count against its cap and the bytes left before
+  allocating, then the mesh itself (convex polygons, walkable areas,
+  neighbors that link back, tile sides, detail indices), and names the
+  section and element it refuses (N21). A libFuzzer target,
+  fuzz_tile, runs with MAUL_NAV_FUZZ; test_tile --seed writes its
+  seed.
