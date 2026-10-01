@@ -7,6 +7,7 @@
 
 #include "allocator.h"
 #include "contour.h"
+#include "planar.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -37,57 +38,6 @@ typedef struct Merger
     int32_t candidateCapacity;
 } Merger;
 
-// Twice the signed area of triangle (a, b, c) on the ground.
-static int64_t Area2(const mnavContourVertex* a, const mnavContourVertex* b,
-                     const mnavContourVertex* c)
-{
-    return (int64_t)(b->x - a->x) * (c->z - a->z) - (int64_t)(c->x - a->x) * (b->z - a->z);
-}
-
-static bool Left(const mnavContourVertex* a, const mnavContourVertex* b, const mnavContourVertex* c)
-{
-    return Area2(a, b, c) < 0;
-}
-
-static bool LeftOn(const mnavContourVertex* a, const mnavContourVertex* b,
-                   const mnavContourVertex* c)
-{
-    return Area2(a, b, c) <= 0;
-}
-
-static bool SameGround(const mnavContourVertex* a, const mnavContourVertex* b)
-{
-    return a->x == b->x && a->z == b->z;
-}
-
-// Whether c lies on the closed segment ab.
-static bool Between(const mnavContourVertex* a, const mnavContourVertex* b,
-                    const mnavContourVertex* c)
-{
-    if (Area2(a, b, c) != 0)
-    {
-        return false;
-    }
-    if (a->x != b->x)
-    {
-        return (a->x <= c->x && c->x <= b->x) || (a->x >= c->x && c->x >= b->x);
-    }
-    return (a->z <= c->z && c->z <= b->z) || (a->z >= c->z && c->z >= b->z);
-}
-
-// Whether segments ab and cd meet, properly or at an end.
-static bool Intersect(const mnavContourVertex* a, const mnavContourVertex* b,
-                      const mnavContourVertex* c, const mnavContourVertex* d)
-{
-    bool improper =
-        Area2(a, b, c) == 0 || Area2(a, b, d) == 0 || Area2(c, d, a) == 0 || Area2(c, d, b) == 0;
-    if (!improper && (Left(a, b, c) != Left(a, b, d)) && (Left(c, d, a) != Left(c, d, b)))
-    {
-        return true;
-    }
-    return Between(a, b, c) || Between(a, b, d) || Between(c, d, a) || Between(c, d, b);
-}
-
 // Whether segment d0 d1 crosses an edge of a contour, skipping the edges
 // at vertex skip (or none for -1) and edges sharing an end with it.
 static bool CrossesContour(const mnavContourVertex* d0, const mnavContourVertex* d1, int32_t skip,
@@ -98,9 +48,9 @@ static bool CrossesContour(const mnavContourVertex* d0, const mnavContourVertex*
         int32_t k1 = (k + 1) % count;
         const mnavContourVertex* p0 = &vertices[k];
         const mnavContourVertex* p1 = &vertices[k1];
-        bool incident = k == skip || k1 == skip || SameGround(d0, p0) || SameGround(d1, p0) ||
-                        SameGround(d0, p1) || SameGround(d1, p1);
-        if (!incident && Intersect(d0, d1, p0, p1))
+        bool incident = k == skip || k1 == skip || mnavSameGround(d0, p0) ||
+                        mnavSameGround(d1, p0) || mnavSameGround(d0, p1) || mnavSameGround(d1, p1);
+        if (!incident && mnavIntersect(d0, d1, p0, p1))
         {
             return true;
         }
@@ -112,14 +62,8 @@ static bool CrossesContour(const mnavContourVertex* d0, const mnavContourVertex*
 static bool InCone(const mnavContourVertex* vertices, int32_t count, int32_t i,
                    const mnavContourVertex* p)
 {
-    const mnavContourVertex* at = &vertices[i];
-    const mnavContourVertex* next = &vertices[(i + 1) % count];
-    const mnavContourVertex* prev = &vertices[(i + count - 1) % count];
-    if (LeftOn(prev, at, next))
-    {
-        return Left(at, p, prev) && Left(p, at, next);
-    }
-    return !(LeftOn(at, p, next) && LeftOn(p, at, prev));
+    return mnavInCone(&vertices[(i + count - 1) % count], &vertices[i], &vertices[(i + 1) % count],
+                      p, false);
 }
 
 static const mnavContourVertex* VerticesOf(const mnavContourSet* set, int32_t contour)

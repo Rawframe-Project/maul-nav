@@ -15,4 +15,7 @@ sort:
 region: allocator compact sort
 invariant:
 contour: allocator compact invariant region
-holes: allocator contour
+holes: allocator contour planar
+planar: contour
+triangulate: contour planar
+polymesh: allocator contour triangulate

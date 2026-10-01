@@ -51,10 +51,13 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/heightfield.c
     src/holes.c
     src/input.c
+    src/planar.c
+    src/polymesh.c
     src/raster.c
     src/region.c
     src/scalar.c
-    src/sort.c)
+    src/sort.c
+    src/triangulate.c)
 maul_configure_library(maul-nav)
 # floor, ceil, fabs and sqrt, the exactly rounded functions the library
 # takes from libm (mnav-0001).
@@ -71,6 +74,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(filter WHITEBOX)
     maul_add_test(heightfield WHITEBOX)
     maul_add_test(holes WHITEBOX)
+    maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)
     maul_add_header_tests()

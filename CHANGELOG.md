@@ -48,3 +48,9 @@ format.
   outline left to right through the nearest vertex whose diagonal
   crosses nothing, every tie broken by an index, and a hole that cannot
   be bridged is dropped and counted for the bake report (N17).
+- The polygon mesh (internal): each region's ring cut into triangles by
+  ear clipping, shortest diagonal first, its vertices welded across the
+  tile, merged into convex polygons of at most 6 vertices along their
+  longest shared edges, and linked to the polygons across each edge or
+  marked with the tile side it lies on. A ring that cannot be finished
+  keeps its triangles and is counted (N18).
