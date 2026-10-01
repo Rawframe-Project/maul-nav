@@ -30,6 +30,15 @@ static void TestDefaultDefIsValid(void)
     CHECK(cells.minRegion == 32, "2 square meters of 0.0625 is 32 cells");
     CHECK(cells.edgeError == 1.2f, "0.3 m is 1.2 cells");
     CHECK(cells.edgeLength == 48, "12 m is 48 cells");
+    CHECK(cells.detailSample == 96, "1.5 m is 96 sixteenths of a cell");
+    CHECK(cells.detailError == 16, "0.125 m is 16 sixteenths of a cell height");
+    mnavBakeDef fine = mnavDefaultBakeDef();
+    fine.detailSampleDistance = 0.1f;
+    CHECK(mnavValidateBakeDef(&fine, &cells).result == mnav_success && cells.detailSample == 16,
+          "a sample distance under a cell is one cell");
+    fine.detailSampleDistance = 0.0f;
+    CHECK(mnavValidateBakeDef(&fine, &cells).result == mnav_success && cells.detailSample == 0,
+          "0 for no samples");
     CHECK(cells.cosMaxSlope > 0.707106f && cells.cosMaxSlope < 0.707107f, "cos 45");
 }
 
@@ -115,6 +124,15 @@ static void TestAgentSettingsAreChecked(void)
     broken = def;
     broken.maxEdgeLength = NAN;
     CHECK(Refuses(broken, mnav_settingMaxEdgeLength), "NaN edge length");
+    broken = def;
+    broken.detailSampleDistance = -1.0f;
+    CHECK(Refuses(broken, mnav_settingDetailSampleDistance), "negative sample distance");
+    broken = def;
+    broken.detailSampleDistance = INFINITY;
+    CHECK(Refuses(broken, mnav_settingDetailSampleDistance), "infinite sample distance");
+    broken = def;
+    broken.detailMaxError = NAN;
+    CHECK(Refuses(broken, mnav_settingDetailMaxError), "NaN detail error");
 }
 
 static void TestMetersSnapToCells(void)

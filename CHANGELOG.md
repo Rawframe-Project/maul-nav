@@ -69,3 +69,13 @@ format.
   height takes the nearest height in the first ring of cells that has
   one, and says so when none is within its radius rather than
   returning a marker as a height (N20).
+- Two bake settings, detailSampleDistance (1.5 m, 0 for none) and
+  detailMaxError (0.125 m), with mnav_settingDetailSampleDistance and
+  mnav_settingDetailMaxError; mnavBakeCells reports them in sixteenths
+  of a cell and of a cell height.
+- The detail mesh's outline (internal): each polygon edge sampled from
+  its lexically first end at most a sample distance apart, at most 20
+  samples, heights from the height patch, samples within the maximum
+  error dropped, and the outline triangulated; all in sixteenths of a
+  cell with integer arithmetic, so both sides of an edge get the same
+  points and the result is the same on every platform (N20).

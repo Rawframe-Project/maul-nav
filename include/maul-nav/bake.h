@@ -122,6 +122,13 @@ extern "C"
         float maxEdgeError;
         // The longest wall edge, in meters, at least 0; 0 for no limit.
         float maxEdgeLength;
+        // How far apart the detail mesh samples the floor's height along
+        // polygon edges and inside polygons, in meters, at least 0; 0 for
+        // none, and at least one cell otherwise.
+        float detailSampleDistance;
+        // How far the detail surface may stray from a sampled height, in
+        // meters, at least 0.
+        float detailMaxError;
         // The limits on the work.
         mnavBakeLimits limits;
     } mnavBakeDef;
@@ -153,6 +160,8 @@ extern "C"
         mnav_settingMinRegionArea = 19,
         mnav_settingMaxEdgeError = 20,
         mnav_settingMaxEdgeLength = 21,
+        mnav_settingDetailSampleDistance = 22,
+        mnav_settingDetailMaxError = 23,
     };
 
     // A def check's outcome: the status, and the first setting it refused.
@@ -188,6 +197,12 @@ extern "C"
         // The maximum wall edge length, in cells, rounded down; 0 for no
         // limit.
         int32_t edgeLength;
+        // The detail sample distance, in sixteenths of a cell, rounded
+        // down; 0 for none, at least 16 otherwise.
+        int32_t detailSample;
+        // The detail maximum error, in sixteenths of a cell height,
+        // rounded down.
+        int32_t detailError;
     } mnavBakeCells;
 
     // A triangle mesh in a bake's input.
@@ -231,7 +246,9 @@ extern "C"
     /// Returns the default bake def: cells of 0.25 m by 0.125 m, tiles of
     /// 128 cells, an agent 0.5 m in radius and 2 m tall that steps 0.75 m
     /// and walks slopes up to 45 degrees, regions of at least 2 square
-    /// meters, and limits sized for a large level.
+    /// meters, walls within 0.3 m of the cells and at most 12 m long,
+    /// detail samples every 1.5 m within 0.125 m, and limits sized for a
+    /// large level.
     ///
     /// @return The def, with a valid cookie.
     /// @par Thread safety

@@ -35,6 +35,8 @@ mnavBakeDef mnavDefaultBakeDef(void)
     def.minRegionArea = 2.0f;
     def.maxEdgeError = 0.3f;
     def.maxEdgeLength = 12.0f;
+    def.detailSampleDistance = 1.5f;
+    def.detailMaxError = 0.125f;
     def.limits.inputTriangles = 4194304;
     def.limits.tileTriangles = 1048576;
     def.limits.tileSpans = 4194304;
@@ -166,6 +168,25 @@ static mnavBakeSetting ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cells
         !mnavToCells(def->maxEdgeLength, def->cellSize, false, 1 << 30, &cells->edgeLength))
     {
         return mnav_settingMaxEdgeLength;
+    }
+    // Sixteenths of a cell and of a cell height are exact: the division
+    // only lowers the exponent.
+    if (!InRange(def->detailSampleDistance, 0.0f, INFINITY) ||
+        !mnavToCells(def->detailSampleDistance, def->cellSize / 16.0f, false, 1 << 30,
+                     &cells->detailSample))
+    {
+        return mnav_settingDetailSampleDistance;
+    }
+    // Heights come one per cell; sampling closer than a cell adds nothing.
+    if (cells->detailSample > 0 && cells->detailSample < 16)
+    {
+        cells->detailSample = 16;
+    }
+    if (!InRange(def->detailMaxError, 0.0f, INFINITY) ||
+        !mnavToCells(def->detailMaxError, def->cellHeight / 16.0f, false, 1 << 30,
+                     &cells->detailError))
+    {
+        return mnav_settingDetailMaxError;
     }
     cells->border = cells->agentRadius + BORDER_MARGIN_CELLS;
     cells->cosMaxSlope = mnavCosDegrees(agent->maxSlopeDegrees);
