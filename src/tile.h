@@ -14,6 +14,7 @@
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/navmesh.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -38,30 +39,6 @@ typedef struct mnavTileInfo
     int32_t agentStep;
     mnavPos3 origin;
 } mnavTileInfo;
-
-// The part of a tile a load refused.
-typedef uint8_t mnavTileSection;
-
-enum
-{
-    mnav_tileHeader = 0,
-    mnav_tileVertices = 1,
-    mnav_tilePolygons = 2,
-    mnav_tileDetailParts = 3,
-    mnav_tileDetailVertices = 4,
-    mnav_tileDetailTriangles = 5,
-    // The payload's size or hash.
-    mnav_tilePayload = 6,
-};
-
-// A load's outcome: the status, and the section and element refused (-1
-// for the section as a whole).
-typedef struct mnavTileResult
-{
-    mnavResult result;
-    mnavTileSection section;
-    int32_t index;
-} mnavTileResult;
 
 // The payload's hash is mnavHash64 over its bytes with eight-byte words
 // read little-endian, which is what mnavHash64 computes on every platform

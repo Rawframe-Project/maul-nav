@@ -1,0 +1,155 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// The navmesh queries read: tiles loaded from baked bytes, staged and
+// committed together, their polygons named by generation-checked ids and
+// linked across the tiles' shared sides (mnav-0004).
+
+#ifndef MAUL_NAV_NAVMESH_H
+#define MAUL_NAV_NAVMESH_H
+
+#include "maul-nav/bake.h"
+#include "maul-nav/base.h"
+
+#include <stddef.h>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+    // A navmesh. Made by mnavCreateNavmesh.
+    typedef struct mnavNavmesh mnavNavmesh;
+
+    // A tile in a navmesh: its 1-based slot (0 for none) and the slot's
+    // generation, which changes whenever the slot's tile does.
+    typedef struct mnavTileId
+    {
+        uint32_t slot;
+        uint32_t generation;
+    } mnavTileId;
+
+    // A polygon: its tile's slot and generation and its index there.
+    typedef struct mnavPolygonId
+    {
+        uint32_t slot;
+        uint32_t generation;
+        uint32_t polygon;
+    } mnavPolygonId;
+
+    // The part of tile bytes a load refused.
+    typedef uint8_t mnavTileSection;
+
+    enum
+    {
+        mnav_tileHeader = 0,
+        mnav_tileVertices = 1,
+        mnav_tilePolygons = 2,
+        mnav_tileDetailParts = 3,
+        mnav_tileDetailVertices = 4,
+        mnav_tileDetailTriangles = 5,
+        // The payload's size or hash.
+        mnav_tilePayload = 6,
+    };
+
+    // A tile load's outcome: the status, and the section and element
+    // refused (-1 for the section as a whole).
+    typedef struct mnavTileResult
+    {
+        mnavResult result;
+        mnavTileSection section;
+        int32_t index;
+    } mnavTileResult;
+
+    /// Makes an empty navmesh for tiles baked with a def: checks the def
+    /// and keeps a copy, its allocator and its limits.
+    ///
+    /// @param def          The def the tiles are baked with.
+    /// @param navmeshOut   Receives the navmesh, or NULL on failure.
+    /// @return `mnav_success`; `mnav_errorInvalid` with the setting for an
+    /// invalid def or a NULL argument; `mnav_errorLimit` when the navmesh
+    /// does not fit the def's memory limit; `mnav_errorCapacity` when the
+    /// allocator fails.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavCreateNavmesh(const mnavBakeDef* def,
+                                                                mnavNavmesh** navmeshOut);
+
+    /// Destroys a navmesh, its tiles and everything staged.
+    ///
+    /// @param navmesh  The navmesh, or NULL.
+    /// @par Thread safety
+    /// Safe from any thread; the navmesh is used by one thread at a time.
+    MNAV_API void mnavDestroyNavmesh(mnavNavmesh* navmesh);
+
+    /// Loads tile bytes, checking every field as hostile input and the
+    /// tile's settings against the navmesh's def, and stages the tile for
+    /// the next commit, in place of anything staged at its place before.
+    /// Queries do not see it until the commit.
+    ///
+    /// @param navmesh  The navmesh.
+    /// @param bytes    The tile's bytes, as mnavCopyBakedTile gives them.
+    /// @param size     Their size in bytes.
+    /// @return `mnav_success`; `mnav_errorInvalid` naming the section and
+    /// element for malformed bytes, a tile baked with other settings
+    /// (the header) or a NULL argument; `mnav_errorVersion` for another
+    /// tile format version; `mnav_errorLimit` past the memory limit;
+    /// `mnav_errorCapacity` when the allocator fails.
+    /// @par Thread safety
+    /// Safe from any thread; the navmesh is used by one thread at a time.
+    /// Staging changes nothing queries read, but it may not run beside
+    /// another call that stages or commits.
+    MNAV_NODISCARD MNAV_API mnavTileResult mnavStageTile(mnavNavmesh* navmesh, const uint8_t* bytes,
+                                                         size_t size);
+
+    /// Stages the removal of the tile at a place for the next commit, in
+    /// place of anything staged there before.
+    ///
+    /// @param navmesh  The navmesh.
+    /// @param tileX    The tile's column.
+    /// @param tileZ    The tile's row.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
+    /// `mnav_errorLimit` past the memory limit; `mnav_errorCapacity` when
+    /// the allocator fails.
+    /// @par Thread safety
+    /// Safe from any thread; the navmesh is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX,
+                                                            int32_t tileZ);
+
+    /// Applies everything staged at once: installs and removes the tiles
+    /// and links every polygon on a changed tile's sides to the polygons
+    /// across them. Either all of it applies or, on failure, nothing does
+    /// and the staged changes stay. A replaced or removed tile's ids
+    /// become stale.
+    ///
+    /// @param navmesh  The navmesh.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
+    /// `mnav_errorLimit` when the tiles would pass the tiles limit, a tile
+    /// its tileLinks limit, or memory its limit; `mnav_errorCapacity` when
+    /// the allocator fails.
+    /// @par Thread safety
+    /// Safe from any thread; the navmesh is used by one thread at a time,
+    /// so no query may run during a commit.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCommit(mnavNavmesh* navmesh);
+
+    /// Finds the tile at a place.
+    ///
+    /// @param navmesh  The navmesh.
+    /// @param tileX    The tile's column.
+    /// @param tileZ    The tile's row.
+    /// @param tileOut  Receives the tile's id, or a zeroed id.
+    /// @return `mnav_success`; `mnav_errorNotLoaded` when no tile is
+    /// committed there; `mnav_errorInvalid` for a NULL argument.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may find tiles and
+    /// query at once between commits; none may while a stage or commit
+    /// call runs.
+    MNAV_NODISCARD MNAV_API mnavResult mnavGetTile(const mnavNavmesh* navmesh, int32_t tileX,
+                                                   int32_t tileZ, mnavTileId* tileOut);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // MAUL_NAV_NAVMESH_H

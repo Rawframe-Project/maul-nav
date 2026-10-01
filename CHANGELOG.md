@@ -103,3 +103,11 @@ format.
   stage, refused input, counts, memory peak, work given up) and
   mnavBakeStage; MNAV_TILE_FORMAT. A tile carries a fingerprint of the
   input that reaches it.
+- The navmesh (mnav-0004): mnavCreateNavmesh, mnavDestroyNavmesh,
+  mnavStageTile, mnavStageTileRemoval, mnavCommit and mnavGetTile in
+  the new header maul-nav/navmesh.h, with mnavTileId, mnavPolygonId,
+  mnavTileSection and mnavTileResult; mnav_errorNotLoaded. A commit
+  applies everything staged or nothing, replaced and removed tiles'
+  ids go stale through their slot's generation, and polygons on facing
+  tile sides are linked wherever their edges overlap within the agent's
+  step, computed exactly.

@@ -26,6 +26,8 @@ const char* mnavResultName(mnavResult result)
         return "mnav_errorRange";
     case mnav_errorVersion:
         return "mnav_errorVersion";
+    case mnav_errorNotLoaded:
+        return "mnav_errorNotLoaded";
     default:
         return "unknown result";
     }

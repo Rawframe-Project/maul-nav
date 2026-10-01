@@ -76,6 +76,9 @@ extern "C"
         // Data was written in a format version this library does not
         // read.
         mnav_errorVersion = -5,
+        // The place asked about has no tile loaded: not a wall, nothing
+        // is known there.
+        mnav_errorNotLoaded = -6,
     };
 
     // A library version: major, minor and patch.
