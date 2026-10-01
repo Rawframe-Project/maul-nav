@@ -50,28 +50,46 @@ static mnavTerrain Terrain(void)
 // The same cells as a triangle mesh, split and wound as the terrain is.
 static mnavTriangleMesh Mesh(const mnavTerrain* t)
 {
-    for (int32_t r = 0; r < SIDE; ++r)
+    int32_t w = t->columns;
+    for (int32_t r = 0; r < t->rows; ++r)
     {
-        for (int32_t c = 0; c < SIDE; ++c)
+        for (int32_t c = 0; c < w; ++c)
         {
-            s_vertices[r * SIDE + c] =
+            s_vertices[r * w + c] =
                 (mnavVec3){(float)((double)t->origin.x + (double)c * (double)t->spacingX),
-                           (float)((double)t->origin.y + (double)t->heights[r * SIDE + c]),
+                           (float)((double)t->origin.y + (double)t->heights[r * w + c]),
                            (float)((double)t->origin.z + (double)r * (double)t->spacingZ)};
         }
     }
     int32_t n = 0;
-    for (int32_t r = 0; r + 1 < SIDE; ++r)
+    for (int32_t r = 0; r + 1 < t->rows; ++r)
     {
-        for (int32_t c = 0; c + 1 < SIDE; ++c)
+        for (int32_t c = 0; c + 1 < w; ++c)
         {
-            int32_t a = r * SIDE + c;
-            const int32_t corners[6] = {a, a + SIDE, a + SIDE + 1, a, a + SIDE + 1, a + 1};
+            int32_t a = r * w + c;
+            const int32_t corners[6] = {a, a + w, a + w + 1, a, a + w + 1, a + 1};
             memcpy(&s_indices[n], corners, sizeof(corners));
             n += 6;
         }
     }
-    return (mnavTriangleMesh){s_vertices, SIDE * SIDE, s_indices, CELLS * 2, nullptr};
+    return (mnavTriangleMesh){s_vertices, w * t->rows, s_indices, n / 3, nullptr};
+}
+
+// Whether a terrain bakes tile (0, 0) to the same bytes as the mesh of
+// its cells.
+static bool Same(mnavBaker* baker, const mnavTerrain* terrain, mnavBakeReport* report)
+{
+    mnavTriangleMesh mesh = Mesh(terrain);
+    const mnavBakeInput input = {nullptr, 0, terrain, 1};
+    mnavBakeReport other;
+    size_t first = 0;
+    size_t second = 0;
+    bool baked = mnavBakeTileInput(baker, &input, 0, 0, report) == mnav_success &&
+                 mnavCopyBakedTile(baker, s_first, TILE_ROOM, &first) == mnav_success &&
+                 mnavBakeTile(baker, &mesh, 1, 0, 0, &other) == mnav_success &&
+                 mnavCopyBakedTile(baker, s_second, TILE_ROOM, &second) == mnav_success;
+    return baked && report->triangles == other.triangles && first == second &&
+           memcmp(s_first, s_second, first) == 0;
 }
 
 static size_t Bake(mnavBaker* baker, const mnavBakeInput* input, uint8_t* out,
@@ -87,23 +105,31 @@ static size_t Bake(mnavBaker* baker, const mnavBakeInput* input, uint8_t* out,
 static void TestLikeItsMesh(mnavBaker* baker)
 {
     mnavTerrain terrain = Terrain();
-    mnavTriangleMesh mesh = Mesh(&terrain);
     mnavBakeReport a;
-    mnavBakeReport b;
-    const mnavBakeInput fromTerrain = {nullptr, 0, &terrain, 1};
-    size_t first = Bake(baker, &fromTerrain, s_first, &a);
-    size_t second = 0;
-    CHECK(mnavBakeTile(baker, &mesh, 1, 0, 0, &b) == mnav_success &&
-              mnavCopyBakedTile(baker, s_second, TILE_ROOM, &second) == mnav_success,
-          "the mesh baked");
+    CHECK(Same(baker, &terrain, &a), "the same bytes as the mesh of its cells");
+    size_t first = 0;
+    CHECK(mnavCopyBakedTile(baker, s_first, TILE_ROOM, &first) == mnav_success, "copied");
     printf("terrain: %d triangles, %d polygons, %zu bytes\n", a.triangles, a.polygons, first);
-    CHECK(a.polygons > 0 && a.triangles == b.triangles && a.fingerprint == b.fingerprint &&
-              first == second && memcmp(s_first, s_second, first) == 0,
-          "the same bytes as the mesh of its cells");
-    CHECK(a.triangles < CELLS * 2, "only the cells near the tile");
+    CHECK(a.polygons > 0 && a.triangles < CELLS * 2, "only the cells near the tile");
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_first, (int32_t)first);
     printf("TERRAIN_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == TERRAIN_HASH, "the pinned hash");
+    // Cells whose edges fall on the tile's bounds, border included (1.25
+    // m outside the tile), on both sides.
+    mnavTerrain edged = terrain;
+    edged.origin = (mnavVec3){-3.25f, 1.0f, -3.25f};
+    CHECK(Same(baker, &edged, &a), "cells on the tile's bounds");
+    // Ending inside the tile; then a spacing that rounds.
+    mnavTerrain inside = terrain;
+    inside.columns = 20;
+    inside.rows = 20;
+    CHECK(Same(baker, &inside, &a) && a.triangles == 19 * 19 * 2, "ending inside the tile");
+    mnavTerrain odd = terrain;
+    odd.origin = (mnavVec3){-1.3f, 1.0f, 3.1f};
+    odd.spacingX = 0.7f;
+    odd.spacingZ = 0.9f;
+    CHECK(Same(baker, &odd, &a), "spacings that round");
+    const mnavBakeInput fromTerrain = {nullptr, 0, &terrain, 1};
     // A hole of 6 by 6 cells.
     memset(s_areas, mnav_areaWalkable, sizeof(s_areas));
     for (int32_t r = 10; r < 16; ++r)
@@ -115,8 +141,12 @@ static void TestLikeItsMesh(mnavBaker* baker)
     }
     terrain.areas = s_areas;
     mnavBakeReport holed;
+    mnavBakeReport whole;
+    terrain.areas = nullptr;
+    Bake(baker, &fromTerrain, s_second, &whole);
+    terrain.areas = s_areas;
     Bake(baker, &fromTerrain, s_second, &holed);
-    CHECK(holed.triangles == a.triangles - 72 && holed.spans < a.spans - 30,
+    CHECK(holed.triangles == whole.triangles - 72 && holed.spans < whole.spans - 30,
           "a hole has no ground");
     // Far from the terrain, a tile has nothing of it.
     mnavBakeReport far;
@@ -189,6 +219,16 @@ static void TestLimits(void)
     mnavBakeReport report;
     CHECK(mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_errorLimit && report.mesh == 0,
           "one triangle over the input limit");
+    // A mesh's triangles and a terrain's count together.
+    mnavTriangleMesh mesh = Mesh(&terrain);
+    mesh.triangleCount = 1;
+    const mnavBakeInput both = {&mesh, 1, &terrain, 1};
+    def.limits.inputTriangles = CELLS * 2;
+    mnavDestroyBaker(baker);
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success &&
+              mnavBakeTileInput(baker, &both, 0, 0, &report) == mnav_errorLimit,
+          "a mesh's and a terrain's triangles together over the input limit");
     mnavDestroyBaker(baker);
     def = mnavDefaultBakeDef();
     def.limits.tileTriangles = 100;
