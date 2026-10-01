@@ -154,7 +154,7 @@ if(MAUL_NAV_FUZZ)
     # the sanitizers watch its code, not only the targets'.
     target_compile_options(maul-nav PRIVATE -fsanitize=fuzzer-no-link,address,undefined)
     target_link_options(maul-nav PUBLIC -fsanitize=address,undefined)
-    foreach(area tile)
+    foreach(area tile bake query)
         add_executable(fuzz_${area} test/fuzz_${area}.c)
         target_link_libraries(fuzz_${area} PRIVATE maul-nav)
         # The targets reach the library's own functions.

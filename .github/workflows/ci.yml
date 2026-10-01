@@ -109,8 +109,8 @@ jobs:
         # 0013).
         run: stat -c '%s bytes' build/libmaul-nav.a
 
-  # Each fuzz target runs for one minute on every push, over the bytes
-  # programs load and hand the library, from its seed.
+  # Each fuzz target runs for one minute on every push: the tile loader
+  # from its seed, the bake input and the query inputs.
   fuzz:
     name: fuzz
     runs-on: ubuntu-24.04

@@ -236,3 +236,5 @@ format.
 - mnavUpdateFlowField repairs a flow field after goals or cell areas
   change, searching only the cells whose ways change; the result is the
   field a rebuild gives, bit for bit.
+- Fuzz targets for the bake input (fuzz_bake) and query inputs
+  (fuzz_query).
