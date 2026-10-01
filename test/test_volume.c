@@ -130,6 +130,23 @@ static void TestKinds(void)
               Count(&f, 3, 0) == 16 * 32 && Count(&f, 4, 0) == 32 * 32 && Count(&f, 5, -1) == 0,
           "the last volume wins; no walkable ground is made");
     Release(&f);
+    // A ring of many points before a square: the scan has room for the
+    // most points of any.
+    Build(&f);
+    mnavVec2 strip[24];
+    for (int32_t k = 0; k < 24; ++k)
+    {
+        // A zigzag strip from x = 2 to 13, between z = 2 and 6.
+        strip[k] = k < 12 ? (mnavVec2){2.0f + (float)k, k % 2 == 0 ? 2.0f : 3.0f}
+                          : (mnavVec2){13.0f - (float)(k - 12), k % 2 == 0 ? 6.0f : 5.0f};
+    }
+    Square small = MakeSquare(20, 2, 24, 6);
+    const mnavBakeVolume two[2] = {{strip, 24, -1, 1, mnav_volumeExclude, 0},
+                                   Volume(&small, -1, 1, mnav_volumeExclude, 0)};
+    CHECK(mnavCarveVolumes(&f.memory, &f.compact, two, 2) == mnav_success &&
+              Count(&f, mnav_areaNone, 0) > 256 + 11 * 2 * 16,
+          "a many-pointed ring, then a square");
+    Release(&f);
     // Include volumes: ground outside every one goes.
     Build(&f);
     Square left = MakeSquare(0, 0, 4, 4);
@@ -229,6 +246,17 @@ static void TestChecks(mnavBaker* baker)
     points[2] = (mnavVec2){1e9f, 4};
     r = Refused(baker, v, mnav_errorRange);
     CHECK(r.input.element == mnav_elementPoint && r.input.index == 2, "a point too far");
+    points[2] = (mnavVec2){4, -1e9f};
+    r = Refused(baker, v, mnav_errorRange);
+    CHECK(r.input.element == mnav_elementPoint && r.input.index == 2, "a point too far along Z");
+    // After a terrain too.
+    const float heights[4] = {0, 0, 0, 0};
+    const mnavTerrain terrain = {{0, 0, 0}, 1, 1, 2, 2, heights, nullptr};
+    v = good;
+    v.pointCount = 2;
+    const mnavBakeInput withTerrain = {&s_mesh, 1, &terrain, 1, &v, 1};
+    CHECK(mnavBakeTileInput(baker, &withTerrain, 0, 0, &r) == mnav_errorInvalid && r.mesh == 2,
+          "a volume named after the meshes and terrains");
     // An exclude or include volume's area is unused.
     v = good;
     v.kind = mnav_volumeExclude;
@@ -282,6 +310,15 @@ static void TestBake(mnavBaker* baker)
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, all, 3};
     CHECK(mnavBakeTileInput(small, &input, 0, 0, &report) == mnav_errorLimit && report.mesh == -1,
           "points over the input limit");
+    mnavVec2 many[16];
+    for (int32_t k = 0; k < 16; ++k)
+    {
+        many[k] = (mnavVec2){(float)(k % 2), (float)k};
+    }
+    const mnavBakeVolume big = {many, 16, -1, 1, mnav_volumeExclude, 0};
+    const mnavBakeInput alone = {nullptr, 0, nullptr, 0, &big, 1};
+    CHECK(mnavBakeTileInput(small, &alone, 0, 0, &report) == mnav_errorLimit && report.mesh == 0,
+          "one volume over the input limit, named");
     mnavDestroyBaker(small);
     def.limits.inputTriangles += 1;
     CHECK(mnavCreateBaker(&def, &small).result == mnav_success &&
