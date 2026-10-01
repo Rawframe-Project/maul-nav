@@ -62,3 +62,10 @@ format.
   vertex that cannot be replaced stays flagged (N19). Linking polygons
   is now its own step after removal, and ear clipping refuses ears with
   a ring vertex inside them.
+- The height patch under a polygon (internal), the first part of the
+  detail mesh: each cell's floor in the polygon's region, flooded
+  outward into the cells round it; a polygon of mixed regions floods
+  from the spans nearest its vertices. A lookup in a cell without a
+  height takes the nearest height in the first ring of cells that has
+  one, and says so when none is within its radius rather than
+  returning a marker as a height (N20).

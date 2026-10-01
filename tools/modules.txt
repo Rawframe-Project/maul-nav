@@ -20,3 +20,4 @@ planar: contour
 triangulate: contour planar
 polymesh: allocator contour triangulate
 border_vertices: allocator contour planar polymesh triangulate
+height_patch: allocator compact polymesh region
