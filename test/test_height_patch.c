@@ -22,7 +22,8 @@ enum
 };
 
 // A compact field from a hand field, with region ids by floor height:
-// floors below DECK are region 1 left of x = 4 and 2 from it, decks are 3.
+// floors below DECK are region 1 left of x = 4 and 2 from it, but none
+// at x = 0; decks are 3.
 typedef struct Setup
 {
     mnavMemory memory;
@@ -43,6 +44,9 @@ static void Prepare(Setup* setup, Field* hand)
         {
             bool deck = setup->field.spans[i].floor >= BASE + DECK;
             setup->ids[i] = deck ? 3u : (c % WIDTH < 4 ? 1u : 2u);
+            // The floor's first column is eroded: no region, the id that
+            // also marks mixed polygons.
+            setup->ids[i] = !deck && c % WIDTH == 0 ? 0u : setup->ids[i];
         }
     }
     setup->regions = (mnavRegionMap){setup->ids, setup->field.spanCount, 3};
@@ -142,6 +146,12 @@ static void TestDeckOverFloor(void)
           "deck");
     CHECK(At(&patch, 2, 2) == BASE + DECK && At(&patch, 1, 1) == BASE + DECK,
           "the deck, not the floor");
+    // A vertex halfway between floor and deck takes the lower span.
+    MakeSquare(&square, 1, 1, 3, 3, (4 + DECK) / 2, MNAV_MIXED_REGION);
+    CHECK(mnavFillHeightPatch(&setup.memory, &setup.field, &setup.regions, 0, &square.mesh, 0,
+                              &patch) == mnav_success,
+          "halfway");
+    CHECK(At(&patch, 2, 2) == BASE + 4, "the first span on ties");
     // A region with no span under the polygon floods from its vertices too.
     MakeSquare(&square, 1, 1, 3, 3, 4, 7);
     CHECK(mnavFillHeightPatch(&setup.memory, &setup.field, &setup.regions, 0, &square.mesh, 0,
