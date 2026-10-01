@@ -5,6 +5,7 @@
 
 #include "allocator.h"
 #include "navmesh.h"
+#include "offmesh.h"
 #include "polymesh.h"
 #include "query.h"
 #include "query_filter.h"
@@ -38,8 +39,9 @@ void mnavDestroyQuery(mnavQuery* query)
     }
     mnavMemory* memory = &query->memory;
     size_t nodes = (size_t)query->limits.nodes;
-    mnavRelease(memory, query->points, nodes + 1, sizeof(mnavPos3), alignof(mnavPos3));
-    mnavRelease(memory, query->portals, nodes + 1, sizeof(mnavPortal), alignof(mnavPortal));
+    mnavRelease(memory, query->links, nodes, sizeof(mnavPathLink), alignof(mnavPathLink));
+    mnavRelease(memory, query->points, 2 * nodes + 1, sizeof(mnavPos3), alignof(mnavPos3));
+    mnavRelease(memory, query->portals, 2 * nodes + 1, sizeof(mnavPortal), alignof(mnavPortal));
     mnavRelease(memory, query->corridor, nodes, sizeof(mnavPolygonId), alignof(mnavPolygonId));
     mnavRelease(memory, query->table, (size_t)query->tableMask + 1, sizeof(int32_t),
                 alignof(int32_t));
@@ -104,13 +106,18 @@ mnavResult mnavCreateQuery(const mnavQueryDef* def, mnavQuery** queryOut)
     }
     if (result == mnav_success)
     {
-        result = mnavAllocate(&query->memory, nodes + 1, sizeof(mnavPortal), alignof(mnavPortal),
-                              (void**)&query->portals);
+        result = mnavAllocate(&query->memory, 2 * nodes + 1, sizeof(mnavPortal),
+                              alignof(mnavPortal), (void**)&query->portals);
     }
     if (result == mnav_success)
     {
-        result = mnavAllocate(&query->memory, nodes + 1, sizeof(mnavPos3), alignof(mnavPos3),
+        result = mnavAllocate(&query->memory, 2 * nodes + 1, sizeof(mnavPos3), alignof(mnavPos3),
                               (void**)&query->points);
+    }
+    if (result == mnav_success)
+    {
+        result = mnavAllocate(&query->memory, nodes, sizeof(mnavPathLink), alignof(mnavPathLink),
+                              (void**)&query->links);
     }
     if (result != mnav_success)
     {
@@ -244,17 +251,24 @@ static mnavPos3 Midpoint(mnavPos3 a, mnavPos3 b)
 
 // Opens the node behind a portal from node from, or lowers its cost when
 // this way is cheaper; closed nodes are final.
-static void Open(Search* s, int32_t from, const mnavSearchNode* key, mnavPos3 a, mnavPos3 b)
+static void Open(Search* s, int32_t from, const mnavSearchNode* key, mnavPos3 a, mnavPos3 b,
+                 double linkCost)
 {
     mnavQuery* query = s->query;
     const mnavSearchNode* parent = &query->nodes[from];
-    mnavPos3 at = key->tag == MNAV_TAG_END ? s->end : Midpoint(a, b);
-    // The step lies in the parent's polygon, which is convex.
+    bool offMesh = key->tag == MNAV_TAG_OFFMESH;
+    // Where the walk in the parent's polygon goes, and where the node
+    // stands: a portal's midpoint, the end point, or an off-mesh link's
+    // takeoff and landing points.
+    mnavPos3 via = key->tag == MNAV_TAG_END ? s->end : (offMesh ? a : Midpoint(a, b));
+    mnavPos3 at = offMesh ? b : via;
+    // The walk lies in the parent's polygon, which is convex.
     const mnavPolygon* crossed =
         &s->navmesh->slots[parent->slot].tile->mesh.polygons[parent->polygon];
-    double step = Distance(parent->at, at);
-    double cost = parent->cost + step * (double)s->filter->costs[crossed->area];
-    double length = parent->length + step;
+    double step = Distance(parent->at, via);
+    double span = offMesh ? Distance(a, b) : 0.0;
+    double cost = parent->cost + step * (double)s->filter->costs[crossed->area] + linkCost;
+    double length = parent->length + step + span;
     double toEnd = key->tag == MNAV_TAG_END ? 0.0 : Distance(at, s->end);
     if (length + toEnd > s->limit)
     {
@@ -310,7 +324,7 @@ static void ExpandInner(Search* s, int32_t n, const mnavTile* tile, int32_t j)
                                       s->navmesh->slots[node->slot].z);
             mnavSearchNode key = {.slot = node->slot, .polygon = next, .tag = i, .low = 0};
             Open(s, n, &key, mnavVertexWorld(&f, &tile->mesh.vertices[from]),
-                 mnavVertexWorld(&f, &tile->mesh.vertices[to]));
+                 mnavVertexWorld(&f, &tile->mesh.vertices[to]), 0.0);
             return;
         }
     }
@@ -367,7 +381,36 @@ static void ExpandSide(Search* s, int32_t n, const mnavTile* tile, int32_t j)
                               .polygon = (int32_t)link->target.polygon,
                               .tag = MNAV_TAG_LINK + facing,
                               .low = link->low};
-        Open(s, n, &key, first, second);
+        Open(s, n, &key, first, second, 0.0);
+    }
+}
+
+// Opens the polygons the off-mesh links leaving node n's polygon land on,
+// for the kinds and areas the filter includes.
+static void ExpandOffMesh(Search* s, int32_t n)
+{
+    const mnavNavmesh* navmesh = s->navmesh;
+    const mnavSearchNode* node = &s->query->nodes[n];
+    int32_t first = 0;
+    int32_t count = mnavAttachmentsFrom(navmesh, node->slot, node->polygon, &first);
+    for (int32_t i = first; i < first + count; ++i)
+    {
+        mnavAttachment attachment = mnavAttachmentOf(navmesh->attachments[i]);
+        const mnavOffLink* link = &navmesh->links[attachment.link];
+        const mnavLinkState* state = &link->state;
+        mnavPolygonId landing = attachment.reverse ? state->startPolygon : state->endPolygon;
+        const mnavTile* tile = navmesh->slots[landing.slot - 1].tile;
+        if (!mnavCrosses(s->filter, link->def.kind) ||
+            !mnavIncludes(s->filter, tile->mesh.polygons[landing.polygon].area))
+        {
+            continue;
+        }
+        mnavSearchNode key = {.slot = (int32_t)landing.slot - 1,
+                              .polygon = (int32_t)landing.polygon,
+                              .tag = MNAV_TAG_OFFMESH,
+                              .low = attachment.link * 2 + (attachment.reverse ? 1 : 0)};
+        Open(s, n, &key, attachment.reverse ? state->end : state->start,
+             attachment.reverse ? state->start : state->end, (double)link->def.cost);
     }
 }
 
@@ -380,7 +423,7 @@ static void Expand(Search* s, int32_t n)
     {
         mnavSearchNode key = {
             .slot = node->slot, .polygon = node->polygon, .tag = MNAV_TAG_END, .low = 0};
-        Open(s, n, &key, s->end, s->end);
+        Open(s, n, &key, s->end, s->end, 0.0);
     }
     // mnavSearchNode pointers stay valid as nodes are added: the array never moves.
     // The edge the node came in through leads only back.
@@ -396,6 +439,7 @@ static void Expand(Search* s, int32_t n)
             ExpandSide(s, n, tile, j);
         }
     }
+    ExpandOffMesh(s, n);
 }
 
 static bool FinitePoint(mnavPos3 p)
@@ -414,6 +458,19 @@ static bool Nearer(const mnavQuery* query, int32_t a, int32_t b)
         return na->remaining < nb->remaining;
     }
     return na->cost != nb->cost ? na->cost < nb->cost : a < b;
+}
+
+// The heuristic's scale: the cheapest included area's cost, or less for
+// a kind of link the filter crosses that costs less per meter (N30).
+static double Scale(const mnavNavmesh* navmesh, const mnavQueryFilter* filter)
+{
+    double scale = mnavCheapest(filter);
+    for (int32_t k = 0; k < MNAV_LINK_KINDS; ++k)
+    {
+        double perMeter = navmesh->costPerMeter[k];
+        scale = mnavCrosses(filter, (mnavLinkKind)k) && perMeter < scale ? perMeter : scale;
+    }
+    return scale;
 }
 
 // Writes the polygons from the start to node last into the corridor.
@@ -449,8 +506,16 @@ static int32_t Portals(mnavQuery* query, int32_t last)
     {
         // A portal's ends are in the order of the polygon walked out of,
         // whose inside lies to the right of each edge: the first end is on
-        // the walker's left.
-        query->portals[count++] = (mnavPortal){query->nodes[n].a, query->nodes[n].b};
+        // the walker's left. An off-mesh link gives its takeoff point, then
+        // its landing point; written backward here.
+        const mnavSearchNode* node = &query->nodes[n];
+        if (node->tag == MNAV_TAG_OFFMESH)
+        {
+            query->portals[count++] = (mnavPortal){node->b, node->b, -1};
+            query->portals[count++] = (mnavPortal){node->a, node->a, node->low};
+            continue;
+        }
+        query->portals[count++] = (mnavPortal){node->a, node->b, -1};
     }
     for (int32_t i = 0; i < count / 2; ++i)
     {
@@ -461,7 +526,7 @@ static int32_t Portals(mnavQuery* query, int32_t last)
     const mnavSearchNode* node = &query->nodes[last];
     if (node->tag != MNAV_TAG_END)
     {
-        query->portals[count++] = (mnavPortal){node->at, node->at};
+        query->portals[count++] = (mnavPortal){node->at, node->at, -1};
     }
     return count;
 }
@@ -504,16 +569,16 @@ static void Corner(mnavQuery* query, int32_t* count, Funnel* f, mnavPos3 p, int3
     *f = (Funnel){p, p, p, at, at, at};
 }
 
-// Pulls the corridor's portals tight into a straight path: a portal end on
+// Pulls portals first to last tight into a straight path: a portal end on
 // or inside a side of the funnel narrows it; one on or past the other side
-// makes that side's point a corner, and the scan goes on from there.
-static int32_t Straighten(mnavQuery* query, int32_t portals)
+// makes that side's point a corner, and the scan goes on from there. The
+// first portal is a point, always kept: the start or a landing point.
+static int32_t Pull(mnavQuery* query, int32_t first, int32_t last, int32_t count)
 {
     const mnavPortal* p = query->portals;
-    int32_t count = 0;
-    Push(query, &count, p[0].left);
-    Funnel f = {p[0].left, p[0].left, p[0].right, 0, 0, 0};
-    for (int32_t i = 1; i < portals; ++i)
+    query->points[count++] = p[first].left;
+    Funnel f = {p[first].left, p[first].left, p[first].right, first, first, first};
+    for (int32_t i = first + 1; i <= last; ++i)
     {
         if (Area2(f.apex, f.right, p[i].right) >= 0.0)
         {
@@ -538,7 +603,34 @@ static int32_t Straighten(mnavQuery* query, int32_t portals)
             f.leftAt = i;
         }
     }
-    Push(query, &count, p[portals - 1].left);
+    Push(query, &count, p[last].left);
+    return count;
+}
+
+// The straight path, stretch by stretch between off-mesh links: each
+// stretch ends at a takeoff point, the next begins at its landing point.
+static int32_t Straighten(mnavQuery* query, const mnavNavmesh* navmesh, int32_t portals,
+                          int32_t* linkCount)
+{
+    int32_t count = 0;
+    int32_t first = 0;
+    *linkCount = 0;
+    for (int32_t i = 0; i < portals; ++i)
+    {
+        int32_t crossed = query->portals[i].link;
+        if (crossed < 0 && i + 1 < portals)
+        {
+            continue;
+        }
+        count = Pull(query, first, i, count);
+        first = i + 1;
+        if (crossed >= 0)
+        {
+            const mnavOffLink* link = &navmesh->links[crossed / 2];
+            query->links[(*linkCount)++] = (mnavPathLink){
+                {(uint32_t)crossed / 2 + 1, link->generation}, link->def.kind, count - 1};
+        }
+    }
     return count;
 }
 
@@ -576,7 +668,7 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnav
     Search s = {query,
                 navmesh,
                 usable,
-                mnavCheapest(usable),
+                Scale(navmesh, usable),
                 end,
                 (int32_t)endPolygon.slot - 1,
                 (int32_t)endPolygon.polygon,
@@ -614,12 +706,16 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnav
         Expand(&s, n);
     }
     int32_t last = found != MNAV_NO_NODE ? found : best;
+    int32_t linkCount = 0;
+    int32_t pointCount = Straighten(query, navmesh, Portals(query, last), &linkCount);
     *pathOut = (mnavPath){found != MNAV_NO_NODE ? mnav_pathFound : EndOf(&s),
                           query->nodes[last].cost,
                           query->nodes[last].length,
                           query->corridor,
                           Corridor(query, navmesh, last),
                           query->points,
-                          Straighten(query, Portals(query, last))};
+                          pointCount,
+                          query->links,
+                          linkCount};
     return mnav_success;
 }

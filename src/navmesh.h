@@ -117,6 +117,10 @@ struct mnavNavmesh
     uint64_t* attachments;
     int32_t attachmentCount;
     int32_t attachmentCapacity;
+    // For each link kind, the lowest cost per meter of its attached links'
+    // spans, INFINITY when it has none: what scales the search's
+    // heuristic (N30).
+    double costPerMeter[MNAV_LINK_KINDS];
 };
 
 // The committed tile at a place, or NULL; slotOut receives its 0-based

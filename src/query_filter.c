@@ -23,7 +23,7 @@
 
 // The default filter: every walkable area at a cost of 1.
 static const mnavQueryFilter s_default = {
-    FILTER_COOKIE, {ONES16, ONES16, ONES16, ONES16}, WALKABLE_AREAS};
+    FILTER_COOKIE, {ONES16, ONES16, ONES16, ONES16}, WALKABLE_AREAS, ~(uint64_t)0};
 
 static_assert(sizeof(s_default.costs) == 64 * sizeof(float), "the default lists 64 costs");
 
@@ -71,4 +71,9 @@ double mnavCheapest(const mnavQueryFilter* filter)
     // With nothing included only the start polygon is usable and the
     // heuristic never matters; 1 keeps it finite.
     return cheapest < (double)INFINITY ? cheapest : 1.0;
+}
+
+bool mnavCrosses(const mnavQueryFilter* filter, mnavLinkKind kind)
+{
+    return kind < MNAV_LINK_KINDS && ((filter->kinds >> kind) & 1u) != 0;
 }

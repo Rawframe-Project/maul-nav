@@ -15,6 +15,7 @@
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -40,6 +41,10 @@ mnavBakeDefResult mnavCreateNavmesh(const mnavBakeDef* def, mnavNavmesh** navmes
         return (mnavBakeDefResult){result, mnav_settingNone};
     }
     *navmesh = (mnavNavmesh){0};
+    for (int32_t k = 0; k < MNAV_LINK_KINDS; ++k)
+    {
+        navmesh->costPerMeter[k] = (double)INFINITY;
+    }
     navmesh->def = *def;
     navmesh->cells = cells;
     navmesh->memory = memory;

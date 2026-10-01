@@ -254,6 +254,24 @@ void mnavApplyAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
             count = Attach(navmesh, s, navmesh->attachments, count);
         }
     }
+    for (int32_t k = 0; k < MNAV_LINK_KINDS; ++k)
+    {
+        navmesh->costPerMeter[k] = (double)INFINITY;
+    }
+    for (int32_t s = 0; s < navmesh->linkSlots; ++s)
+    {
+        const mnavOffLink* link = &navmesh->links[s];
+        double dx = link->state.end.x - link->state.start.x;
+        double dy = link->state.end.y - link->state.start.y;
+        double dz = link->state.end.z - link->state.start.z;
+        double span = sqrt(dx * dx + dy * dy + dz * dz);
+        if (link->state.attached && span > 0.0)
+        {
+            double perMeter = (double)link->def.cost / span;
+            double* lowest = &navmesh->costPerMeter[link->def.kind];
+            *lowest = perMeter < *lowest ? perMeter : *lowest;
+        }
+    }
     // The second half of the memory is the sort's scratch.
     int32_t half = navmesh->attachmentCapacity / 2;
     navmesh->attachmentCount =

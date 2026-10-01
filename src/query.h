@@ -15,10 +15,12 @@
 #include <stdint.h>
 
 // A node's way in: an edge index below 8, 8 plus the side for a tile link,
-// or the start or end point.
-#define MNAV_TAG_LINK  8
-#define MNAV_TAG_START 0xFE
-#define MNAV_TAG_END   0xFF
+// an off-mesh link (its low is the link's slot times 2, plus 1 when crossed
+// backward), or the start or end point.
+#define MNAV_TAG_LINK    8
+#define MNAV_TAG_OFFMESH 16
+#define MNAV_TAG_START   0xFE
+#define MNAV_TAG_END     0xFF
 
 // No node, or a node that has left the open list.
 #define MNAV_NO_NODE (-1)
@@ -27,7 +29,8 @@
 // stands, the way it came, and its cost so far.
 typedef struct mnavSearchNode
 {
-    // The portal's ends, in the order of the polygon left, and its midpoint.
+    // The portal's ends, in the order of the polygon left, and its midpoint;
+    // for an off-mesh link, its takeoff and landing points, and the landing.
     mnavPos3 a;
     mnavPos3 b;
     mnavPos3 at;
@@ -53,6 +56,9 @@ typedef struct mnavPortal
 {
     mnavPos3 left;
     mnavPos3 right;
+    // At a takeoff point, the off-mesh link crossed next, as the search
+    // node's low; -1 otherwise.
+    int32_t link;
 } mnavPortal;
 
 struct mnavQuery
@@ -67,10 +73,12 @@ struct mnavQuery
     int32_t* table;
     uint32_t tableMask;
     mnavPolygonId* corridor;
-    // The corridor's portals, then the straight path; a corridor of n
-    // polygons has n + 1 of each at most.
+    // The corridor's portals, then the straight path: a node gives one
+    // portal, an off-mesh link two, and the end one more, so twice the
+    // nodes plus one bound both. Then the links crossed.
     mnavPortal* portals;
     mnavPos3* points;
+    mnavPathLink* links;
 };
 
 #endif // MAUL_NAV_SRC_QUERY_H

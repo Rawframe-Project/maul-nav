@@ -35,9 +35,13 @@ extern "C"
         // walkable type by default. Bit 0 is ignored: area 0 is never
         // walkable.
         uint64_t areas;
+        // Bit n set when the agent may cross off-mesh links of kind n; every
+        // kind by default.
+        uint64_t kinds;
     } mnavQueryFilter;
 
-    /// Returns the filter that uses every walkable area at a cost of 1.
+    /// Returns the filter that uses every walkable area at a cost of 1 and
+    /// every kind of off-mesh link.
     ///
     /// @return The filter.
     /// @par Thread safety
@@ -135,6 +139,15 @@ extern "C"
         mnav_pathNone = 4,
     };
 
+    // An off-mesh link a path crosses: the link, its kind, and the index of
+    // its takeoff point in the straight path; the landing point follows it.
+    typedef struct mnavPathLink
+    {
+        mnavLinkId link;
+        mnavLinkKind kind;
+        int32_t point;
+    } mnavPathLink;
+
     // A path search's result. Short of the end point, the corridor runs to
     // the polygon nearest it.
     typedef struct mnavPath
@@ -156,6 +169,10 @@ extern "C"
         // its next search; never cut short.
         const mnavPos3* points;
         int32_t pointCount;
+        // The off-mesh links crossed, in order, in the context's memory
+        // until its next search.
+        const mnavPathLink* links;
+        int32_t linkCount;
     } mnavPath;
 
     /// Returns a query def with 8,192 nodes per search and paths up to
@@ -191,8 +208,11 @@ extern "C"
     /// node made first. A step costs its length times the cost of the area
     /// it crosses, and the heuristic is scaled by the cheapest included
     /// area's cost; polygons of excluded areas other than the start
-    /// polygon are not entered. The corridor found is pulled tight into a
-    /// straight path with the funnel algorithm.
+    /// polygon are not entered. Attached off-mesh links of included kinds are
+    /// crossed at their declared cost, the heuristic scaled down to the
+    /// lowest cost per meter among them (N30). The corridor found is pulled
+    /// tight into a straight path with the funnel algorithm, stretch by
+    /// stretch between links.
     ///
     /// @param query        The context; its memory holds the result.
     /// @param navmesh      The navmesh.

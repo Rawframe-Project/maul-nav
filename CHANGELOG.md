@@ -142,3 +142,6 @@ format.
   mnavGetLink. Links are staged and committed with tiles and snapped
   again at every commit. The bake def gains limits.links
   (mnav_settingLinks). mnavCommit moves to its own module.
+- Paths across off-mesh links (mnav-0005): mnavQueryFilter gains
+  kinds, the link kinds an agent may cross; mnavPath gains links, an
+  mnavPathLink per link crossed (its id, kind and takeoff point).

@@ -69,6 +69,15 @@ that are not loaded must say so rather than treat them as walls.
   path length limit counts meters, and a path reports its cost and its
   length apart.
 
+- **Paths across off-mesh links:** the filter's kind mask says which
+  links an agent may cross. The search crosses an attached link from
+  its takeoff polygon at its declared cost when its kind and its
+  landing polygon's area are included; the heuristic's scale drops to
+  the lowest cost per meter of any included kind's attached links, so
+  cheap teleports keep the search exact. The funnel runs stretch by
+  stretch between links, and the path lists each link crossed with its
+  id, its kind and the index of its takeoff point.
+
 ## Consequences
 
 - Queries scan the polygons of each loaded tile in their box; a search
