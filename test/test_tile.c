@@ -513,6 +513,11 @@ static void TestHandTilesRefuseOneFlawEach(void)
     HandPolygon(&h, square, 4, nullptr, 0);
     h.polygons[0].neighbors[1] = 0;
     CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "its own neighbor");
+    // A neighbor past the polygons.
+    HandBegin(&h, points, 5);
+    HandPolygon(&h, square, 4, nullptr, 0);
+    h.polygons[0].neighbors[1] = 1;
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "a neighbor past the polygons");
     // A vertex used twice.
     const uint16_t twice[4] = {0, 1, 0, 2};
     HandBegin(&h, points, 5);
