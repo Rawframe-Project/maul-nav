@@ -60,6 +60,14 @@ when loaded.
   tile, and the tile is byte for byte the one the same triangles as a
   mesh give.
 
+- **Volumes:** `mnavBakeVolume` is a prism on a ring of points with a
+  height range. Include volumes, when a bake has any, keep only the
+  ground they hold; exclude volumes drop the ground they hold; both act
+  before the agent's radius is kept, so agents keep clear of what they
+  drop as of a wall. Area volumes then give the walkable ground they
+  hold their area, the last one winning, without shrinking it. 2D
+  bakes shape their ground with outlines instead.
+
 ## Consequences
 
 - Tiles move between platforms and versions of a host unchanged, and a

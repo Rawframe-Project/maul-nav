@@ -271,15 +271,6 @@ extern "C"
         const mnavAreaType* areas;
     } mnavTerrain;
 
-    // Everything a 3D bake reads: triangle meshes and terrains.
-    typedef struct mnavBakeInput
-    {
-        const mnavTriangleMesh* meshes;
-        int32_t meshCount;
-        const mnavTerrain* terrains;
-        int32_t terrainCount;
-    } mnavBakeInput;
-
     // A point of a 2D outline, in meters relative to the bake's origin:
     // (x, y) is the navmesh point (x, 0, y) (mnav-0002).
     typedef struct mnavVec2
@@ -300,6 +291,52 @@ extern "C"
         int32_t pointCount;
         mnavAreaType area;
     } mnavOutline;
+
+    // What a bake volume does (mnav-0003).
+    typedef uint8_t mnavVolumeKind;
+
+    enum
+    {
+        // When a bake has include volumes, the ground inside none of them
+        // is dropped, before the agent's radius is kept from walls.
+        mnav_volumeInclude = 0,
+        // The ground inside is dropped before the agent's radius is kept
+        // from walls, so agents keep clear of it as of a wall.
+        mnav_volumeExclude = 1,
+        // The walkable ground inside takes the volume's area after the
+        // radius is kept, the last such volume holding it winning.
+        mnav_volumeArea = 2,
+    };
+
+    // A prism standing on a ring of points: the cells whose centers the
+    // ring holds, by the even-odd rule, with their ground from minY to
+    // maxY.
+    typedef struct mnavBakeVolume
+    {
+        // The ring, (x, y) being the place (x, 0, y) relative to the bake's
+        // origin, the last point joined back to the first. Only read during
+        // the call.
+        const mnavVec2* points;
+        // The number of points, at least 3.
+        int32_t pointCount;
+        // The heights the ground must lie within, minY at most maxY.
+        float minY;
+        float maxY;
+        mnavVolumeKind kind;
+        // For mnav_volumeArea, a walkable area type; otherwise unused.
+        mnavAreaType area;
+    } mnavBakeVolume;
+
+    // Everything a 3D bake reads: triangle meshes, terrains and volumes.
+    typedef struct mnavBakeInput
+    {
+        const mnavTriangleMesh* meshes;
+        int32_t meshCount;
+        const mnavTerrain* terrains;
+        int32_t terrainCount;
+        const mnavBakeVolume* volumes;
+        int32_t volumeCount;
+    } mnavBakeInput;
 
     // The kind of input element a check refused.
     typedef uint8_t mnavInputElement;
@@ -473,11 +510,13 @@ extern "C"
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_API void mnavDestroyBaker(mnavBaker* baker);
 
-    /// Bakes one tile from triangle meshes and terrains, as mnavBakeTile
-    /// does from meshes alone; a terrain's triangles count as input
-    /// triangles, after the meshes', toward the limits and the
-    /// fingerprint, and a refused terrain is reported as the mesh at its
-    /// index after the meshes.
+    /// Bakes one tile from triangle meshes and terrains, shaped by
+    /// volumes, as mnavBakeTile does from meshes alone; a terrain's
+    /// triangles count as input triangles, after the meshes', toward the
+    /// limits and the fingerprint, and a volume's points count as input
+    /// triangles too. A refused terrain is reported as the mesh at its
+    /// index after the meshes, a refused volume as the one at its index
+    /// after the terrains.
     ///
     /// @param baker     The baker; the tile it held before is dropped.
     /// @param input     The meshes and terrains.
@@ -488,7 +527,10 @@ extern "C"
     /// spacing not more than 0 or not finite, a height not finite (the
     /// sample) or an area of MNAV_AREA_TYPES or more (the cell) is
     /// `mnav_errorInvalid`, a sample past the extent input may have
-    /// `mnav_errorRange`.
+    /// `mnav_errorRange`; a volume with fewer than 3 points, a kind out of
+    /// range, an area volume's area not walkable, heights not finite or
+    /// backward, or a point not finite (the point) is `mnav_errorInvalid`,
+    /// a point past the extent (the point) `mnav_errorRange`.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBakeTileInput(mnavBaker* baker,

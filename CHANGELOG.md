@@ -228,3 +228,5 @@ format.
   minimum region area.
 - Terrains (mnav-0003): mnavTerrain, mnavBakeInput and
   mnavBakeTileInput bake heightfields in a compact form beside meshes.
+- Bake volumes (mnav-0003): mnavBakeVolume in mnavBakeInput, include,
+  exclude and area override, applied around the agent radius's erosion.

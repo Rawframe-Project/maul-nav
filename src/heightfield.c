@@ -224,7 +224,7 @@ mnavResult mnavBuildHeightfield(mnavMemory* memory, const mnavBakeDef* def,
                                 int32_t meshCount, int32_t tileX, int32_t tileZ,
                                 mnavHeightfield* heightfield)
 {
-    const mnavBakeInput input = {meshes, meshCount, nullptr, 0};
+    const mnavBakeInput input = {meshes, meshCount, nullptr, 0, nullptr, 0};
     return mnavBuildHeightfieldInput(memory, def, cells, &input, tileX, tileZ, heightfield);
 }
 

@@ -15,8 +15,22 @@
 
 #include <stdint.h>
 
+// Whether a ring of points' bounds meet the tile's cells, border
+// included; (x, y) is the place (x, 0, y).
+bool mnavRingTouchesTile(const mnavTileFrame* frame, const mnavVec2* points, int32_t count);
+
 // Whether an outline's bounds meet the tile's cells, border included.
 bool mnavOutlineTouchesTile(const mnavTileFrame* frame, const mnavOutline* outline);
+
+// Called for a cell (x, z) of the tile; anything but mnav_success stops
+// the visit with that result.
+typedef mnavResult (*mnavCellVisit)(void* context, int32_t x, int32_t z);
+
+// Visits every cell of the tile whose center a ring holds by the even-odd
+// rule, row by row and along each row in order; crossings has room for
+// pointCount values.
+mnavResult mnavVisitRing(const mnavTileFrame* frame, const mnavVec2* points, int32_t pointCount,
+                         double* crossings, mnavCellVisit visit, void* context);
 
 // Adds the fragments of valid outlines for the tile. Returns
 // mnav_errorLimit past the tileTriangles limit on outlines touching the
