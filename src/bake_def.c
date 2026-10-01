@@ -33,6 +33,8 @@ mnavBakeDef mnavDefaultBakeDef(void)
     def.agent.stepHeight = 0.75f;
     def.agent.maxSlopeDegrees = 45.0f;
     def.minRegionArea = 2.0f;
+    def.maxEdgeError = 0.3f;
+    def.maxEdgeLength = 12.0f;
     def.limits.inputTriangles = 4194304;
     def.limits.tileTriangles = 1048576;
     def.limits.tileSpans = 4194304;
@@ -154,6 +156,16 @@ static mnavBakeSetting ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cells
         !mnavToCells(def->minRegionArea, cellArea, true, 1 << 30, &cells->minRegion))
     {
         return mnav_settingMinRegionArea;
+    }
+    if (!InRange(def->maxEdgeError, 0.0f, MNAV_MAX_CELL_SIZE * MNAV_MAX_TILE_CELLS))
+    {
+        return mnav_settingMaxEdgeError;
+    }
+    cells->edgeError = def->maxEdgeError / def->cellSize;
+    if (!InRange(def->maxEdgeLength, 0.0f, INFINITY) ||
+        !mnavToCells(def->maxEdgeLength, def->cellSize, false, 1 << 30, &cells->edgeLength))
+    {
+        return mnav_settingMaxEdgeLength;
     }
     cells->border = cells->agentRadius + BORDER_MARGIN_CELLS;
     cells->cosMaxSlope = mnavCosDegrees(agent->maxSlopeDegrees);

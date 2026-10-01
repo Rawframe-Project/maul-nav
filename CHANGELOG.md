@@ -39,3 +39,8 @@ format.
   non-overlapping layers of one area, small islands off the tile's
   border dropped, with 32-bit ids and sweep storage sized by the row's
   spans (N15).
+- `mnavBakeDef.maxEdgeError` and `maxEdgeLength`, in meters (0.3 and
+  12 by default), and region contours (internal): each region's
+  boundary traced edge by edge with corner heights and the region
+  across each edge, simplified along walls and area borders, walls
+  split past the maximum length (N16).

@@ -9,6 +9,7 @@
 #include <stdckdint.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 mnavMemory mnavMakeMemory(mnavAllocator allocator, uint64_t limit)
 {
@@ -65,4 +66,31 @@ void mnavRelease(mnavMemory* memory, void* block, size_t count, size_t size, siz
         return;
     }
     free(block);
+}
+
+mnavResult mnavReserve(mnavMemory* memory, void** block, int32_t* capacity, int32_t count,
+                       int32_t needed, size_t size, size_t alignment)
+{
+    if (needed <= *capacity)
+    {
+        return mnav_success;
+    }
+    int64_t doubled = (int64_t)*capacity * 2;
+    int64_t grown = doubled > needed ? doubled : needed;
+    grown = grown < 16 ? 16 : grown;
+    grown = grown > INT32_MAX ? INT32_MAX : grown;
+    void* fresh = nullptr;
+    mnavResult result = mnavAllocate(memory, (size_t)grown, size, alignment, &fresh);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    if (count > 0 && fresh != nullptr && *block != nullptr)
+    {
+        memcpy(fresh, *block, (size_t)count * size);
+    }
+    mnavRelease(memory, *block, (size_t)*capacity, size, alignment);
+    *block = fresh;
+    *capacity = (int32_t)grown;
+    return mnav_success;
 }

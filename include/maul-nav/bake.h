@@ -117,6 +117,11 @@ extern "C"
         // The smallest walkable region kept, in square meters, at least 0:
         // smaller islands away from a tile's edge are dropped.
         float minRegionArea;
+        // How far a simplified wall may stray from the cells it follows, in
+        // meters, at least 0.
+        float maxEdgeError;
+        // The longest wall edge, in meters, at least 0; 0 for no limit.
+        float maxEdgeLength;
         // The limits on the work.
         mnavBakeLimits limits;
     } mnavBakeDef;
@@ -146,6 +151,8 @@ extern "C"
         mnav_settingTiles = 17,
         mnav_settingMemoryBytes = 18,
         mnav_settingMinRegionArea = 19,
+        mnav_settingMaxEdgeError = 20,
+        mnav_settingMaxEdgeLength = 21,
     };
 
     // A def check's outcome: the status, and the first setting it refused.
@@ -176,6 +183,11 @@ extern "C"
         float tileSize;
         // The minimum region area, in cells.
         int32_t minRegion;
+        // The maximum edge error, in cells, unrounded.
+        float edgeError;
+        // The maximum wall edge length, in cells, rounded down; 0 for no
+        // limit.
+        int32_t edgeLength;
     } mnavBakeCells;
 
     // A triangle mesh in a bake's input.

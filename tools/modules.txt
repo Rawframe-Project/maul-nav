@@ -13,3 +13,5 @@ erode: allocator compact
 hash:
 sort:
 region: allocator compact sort
+invariant:
+contour: allocator compact invariant region

@@ -28,6 +28,8 @@ static void TestDefaultDefIsValid(void)
     CHECK(cells.border == 5, "border is the radius and 3");
     CHECK(cells.tileSize == 32.0f, "128 cells of 0.25 m");
     CHECK(cells.minRegion == 32, "2 square meters of 0.0625 is 32 cells");
+    CHECK(cells.edgeError == 1.2f, "0.3 m is 1.2 cells");
+    CHECK(cells.edgeLength == 48, "12 m is 48 cells");
     CHECK(cells.cosMaxSlope > 0.707106f && cells.cosMaxSlope < 0.707107f, "cos 45");
 }
 
@@ -107,6 +109,12 @@ static void TestAgentSettingsAreChecked(void)
     broken = def;
     broken.minRegionArea = 1.0e30f;
     CHECK(Refuses(broken, mnav_settingMinRegionArea), "region area past any tile");
+    broken = def;
+    broken.maxEdgeError = -0.1f;
+    CHECK(Refuses(broken, mnav_settingMaxEdgeError), "negative edge error");
+    broken = def;
+    broken.maxEdgeLength = NAN;
+    CHECK(Refuses(broken, mnav_settingMaxEdgeLength), "NaN edge length");
 }
 
 static void TestMetersSnapToCells(void)

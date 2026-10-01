@@ -44,6 +44,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/bake_def.c
     src/base.c
     src/compact.c
+    src/contour.c
     src/erode.c
     src/filter.c
     src/hash.c
@@ -65,6 +66,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(base)
     maul_add_test(bake)
     maul_add_test(compact WHITEBOX)
+    maul_add_test(contour WHITEBOX)
     maul_add_test(filter WHITEBOX)
     maul_add_test(heightfield WHITEBOX)
     maul_add_test(region WHITEBOX)

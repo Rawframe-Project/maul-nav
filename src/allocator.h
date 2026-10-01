@@ -36,4 +36,11 @@ mnavResult mnavAllocate(mnavMemory* memory, size_t count, size_t size, size_t al
 // NULL is ignored.
 void mnavRelease(mnavMemory* memory, void* block, size_t count, size_t size, size_t alignment);
 
+// Grows an array of elements of size bytes holding count elements in a
+// block of *capacity, so that it holds at least needed: a new block of
+// twice the size (or needed, if larger), the elements copied over and the
+// old block released. Does nothing when the block is large enough.
+mnavResult mnavReserve(mnavMemory* memory, void** block, int32_t* capacity, int32_t count,
+                       int32_t needed, size_t size, size_t alignment);
+
 #endif // MAUL_NAV_SRC_ALLOCATOR_H
