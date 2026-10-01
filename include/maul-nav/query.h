@@ -448,6 +448,52 @@ extern "C"
                                                            const mnavCorridor* corridor,
                                                            mnavCorners* cornersOut);
 
+    /// Moves a corridor's position along the surface toward a wanted point
+    /// (mnavMoveAlongSurface from its first polygon) and merges the
+    /// polygons walked into its start: it keeps its polygons from the
+    /// farthest one the walk passed, led to by the walk.
+    ///
+    /// @param query    The context, for the walk.
+    /// @param navmesh  The navmesh.
+    /// @param filter   The areas usable, or NULL for every walkable one.
+    /// @param corridor The corridor.
+    /// @param wanted   Where the agent would be; only its ground position
+    ///                 counts.
+    /// @param moveOut  Receives the walk, or NULL.
+    /// @return As mnavMoveAlongSurface; also `mnav_errorInvalid` for a
+    /// corridor with no buffer, and `mnav_errorCapacity` when the merged
+    /// corridor would outgrow its buffer, which leaves it unchanged.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    /// So is the corridor.
+    MNAV_NODISCARD MNAV_API mnavResult mnavMoveCorridor(mnavQuery* query,
+                                                        const mnavNavmesh* navmesh,
+                                                        const mnavQueryFilter* filter,
+                                                        mnavCorridor* corridor, mnavPos3 wanted,
+                                                        mnavMove* moveOut);
+
+    /// Moves a corridor's target along the surface toward a wanted point
+    /// (mnavMoveAlongSurface from its last polygon) and merges the polygons
+    /// walked into its end: it keeps its polygons up to the first one the
+    /// walk passed, then the rest of the walk.
+    ///
+    /// @param query    The context, for the walk.
+    /// @param navmesh  The navmesh.
+    /// @param filter   The areas usable, or NULL for every walkable one.
+    /// @param corridor The corridor.
+    /// @param wanted   Where the target would be; only its ground position
+    ///                 counts.
+    /// @param moveOut  Receives the walk, or NULL.
+    /// @return As mnavMoveCorridor.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    /// So is the corridor.
+    MNAV_NODISCARD MNAV_API mnavResult mnavMoveCorridorTarget(mnavQuery* query,
+                                                              const mnavNavmesh* navmesh,
+                                                              const mnavQueryFilter* filter,
+                                                              mnavCorridor* corridor,
+                                                              mnavPos3 wanted, mnavMove* moveOut);
+
     // How a raycast ended.
     typedef uint8_t mnavRayEnd;
 

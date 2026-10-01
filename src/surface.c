@@ -288,13 +288,15 @@ mnavResult mnavMoveAlongSurface(mnavQuery* query, const mnavNavmesh* navmesh,
     {
         return result;
     }
-    // A move searches no further than the circle through its two points.
+    // A move searches the circle through its two points, widened by a
+    // cell: the start lies on the circle, and a start on a corner or an
+    // edge must not lose the polygons there to rounding either way.
     Ground from = {start.x, start.z};
     Ground to = {end.x, end.z};
     Ground center = {(from.x + to.x) * 0.5, (from.z + to.z) * 0.5};
-    Mover m = {
-        query, navmesh, usable, to, center, Distance2(from, to) * 0.25, from, Distance2(from, to),
-        0,     false,   false,  1};
+    double radius = sqrt(Distance2(from, to)) * 0.5 + (double)navmesh->def.cellSize;
+    Mover m = {query, navmesh, usable, to, center, radius * radius, from, Distance2(from, to),
+               0,     false,   false,  1};
     memset(query->table, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
     query->nodes[0] = (mnavSearchNode){0};
     query->nodes[0].slot = (int32_t)startPolygon.slot - 1;

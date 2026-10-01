@@ -17,7 +17,7 @@
 #include <stdint.h>
 
 // The hash of the world's moves, the same on every platform.
-#define WORLD_MOVES_HASH 0x656dbef43af4d778ull
+#define WORLD_MOVES_HASH 0x0a1f6e7a2f2b8f5aull
 
 static uint8_t s_bytes[2][8192];
 

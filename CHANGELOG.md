@@ -156,3 +156,7 @@ format.
   mnavResetCorridor, mnavSetCorridor, mnavCheckCorridor and
   mnavCorridorCorners. A loaded path's corners equal its straight path
   bit for bit.
+- Moving corridors (mnav-0005): mnavMoveCorridor and
+  mnavMoveCorridorTarget. mnavMoveAlongSurface's search circle is
+  widened by one cell: a move starting on a vertex could lose its
+  neighbours to rounding and go nowhere.

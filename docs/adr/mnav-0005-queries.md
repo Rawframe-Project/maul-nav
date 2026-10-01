@@ -89,7 +89,9 @@ that are not loaded must say so rather than treat them as walls.
 
 - **Moving along the surface:** `mnavMoveAlongSurface` walks
   breadth-first, in edge order, from a point on a polygon over the
-  included polygons whose shared edges meet the circle round the move.
+  included polygons whose shared edges meet the circle round the move,
+  widened by one cell so that a start on a vertex keeps its
+  neighbours.
   It reaches the wanted point in the polygon holding it, or ends at the
   nearest point on the walls met, ties to the wall met first. Walls are
   every edge, and every part of a tile-side edge, with no included
@@ -104,7 +106,10 @@ that are not loaded must say so rather than treat them as walls.
   pulls it tight with the funnel over the portals between its polygons
   (edges, tile links, off-mesh links), and `mnavCheckCorridor` counts
   the leading polygons still current, included and joined, where the
-  caller trims and replans.
+  caller trims and replans. `mnavMoveCorridor` and
+  `mnavMoveCorridorTarget` move its ends along the surface and merge
+  the polygons walked into its start or end; a merge that would
+  outgrow the buffer is refused and changes nothing.
 
 ## Consequences
 

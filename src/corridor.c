@@ -240,3 +240,116 @@ mnavResult mnavCorridorCorners(mnavQuery* query, const mnavNavmesh* navmesh,
     *cornersOut = (mnavCorners){query->points, points, query->links, links};
     return mnav_success;
 }
+
+// The index of a polygon among the first count of a list, or -1.
+static int32_t IndexOf(const mnavPolygonId* list, int32_t count, mnavPolygonId id)
+{
+    for (int32_t i = 0; i < count; ++i)
+    {
+        if (SameId(list[i], id))
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Merges a walk from the corridor's first polygon into its start: the
+// farthest corridor polygon the walk passed, and the walk back to it from
+// where it ended, lead the corridor from there on.
+static mnavResult MergeStart(mnavCorridor* corridor, const mnavMove* move)
+{
+    const mnavPolygonId* walked = move->polygons;
+    int32_t farthest = -1;
+    int32_t at = -1;
+    for (int32_t i = corridor->count - 1; i >= 0 && farthest < 0; --i)
+    {
+        int32_t j = IndexOf(walked, move->polygonCount, corridor->polygons[i]);
+        farthest = j >= 0 ? i : -1;
+        at = j;
+    }
+    // The walk began on the first polygon, so some polygon is shared.
+    int32_t lead = move->polygonCount - at;
+    int32_t rest = corridor->count - farthest - 1;
+    if (lead + rest > corridor->capacity)
+    {
+        return mnav_errorCapacity;
+    }
+    memmove(corridor->polygons + lead, corridor->polygons + farthest + 1,
+            (size_t)rest * sizeof(mnavPolygonId));
+    for (int32_t i = 0; i < lead; ++i)
+    {
+        corridor->polygons[i] = walked[move->polygonCount - 1 - i];
+    }
+    corridor->count = lead + rest;
+    return mnav_success;
+}
+
+// Merges a walk from the corridor's last polygon into its end: the
+// corridor up to the first polygon the walk passed, then the walk on.
+static mnavResult MergeEnd(mnavCorridor* corridor, const mnavMove* move)
+{
+    const mnavPolygonId* walked = move->polygons;
+    int32_t first = -1;
+    int32_t at = -1;
+    for (int32_t i = 0; i < corridor->count && first < 0; ++i)
+    {
+        at = IndexOf(walked, move->polygonCount, corridor->polygons[i]);
+        first = at >= 0 ? i : -1;
+    }
+    int32_t tail = move->polygonCount - at - 1;
+    if (first + 1 + tail > corridor->capacity)
+    {
+        return mnav_errorCapacity;
+    }
+    memcpy(corridor->polygons + first + 1, walked + at + 1, (size_t)tail * sizeof(mnavPolygonId));
+    corridor->count = first + 1 + tail;
+    return mnav_success;
+}
+
+mnavResult mnavMoveCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
+                            const mnavQueryFilter* filter, mnavCorridor* corridor, mnavPos3 wanted,
+                            mnavMove* moveOut)
+{
+    if (corridor == nullptr || corridor->polygons == nullptr || corridor->count < 1)
+    {
+        return mnav_errorInvalid;
+    }
+    mnavMove move;
+    mnavResult result = mnavMoveAlongSurface(query, navmesh, filter, corridor->polygons[0],
+                                             corridor->position, wanted, &move);
+    result = result == mnav_success ? MergeStart(corridor, &move) : result;
+    if (result == mnav_success)
+    {
+        corridor->position = move.point;
+    }
+    if (result == mnav_success && moveOut != nullptr)
+    {
+        *moveOut = move;
+    }
+    return result;
+}
+
+mnavResult mnavMoveCorridorTarget(mnavQuery* query, const mnavNavmesh* navmesh,
+                                  const mnavQueryFilter* filter, mnavCorridor* corridor,
+                                  mnavPos3 wanted, mnavMove* moveOut)
+{
+    if (corridor == nullptr || corridor->polygons == nullptr || corridor->count < 1)
+    {
+        return mnav_errorInvalid;
+    }
+    mnavMove move;
+    mnavResult result =
+        mnavMoveAlongSurface(query, navmesh, filter, corridor->polygons[corridor->count - 1],
+                             corridor->target, wanted, &move);
+    result = result == mnav_success ? MergeEnd(corridor, &move) : result;
+    if (result == mnav_success)
+    {
+        corridor->target = move.point;
+    }
+    if (result == mnav_success && moveOut != nullptr)
+    {
+        *moveOut = move;
+    }
+    return result;
+}
