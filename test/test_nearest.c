@@ -34,7 +34,7 @@ static mnavNavmesh* Load(int32_t tiles)
 static mnavNearest Near(const mnavNavmesh* navmesh, double x, double y, double z, float extent)
 {
     mnavNearest nearest;
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){x, y, z}, (mnavVec3){extent, extent, extent},
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, y, z}, (mnavVec3){extent, extent, extent},
                           &nearest) == mnav_success,
           "queried");
     return nearest;
@@ -62,8 +62,8 @@ static void TestPointInsideAnObstacle(void)
     // height of 1 m keeps its top out of reach.
     mnavNavmesh* navmesh = Load(4);
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){22.0, 0.3, 22.0}, (mnavVec3){4.0f, 0.5f, 4.0f}, &n) ==
-              mnav_success,
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){22.0, 0.3, 22.0},
+                          (mnavVec3){4.0f, 0.5f, 4.0f}, &n) == mnav_success,
           "queried");
     CHECK(n.polygon.slot != 0 && !n.over, "beside a polygon, not over one");
     double dx = n.point.x - 22.0;
@@ -95,26 +95,26 @@ static void TestBadArgumentsAreRefused(void)
 {
     mnavNavmesh* navmesh = Load(1);
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){(double)NAN, 0, 0}, (mnavVec3){1, 1, 1}, &n) ==
-              mnav_errorInvalid,
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){(double)NAN, 0, 0}, (mnavVec3){1, 1, 1},
+                          &n) == mnav_errorInvalid,
           "a NaN point");
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){0, (double)INFINITY, 0}, (mnavVec3){1, 1, 1}, &n) ==
-              mnav_errorInvalid,
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){0, (double)INFINITY, 0}, (mnavVec3){1, 1, 1},
+                          &n) == mnav_errorInvalid,
           "an infinite point");
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){0, 0, 0}, (mnavVec3){-1, 1, 1}, &n) ==
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){-1, 1, 1}, &n) ==
               mnav_errorInvalid,
           "a negative extent");
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){0, 0, 0}, (mnavVec3){1, NAN, 1}, &n) ==
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){1, NAN, 1}, &n) ==
               mnav_errorInvalid,
           "a NaN extent");
-    CHECK(mnavFindNearest(nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){1, 1, 1}, &n) ==
+    CHECK(mnavFindNearest(nullptr, nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){1, 1, 1}, &n) ==
               mnav_errorInvalid,
           "no navmesh");
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){0, 0, 0}, (mnavVec3){1, 1, 1}, nullptr) ==
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){1, 1, 1}, nullptr) ==
               mnav_errorInvalid,
           "nowhere to put it");
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){1.0e300, 0, 0}, (mnavVec3){1.0e30f, 1, 1}, &n) ==
-              mnav_success,
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){1.0e300, 0, 0}, (mnavVec3){1.0e30f, 1, 1},
+                          &n) == mnav_success,
           "a huge box past the extent is clamped to it");
     mnavDestroyNavmesh(navmesh);
 }

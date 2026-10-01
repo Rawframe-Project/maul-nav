@@ -55,8 +55,8 @@ static mnavQuery* MakeQuery(int32_t nodes, float length)
 static mnavNearest On(const mnavNavmesh* navmesh, double x, double y, double z)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){x, y, z}, (mnavVec3){2.0f, 2.0f, 2.0f}, &n) ==
-                  mnav_success &&
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, y, z}, (mnavVec3){2.0f, 2.0f, 2.0f},
+                          &n) == mnav_success &&
               n.polygon.slot != 0,
           "on the navmesh");
     return n;
@@ -65,7 +65,7 @@ static mnavNearest On(const mnavNavmesh* navmesh, double x, double y, double z)
 static mnavPath Search(mnavQuery* query, const mnavNavmesh* navmesh, mnavNearest a, mnavNearest b)
 {
     mnavPath path = {0};
-    CHECK(mnavFindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, &path) ==
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
               mnav_success,
           "searched");
     return path;
@@ -137,7 +137,8 @@ static bool Walkable(const mnavNavmesh* navmesh, const mnavPath* path)
             // Segments along walls touch the navmesh's edge, where
             // rounding leaves samples a few ulps outside.
             mnavNearest n;
-            if (mnavFindNearest(navmesh, p, (mnavVec3){0.5f, 1.0f, 0.5f}, &n) != mnav_success ||
+            if (mnavFindNearest(navmesh, nullptr, p, (mnavVec3){0.5f, 1.0f, 0.5f}, &n) !=
+                    mnav_success ||
                 n.polygon.slot == 0 || hypot(p.x - n.point.x, p.z - n.point.z) > 1.0e-9)
             {
                 return false;
@@ -256,7 +257,8 @@ static void TestUnloadedPlacesAreNamed(void)
 static void TestUnreachableIsNone(void)
 {
     // Two squares inside one tile, apart, touching none of its sides.
-    const HandSquare squares[2] = {{10, 10, 30, 30, {0, 0, 0, 0}}, {60, 60, 90, 90, {0, 0, 0, 0}}};
+    const HandSquare squares[2] = {{10, 10, 30, 30, {0, 0, 0, 0}, 0},
+                                   {60, 60, 90, 90, {0, 0, 0, 0}, 0}};
     static uint8_t bytes[2048];
     size_t size = HandTileBytes(bytes, 0, squares, 2);
     mnavBakeDef def = mnavDefaultBakeDef();
@@ -283,36 +285,36 @@ static void TestIdsAreChecked(void)
     mnavPath path;
     mnavPolygonId bad = a.polygon;
     bad.slot = 99;
-    CHECK(mnavFindPath(query, navmesh, bad, a.point, a.polygon, a.point, &path) ==
+    CHECK(mnavFindPath(query, navmesh, nullptr, bad, a.point, a.polygon, a.point, &path) ==
               mnav_errorInvalid,
           "no such slot");
     bad = a.polygon;
     bad.generation += 1;
-    CHECK(mnavFindPath(query, navmesh, a.polygon, a.point, bad, a.point, &path) ==
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, bad, a.point, &path) ==
               mnav_errorInvalid,
           "a generation not yet given");
     bad = a.polygon;
     bad.polygon = 60000;
-    CHECK(mnavFindPath(query, navmesh, a.polygon, a.point, bad, a.point, &path) ==
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, bad, a.point, &path) ==
               mnav_errorInvalid,
           "no such polygon");
     CHECK(mnavStageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "tile (0, 0) replaced");
-    CHECK(mnavFindPath(query, navmesh, a.polygon, a.point, a.polygon, a.point, &path) ==
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, a.polygon, a.point, &path) ==
               mnav_errorStale,
           "stale");
     mnavPos3 nan = {(double)NAN, 0.0, 0.0};
     a = On(navmesh, 2.0, 0.0, 2.0);
-    CHECK(mnavFindPath(query, navmesh, a.polygon, nan, a.polygon, a.point, &path) ==
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, nan, a.polygon, a.point, &path) ==
               mnav_errorInvalid,
           "a point not finite");
-    CHECK(mnavFindPath(nullptr, navmesh, a.polygon, a.point, a.polygon, a.point, &path) ==
+    CHECK(mnavFindPath(nullptr, navmesh, nullptr, a.polygon, a.point, a.polygon, a.point, &path) ==
                   mnav_errorInvalid &&
-              mnavFindPath(query, nullptr, a.polygon, a.point, a.polygon, a.point, &path) ==
-                  mnav_errorInvalid &&
-              mnavFindPath(query, navmesh, a.polygon, a.point, a.polygon, a.point, nullptr) ==
-                  mnav_errorInvalid,
+              mnavFindPath(query, nullptr, nullptr, a.polygon, a.point, a.polygon, a.point,
+                           &path) == mnav_errorInvalid &&
+              mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, a.polygon, a.point,
+                           nullptr) == mnav_errorInvalid,
           "NULL arguments");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -388,8 +390,10 @@ static void TestSearchesArePinned(void)
         mnavNearest a;
         mnavNearest b;
         mnavVec3 box = {3.0f, 2.0f, 3.0f};
-        CHECK(mnavFindNearest(navmesh, (mnavPos3){p[0], 0.0, p[1]}, box, &a) == mnav_success &&
-                  mnavFindNearest(navmesh, (mnavPos3){p[2], 0.0, p[3]}, box, &b) == mnav_success,
+        CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){p[0], 0.0, p[1]}, box, &a) ==
+                      mnav_success &&
+                  mnavFindNearest(navmesh, nullptr, (mnavPos3){p[2], 0.0, p[3]}, box, &b) ==
+                      mnav_success,
               "nearest");
         if (a.polygon.slot == 0 || b.polygon.slot == 0)
         {

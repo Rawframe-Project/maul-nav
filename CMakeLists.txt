@@ -60,6 +60,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/navmesh.c
     src/nearest.c
     src/path.c
+    src/query_filter.c
     src/raycast.c
     src/planar.c
     src/polymesh.c
@@ -96,6 +97,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(path WHITEBOX)
     maul_add_test(path_rules WHITEBOX)
     maul_add_test(raycast WHITEBOX)
+    maul_add_test(query_filter WHITEBOX)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)

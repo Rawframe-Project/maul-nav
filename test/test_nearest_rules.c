@@ -19,8 +19,8 @@
 // heights up.
 static mnavNavmesh* TwoFloors(int32_t high)
 {
-    const HandSquare squares[2] = {{0, 0, 40, 40, {0, 0, 0, 0}},
-                                   {41, 0, 80, 40, {high, high, high, high}}};
+    const HandSquare squares[2] = {{0, 0, 40, 40, {0, 0, 0, 0}, 0},
+                                   {41, 0, 80, 40, {high, high, high, high}, 0}};
     static uint8_t bytes[2048];
     size_t size = HandTileBytes(bytes, 0, squares, 2);
     mnavBakeDef def = mnavDefaultBakeDef();
@@ -35,8 +35,8 @@ static mnavNavmesh* TwoFloors(int32_t high)
 static uint32_t NearestPolygon(const mnavNavmesh* navmesh, double x, double y)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){x, y, 5.0}, (mnavVec3){4.0f, 4.0f, 4.0f}, &n) ==
-              mnav_success,
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, y, 5.0}, (mnavVec3){4.0f, 4.0f, 4.0f},
+                          &n) == mnav_success,
           "queried");
     return n.polygon.slot != 0 ? n.polygon.polygon : 99;
 }

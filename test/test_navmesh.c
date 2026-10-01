@@ -275,10 +275,10 @@ static int32_t HandLinks(const int32_t* left, const int32_t* right)
     static uint8_t b[1024];
     const int32_t flatLeft[4] = {0, 0, left[1], left[0]};
     const int32_t flatRight[4] = {right[0], right[1], 0, 0};
-    const HandSquare left4 = {
-        100, 0, 128, 10, {flatLeft[0], flatLeft[1], flatLeft[2], flatLeft[3]}};
+    const HandSquare left4 = {100, 0, 128, 10, {flatLeft[0], flatLeft[1], flatLeft[2], flatLeft[3]},
+                              0};
     const HandSquare right4 = {
-        0, 0, 20, 10, {flatRight[0], flatRight[1], flatRight[2], flatRight[3]}};
+        0, 0, 20, 10, {flatRight[0], flatRight[1], flatRight[2], flatRight[3]}, 0};
     size_t sizeA = HandTileBytes(a, 0, &left4, 1);
     size_t sizeB = HandTileBytes(b, 1, &right4, 1);
     mnavNavmesh* navmesh = Make();

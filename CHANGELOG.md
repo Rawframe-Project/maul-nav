@@ -132,3 +132,8 @@ format.
   a segment along the navmesh in binary64 with exact link ranges, and
   ends reached, at a wall with its normal, at a side with no tile
   loaded, or out of nodes.
+- Query filters (mnav-0005): mnavQueryFilter and
+  mnavDefaultQueryFilter, a cost and an inclusion bit per area type.
+  mnavFindNearest, mnavFindPath and mnavRaycast take a filter after the
+  navmesh (NULL for the default); mnavPath gains the length in meters
+  beside its cost, and the path length limit counts meters.

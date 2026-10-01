@@ -6,6 +6,7 @@
 #include "navmesh.h"
 #include "polymesh.h"
 #include "query.h"
+#include "query_filter.h"
 
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
@@ -21,6 +22,7 @@ typedef struct Walk
     mnavPos3 start;
     double wayX;
     double wayZ;
+    const mnavQueryFilter* filter;
     int32_t slot;
     int32_t polygon;
 } Walk;
@@ -50,8 +52,10 @@ static bool Follow(Walk* w, int32_t j, double t, bool* notLoaded)
     const mnavPolygon* polygon = &tile->mesh.polygons[w->polygon];
     if (polygon->neighbors[j] != MNAV_NO_INDEX)
     {
-        w->polygon = polygon->neighbors[j];
-        return true;
+        uint16_t next = polygon->neighbors[j];
+        bool included = mnavIncludes(w->filter, tile->mesh.polygons[next].area);
+        w->polygon = included ? next : w->polygon;
+        return included;
     }
     int32_t side = polygon->sides[j];
     if (side == 0)
@@ -76,7 +80,9 @@ static bool Follow(Walk* w, int32_t j, double t, bool* notLoaded)
     for (int32_t l = tile->firstLink[w->polygon]; l < tile->firstLink[w->polygon + 1]; ++l)
     {
         const mnavLink* link = &tile->links[l];
-        if (link->edge == j && u >= link->low && u <= link->high)
+        const mnavTile* target = w->navmesh->slots[link->target.slot - 1].tile;
+        bool included = mnavIncludes(w->filter, target->mesh.polygons[link->target.polygon].area);
+        if (link->edge == j && u >= link->low && u <= link->high && included)
         {
             w->slot = (int32_t)link->target.slot - 1;
             w->polygon = (int32_t)link->target.polygon;
@@ -124,8 +130,8 @@ static void Wall(mnavRay* ray, mnavPos3 a, mnavPos3 b)
     ray->normalZ = -ex / length;
 }
 
-mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId startPolygon,
-                       mnavPos3 start, mnavPos3 end, mnavRay* rayOut)
+mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                       mnavPolygonId startPolygon, mnavPos3 start, mnavPos3 end, mnavRay* rayOut)
 {
     if (query == nullptr || navmesh == nullptr || rayOut == nullptr || !isfinite(start.x) ||
         !isfinite(start.y) || !isfinite(start.z) || !isfinite(end.x) || !isfinite(end.z))
@@ -133,6 +139,8 @@ mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygon
         return mnav_errorInvalid;
     }
     mnavResult result = mnavCheckPolygon(navmesh, startPolygon);
+    const mnavQueryFilter* usable = nullptr;
+    result = result == mnav_success ? mnavCheckFilter(filter, &usable) : result;
     if (result != mnav_success)
     {
         return result;
@@ -141,6 +149,7 @@ mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygon
               start,
               end.x - start.x,
               end.z - start.z,
+              usable,
               (int32_t)startPolygon.slot - 1,
               (int32_t)startPolygon.polygon};
     *rayOut = (mnavRay){mnav_rayReached, 1.0, 0.0, 0.0, query->corridor, 0};

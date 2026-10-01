@@ -51,21 +51,23 @@ static mnavRay Cast(mnavQuery* query, const mnavNavmesh* navmesh, double x0, dou
                     double z1)
 {
     mnavNearest a;
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){x0, 0.0, z0}, (mnavVec3){0.1f, 1.0f, 0.1f}, &a) ==
-                  mnav_success &&
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x0, 0.0, z0}, (mnavVec3){0.1f, 1.0f, 0.1f},
+                          &a) == mnav_success &&
               a.over,
           "the start on a polygon");
     mnavRay ray = {0};
-    CHECK(mnavRaycast(query, navmesh, a.polygon, a.point, (mnavPos3){x1, 0.0, z1}, &ray) ==
+    CHECK(mnavRaycast(query, navmesh, nullptr, a.polygon, a.point, (mnavPos3){x1, 0.0, z1}, &ray) ==
               mnav_success,
           "cast");
     return ray;
 }
 
-static const HandSquare s_row[4] = {
-    {0, 0, 20, 20, {0}}, {20, 0, 40, 20, {0}}, {40, 0, 60, 20, {0}}, {60, 0, 80, 20, {0}}};
+static const HandSquare s_row[4] = {{0, 0, 20, 20, {0}, 0},
+                                    {20, 0, 40, 20, {0}, 0},
+                                    {40, 0, 60, 20, {0}, 0},
+                                    {60, 0, 80, 20, {0}, 0}};
 static const HandSquare s_ell[3] = {
-    {0, 0, 20, 20, {0}}, {20, 0, 40, 20, {0}}, {20, 20, 40, 40, {0}}};
+    {0, 0, 20, 20, {0}, 0}, {20, 0, 40, 20, {0}, 0}, {20, 20, 40, 40, {0}, 0}};
 
 static void TestReachAndWalls(void)
 {
@@ -120,8 +122,8 @@ static void TestTileSides(void)
 {
     // A tall square on tile (0, 0)'s +X side, world z 0 to 20, and one on
     // tile (1, 0)'s -X side, z 0 to 10: the link covers z 0 to 10.
-    const HandSquare left[1] = {{100, 0, 128, 80, {0}}};
-    const HandSquare right[1] = {{0, 0, 20, 40, {0}}};
+    const HandSquare left[1] = {{100, 0, 128, 80, {0}, 0}};
+    const HandSquare right[1] = {{0, 0, 20, 40, {0}, 0}};
     mnavNavmesh* navmesh = Make(left, 1, right, 1);
     mnavQuery* query = MakeQuery(64);
     mnavRay ray = Cast(query, navmesh, 26.0, 1.0, 36.0, 7.0);
@@ -152,27 +154,32 @@ static void TestArgumentsAreChecked(void)
     mnavNavmesh* navmesh = Make(s_row, 4, nullptr, 0);
     mnavQuery* query = MakeQuery(64);
     mnavNearest a;
-    CHECK(mnavFindNearest(navmesh, (mnavPos3){1.0, 0.0, 1.0}, (mnavVec3){0.1f, 1.0f, 0.1f}, &a) ==
-              mnav_success,
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){1.0, 0.0, 1.0}, (mnavVec3){0.1f, 1.0f, 0.1f},
+                          &a) == mnav_success,
           "start");
     mnavRay ray;
     mnavPos3 nan = {(double)NAN, 0.0, 0.0};
-    CHECK(mnavRaycast(query, navmesh, a.polygon, a.point, nan, &ray) == mnav_errorInvalid &&
-              mnavRaycast(query, navmesh, a.polygon, nan, a.point, &ray) == mnav_errorInvalid,
+    CHECK(mnavRaycast(query, navmesh, nullptr, a.polygon, a.point, nan, &ray) ==
+                  mnav_errorInvalid &&
+              mnavRaycast(query, navmesh, nullptr, a.polygon, nan, a.point, &ray) ==
+                  mnav_errorInvalid,
           "points not finite");
-    CHECK(mnavRaycast(nullptr, navmesh, a.polygon, a.point, a.point, &ray) == mnav_errorInvalid &&
-              mnavRaycast(query, nullptr, a.polygon, a.point, a.point, &ray) == mnav_errorInvalid &&
-              mnavRaycast(query, navmesh, a.polygon, a.point, a.point, nullptr) ==
+    CHECK(mnavRaycast(nullptr, navmesh, nullptr, a.polygon, a.point, a.point, &ray) ==
+                  mnav_errorInvalid &&
+              mnavRaycast(query, nullptr, nullptr, a.polygon, a.point, a.point, &ray) ==
+                  mnav_errorInvalid &&
+              mnavRaycast(query, navmesh, nullptr, a.polygon, a.point, a.point, nullptr) ==
                   mnav_errorInvalid,
           "NULL arguments");
     mnavPolygonId bad = a.polygon;
     bad.slot = 9;
-    CHECK(mnavRaycast(query, navmesh, bad, a.point, a.point, &ray) == mnav_errorInvalid,
+    CHECK(mnavRaycast(query, navmesh, nullptr, bad, a.point, a.point, &ray) == mnav_errorInvalid,
           "no such slot");
     size_t size = HandTileBytes(s_bytes[0], 0, s_row, 4);
     CHECK(mnavStageTile(navmesh, s_bytes[0], size).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success &&
-              mnavRaycast(query, navmesh, a.polygon, a.point, a.point, &ray) == mnav_errorStale,
+              mnavRaycast(query, navmesh, nullptr, a.polygon, a.point, a.point, &ray) ==
+                  mnav_errorStale,
           "stale");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -207,8 +214,8 @@ static void TestWorldRays(void)
         double x = 4.0 + (i % 8) * 7.5;
         double z = 4.0 + (i / 8) * 7.5;
         mnavNearest a;
-        CHECK(mnavFindNearest(navmesh, (mnavPos3){x, 0.0, z}, (mnavVec3){3.0f, 2.0f, 3.0f}, &a) ==
-                  mnav_success,
+        CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 0.0, z}, (mnavVec3){3.0f, 2.0f, 3.0f},
+                              &a) == mnav_success,
               "start");
         if (a.polygon.slot == 0)
         {
@@ -218,7 +225,8 @@ static void TestWorldRays(void)
         {
             mnavPos3 end = {a.point.x + s_fan[k][0], 0.0, a.point.z + s_fan[k][1]};
             mnavRay ray = {0};
-            CHECK(mnavRaycast(query, navmesh, a.polygon, a.point, end, &ray) == mnav_success,
+            CHECK(mnavRaycast(query, navmesh, nullptr, a.polygon, a.point, end, &ray) ==
+                      mnav_success,
                   "cast");
             ends[ray.end] += 1;
             for (int32_t s = 0; s <= 120; ++s)
@@ -227,10 +235,10 @@ static void TestWorldRays(void)
                 mnavPos3 p = {a.point.x + f * (end.x - a.point.x), a.point.y,
                               a.point.z + f * (end.z - a.point.z)};
                 mnavNearest n;
-                onMesh =
-                    onMesh &&
-                    mnavFindNearest(navmesh, p, (mnavVec3){0.5f, 2.0f, 0.5f}, &n) == mnav_success &&
-                    n.polygon.slot != 0 && hypot(p.x - n.point.x, p.z - n.point.z) < 1.0e-9;
+                onMesh = onMesh &&
+                         mnavFindNearest(navmesh, nullptr, p, (mnavVec3){0.5f, 2.0f, 0.5f}, &n) ==
+                             mnav_success &&
+                         n.polygon.slot != 0 && hypot(p.x - n.point.x, p.z - n.point.z) < 1.0e-9;
             }
             hash = mnavHash64(hash, &ray.end, (int32_t)sizeof(ray.end));
             hash = mnavHash64(hash, &ray.t, (int32_t)sizeof(ray.t));

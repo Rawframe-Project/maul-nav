@@ -6,6 +6,7 @@
 #include "detail.h"
 #include "navmesh.h"
 #include "polymesh.h"
+#include "query_filter.h"
 #include "raster.h"
 
 #include "maul-nav/bake.h"
@@ -239,8 +240,8 @@ static bool Finite(double v)
     return isfinite(v);
 }
 
-mnavResult mnavFindNearest(const mnavNavmesh* navmesh, mnavPos3 point, mnavVec3 halfExtents,
-                           mnavNearest* nearestOut)
+mnavResult mnavFindNearest(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                           mnavPos3 point, mnavVec3 halfExtents, mnavNearest* nearestOut)
 {
     if (navmesh == nullptr || nearestOut == nullptr || !Finite(point.x) || !Finite(point.y) ||
         !Finite(point.z) ||
@@ -248,6 +249,12 @@ mnavResult mnavFindNearest(const mnavNavmesh* navmesh, mnavPos3 point, mnavVec3 
         !isfinite(halfExtents.x) || !isfinite(halfExtents.y) || !isfinite(halfExtents.z))
     {
         return mnav_errorInvalid;
+    }
+    const mnavQueryFilter* usable = nullptr;
+    mnavResult checked = mnavCheckFilter(filter, &usable);
+    if (checked != mnav_success)
+    {
+        return checked;
     }
     *nearestOut = (mnavNearest){0};
     const mnavBakeDef* def = &navmesh->def;
@@ -281,7 +288,7 @@ mnavResult mnavFindNearest(const mnavNavmesh* navmesh, mnavPos3 point, mnavVec3 
         mnavFrame f = mnavFrameOf(navmesh, place->x, place->z);
         for (int32_t p = 0; p < tile->mesh.polygonCount; ++p)
         {
-            if (InBox(&s, &f, tile, p))
+            if (mnavIncludes(usable, tile->mesh.polygons[p].area) && InBox(&s, &f, tile, p))
             {
                 Consider(&s, &f, place->slot, tile, p);
             }

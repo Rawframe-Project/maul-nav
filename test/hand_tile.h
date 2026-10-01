@@ -34,6 +34,8 @@ typedef struct HandSquare
     int32_t x1;
     int32_t z1;
     int32_t y[4];
+    // The area type; 0 for mnav_areaWalkable.
+    mnavAreaType area;
 } HandSquare;
 
 static inline uint8_t HandSide(int32_t ax, int32_t az, int32_t bx, int32_t bz, int32_t size)
@@ -107,7 +109,7 @@ static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare
         const int32_t xs[4] = {q->x0, q->x0, q->x1, q->x1};
         const int32_t zs[4] = {q->z0, q->z1, q->z1, q->z0};
         mnavPolygon* polygon = &polygons[s];
-        *polygon = (mnavPolygon){{0}, {0}, {0}, 4, 1, 0};
+        *polygon = (mnavPolygon){{0}, {0}, {0}, 4, q->area != 0 ? q->area : 1, 0};
         memset(polygon->vertices, 0xFF, sizeof(polygon->vertices));
         memset(polygon->neighbors, 0xFF, sizeof(polygon->neighbors));
         for (int32_t k = 0; k < 4; ++k)

@@ -59,6 +59,16 @@ that are not loaded must say so rather than treat them as walls.
   the polygons crossed reach the node limit, and reports the fraction
   travelled and the polygons crossed.
 
+- **Filters:** every query takes an `mnavQueryFilter` (NULL for the
+  default): a cost per area type, from 0.001 to 1,000,000, and a mask of
+  the area types included. A search step costs its length times the
+  cost of the polygon it lies in, and the heuristic is the distance
+  times the cheapest included cost, so it stays consistent at any
+  costs. Excluded polygons are not entered, are walls to rays, and are
+  skipped by the nearest point; the start polygon is always usable. The
+  path length limit counts meters, and a path reports its cost and its
+  length apart.
+
 ## Consequences
 
 - Queries scan the polygons of each loaded tile in their box; a search

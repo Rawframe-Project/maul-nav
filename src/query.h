@@ -31,7 +31,10 @@ typedef struct mnavSearchNode
     mnavPos3 a;
     mnavPos3 b;
     mnavPos3 at;
+    // The cost so far, the length so far in meters, and the heuristic: the
+    // distance to the end times the cheapest included area's cost.
     double cost;
+    double length;
     double remaining;
     // The polygon entered: its 0-based slot and index.
     int32_t slot;

@@ -19,6 +19,31 @@ extern "C"
 {
 #endif
 
+// The cheapest and dearest an area's cost may be.
+#define MNAV_MIN_AREA_COST 0.001f
+#define MNAV_MAX_AREA_COST 1000000.0f
+
+    // Which polygons a query may use and what crossing them costs, by area
+    // type (N9). Build it with mnavDefaultQueryFilter.
+    typedef struct mnavQueryFilter
+    {
+        uint32_t cookie;
+        // What a meter costs in each area type, MNAV_MIN_AREA_COST to
+        // MNAV_MAX_AREA_COST; 1 by default.
+        float costs[MNAV_AREA_TYPES];
+        // Bit n set when polygons of area type n may be used; every
+        // walkable type by default. Bit 0 is ignored: area 0 is never
+        // walkable.
+        uint64_t areas;
+    } mnavQueryFilter;
+
+    /// Returns the filter that uses every walkable area at a cost of 1.
+    ///
+    /// @return The filter.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MNAV_API mnavQueryFilter mnavDefaultQueryFilter(void);
+
     // The nearest point on the navmesh to a query point.
     typedef struct mnavNearest
     {
@@ -35,24 +60,30 @@ extern "C"
         bool incomplete;
     } mnavNearest;
 
-    /// Finds the polygon nearest a point whose nearest point lies within a
-    /// box round it, and that point. A point over a polygon scores the height it
-    /// lies beyond the agent's step, any other the distance to the
-    /// polygon; ties go to the shorter distance, then the tile first by
-    /// place (x, then z), then the lower polygon index.
+    /// Finds the polygon, among those the filter includes, nearest a point
+    /// whose nearest point lies within a box round it, and that point. A
+    /// point over a polygon scores the height it lies beyond the agent's
+    /// step, any other the distance to the polygon; ties go to the shorter
+    /// distance, then the tile first by place (x, then z), then the lower
+    /// polygon index.
     ///
     /// @param navmesh      The navmesh.
+    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param point        The query point.
     /// @param halfExtents  The box's half sizes, in meters, at least 0.
     /// @param nearestOut   Receives the result.
     /// @return `mnav_success`, also when no polygon's nearest point lies in
-    /// the box (the polygon's slot is then 0); `mnav_errorInvalid` for a NULL argument,
-    /// a point or extent that is not finite, or a negative extent.
+    /// the box (the polygon's slot is then 0); `mnav_errorInvalid` for a NULL
+    /// argument, a point or extent that is not finite, or a negative
+    /// extent; `mnav_errorInvalid` for a filter not built from
+    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of its
+    /// range.
     /// @par Thread safety
     /// Safe from any thread. Any number of queries may run at once between
     /// commits.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindNearest(const mnavNavmesh* navmesh, mnavPos3 point,
-                                                       mnavVec3 halfExtents,
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindNearest(const mnavNavmesh* navmesh,
+                                                       const mnavQueryFilter* filter,
+                                                       mnavPos3 point, mnavVec3 halfExtents,
                                                        mnavNearest* nearestOut);
 
 // The largest nodes one search may use.
@@ -109,10 +140,12 @@ extern "C"
     typedef struct mnavPath
     {
         mnavPathEnd end;
-        // The length of the way searched, in meters, through the midpoints
-        // of the edges the corridor crosses; the straight path is never
-        // longer.
+        // The cost of the way searched, through the midpoints of the edges
+        // the corridor crosses: each step's length times the cost of the
+        // area it lies in.
         double cost;
+        // That way's length in meters; the straight path is never longer.
+        double length;
         // The polygons from the start polygon on, in the context's memory
         // until its next search.
         const mnavPolygonId* polygons;
@@ -155,11 +188,16 @@ extern "C"
     /// Searches for the shortest way from a point on one polygon to a point
     /// on another (mnav-0005): A* over the edges between polygons, its
     /// heuristic the straight distance to the end point; ties go to the
-    /// node made first. The corridor found is
-    /// pulled tight into a straight path with the funnel algorithm.
+    /// node made first. A step costs its length times the cost of the area
+    /// it crosses, and the heuristic is scaled by the cheapest included
+    /// area's cost; polygons of excluded areas other than the start
+    /// polygon are not entered. The corridor found is pulled tight into a
+    /// straight path with the funnel algorithm.
     ///
     /// @param query        The context; its memory holds the result.
     /// @param navmesh      The navmesh.
+    /// @param filter       The areas usable and their costs, or NULL for
+    ///                     every walkable area at a cost of 1.
     /// @param startPolygon The polygon the start point lies on, as
     ///                     mnavFindNearest gives it.
     /// @param start        The start point.
@@ -168,13 +206,16 @@ extern "C"
     /// @param pathOut      Receives the result.
     /// @return `mnav_success` whenever a search ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite
-    /// or a polygon id that never existed; `mnav_errorStale` for a polygon
-    /// id whose tile has been replaced or removed.
+    /// or a polygon id that never existed; `mnav_errorInvalid` for a filter not built from
+    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of its
+    /// range; `mnav_errorStale` for a polygon id whose tile
+    /// has been replaced or removed.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may search one navmesh at once between
     /// commits.
     MNAV_NODISCARD MNAV_API mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                    const mnavQueryFilter* filter,
                                                     mnavPolygonId startPolygon, mnavPos3 start,
                                                     mnavPolygonId endPolygon, mnavPos3 end,
                                                     mnavPath* pathOut);
@@ -214,12 +255,14 @@ extern "C"
     /// Casts a ray along the navmesh on the ground from a point on a polygon
     /// toward an end point (mnav-0005): polygon to polygon through the
     /// first edge it crosses, until it reaches the end point, meets a wall
-    /// or a tile side with no tile loaded, or crosses as many polygons as
-    /// the context's node limit. Where it leaves through a corner, it goes
+    /// (an edge into a polygon the filter excludes is a wall too) or a tile
+    /// side with no tile loaded, or crosses as many polygons as the
+    /// context's node limit. Where it leaves through a corner, it goes
     /// on through an edge that leads on, the lowest-numbered first.
     ///
     /// @param query        The context; its memory holds the polygons.
     /// @param navmesh      The navmesh.
+    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param startPolygon The polygon the start point lies on, as
     ///                     mnavFindNearest gives it.
     /// @param start        The start point.
@@ -227,13 +270,16 @@ extern "C"
     /// @param rayOut       Receives the result.
     /// @return `mnav_success` whenever the ray was cast, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite
-    /// or a polygon id that never existed; `mnav_errorStale` for a polygon
-    /// id whose tile has been replaced or removed.
+    /// or a polygon id that never existed; `mnav_errorInvalid` for a filter not built from
+    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of its
+    /// range; `mnav_errorStale` for a polygon id whose tile
+    /// has been replaced or removed.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may cast on one navmesh at once between
     /// commits.
     MNAV_NODISCARD MNAV_API mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                   const mnavQueryFilter* filter,
                                                    mnavPolygonId startPolygon, mnavPos3 start,
                                                    mnavPos3 end, mnavRay* rayOut);
 

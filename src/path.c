@@ -7,6 +7,7 @@
 #include "navmesh.h"
 #include "polymesh.h"
 #include "query.h"
+#include "query_filter.h"
 #include "raster.h"
 
 #include "maul-nav/base.h"
@@ -216,6 +217,9 @@ typedef struct Search
 {
     mnavQuery* query;
     const mnavNavmesh* navmesh;
+    const mnavQueryFilter* filter;
+    // The cheapest included area's cost, scaling the heuristic.
+    double cheapest;
     mnavPos3 end;
     int32_t endSlot;
     int32_t endPolygon;
@@ -245,9 +249,14 @@ static void Open(Search* s, int32_t from, const mnavSearchNode* key, mnavPos3 a,
     mnavQuery* query = s->query;
     const mnavSearchNode* parent = &query->nodes[from];
     mnavPos3 at = key->tag == MNAV_TAG_END ? s->end : Midpoint(a, b);
-    double cost = parent->cost + Distance(parent->at, at);
-    double remaining = key->tag == MNAV_TAG_END ? 0.0 : Distance(at, s->end);
-    if (cost + remaining > s->limit)
+    // The step lies in the parent's polygon, which is convex.
+    const mnavPolygon* crossed =
+        &s->navmesh->slots[parent->slot].tile->mesh.polygons[parent->polygon];
+    double step = Distance(parent->at, at);
+    double cost = parent->cost + step * (double)s->filter->costs[crossed->area];
+    double length = parent->length + step;
+    double toEnd = key->tag == MNAV_TAG_END ? 0.0 : Distance(at, s->end);
+    if (length + toEnd > s->limit)
     {
         s->tooLong = true;
         return;
@@ -260,6 +269,7 @@ static void Open(Search* s, int32_t from, const mnavSearchNode* key, mnavPos3 a,
         if (node->heap != MNAV_NO_NODE && cost < node->cost)
         {
             node->cost = cost;
+            node->length = length;
             node->parent = from;
             SiftUp(query, node->heap);
         }
@@ -272,7 +282,8 @@ static void Open(Search* s, int32_t from, const mnavSearchNode* key, mnavPos3 a,
     }
     n = query->nodeCount++;
     query->nodes[n] = (mnavSearchNode){
-        a, b, at, cost, remaining, key->slot, key->polygon, key->tag, key->low, from, MNAV_NO_NODE};
+        a,        b,        at,   cost,        length, toEnd * s->cheapest, key->slot, key->polygon,
+        key->tag, key->low, from, MNAV_NO_NODE};
     query->table[cell] = n;
     query->heap[query->heapCount] = n;
     SiftUp(query, query->heapCount++);
@@ -287,6 +298,10 @@ static void ExpandInner(Search* s, int32_t n, const mnavTile* tile, int32_t j)
     uint16_t from = polygon->vertices[j];
     uint16_t to = polygon->vertices[(j + 1) % polygon->count];
     const mnavPolygon* other = &tile->mesh.polygons[next];
+    if (!mnavIncludes(s->filter, other->area))
+    {
+        return;
+    }
     for (int32_t i = 0; i < other->count; ++i)
     {
         if (other->vertices[i] == to && other->vertices[(i + 1) % other->count] == from)
@@ -338,7 +353,9 @@ static void ExpandSide(Search* s, int32_t n, const mnavTile* tile, int32_t j)
     {
         const mnavLink* link = &tile->links[l];
         bool back = node->tag == MNAV_TAG_LINK + side && node->low == link->low;
-        if (link->edge != j || back)
+        const mnavTile* beyond = s->navmesh->slots[link->target.slot - 1].tile;
+        mnavAreaType area = beyond->mesh.polygons[link->target.polygon].area;
+        if (link->edge != j || back || !mnavIncludes(s->filter, area))
         {
             continue;
         }
@@ -538,8 +555,9 @@ static mnavPathEnd EndOf(const Search* s)
     return s->notLoaded ? mnav_pathNotLoaded : mnav_pathNone;
 }
 
-mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId startPolygon,
-                        mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end, mnavPath* pathOut)
+mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                        mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
+                        mnavPos3 end, mnavPath* pathOut)
 {
     if (query == nullptr || navmesh == nullptr || pathOut == nullptr || !FinitePoint(start) ||
         !FinitePoint(end))
@@ -548,6 +566,8 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygo
     }
     mnavResult result = mnavCheckPolygon(navmesh, startPolygon);
     result = result == mnav_success ? mnavCheckPolygon(navmesh, endPolygon) : result;
+    const mnavQueryFilter* usable = nullptr;
+    result = result == mnav_success ? mnavCheckFilter(filter, &usable) : result;
     if (result != mnav_success)
     {
         return result;
@@ -555,6 +575,8 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygo
     memset(query->table, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
     Search s = {query,
                 navmesh,
+                usable,
+                mnavCheapest(usable),
                 end,
                 (int32_t)endPolygon.slot - 1,
                 (int32_t)endPolygon.polygon,
@@ -566,7 +588,8 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygo
                                        start,
                                        start,
                                        0.0,
-                                       Distance(start, end),
+                                       0.0,
+                                       Distance(start, end) * s.cheapest,
                                        (int32_t)startPolygon.slot - 1,
                                        (int32_t)startPolygon.polygon,
                                        MNAV_TAG_START,
@@ -593,6 +616,7 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygo
     int32_t last = found != MNAV_NO_NODE ? found : best;
     *pathOut = (mnavPath){found != MNAV_NO_NODE ? mnav_pathFound : EndOf(&s),
                           query->nodes[last].cost,
+                          query->nodes[last].length,
                           query->corridor,
                           Corridor(query, navmesh, last),
                           query->points,
