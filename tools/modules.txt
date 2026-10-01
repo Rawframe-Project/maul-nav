@@ -41,4 +41,5 @@ modifiers: allocator navmesh
 grid: query query_filter
 # Avoidance (mnav-0006) uses the base alone, never a navmesh module.
 orca:
-avoidance: allocator orca
+obstacle: orca
+avoidance: allocator obstacle orca

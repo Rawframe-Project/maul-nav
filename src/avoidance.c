@@ -9,6 +9,7 @@
 #include "maul-nav/avoidance.h"
 
 #include "allocator.h"
+#include "obstacle.h"
 #include "orca.h"
 
 #include "maul-nav/base.h"
@@ -53,18 +54,35 @@ struct mnavAvoidance
     Key* keys;
     Key* scratch;
     Neighbor* neighbors;
+    mnavObstacleVertex* vertices;
+    mnavObstacleNear* near;
+    // Room for the obstacle lines, then the agents'.
     mnavLine* lines;
     mnavLine* projected;
 };
 
 mnavAvoidanceDef mnavDefaultAvoidanceDef(void)
 {
-    return (mnavAvoidanceDef){AVOIDANCE_DEF_COOKIE, {0}, {4096, 10}, 10.0, 2.0};
+    return (mnavAvoidanceDef){AVOIDANCE_DEF_COOKIE, {0}, {4096, 10, 4096, 16}, 10.0, 2.0, 2.0};
 }
 
 static bool Positive(double v)
 {
     return isfinite(v) && v > 0.0;
+}
+
+// Whether a def's limits, distance and horizons lie in their ranges.
+static bool GoodLimits(const mnavAvoidanceDef* def)
+{
+    const mnavAvoidanceLimits* limits = &def->limits;
+    return limits->agents >= 1 && limits->agents <= MNAV_MAX_AVOIDANCE_AGENTS &&
+           limits->neighbors >= 1 && limits->neighbors <= MNAV_MAX_AVOIDANCE_NEIGHBORS &&
+           limits->obstacleVertices >= 0 &&
+           limits->obstacleVertices <= MNAV_MAX_AVOIDANCE_VERTICES &&
+           limits->obstacleNeighbors >= 1 &&
+           limits->obstacleNeighbors <= MNAV_MAX_AVOIDANCE_NEIGHBORS &&
+           Positive(def->neighborDistance) && Positive(def->timeHorizon) &&
+           Positive(def->obstacleTimeHorizon);
 }
 
 mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoidanceOut)
@@ -80,9 +98,7 @@ mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoi
         return mnav_errorInvalid;
     }
     const mnavAvoidanceLimits* limits = &def->limits;
-    if (limits->agents < 1 || limits->agents > MNAV_MAX_AVOIDANCE_AGENTS || limits->neighbors < 1 ||
-        limits->neighbors > MNAV_MAX_AVOIDANCE_NEIGHBORS || !Positive(def->neighborDistance) ||
-        !Positive(def->timeHorizon))
+    if (!GoodLimits(def))
     {
         return mnav_errorRange;
     }
@@ -99,6 +115,8 @@ mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoi
     a->def = *def;
     size_t agents = (size_t)limits->agents;
     size_t neighbors = (size_t)limits->neighbors;
+    size_t vertices = (size_t)limits->obstacleVertices;
+    size_t near = (size_t)limits->obstacleNeighbors;
     result = mnavAllocate(&a->memory, agents, sizeof(Key), alignof(Key), (void**)&a->keys);
     if (result == mnav_success)
     {
@@ -109,14 +127,24 @@ mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoi
         result = mnavAllocate(&a->memory, neighbors, sizeof(Neighbor), alignof(Neighbor),
                               (void**)&a->neighbors);
     }
+    if (result == mnav_success && vertices > 0)
+    {
+        result = mnavAllocate(&a->memory, vertices, sizeof(mnavObstacleVertex),
+                              alignof(mnavObstacleVertex), (void**)&a->vertices);
+    }
     if (result == mnav_success)
     {
-        result = mnavAllocate(&a->memory, neighbors, sizeof(mnavLine), alignof(mnavLine),
+        result = mnavAllocate(&a->memory, near, sizeof(mnavObstacleNear), alignof(mnavObstacleNear),
+                              (void**)&a->near);
+    }
+    if (result == mnav_success)
+    {
+        result = mnavAllocate(&a->memory, neighbors + near, sizeof(mnavLine), alignof(mnavLine),
                               (void**)&a->lines);
     }
     if (result == mnav_success)
     {
-        result = mnavAllocate(&a->memory, neighbors, sizeof(mnavLine), alignof(mnavLine),
+        result = mnavAllocate(&a->memory, neighbors + near, sizeof(mnavLine), alignof(mnavLine),
                               (void**)&a->projected);
     }
     if (result != mnav_success)
@@ -135,13 +163,20 @@ void mnavDestroyAvoidance(mnavAvoidance* avoidance)
         return;
     }
     mnavMemory memory = avoidance->memory;
-    size_t agents = (size_t)avoidance->def.limits.agents;
-    size_t neighbors = (size_t)avoidance->def.limits.neighbors;
+    const mnavAvoidanceLimits* limits = &avoidance->def.limits;
+    size_t agents = (size_t)limits->agents;
+    size_t neighbors = (size_t)limits->neighbors;
+    size_t near = (size_t)limits->obstacleNeighbors;
+    size_t lines = neighbors + near;
     mnavRelease(&memory, avoidance->keys, agents, sizeof(Key), alignof(Key));
     mnavRelease(&memory, avoidance->scratch, agents, sizeof(Key), alignof(Key));
     mnavRelease(&memory, avoidance->neighbors, neighbors, sizeof(Neighbor), alignof(Neighbor));
-    mnavRelease(&memory, avoidance->lines, neighbors, sizeof(mnavLine), alignof(mnavLine));
-    mnavRelease(&memory, avoidance->projected, neighbors, sizeof(mnavLine), alignof(mnavLine));
+    mnavRelease(&memory, avoidance->vertices, (size_t)limits->obstacleVertices,
+                sizeof(mnavObstacleVertex), alignof(mnavObstacleVertex));
+    mnavRelease(&memory, avoidance->near, near, sizeof(mnavObstacleNear),
+                alignof(mnavObstacleNear));
+    mnavRelease(&memory, avoidance->lines, lines, sizeof(mnavLine), alignof(mnavLine));
+    mnavRelease(&memory, avoidance->projected, lines, sizeof(mnavLine), alignof(mnavLine));
     mnavRelease(&memory, avoidance, 1, sizeof(mnavAvoidance), alignof(mnavAvoidance));
 }
 
@@ -273,81 +308,52 @@ static int32_t Neighbors(mnavAvoidance* a, const mnavAgent* agents, int32_t coun
     return found;
 }
 
-// The ORCA line of agent self against other: the half-plane of its
-// velocities that, with other doing its share, avoid colliding within
-// the horizon, or for agents already overlapping, parting within the
-// step. self's share is other's priority over the sum of both.
-static mnavLine AgentLine(const mnavAgent* self, const mnavAgent* other, double horizon,
-                          double step)
+// The new velocity of agent i: its obstacle lines, then its neighbours',
+// the 2D program over them all and the 3D one when they leave nothing.
+static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, int32_t agentCount,
+                      int32_t vertexCount, double step, int32_t i)
 {
-    mnavPos2 position = {other->position.x - self->position.x,
-                         other->position.y - self->position.y};
-    mnavPos2 velocity = {self->velocity.x - other->velocity.x,
-                         self->velocity.y - other->velocity.y};
-    double distance = position.x * position.x + position.y * position.y;
-    double combined = self->radius + other->radius;
-    double combinedSq = combined * combined;
-    double share = other->priority / (self->priority + other->priority);
-    mnavLine line;
-    mnavPos2 u;
-    if (distance > combinedSq)
+    const mnavAgent* self = &agents[i];
+    int32_t near = mnavNearObstacles(self, a->vertices, vertexCount, a->def.obstacleTimeHorizon,
+                                     a->near, a->def.limits.obstacleNeighbors);
+    int32_t fixed = mnavObstacleLines(self, a->vertices, a->near, near, a->def.obstacleTimeHorizon,
+                                      step, a->lines);
+    int32_t count = fixed;
+    int32_t neighbors = Neighbors(a, agents, agentCount, i);
+    for (int32_t n = 0; n < neighbors; ++n)
     {
-        double inverse = 1.0 / horizon;
-        mnavPos2 w = {velocity.x - inverse * position.x, velocity.y - inverse * position.y};
-        double wSq = w.x * w.x + w.y * w.y;
-        double dot = w.x * position.x + w.y * position.y;
-        if (dot < 0.0 && dot * dot > combinedSq * wSq)
-        {
-            // Onto the cut-off circle.
-            double length = sqrt(wSq);
-            mnavPos2 unit = {w.x / length, w.y / length};
-            line.direction = (mnavPos2){unit.y, -unit.x};
-            double by = combined * inverse - length;
-            u = (mnavPos2){by * unit.x, by * unit.y};
-        }
-        else
-        {
-            // Onto a leg.
-            double leg = sqrt(distance - combinedSq);
-            if (position.x * w.y - position.y * w.x > 0.0)
-            {
-                line.direction = (mnavPos2){(position.x * leg - position.y * combined) / distance,
-                                            (position.x * combined + position.y * leg) / distance};
-            }
-            else
-            {
-                line.direction =
-                    (mnavPos2){-(position.x * leg + position.y * combined) / distance,
-                               -(-position.x * combined + position.y * leg) / distance};
-            }
-            double along = velocity.x * line.direction.x + velocity.y * line.direction.y;
-            u = (mnavPos2){along * line.direction.x - velocity.x,
-                           along * line.direction.y - velocity.y};
-        }
+        const mnavAgent* other = &agents[a->neighbors[n].index];
+        a->lines[count++] = mnavPairLine(self->position, self->velocity, other->position,
+                                         other->velocity, self->radius + other->radius,
+                                         other->priority / (self->priority + other->priority),
+                                         a->def.timeHorizon, step, self->id < other->id);
     }
-    else
+    mnavPos2 velocity = {0.0, 0.0};
+    int32_t failed =
+        mnavLinearProgram2(a->lines, count, self->maxSpeed, self->preferred, false, &velocity);
+    if (failed == count && (velocity.x != self->preferred.x || velocity.y != self->preferred.y))
     {
-        // Overlapping: part within the step.
-        double inverse = 1.0 / step;
-        mnavPos2 w = {velocity.x - inverse * position.x, velocity.y - inverse * position.y};
-        double length = sqrt(w.x * w.x + w.y * w.y);
-        // Same place, same velocity: the lower id goes one way and the
-        // other the opposite.
-        mnavPos2 unit = length > 0.0 ? (mnavPos2){w.x / length, w.y / length}
-                                     : (mnavPos2){self->id < other->id ? -1.0 : 1.0, 0.0};
-        line.direction = (mnavPos2){unit.y, -unit.x};
-        double by = combined * inverse - length;
-        u = (mnavPos2){by * unit.x, by * unit.y};
+        // Held back: aim a little right of the preferred velocity, so that
+        // agents meeting in perfect symmetry pass on their right rather
+        // than stop face to face.
+        mnavPos2 biased = {self->preferred.x + KEEP_RIGHT * self->preferred.y,
+                           self->preferred.y - KEEP_RIGHT * self->preferred.x};
+        failed = mnavLinearProgram2(a->lines, count, self->maxSpeed, biased, false, &velocity);
     }
-    line.point = (mnavPos2){self->velocity.x + share * u.x, self->velocity.y + share * u.y};
-    return line;
+    if (failed < count)
+    {
+        mnavLinearProgram3(a->lines, count, fixed, failed, self->maxSpeed, a->projected, &velocity);
+    }
+    return velocity;
 }
 
 mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount,
-                     double step, mnavPos2* velocitiesOut)
+                     const mnavObstacle* obstacles, int32_t obstacleCount, double step,
+                     mnavPos2* velocitiesOut)
 {
-    if (avoidance == nullptr || agentCount < 0 ||
-        (agentCount > 0 && (agents == nullptr || velocitiesOut == nullptr)) || !Positive(step))
+    if (avoidance == nullptr || agentCount < 0 || obstacleCount < 0 ||
+        (agentCount > 0 && (agents == nullptr || velocitiesOut == nullptr)) ||
+        (obstacleCount > 0 && obstacles == nullptr) || !Positive(step))
     {
         return mnav_errorInvalid;
     }
@@ -365,35 +371,17 @@ mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t 
         avoidance->keys[i] = (Key){CellOf(agents[i].position.x, range),
                                    CellOf(agents[i].position.y, range), agents[i].id, i};
     }
+    int32_t vertexCount = 0;
+    mnavResult result = mnavBuildObstacles(obstacles, obstacleCount, avoidance->vertices,
+                                           avoidance->def.limits.obstacleVertices, &vertexCount);
+    if (result != mnav_success)
+    {
+        return result;
+    }
     SortKeys(avoidance->keys, avoidance->scratch, agentCount);
     for (int32_t i = 0; i < agentCount; ++i)
     {
-        const mnavAgent* self = &agents[i];
-        int32_t count = Neighbors(avoidance, agents, agentCount, i);
-        for (int32_t n = 0; n < count; ++n)
-        {
-            avoidance->lines[n] = AgentLine(self, &agents[avoidance->neighbors[n].index],
-                                            avoidance->def.timeHorizon, step);
-        }
-        mnavPos2 velocity = {0.0, 0.0};
-        int32_t failed = mnavLinearProgram2(avoidance->lines, count, self->maxSpeed,
-                                            self->preferred, false, &velocity);
-        if (failed == count && (velocity.x != self->preferred.x || velocity.y != self->preferred.y))
-        {
-            // Held back: aim a little right of the preferred velocity, so
-            // that agents meeting in perfect symmetry pass on their right
-            // rather than stop face to face.
-            mnavPos2 biased = {self->preferred.x + KEEP_RIGHT * self->preferred.y,
-                               self->preferred.y - KEEP_RIGHT * self->preferred.x};
-            failed = mnavLinearProgram2(avoidance->lines, count, self->maxSpeed, biased, false,
-                                        &velocity);
-        }
-        if (failed < count)
-        {
-            mnavLinearProgram3(avoidance->lines, count, 0, failed, self->maxSpeed,
-                               avoidance->projected, &velocity);
-        }
-        velocitiesOut[i] = velocity;
+        velocitiesOut[i] = Solve(avoidance, agents, agentCount, vertexCount, step, i);
     }
     return mnav_success;
 }

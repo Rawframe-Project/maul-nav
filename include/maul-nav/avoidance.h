@@ -21,6 +21,8 @@ extern "C"
 // The most agents and neighbours per agent an avoidance set may have.
 #define MNAV_MAX_AVOIDANCE_AGENTS    1048576
 #define MNAV_MAX_AVOIDANCE_NEIGHBORS 256
+// The most obstacle points one call may have.
+#define MNAV_MAX_AVOIDANCE_VERTICES 1048576
 
     // A point or a velocity on the ground plane, binary64.
     typedef struct mnavPos2
@@ -48,6 +50,24 @@ extern "C"
         uint64_t id;
     } mnavAgent;
 
+    // An obstacle agents steer round, taking the whole avoidance: one point
+    // and a radius (a circle), two points (a segment), or three or more
+    // counterclockwise (a polygon agents stay out of). A moving one
+    // translates at its velocity; it does not turn.
+    typedef struct mnavObstacle
+    {
+        // The points, in meters. Only read during the call.
+        const mnavPos2* points;
+        // At least 1.
+        int32_t pointCount;
+        // A circle's radius, more than 0; 0 for two or more points.
+        double radius;
+        mnavPos2 velocity;
+        // The host's id for the obstacle, which orders obstacles at equal
+        // distances; ids should differ, or the input's order counts.
+        uint64_t id;
+    } mnavObstacle;
+
     // The limits of an avoidance set.
     typedef struct mnavAvoidanceLimits
     {
@@ -56,6 +76,11 @@ extern "C"
         // Neighbours each agent avoids, the nearest first, 1 to
         // MNAV_MAX_AVOIDANCE_NEIGHBORS.
         int32_t neighbors;
+        // Obstacle points in one call, 0 to MNAV_MAX_AVOIDANCE_VERTICES.
+        int32_t obstacleVertices;
+        // Obstacle edges and circles each agent avoids, the nearest first,
+        // 1 to MNAV_MAX_AVOIDANCE_NEIGHBORS.
+        int32_t obstacleNeighbors;
     } mnavAvoidanceLimits;
 
     // How an avoidance set is made. Build it with mnavDefaultAvoidanceDef.
@@ -70,13 +95,17 @@ extern "C"
         double neighborDistance;
         // How far ahead agents avoid each other, in seconds, more than 0.
         double timeHorizon;
+        // How far ahead agents avoid obstacles, in seconds, more than 0.
+        double obstacleTimeHorizon;
     } mnavAvoidanceDef;
 
     // An avoidance set: the memory its limits need.
     typedef struct mnavAvoidance mnavAvoidance;
 
     /// Returns the default avoidance def: up to 4096 agents, each avoiding
-    /// its 10 nearest neighbours within 10 m, 2 s ahead.
+    /// its 10 nearest neighbours within 10 m, 2 s ahead, and up to 4096
+    /// obstacle points, each agent avoiding its 16 nearest obstacle edges
+    /// or circles, 2 s ahead.
     ///
     /// @return The def.
     /// @par Thread safety
@@ -104,9 +133,12 @@ extern "C"
     MNAV_API void mnavDestroyAvoidance(mnavAvoidance* avoidance);
 
     /// Finds each agent's new velocity: the one nearest its preferred
-    /// velocity, no faster than its maximum speed, that avoids colliding
-    /// with its neighbours within the time horizon if they do their share
-    /// (ORCA); when none does, the one that breaks those constraints least.
+    /// velocity, no faster than its maximum speed, that avoids the
+    /// obstacles within the obstacle horizon and colliding with its
+    /// neighbours within the time horizon if they do their share (ORCA);
+    /// when none does, the one that keeps clear of the obstacles and breaks
+    /// the agents' constraints least. An agent sees an obstacle edge only
+    /// from outside it.
     /// An agent held back from its preferred velocity aims 1% of its speed
     /// to the right of it, so that agents meeting in perfect symmetry pass
     /// rather than stop face to face. The same agents give the same
@@ -115,19 +147,25 @@ extern "C"
     /// @param avoidance     The set.
     /// @param agents        The agents.
     /// @param agentCount    How many, at least 0.
+    /// @param obstacles     The obstacles.
+    /// @param obstacleCount How many, at least 0.
     /// @param step          The step the velocities are for, in seconds,
     ///                      more than 0: agents already overlapping part
     ///                      within it.
     /// @param velocitiesOut Receives agentCount velocities, in the agents'
     ///                      order.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
-    /// agents, a negative count, a step not more than 0 or not finite, or
-    /// an agent with a value not finite or out of its range;
-    /// `mnav_errorLimit` for more agents than the set's limit.
+    /// agents or obstacles, a negative count, a step not more than 0 or not
+    /// finite, an agent or obstacle point with a value not finite or out of
+    /// its range, a zero-length obstacle edge, a circle's radius not more
+    /// than 0, another obstacle with a radius, or a polygon not
+    /// counterclockwise; `mnav_errorLimit` for more agents or obstacle
+    /// points than the set's limits.
     /// @par Thread safety
     /// Safe from any thread; the set is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents,
-                                                 int32_t agentCount, double step,
+                                                 int32_t agentCount, const mnavObstacle* obstacles,
+                                                 int32_t obstacleCount, double step,
                                                  mnavPos2* velocitiesOut);
 
 #ifdef __cplusplus

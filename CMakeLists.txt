@@ -65,6 +65,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/input.c
     src/navmesh.c
     src/nearest.c
+    src/obstacle.c
     src/offmesh.c
     src/orca.c
     src/outline.c

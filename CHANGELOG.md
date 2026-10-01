@@ -183,3 +183,8 @@ format.
   mnavAvoidanceLimits, mnavAvoidanceDef, mnavDefaultAvoidanceDef,
   mnavCreateAvoidance, mnavDestroyAvoidance and mnavAvoid: ORCA in
   binary64 among agents, ordered by ids and split by priority.
+- Avoidance obstacles (mnav-0006): mnavObstacle (circles, segments,
+  counterclockwise polygons, static or moving), the def's
+  obstacleTimeHorizon and limits.obstacleVertices and
+  limits.obstacleNeighbors; mnavAvoid takes the obstacles beside the
+  agents.

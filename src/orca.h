@@ -10,8 +10,40 @@
 
 #include "maul-nav/avoidance.h"
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
+
+// Vector helpers on the ground plane.
+static inline mnavPos2 mnavAdd2(mnavPos2 a, mnavPos2 b)
+{
+    return (mnavPos2){a.x + b.x, a.y + b.y};
+}
+
+static inline mnavPos2 mnavSub2(mnavPos2 a, mnavPos2 b)
+{
+    return (mnavPos2){a.x - b.x, a.y - b.y};
+}
+
+static inline mnavPos2 mnavScale2(mnavPos2 a, double s)
+{
+    return (mnavPos2){a.x * s, a.y * s};
+}
+
+static inline double mnavDot2(mnavPos2 a, mnavPos2 b)
+{
+    return a.x * b.x + a.y * b.y;
+}
+
+static inline double mnavDet2(mnavPos2 a, mnavPos2 b)
+{
+    return a.x * b.y - a.y * b.x;
+}
+
+static inline mnavPos2 mnavNormalize2(mnavPos2 a)
+{
+    return mnavScale2(a, 1.0 / sqrt(mnavDot2(a, a)));
+}
 
 // Lines whose directions' cross product is within this count as parallel.
 #define MNAV_ORCA_PARALLEL 1e-9
@@ -36,5 +68,15 @@ int32_t mnavLinearProgram2(const mnavLine* lines, int32_t count, double radius, 
 // scratch room for count lines.
 void mnavLinearProgram3(const mnavLine* lines, int32_t count, int32_t fixed, int32_t first,
                         double radius, mnavLine* scratch, mnavPos2* result);
+
+// The ORCA line of a disc against another, combined being their radii's
+// sum: the velocities of the first that, if the other takes the rest,
+// avoid colliding within horizon, or for discs already overlapping, part
+// within step. share is the first's part of the avoidance, 1 against an
+// obstacle; lowerId says which way it goes from a disc on the same spot
+// with the same velocity.
+mnavLine mnavPairLine(mnavPos2 selfPosition, mnavPos2 selfVelocity, mnavPos2 otherPosition,
+                      mnavPos2 otherVelocity, double combined, double share, double horizon,
+                      double step, bool lowerId);
 
 #endif // MAUL_NAV_SRC_ORCA_H

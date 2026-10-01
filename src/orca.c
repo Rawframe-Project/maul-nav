@@ -13,36 +13,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-static mnavPos2 Add(mnavPos2 a, mnavPos2 b)
-{
-    return (mnavPos2){a.x + b.x, a.y + b.y};
-}
-
-static mnavPos2 Sub(mnavPos2 a, mnavPos2 b)
-{
-    return (mnavPos2){a.x - b.x, a.y - b.y};
-}
-
-static mnavPos2 Scale(mnavPos2 a, double s)
-{
-    return (mnavPos2){a.x * s, a.y * s};
-}
-
-static double Dot(mnavPos2 a, mnavPos2 b)
-{
-    return a.x * b.x + a.y * b.y;
-}
-
-static double Det(mnavPos2 a, mnavPos2 b)
-{
-    return a.x * b.y - a.y * b.x;
-}
-
-static mnavPos2 Normalize(mnavPos2 a)
-{
-    return Scale(a, 1.0 / sqrt(Dot(a, a)));
-}
-
 // Narrows [left, right] along line n to where the lines before it allow;
 // false when nothing is left.
 static bool Bound(const mnavLine* lines, int32_t n, double* left, double* right)
@@ -50,8 +20,8 @@ static bool Bound(const mnavLine* lines, int32_t n, double* left, double* right)
     const mnavLine* line = &lines[n];
     for (int32_t i = 0; i < n; ++i)
     {
-        double denominator = Det(line->direction, lines[i].direction);
-        double numerator = Det(lines[i].direction, Sub(line->point, lines[i].point));
+        double denominator = mnavDet2(line->direction, lines[i].direction);
+        double numerator = mnavDet2(lines[i].direction, mnavSub2(line->point, lines[i].point));
         if (fabs(denominator) <= MNAV_ORCA_PARALLEL)
         {
             if (numerator < 0.0)
@@ -83,8 +53,8 @@ static bool Program1(const mnavLine* lines, int32_t n, double radius, mnavPos2 w
                      bool directionOpt, mnavPos2* result)
 {
     const mnavLine* line = &lines[n];
-    double dot = Dot(line->point, line->direction);
-    double discriminant = dot * dot + radius * radius - Dot(line->point, line->point);
+    double dot = mnavDot2(line->point, line->direction);
+    double discriminant = dot * dot + radius * radius - mnavDot2(line->point, line->point);
     if (discriminant < 0.0)
     {
         return false;
@@ -99,14 +69,14 @@ static bool Program1(const mnavLine* lines, int32_t n, double radius, mnavPos2 w
     double t = 0.0;
     if (directionOpt)
     {
-        t = Dot(wanted, line->direction) > 0.0 ? right : left;
+        t = mnavDot2(wanted, line->direction) > 0.0 ? right : left;
     }
     else
     {
-        t = Dot(line->direction, Sub(wanted, line->point));
+        t = mnavDot2(line->direction, mnavSub2(wanted, line->point));
         t = t < left ? left : (t > right ? right : t);
     }
-    *result = Add(line->point, Scale(line->direction, t));
+    *result = mnavAdd2(line->point, mnavScale2(line->direction, t));
     return true;
 }
 
@@ -115,11 +85,11 @@ int32_t mnavLinearProgram2(const mnavLine* lines, int32_t count, double radius, 
 {
     if (directionOpt)
     {
-        *result = Scale(wanted, radius);
+        *result = mnavScale2(wanted, radius);
     }
-    else if (Dot(wanted, wanted) > radius * radius)
+    else if (mnavDot2(wanted, wanted) > radius * radius)
     {
-        *result = Scale(Normalize(wanted), radius);
+        *result = mnavScale2(mnavNormalize2(wanted), radius);
     }
     else
     {
@@ -127,7 +97,7 @@ int32_t mnavLinearProgram2(const mnavLine* lines, int32_t count, double radius, 
     }
     for (int32_t i = 0; i < count; ++i)
     {
-        if (Det(lines[i].direction, Sub(lines[i].point, *result)) > 0.0)
+        if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) > 0.0)
         {
             mnavPos2 before = *result;
             if (!Program1(lines, i, radius, wanted, directionOpt, result))
@@ -144,21 +114,21 @@ int32_t mnavLinearProgram2(const mnavLine* lines, int32_t count, double radius, 
 // program's projection runs; false when they point the same way.
 static bool Bisector(const mnavLine* i, const mnavLine* j, mnavLine* out)
 {
-    double determinant = Det(i->direction, j->direction);
+    double determinant = mnavDet2(i->direction, j->direction);
     if (fabs(determinant) <= MNAV_ORCA_PARALLEL)
     {
-        if (Dot(i->direction, j->direction) > 0.0)
+        if (mnavDot2(i->direction, j->direction) > 0.0)
         {
             return false;
         }
-        out->point = Scale(Add(i->point, j->point), 0.5);
+        out->point = mnavScale2(mnavAdd2(i->point, j->point), 0.5);
     }
     else
     {
-        double t = Det(j->direction, Sub(i->point, j->point)) / determinant;
-        out->point = Add(i->point, Scale(i->direction, t));
+        double t = mnavDet2(j->direction, mnavSub2(i->point, j->point)) / determinant;
+        out->point = mnavAdd2(i->point, mnavScale2(i->direction, t));
     }
-    out->direction = Normalize(Sub(j->direction, i->direction));
+    out->direction = mnavNormalize2(mnavSub2(j->direction, i->direction));
     return true;
 }
 
@@ -168,7 +138,7 @@ void mnavLinearProgram3(const mnavLine* lines, int32_t count, int32_t fixed, int
     double distance = 0.0;
     for (int32_t i = first; i < count; ++i)
     {
-        if (Det(lines[i].direction, Sub(lines[i].point, *result)) <= distance)
+        if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) <= distance)
         {
             continue;
         }
@@ -189,6 +159,65 @@ void mnavLinearProgram3(const mnavLine* lines, int32_t count, int32_t fixed, int
             // program's region. Rounding can say otherwise; keep it then.
             *result = before;
         }
-        distance = Det(lines[i].direction, Sub(lines[i].point, *result));
+        distance = mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result));
     }
+}
+
+mnavLine mnavPairLine(mnavPos2 selfPosition, mnavPos2 selfVelocity, mnavPos2 otherPosition,
+                      mnavPos2 otherVelocity, double combined, double share, double horizon,
+                      double step, bool lowerId)
+{
+    mnavPos2 position = mnavSub2(otherPosition, selfPosition);
+    mnavPos2 velocity = mnavSub2(selfVelocity, otherVelocity);
+    double distance = mnavDot2(position, position);
+    double combinedSq = combined * combined;
+    mnavLine line;
+    mnavPos2 u;
+    if (distance > combinedSq)
+    {
+        double inverse = 1.0 / horizon;
+        mnavPos2 w = mnavSub2(velocity, mnavScale2(position, inverse));
+        double wSq = mnavDot2(w, w);
+        double dot = mnavDot2(w, position);
+        if (dot < 0.0 && dot * dot > combinedSq * wSq)
+        {
+            // Onto the cut-off circle.
+            double length = sqrt(wSq);
+            mnavPos2 unit = {w.x / length, w.y / length};
+            line.direction = (mnavPos2){unit.y, -unit.x};
+            u = mnavScale2(unit, combined * inverse - length);
+        }
+        else
+        {
+            // Onto a leg.
+            double leg = sqrt(distance - combinedSq);
+            if (mnavDet2(position, w) > 0.0)
+            {
+                line.direction = (mnavPos2){(position.x * leg - position.y * combined) / distance,
+                                            (position.x * combined + position.y * leg) / distance};
+            }
+            else
+            {
+                line.direction =
+                    (mnavPos2){-(position.x * leg + position.y * combined) / distance,
+                               -(-position.x * combined + position.y * leg) / distance};
+            }
+            u = mnavSub2(mnavScale2(line.direction, mnavDot2(velocity, line.direction)), velocity);
+        }
+    }
+    else
+    {
+        // Overlapping: part within the step.
+        double inverse = 1.0 / step;
+        mnavPos2 w = mnavSub2(velocity, mnavScale2(position, inverse));
+        double length = sqrt(mnavDot2(w, w));
+        // Same place, same velocity: the lower id goes one way and the
+        // other the opposite.
+        mnavPos2 unit = length > 0.0 ? (mnavPos2){w.x / length, w.y / length}
+                                     : (mnavPos2){lowerId ? -1.0 : 1.0, 0.0};
+        line.direction = (mnavPos2){unit.y, -unit.x};
+        u = mnavScale2(unit, combined * inverse - length);
+    }
+    line.point = mnavAdd2(selfVelocity, mnavScale2(u, share));
+    return line;
 }

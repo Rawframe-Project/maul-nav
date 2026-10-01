@@ -32,6 +32,15 @@ symmetry face to face.
   both of each avoidance; equal priorities are plain ORCA.
 - **Symmetry:** an agent held back from its preferred velocity aims 1%
   of its speed to its right; an agent left free keeps it exactly.
+- **Obstacles:** `mnavObstacle` is a circle (one point and a radius),
+  a segment (two points) or a counterclockwise polygon, with a velocity
+  and an id. A circle gives the line of an agent that never gives way;
+  edges give RVO2's obstacle lines, seen from outside only, the nearest
+  first by distance, then id and vertex, at most
+  `limits.obstacleNeighbors`. A moving obstacle's lines are its static
+  lines, built from the agent's velocity relative to it, moved by its
+  velocity. Obstacle lines are kept by the 3D program; their points
+  count against `limits.obstacleVertices`.
 - **Memory and limits:** an `mnavAvoidance` owns the memory for
   `limits.agents` and `limits.neighbors`; more agents is
   `mnav_errorLimit`.
@@ -41,5 +50,7 @@ symmetry face to face.
 - The host owns time: it passes the step and applies the velocities.
 - Dense symmetric crowds can still jam with a short time horizon, as
   in RVO2; the horizon is the host's to set.
-- Obstacles (circles, segments, polygons, static or moving) come next,
-  as lines built before the agents' and never shared.
+- Avoidance is local: an agent whose preferred velocity points into a
+  block waits at its face, as in RVO2; going round is a path's work.
+- Each agent tests every obstacle edge; a grid for edges waits for a
+  measured need.
