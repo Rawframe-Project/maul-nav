@@ -220,6 +220,10 @@ static void TestPolygonsInBoxes(void)
               mnavFindPolygons(navmesh, nullptr, c, half, list, -1, &some) == mnav_errorInvalid &&
               mnavFindPolygons(navmesh, nullptr, c, (mnavVec3){-1.0f, 1.0f, 1.0f}, list, 4,
                                &some) == mnav_errorInvalid &&
+              mnavFindPolygons(navmesh, nullptr, c, (mnavVec3){1.0f, -1.0f, 1.0f}, list, 4,
+                               &some) == mnav_errorInvalid &&
+              mnavFindPolygons(navmesh, nullptr, c, (mnavVec3){1.0f, 1.0f, -1.0f}, list, 4,
+                               &some) == mnav_errorInvalid &&
               mnavFindPolygons(navmesh, nullptr, (mnavPos3){(double)NAN, 0.0, 0.0}, half, list, 4,
                                &some) == mnav_errorInvalid &&
               mnavFindPolygons(navmesh, nullptr, c, half, list, 4, nullptr) == mnav_errorInvalid &&
