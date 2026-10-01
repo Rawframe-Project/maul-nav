@@ -23,3 +23,6 @@ format.
   which sort and merge into each column's solid spans, so a tile's
   heightfield depends only on the set of input triangles, not their
   order (N12). Its hash is pinned across platforms.
+- The walkable filters (internal): spans within a step above walkable
+  ground become walkable, ledges and steep neighbors are removed, and
+  so is ground without the agent's height of free space (N13).

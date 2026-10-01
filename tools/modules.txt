@@ -7,3 +7,4 @@ bake_def: scalar
 input: bake_def
 raster: allocator
 heightfield: allocator raster
+filter: heightfield
