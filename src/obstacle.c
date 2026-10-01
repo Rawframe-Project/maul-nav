@@ -147,30 +147,168 @@ static double Reach(const mnavAgent* agent, const mnavObstacleVertex* vertices, 
     return distance < range * range ? distance : -1.0;
 }
 
-int32_t mnavNearObstacles(const mnavAgent* agent, const mnavObstacleVertex* vertices,
-                          int32_t vertexCount, double horizon, mnavObstacleNear* list,
-                          int32_t limit)
+// The bounds of vertex v's circle or edge.
+static void Bounds(const mnavObstacleVertex* vertices, int32_t v, mnavPos2* low, mnavPos2* high)
 {
-    int32_t count = 0;
+    const mnavObstacleVertex* o = &vertices[v];
+    mnavPos2 a = o->point;
+    mnavPos2 b = o->radius > 0.0 ? o->point : vertices[o->next].point;
+    *low = (mnavPos2){(a.x < b.x ? a.x : b.x) - o->radius, (a.y < b.y ? a.y : b.y) - o->radius};
+    *high = (mnavPos2){(a.x > b.x ? a.x : b.x) + o->radius, (a.y > b.y ? a.y : b.y) + o->radius};
+}
+
+static int64_t CellOf(double v, double size)
+{
+    return (int64_t)floor(v / size);
+}
+
+// The entries vertices' bounds take at a cell size.
+static int64_t Entries(const mnavObstacleVertex* vertices, int32_t count, double size)
+{
+    int64_t total = 0;
+    for (int32_t v = 0; v < count; ++v)
+    {
+        mnavPos2 low;
+        mnavPos2 high;
+        Bounds(vertices, v, &low, &high);
+        total += (CellOf(high.x, size) - CellOf(low.x, size) + 1) *
+                 (CellOf(high.y, size) - CellOf(low.y, size) + 1);
+    }
+    return total;
+}
+
+static bool CellBefore(const mnavObstacleCell* a, const mnavObstacleCell* b)
+{
+    if (a->x != b->x)
+    {
+        return a->x < b->x;
+    }
+    return a->y != b->y ? a->y < b->y : a->vertex < b->vertex;
+}
+
+// A stable bottom-up merge sort through the scratch.
+static void SortCells(mnavObstacleCell* cells, mnavObstacleCell* scratch, int32_t count)
+{
+    mnavObstacleCell* from = cells;
+    mnavObstacleCell* to = scratch;
+    for (int32_t width = 1; width < count; width *= 2)
+    {
+        for (int32_t start = 0; start < count; start += 2 * width)
+        {
+            int32_t middle = start + width < count ? start + width : count;
+            int32_t end = start + 2 * width < count ? start + 2 * width : count;
+            int32_t i = start;
+            int32_t j = middle;
+            for (int32_t k = start; k < end; ++k)
+            {
+                bool left = i < middle && (j >= end || !CellBefore(&from[j], &from[i]));
+                to[k] = left ? from[i++] : from[j++];
+            }
+        }
+        mnavObstacleCell* swap = from;
+        from = to;
+        to = swap;
+    }
+    for (int32_t k = 0; from != cells && k < count; ++k)
+    {
+        cells[k] = from[k];
+    }
+}
+
+void mnavBuildObstacleGrid(mnavObstacleGrid* grid, const mnavObstacleVertex* vertices,
+                           int32_t vertexCount, double size)
+{
+    // Long edges on small cells take many entries: the cells double until
+    // they fit, which they do once no bound spans more than two cells.
+    while (Entries(vertices, vertexCount, size) > grid->capacity)
+    {
+        size *= 2.0;
+    }
+    grid->size = size;
+    grid->count = 0;
+    grid->fastest = 0.0;
     for (int32_t v = 0; v < vertexCount; ++v)
     {
-        double distance = Reach(agent, vertices, v, horizon);
-        if (distance < 0.0)
+        mnavPos2 low;
+        mnavPos2 high;
+        Bounds(vertices, v, &low, &high);
+        for (int64_t x = CellOf(low.x, size); x <= CellOf(high.x, size); ++x)
         {
-            continue;
+            for (int64_t y = CellOf(low.y, size); y <= CellOf(high.y, size); ++y)
+            {
+                grid->cells[grid->count++] = (mnavObstacleCell){x, y, v};
+            }
         }
-        mnavObstacleNear candidate = {distance, v};
-        if (count == limit && !NearBefore(vertices, candidate, list[count - 1]))
+        double speed = sqrt(mnavDot2(vertices[v].velocity, vertices[v].velocity));
+        grid->fastest = speed > grid->fastest ? speed : grid->fastest;
+        grid->stamps[v] = -1;
+    }
+    SortCells(grid->cells, grid->scratch, grid->count);
+    grid->stamp = 0;
+}
+
+// The first entry at or after cell (x, y).
+static int32_t FirstAt(const mnavObstacleGrid* grid, int64_t x, int64_t y)
+{
+    int32_t low = 0;
+    int32_t high = grid->count;
+    while (low < high)
+    {
+        int32_t middle = low + (high - low) / 2;
+        const mnavObstacleCell* c = &grid->cells[middle];
+        bool before = c->x < x || (c->x == x && c->y < y);
+        low = before ? middle + 1 : low;
+        high = before ? high : middle;
+    }
+    return low;
+}
+
+// Keeps a candidate among the nearest, up to the limit; returns the count.
+static int32_t Keep(const mnavObstacleVertex* vertices, mnavObstacleNear* list, int32_t count,
+                    int32_t limit, mnavObstacleNear candidate)
+{
+    if (count == limit && !NearBefore(vertices, candidate, list[count - 1]))
+    {
+        return count;
+    }
+    int32_t i = count < limit ? count++ : count - 1;
+    while (i > 0 && NearBefore(vertices, candidate, list[i - 1]))
+    {
+        list[i] = list[i - 1];
+        i -= 1;
+    }
+    list[i] = candidate;
+    return count;
+}
+
+int32_t mnavNearObstacles(const mnavAgent* agent, const mnavObstacleVertex* vertices,
+                          mnavObstacleGrid* grid, double horizon, mnavObstacleNear* list,
+                          int32_t limit)
+{
+    // Every circle and edge within any vertex's reach lies in the box.
+    double reach = horizon * (agent->maxSpeed + grid->fastest) + agent->radius;
+    mnavPos2 p = agent->position;
+    int64_t y0 = CellOf(p.y - reach, grid->size);
+    int64_t y1 = CellOf(p.y + reach, grid->size);
+    int32_t stamp = grid->stamp++;
+    int32_t count = 0;
+    for (int64_t x = CellOf(p.x - reach, grid->size); x <= CellOf(p.x + reach, grid->size); ++x)
+    {
+        for (int32_t k = FirstAt(grid, x, y0);
+             k < grid->count && grid->cells[k].x == x && grid->cells[k].y <= y1; ++k)
         {
-            continue;
+            int32_t v = grid->cells[k].vertex;
+            if (grid->stamps[v] == stamp)
+            {
+                continue;
+            }
+            grid->stamps[v] = stamp;
+            double distance = Reach(agent, vertices, v, horizon);
+            if (distance >= 0.0)
+            {
+                count = Keep(vertices, list, count, limit, (mnavObstacleNear){distance, v});
+            }
         }
-        int32_t i = count < limit ? count++ : count - 1;
-        while (i > 0 && NearBefore(vertices, candidate, list[i - 1]))
-        {
-            list[i] = list[i - 1];
-            i -= 1;
-        }
-        list[i] = candidate;
     }
     return count;
 }

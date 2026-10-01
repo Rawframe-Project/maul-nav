@@ -30,6 +30,9 @@
 // fraction of its speed.
 #define KEEP_RIGHT 0.01
 
+// Obstacle grid entries per obstacle vertex.
+#define ENTRIES_PER_VERTEX 8
+
 // An agent's grid cell, id and index, sorted to find neighbours.
 typedef struct Key
 {
@@ -56,6 +59,7 @@ struct mnavAvoidance
     Neighbor* neighbors;
     mnavObstacleVertex* vertices;
     mnavObstacleNear* near;
+    mnavObstacleGrid grid;
     // Room for the obstacle lines, then the agents'.
     mnavLine* lines;
     mnavLine* projected;
@@ -85,39 +89,16 @@ static bool GoodLimits(const mnavAvoidanceDef* def)
            Positive(def->obstacleTimeHorizon);
 }
 
-mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoidanceOut)
+// Allocates a set's memory for its limits.
+static mnavResult Allocate(mnavAvoidance* a)
 {
-    if (avoidanceOut == nullptr)
-    {
-        return mnav_errorInvalid;
-    }
-    *avoidanceOut = nullptr;
-    if (def == nullptr || def->cookie != AVOIDANCE_DEF_COOKIE ||
-        (def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
-    {
-        return mnav_errorInvalid;
-    }
-    const mnavAvoidanceLimits* limits = &def->limits;
-    if (!GoodLimits(def))
-    {
-        return mnav_errorRange;
-    }
-    mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
-    mnavAvoidance* a = nullptr;
-    mnavResult result =
-        mnavAllocate(&memory, 1, sizeof(mnavAvoidance), alignof(mnavAvoidance), (void**)&a);
-    if (result != mnav_success)
-    {
-        return result;
-    }
-    *a = (mnavAvoidance){0};
-    a->memory = memory;
-    a->def = *def;
+    const mnavAvoidanceLimits* limits = &a->def.limits;
     size_t agents = (size_t)limits->agents;
     size_t neighbors = (size_t)limits->neighbors;
     size_t vertices = (size_t)limits->obstacleVertices;
     size_t near = (size_t)limits->obstacleNeighbors;
-    result = mnavAllocate(&a->memory, agents, sizeof(Key), alignof(Key), (void**)&a->keys);
+    mnavResult result =
+        mnavAllocate(&a->memory, agents, sizeof(Key), alignof(Key), (void**)&a->keys);
     if (result == mnav_success)
     {
         result = mnavAllocate(&a->memory, agents, sizeof(Key), alignof(Key), (void**)&a->scratch);
@@ -127,11 +108,28 @@ mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoi
         result = mnavAllocate(&a->memory, neighbors, sizeof(Neighbor), alignof(Neighbor),
                               (void**)&a->neighbors);
     }
+    size_t entries = vertices * ENTRIES_PER_VERTEX;
     if (result == mnav_success && vertices > 0)
     {
         result = mnavAllocate(&a->memory, vertices, sizeof(mnavObstacleVertex),
                               alignof(mnavObstacleVertex), (void**)&a->vertices);
     }
+    if (result == mnav_success && vertices > 0)
+    {
+        result = mnavAllocate(&a->memory, vertices, sizeof(int32_t), alignof(int32_t),
+                              (void**)&a->grid.stamps);
+    }
+    if (result == mnav_success && vertices > 0)
+    {
+        result = mnavAllocate(&a->memory, entries, sizeof(mnavObstacleCell),
+                              alignof(mnavObstacleCell), (void**)&a->grid.cells);
+    }
+    if (result == mnav_success && vertices > 0)
+    {
+        result = mnavAllocate(&a->memory, entries, sizeof(mnavObstacleCell),
+                              alignof(mnavObstacleCell), (void**)&a->grid.scratch);
+    }
+    a->grid.capacity = (int32_t)entries;
     if (result == mnav_success)
     {
         result = mnavAllocate(&a->memory, near, sizeof(mnavObstacleNear), alignof(mnavObstacleNear),
@@ -147,6 +145,37 @@ mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoi
         result = mnavAllocate(&a->memory, neighbors + near, sizeof(mnavLine), alignof(mnavLine),
                               (void**)&a->projected);
     }
+    return result;
+}
+
+mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoidanceOut)
+{
+    if (avoidanceOut == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    *avoidanceOut = nullptr;
+    if (def == nullptr || def->cookie != AVOIDANCE_DEF_COOKIE ||
+        (def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
+    {
+        return mnav_errorInvalid;
+    }
+    if (!GoodLimits(def))
+    {
+        return mnav_errorRange;
+    }
+    mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
+    mnavAvoidance* a = nullptr;
+    mnavResult result =
+        mnavAllocate(&memory, 1, sizeof(mnavAvoidance), alignof(mnavAvoidance), (void**)&a);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    *a = (mnavAvoidance){0};
+    a->memory = memory;
+    a->def = *def;
+    result = Allocate(a);
     if (result != mnav_success)
     {
         mnavDestroyAvoidance(a);
@@ -171,8 +200,15 @@ void mnavDestroyAvoidance(mnavAvoidance* avoidance)
     mnavRelease(&memory, avoidance->keys, agents, sizeof(Key), alignof(Key));
     mnavRelease(&memory, avoidance->scratch, agents, sizeof(Key), alignof(Key));
     mnavRelease(&memory, avoidance->neighbors, neighbors, sizeof(Neighbor), alignof(Neighbor));
-    mnavRelease(&memory, avoidance->vertices, (size_t)limits->obstacleVertices,
-                sizeof(mnavObstacleVertex), alignof(mnavObstacleVertex));
+    size_t vertices = (size_t)limits->obstacleVertices;
+    size_t entries = vertices * ENTRIES_PER_VERTEX;
+    mnavRelease(&memory, avoidance->vertices, vertices, sizeof(mnavObstacleVertex),
+                alignof(mnavObstacleVertex));
+    mnavRelease(&memory, avoidance->grid.stamps, vertices, sizeof(int32_t), alignof(int32_t));
+    mnavRelease(&memory, avoidance->grid.cells, entries, sizeof(mnavObstacleCell),
+                alignof(mnavObstacleCell));
+    mnavRelease(&memory, avoidance->grid.scratch, entries, sizeof(mnavObstacleCell),
+                alignof(mnavObstacleCell));
     mnavRelease(&memory, avoidance->near, near, sizeof(mnavObstacleNear),
                 alignof(mnavObstacleNear));
     mnavRelease(&memory, avoidance->lines, lines, sizeof(mnavLine), alignof(mnavLine));
@@ -310,11 +346,11 @@ static int32_t Neighbors(mnavAvoidance* a, const mnavAgent* agents, int32_t coun
 
 // The new velocity of agent i: its obstacle lines, then its neighbours',
 // the 2D program over them all and the 3D one when they leave nothing.
-static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, int32_t agentCount,
-                      int32_t vertexCount, double step, int32_t i)
+static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, int32_t agentCount, double step,
+                      int32_t i)
 {
     const mnavAgent* self = &agents[i];
-    int32_t near = mnavNearObstacles(self, a->vertices, vertexCount, a->def.obstacleTimeHorizon,
+    int32_t near = mnavNearObstacles(self, a->vertices, &a->grid, a->def.obstacleTimeHorizon,
                                      a->near, a->def.limits.obstacleNeighbors);
     int32_t fixed = mnavObstacleLines(self, a->vertices, a->near, near, a->def.obstacleTimeHorizon,
                                       step, a->lines);
@@ -378,10 +414,12 @@ mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t 
     {
         return result;
     }
+    mnavBuildObstacleGrid(&avoidance->grid, avoidance->vertices, vertexCount,
+                          avoidance->def.neighborDistance);
     SortKeys(avoidance->keys, avoidance->scratch, agentCount);
     for (int32_t i = 0; i < agentCount; ++i)
     {
-        velocitiesOut[i] = Solve(avoidance, agents, agentCount, vertexCount, step, i);
+        velocitiesOut[i] = Solve(avoidance, agents, agentCount, step, i);
     }
     return mnav_success;
 }

@@ -45,10 +45,41 @@ typedef struct mnavObstacleNear
 mnavResult mnavBuildObstacles(const mnavObstacle* obstacles, int32_t count,
                               mnavObstacleVertex* vertices, int32_t capacity, int32_t* vertexCount);
 
+// A circle's or an edge's place in a grid cell its bounds cover.
+typedef struct mnavObstacleCell
+{
+    int64_t x;
+    int64_t y;
+    int32_t vertex;
+} mnavObstacleCell;
+
+// The obstacles' circles and edges by the grid cells their bounds cover,
+// sorted by cell, then vertex, in a caller's memory: at most capacity
+// entries, the cells growing until they fit; and a stamp per vertex, so
+// that an agent visits each once.
+typedef struct mnavObstacleGrid
+{
+    mnavObstacleCell* cells;
+    mnavObstacleCell* scratch;
+    int32_t count;
+    int32_t capacity;
+    int32_t* stamps;
+    int32_t stamp;
+    // A cell's side, and the fastest obstacle's speed.
+    double size;
+    double fastest;
+} mnavObstacleGrid;
+
+// Fills the grid with the vertices' circles and edges, starting from cells
+// of the side given, at least 4 entries of room per vertex.
+void mnavBuildObstacleGrid(mnavObstacleGrid* grid, const mnavObstacleVertex* vertices,
+                           int32_t vertexCount, double size);
+
 // The circles and edges an agent sees within reach of the horizon, the
-// nearest first, at most limit.
+// nearest first, at most limit; the grid narrows the candidates, the same
+// for any cell size.
 int32_t mnavNearObstacles(const mnavAgent* agent, const mnavObstacleVertex* vertices,
-                          int32_t vertexCount, double horizon, mnavObstacleNear* list,
+                          mnavObstacleGrid* grid, double horizon, mnavObstacleNear* list,
                           int32_t limit);
 
 // Writes the agent's lines for the obstacles near it, skipping those the

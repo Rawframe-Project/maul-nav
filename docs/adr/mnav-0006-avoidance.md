@@ -52,5 +52,6 @@ symmetry face to face.
   in RVO2; the horizon is the host's to set.
 - Avoidance is local: an agent whose preferred velocity points into a
   block waits at its face, as in RVO2; going round is a path's work.
-- Each agent tests every obstacle edge; a grid for edges waits for a
-  measured need.
+- Obstacle candidates come from a grid of their bounds whose cells
+  double until the entries fit eight per obstacle point; the lines do
+  not depend on the cell size.
