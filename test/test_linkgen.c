@@ -71,6 +71,7 @@ static mnavTriangleMesh World(void)
 static mnavNavmesh* Load(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
+    def.tier = mnav_tierModifiers;
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     mnavTriangleMesh world = World();
@@ -160,6 +161,74 @@ static void TestKinds(const mnavNavmesh* navmesh)
                   mnav_success &&
               loose > count,
           "the walking rule drops links");
+    mnavDestroyQuery(query);
+}
+
+static void TestClimbAndAreas(mnavNavmesh* navmesh)
+{
+    // Drops of 1.5 m go both ways when the agent climbs 2 m.
+    mnavQuery* query = Query();
+    mnavLinkGenDef def = Def();
+    def.climbMax = 2.0f;
+    int32_t count = 0;
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
+              mnav_success,
+          "generated");
+    int32_t both = 0;
+    for (int32_t i = 0; i < count; ++i)
+    {
+        both += s_links[i].kind == mnav_linkDrop && s_links[i].twoWay ? 1 : 0;
+    }
+    CHECK(both > 20, "drops both ways");
+    // Drops up to 8 m reach both the slab and the trench below the
+    // platform's edges; they land on the slab, the highest.
+    def = Def();
+    def.dropMax = 8.0f;
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
+              mnav_success,
+          "generated");
+    int32_t onSlab = 0;
+    int32_t deep = 0;
+    for (int32_t i = 0; i < count; ++i)
+    {
+        const mnavLinkDef* l = &s_links[i];
+        if (l->kind == mnav_linkDrop && l->start.y > 1.2)
+        {
+            onSlab += fabs(l->end.y) < 0.3 ? 1 : 0;
+            deep += fabs(l->end.y) < 0.3 ? 0 : 1;
+        }
+    }
+    CHECK(onSlab > 20 && deep == 0, "the highest surface below");
+    // The platform painted with an area the filter leaves out: no drops
+    // start on it.
+    mnavPolygonId top[64];
+    mnavFound found;
+    CHECK(mnavFindPolygons(navmesh, nullptr, (mnavPos3){15.0, 1.5, 16.0},
+                           (mnavVec3){5.0f, 0.3f, 6.0f}, top, 64, &found) == mnav_success &&
+              found.count > 0,
+          "the platform's polygons");
+    for (int32_t i = 0; i < found.count; ++i)
+    {
+        CHECK(mnavStageArea(navmesh, top[i], 3) == mnav_success, "painted");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    mnavQueryFilter without = mnavDefaultQueryFilter();
+    without.areas &= ~((uint64_t)1 << 3);
+    def = Def();
+    int32_t drops = 0;
+    CHECK(mnavGenerateLinks(query, navmesh, &without, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
+              mnav_success,
+          "generated");
+    for (int32_t i = 0; i < count; ++i)
+    {
+        drops += s_links[i].kind == mnav_linkDrop ? 1 : 0;
+    }
+    CHECK(drops == 0 && count > 0, "no drops from the left-out platform");
+    for (int32_t i = 0; i < found.count; ++i)
+    {
+        CHECK(mnavStageArea(navmesh, top[i], mnav_areaWalkable) == mnav_success, "painted back");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     mnavDestroyQuery(query);
 }
 
@@ -254,6 +323,7 @@ int main(void)
 {
     mnavNavmesh* navmesh = Load();
     TestKinds(navmesh);
+    TestClimbAndAreas(navmesh);
     TestChecksAndBuffer(navmesh);
     TestPathThroughLinks(navmesh);
     mnavDestroyNavmesh(navmesh);
