@@ -435,6 +435,12 @@ static void TestShortcuts(void)
                                &shortened) == mnav_success &&
               !shortened && corridor.count == 5,
           "without the centre the ray meets a wall");
+    // Through the centre to the far wall: the ray passes the corridor's
+    // last square but meets the wall before the point, so nothing changes.
+    CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){25.0, 0.0, 12.5},
+                               &shortened) == mnav_success &&
+              !shortened && corridor.count == 5,
+          "a ray that meets a wall shortens nothing");
     CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){19.0, 0.0, 12.5},
                                &shortened) == mnav_success &&
               shortened && Indices(&corridor) == 456,
@@ -450,6 +456,28 @@ static void TestShortcuts(void)
     CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, a.point, nullptr) ==
               mnav_errorInvalid,
           "nowhere to say");
+    // Replanned from the centre square with the centre left out: the
+    // corridor's own first polygon is still current and still its start,
+    // though no search for the nearest usable polygon would find it.
+    mnavNearest centre = On(navmesh, 12.5, 12.5, 0.1f);
+    CHECK(mnavResetCorridor(&corridor, buffer, 16, centre.polygon, centre.point) == mnav_success &&
+              mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor,
+                                     (mnavPos3){19.0, 0.0, 12.5}, nullptr) == mnav_success &&
+              mnavReplanCorridor(query, navmesh, &round, &corridor, (mnavVec3){0.1f, 1.0f, 0.1f},
+                                 &path) == mnav_success &&
+              path.end == mnav_pathFound && path.polygons[0].polygon == 4,
+          "planned from the corridor's own start");
+    // A position off the navmesh with its polygon gone: found again
+    // within the box, and the corridor starts on the navmesh.
+    size = HandTileBytes(bytes, 0, grid, 9);
+    CHECK(mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "the tile replaced");
+    corridor.position = (mnavPos3){4.7, 0.0, 12.5};
+    CHECK(mnavReplanCorridor(query, navmesh, nullptr, &corridor, (mnavVec3){1.0f, 1.0f, 1.0f},
+                             &path) == mnav_success &&
+              path.end == mnav_pathFound && corridor.position.x == 5.0,
+          "the position snapped back on");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
