@@ -369,6 +369,9 @@ static void TestRegion(void)
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid &&
               mnavFlowAt(field, goals[0], &flow) == mnav_errorInvalid,
           "a region past the grid's side; the field holds nothing after");
+    bad = (mnavFlowRegion){0, 30, 5, 7};
+    CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid,
+          "a region past the grid's foot");
     bad = (mnavFlowRegion){0, 0, 0, 5};
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid,
           "an empty region");
@@ -429,8 +432,26 @@ static void TestSteps(void)
               mnavContinueFlowField(field, &grid, 0, &ended) == mnav_errorInvalid &&
               mnavContinueFlowField(field, nullptr, 1, &ended) == mnav_errorInvalid,
           "another cell size; no cells; no grid");
+    other = grid;
+    other.areas = nullptr;
+    CHECK(mnavContinueFlowField(field, &other, 1, &ended) == mnav_errorInvalid, "no areas");
+    // Debug output waits for the end too, and draws nothing when nothing
+    // was begun.
+    mnavDebugVertex vertex;
+    uint32_t index;
+    mnavDebugBuffer buffer = {{0, 0, 0}, &vertex, 1, 0, nullptr, 0, 0, &index, 1, 0};
+    CHECK(mnavBeginFlowField(field, &grid, &filter, nullptr, goals, 3) == mnav_success &&
+              mnavDebugFlowField(field, 0.0, &buffer) == mnav_errorStale,
+          "no debug output while working");
     mnavFlowField* fresh = Make(10);
     CHECK(mnavContinueFlowField(fresh, &grid, 1, &ended) == mnav_errorInvalid, "nothing begun");
+    CHECK(mnavDebugFlowField(fresh, 0.0, &buffer) == mnav_success && buffer.vertexCount == 0,
+          "nothing to draw");
+    // A begin refused after a field was built leaves nothing to draw.
+    CHECK(mnavBuildFlowField(field, &grid, &filter, goals, 3) == mnav_success &&
+              mnavBuildFlowField(field, &grid, &filter, goals, -1) == mnav_errorInvalid &&
+              mnavDebugFlowField(field, 0.0, &buffer) == mnav_success && buffer.vertexCount == 0,
+          "nothing to draw after a refused begin");
     mnavDestroyFlowField(fresh);
     mnavDestroyFlowField(field);
 }
