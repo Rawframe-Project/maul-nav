@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Hierarchical paths (mnav-0008), after HPA* (Botea, Mueller and
-// Schaeffer, 2004): clusters of tiles, a transition at the middle link of
-// each run of tile links leaving a cluster, edges found by the navmesh
-// search confined to the cluster entered, A* over the transitions, and a
-// refinement confined to the clusters the abstract path crosses.
+// Hierarchies (mnav-0008), after HPA* (Botea, Mueller and Schaeffer,
+// 2004): clusters of tiles, a transition at the middle link of each run of
+// tile links leaving a cluster and at each off-mesh link between clusters,
+// and edges found by the navmesh search confined to the cluster entered.
 
 #include "maul-nav/hierarchy.h"
 
 #include "allocator.h"
+#include "hierarchy.h"
 #include "navmesh.h"
+#include "offmesh.h"
 #include "query.h"
 #include "query_filter.h"
 #include "sort.h"
@@ -30,72 +31,6 @@
 
 // Coordinates are biased into 32 unsigned bits for sort keys.
 #define BIAS 0x80000000u
-
-// A transition: crossing a portal from one cluster into another.
-typedef struct Transition
-{
-    // The portal's midpoint, where the transition stands.
-    mnavPos3 at;
-    // The search node of the crossing: the polygon entered, its slot, the
-    // tag and the link's start along the side.
-    int32_t slot;
-    int32_t polygon;
-    int32_t tag;
-    int32_t low;
-    // The clusters entered and left, the slot left, its side and the
-    // lowest and highest start of the run's links along it.
-    int32_t cluster;
-    int32_t from;
-    int32_t fromSlot;
-    int32_t side;
-    int32_t runLow;
-    int32_t runHigh;
-    // The transition crossing the same portal the other way, or -1.
-    int32_t reverse;
-} Transition;
-
-typedef struct Edge
-{
-    int32_t to;
-    double cost;
-} Edge;
-
-struct mnavHierarchy
-{
-    mnavMemory memory;
-    mnavHierarchyDef def;
-    // The graph's navmesh and its commits when built; NULL with no graph.
-    const mnavNavmesh* navmesh;
-    uint64_t commits;
-    mnavQueryFilter filter;
-    double scale;
-    // Per slot: its cluster, or -1, its place's first transition, and
-    // whether a confined search may expand it.
-    int32_t* clusterOf;
-    int32_t* firstOfSlot;
-    uint8_t* inside;
-    // Clusters: their sort keys, their slots and the transitions leaving
-    // them, each as ranges of the arrays after.
-    uint64_t* keys;
-    uint64_t* scratch;
-    int32_t clusterCount;
-    int32_t* firstSlot;
-    int32_t* slots;
-    int32_t* firstLeaving;
-    int32_t* leaving;
-    Transition* transitions;
-    int32_t transitionCount;
-    int32_t* firstEdge;
-    Edge* edges;
-    int32_t edgeCount;
-    // The abstract search: per transition, and one more for the end.
-    double* costs;
-    double* joins;
-    int32_t* parents;
-    int32_t* places;
-    int32_t* heap;
-    int32_t heapCount;
-};
 
 mnavHierarchyDef mnavDefaultHierarchyDef(void)
 {
@@ -155,9 +90,10 @@ static mnavResult Allocate(mnavHierarchy* h)
     Take(h, &r, n.tiles, sizeof(int32_t), alignof(int32_t), (void**)&h->slots);
     Take(h, &r, n.tiles + 1, sizeof(int32_t), alignof(int32_t), (void**)&h->firstLeaving);
     Take(h, &r, n.transitions, sizeof(int32_t), alignof(int32_t), (void**)&h->leaving);
-    Take(h, &r, n.transitions, sizeof(Transition), alignof(Transition), (void**)&h->transitions);
+    Take(h, &r, n.transitions, sizeof(mnavTransition), alignof(mnavTransition),
+         (void**)&h->transitions);
     Take(h, &r, n.transitions + 1, sizeof(int32_t), alignof(int32_t), (void**)&h->firstEdge);
-    Take(h, &r, n.edges, sizeof(Edge), alignof(Edge), (void**)&h->edges);
+    Take(h, &r, n.edges, sizeof(mnavEdge), alignof(mnavEdge), (void**)&h->edges);
     Take(h, &r, n.transitions + 1, sizeof(double), alignof(double), (void**)&h->costs);
     Take(h, &r, n.transitions, sizeof(double), alignof(double), (void**)&h->joins);
     Take(h, &r, n.transitions + 1, sizeof(int32_t), alignof(int32_t), (void**)&h->parents);
@@ -221,9 +157,9 @@ void mnavDestroyHierarchy(mnavHierarchy* hierarchy)
     Give(h, h->slots, n.tiles, sizeof(int32_t), alignof(int32_t));
     Give(h, h->firstLeaving, n.tiles + 1, sizeof(int32_t), alignof(int32_t));
     Give(h, h->leaving, n.transitions, sizeof(int32_t), alignof(int32_t));
-    Give(h, h->transitions, n.transitions, sizeof(Transition), alignof(Transition));
+    Give(h, h->transitions, n.transitions, sizeof(mnavTransition), alignof(mnavTransition));
     Give(h, h->firstEdge, n.transitions + 1, sizeof(int32_t), alignof(int32_t));
-    Give(h, h->edges, n.edges, sizeof(Edge), alignof(Edge));
+    Give(h, h->edges, n.edges, sizeof(mnavEdge), alignof(mnavEdge));
     Give(h, h->costs, n.transitions + 1, sizeof(double), alignof(double));
     Give(h, h->joins, n.transitions, sizeof(double), alignof(double));
     Give(h, h->parents, n.transitions + 1, sizeof(int32_t), alignof(int32_t));
@@ -312,8 +248,8 @@ static mnavPos3 AlongSide(mnavPos3 a, mnavPos3 b, double au, double bu, double u
 
 // The transition at tile link l of the tile in slot, which leaves its
 // cluster, as the search crosses it.
-static Transition Cross(const mnavHierarchy* h, const mnavNavmesh* navmesh, int32_t slot, int32_t l,
-                        int32_t runLow, int32_t runHigh)
+static mnavTransition Cross(const mnavHierarchy* h, const mnavNavmesh* navmesh, int32_t slot,
+                            int32_t l, int32_t runLow, int32_t runHigh)
 {
     const mnavSlot* s = &navmesh->slots[slot];
     const mnavTile* tile = s->tile;
@@ -336,7 +272,7 @@ static Transition Cross(const mnavHierarchy* h, const mnavNavmesh* navmesh, int3
     mnavPos3 first = AlongSide(a, b, au, bu, link->low);
     mnavPos3 second = AlongSide(a, b, au, bu, link->high);
     int32_t target = (int32_t)link->target.slot - 1;
-    return (Transition){
+    return (mnavTransition){
         {(first.x + second.x) * 0.5, (first.y + second.y) * 0.5, (first.z + second.z) * 0.5},
         target,
         (int32_t)link->target.polygon,
@@ -400,15 +336,61 @@ static mnavResult AddSide(mnavHierarchy* h, const mnavNavmesh* navmesh, int32_t 
     return mnav_success;
 }
 
-// Finds the transition crossing u's portal the other way.
+// Adds a transition for each off-mesh link, one way, that the filter
+// crosses from one cluster into another, in the attachments' order: by
+// takeoff slot and polygon, then link.
+static mnavResult AddLinks(mnavHierarchy* h, const mnavNavmesh* navmesh)
+{
+    for (int32_t i = 0; i < navmesh->attachmentCount; ++i)
+    {
+        mnavAttachment a = mnavAttachmentOf(navmesh->attachments[i]);
+        const mnavOffLink* link = &navmesh->links[a.link];
+        const mnavLinkState* state = &link->state;
+        mnavPolygonId landing = a.reverse ? state->startPolygon : state->endPolygon;
+        int32_t slot = (int32_t)landing.slot - 1;
+        const mnavTile* tile = navmesh->slots[slot].tile;
+        if (h->clusterOf[slot] == h->clusterOf[a.slot] ||
+            !mnavCrosses(&h->filter, link->def.kind) ||
+            !mnavIncludes(&h->filter, tile->mesh.polygons[landing.polygon].area))
+        {
+            continue;
+        }
+        if (h->transitionCount == h->def.limits.transitions)
+        {
+            return mnav_errorLimit;
+        }
+        int32_t low = a.link * 2 + (a.reverse ? 1 : 0);
+        h->transitions[h->transitionCount++] =
+            (mnavTransition){a.reverse ? state->start : state->end,
+                             slot,
+                             (int32_t)landing.polygon,
+                             MNAV_TAG_OFFMESH,
+                             low,
+                             h->clusterOf[slot],
+                             h->clusterOf[a.slot],
+                             a.slot,
+                             0,
+                             low,
+                             low,
+                             -1};
+    }
+    return mnav_success;
+}
+
+// Finds the transition crossing u's portal the other way; an off-mesh
+// link's has none.
 static int32_t ReverseOf(const mnavHierarchy* h, int32_t u)
 {
-    const Transition* t = &h->transitions[u];
+    const mnavTransition* t = &h->transitions[u];
+    if (t->side == 0)
+    {
+        return -1;
+    }
     int32_t facing = t->side <= 2 ? t->side + 2 : t->side - 2;
     int32_t first = h->firstOfSlot[t->slot];
     for (int32_t v = first; v < h->transitionCount && h->transitions[v].fromSlot == t->slot; ++v)
     {
-        const Transition* r = &h->transitions[v];
+        const mnavTransition* r = &h->transitions[v];
         if (r->side == facing && r->runLow == t->runLow)
         {
             return v;
@@ -436,6 +418,11 @@ static mnavResult FindTransitions(mnavHierarchy* h, const mnavNavmesh* navmesh, 
             }
         }
     }
+    mnavResult result = AddLinks(h, navmesh);
+    if (result != mnav_success)
+    {
+        return result;
+    }
     memset(h->firstLeaving, 0, ((size_t)h->clusterCount + 1) * sizeof(int32_t));
     for (int32_t u = 0; u < h->transitionCount; ++u)
     {
@@ -457,7 +444,7 @@ static mnavResult FindTransitions(mnavHierarchy* h, const mnavNavmesh* navmesh, 
     return mnav_success;
 }
 
-static void Mark(mnavHierarchy* h, int32_t cluster, uint8_t value)
+void mnavMarkCluster(mnavHierarchy* h, int32_t cluster, uint8_t value)
 {
     for (int32_t i = h->firstSlot[cluster]; i < h->firstSlot[cluster + 1]; ++i)
     {
@@ -470,33 +457,28 @@ static mnavPolygonId IdOf(const mnavNavmesh* navmesh, int32_t slot, int32_t poly
     return (mnavPolygonId){(uint32_t)slot + 1, navmesh->slots[slot].generation, (uint32_t)polygon};
 }
 
-// Runs Dijkstra's search from a point in a polygon within a cluster,
-// opening the nodes just beyond it; mnav_errorLimit when it runs out of
-// nodes.
-static mnavResult SearchCluster(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh,
-                                int32_t cluster, mnavPolygonId polygon, mnavPos3 point)
+mnavResult mnavSearchCluster(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh,
+                             int32_t cluster, mnavPolygonId polygon, mnavPos3 point)
 {
     mnavResult result = mnavBeginPath(query, navmesh, &h->filter, polygon, point, polygon, point);
     if (result != mnav_success)
     {
         return result;
     }
-    Mark(h, cluster, 1);
+    mnavMarkCluster(h, cluster, 1);
     mnavConfineSearch(query, h->inside, true, true);
     bool ended = false;
     while (result == mnav_success && !ended)
     {
         result = mnavContinuePath(query, navmesh, INT32_MAX, &ended);
     }
-    Mark(h, cluster, 0);
+    mnavMarkCluster(h, cluster, 0);
     bool out = query->search.outOfNodes;
     query->search.active = false;
     return result != mnav_success ? result : (out ? mnav_errorLimit : mnav_success);
 }
 
-// The cost the last search found to cross transition v's portal, or
-// infinity.
-static double CostTo(const mnavQuery* query, const Transition* v)
+double mnavCostTo(const mnavQuery* query, const mnavTransition* v)
 {
     int32_t n = query->table[mnavFindNode(query, v->slot, v->polygon, v->tag, v->low)];
     return n == MNAV_NO_NODE ? (double)INFINITY : query->nodes[n].cost;
@@ -508,10 +490,10 @@ static mnavResult FindEdges(mnavHierarchy* h, mnavQuery* query, const mnavNavmes
     h->edgeCount = 0;
     for (int32_t u = 0; u < h->transitionCount; ++u)
     {
-        const Transition* t = &h->transitions[u];
+        const mnavTransition* t = &h->transitions[u];
         h->firstEdge[u] = h->edgeCount;
-        mnavResult result =
-            SearchCluster(h, query, navmesh, t->cluster, IdOf(navmesh, t->slot, t->polygon), t->at);
+        mnavResult result = mnavSearchCluster(h, query, navmesh, t->cluster,
+                                              IdOf(navmesh, t->slot, t->polygon), t->at);
         if (result != mnav_success)
         {
             return result;
@@ -519,7 +501,7 @@ static mnavResult FindEdges(mnavHierarchy* h, mnavQuery* query, const mnavNavmes
         for (int32_t i = h->firstLeaving[t->cluster]; i < h->firstLeaving[t->cluster + 1]; ++i)
         {
             int32_t v = h->leaving[i];
-            double cost = CostTo(query, &h->transitions[v]);
+            double cost = mnavCostTo(query, &h->transitions[v]);
             if (v == t->reverse || !isfinite(cost))
             {
                 continue;
@@ -528,7 +510,7 @@ static mnavResult FindEdges(mnavHierarchy* h, mnavQuery* query, const mnavNavmes
             {
                 return mnav_errorLimit;
             }
-            h->edges[h->edgeCount++] = (Edge){v, cost};
+            h->edges[h->edgeCount++] = (mnavEdge){v, cost};
         }
     }
     h->firstEdge[h->transitionCount] = h->edgeCount;
@@ -599,331 +581,4 @@ mnavResult mnavBuildHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
                                            hierarchy->edgeCount};
     }
     return mnav_success;
-}
-
-// The abstract search's open list, by cost and estimate, then by index;
-// index transitionCount is the end.
-static double Total(const mnavHierarchy* h, int32_t u, mnavPos3 end)
-{
-    if (u == h->transitionCount)
-    {
-        return h->costs[u];
-    }
-    mnavPos3 a = h->transitions[u].at;
-    double dx = a.x - end.x;
-    double dy = a.y - end.y;
-    double dz = a.z - end.z;
-    return h->costs[u] + sqrt(dx * dx + dy * dy + dz * dz) * h->scale;
-}
-
-static bool Sooner(const mnavHierarchy* h, int32_t a, int32_t b, mnavPos3 end)
-{
-    double ta = Total(h, a, end);
-    double tb = Total(h, b, end);
-    return ta != tb ? ta < tb : a < b;
-}
-
-static void Place(mnavHierarchy* h, int32_t at, int32_t u)
-{
-    h->heap[at] = u;
-    h->places[u] = at;
-}
-
-static void SiftUp(mnavHierarchy* h, int32_t at, mnavPos3 end)
-{
-    int32_t u = h->heap[at];
-    while (at > 0)
-    {
-        int32_t up = (at - 1) / 2;
-        if (!Sooner(h, u, h->heap[up], end))
-        {
-            break;
-        }
-        Place(h, at, h->heap[up]);
-        at = up;
-    }
-    Place(h, at, u);
-}
-
-static int32_t Pop(mnavHierarchy* h, mnavPos3 end)
-{
-    int32_t top = h->heap[0];
-    int32_t last = h->heap[--h->heapCount];
-    int32_t at = 0;
-    while (h->heapCount > 0)
-    {
-        int32_t child = 2 * at + 1;
-        if (child >= h->heapCount)
-        {
-            break;
-        }
-        if (child + 1 < h->heapCount && Sooner(h, h->heap[child + 1], h->heap[child], end))
-        {
-            child += 1;
-        }
-        if (!Sooner(h, h->heap[child], last, end))
-        {
-            break;
-        }
-        Place(h, at, h->heap[child]);
-        at = child;
-    }
-    if (h->heapCount > 0)
-    {
-        Place(h, at, last);
-    }
-    h->places[top] = MNAV_CLOSED;
-    return top;
-}
-
-// Lowers u's cost to cost by way of parent, opening it if new.
-static void Relax(mnavHierarchy* h, int32_t u, double cost, int32_t parent, mnavPos3 end)
-{
-    if (h->places[u] == MNAV_CLOSED || cost >= h->costs[u])
-    {
-        return;
-    }
-    h->costs[u] = cost;
-    h->parents[u] = parent;
-    if (h->places[u] == MNAV_NO_NODE)
-    {
-        Place(h, h->heapCount++, u);
-    }
-    SiftUp(h, h->places[u], end);
-}
-
-// A* over the transitions, opened with the start's costs, to the end,
-// reached from each transition with its join; whether it got there.
-static bool SearchGraph(mnavHierarchy* h, mnavPos3 end)
-{
-    int32_t goal = h->transitionCount;
-    while (h->heapCount > 0)
-    {
-        int32_t u = Pop(h, end);
-        if (u == goal)
-        {
-            return true;
-        }
-        for (int32_t e = h->firstEdge[u]; e < h->firstEdge[u + 1]; ++e)
-        {
-            Relax(h, h->edges[e].to, h->costs[u] + h->edges[e].cost, u, end);
-        }
-        // An infinite join leaves the end as it is.
-        Relax(h, goal, h->costs[u] + h->joins[u], u, end);
-    }
-    return false;
-}
-
-static void ResetGraph(mnavHierarchy* h)
-{
-    for (int32_t u = 0; u < h->transitionCount; ++u)
-    {
-        h->joins[u] = (double)INFINITY;
-    }
-    for (int32_t u = 0; u <= h->transitionCount; ++u)
-    {
-        h->costs[u] = (double)INFINITY;
-        h->parents[u] = -1;
-        h->places[u] = MNAV_NO_NODE;
-    }
-    h->heapCount = 0;
-}
-
-// Joins the end to the transitions entering its cluster, and the start to
-// those leaving its own, by searches within the clusters; the walk's cost
-// is the same either way, so the end's search runs from the end. A search
-// out of nodes joins what it reached.
-static mnavResult Join(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh,
-                       mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
-                       mnavPos3 end)
-{
-    int32_t first = h->clusterOf[startPolygon.slot - 1];
-    int32_t last = h->clusterOf[endPolygon.slot - 1];
-    ResetGraph(h);
-    mnavResult result = SearchCluster(h, query, navmesh, last, endPolygon, end);
-    if (result != mnav_success && result != mnav_errorLimit)
-    {
-        return result;
-    }
-    for (int32_t i = h->firstLeaving[last]; i < h->firstLeaving[last + 1]; ++i)
-    {
-        const Transition* v = &h->transitions[h->leaving[i]];
-        if (v->reverse >= 0)
-        {
-            h->joins[v->reverse] = CostTo(query, v);
-        }
-    }
-    result = SearchCluster(h, query, navmesh, first, startPolygon, start);
-    if (result != mnav_success && result != mnav_errorLimit)
-    {
-        return result;
-    }
-    for (int32_t i = h->firstLeaving[first]; i < h->firstLeaving[first + 1]; ++i)
-    {
-        int32_t v = h->leaving[i];
-        double cost = CostTo(query, &h->transitions[v]);
-        if (isfinite(cost))
-        {
-            Relax(h, v, cost, -1, end);
-        }
-    }
-    return mnav_success;
-}
-
-// Runs the search begun until it ends; whether it found its end.
-static mnavResult Run(mnavQuery* query, const mnavNavmesh* navmesh, bool* foundOut)
-{
-    mnavResult result = mnav_success;
-    bool ended = false;
-    while (result == mnav_success && !ended)
-    {
-        result = mnavContinuePath(query, navmesh, INT32_MAX, &ended);
-    }
-    *foundOut = query->search.found != MNAV_NO_NODE;
-    return result;
-}
-
-// One step of the abstract path: from the node the search stands on, the
-// way within cluster from across any link of the transition's run, aimed
-// at the transition.
-static mnavResult Step(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh, int32_t from,
-                       const Transition* t, bool* foundOut)
-{
-    Mark(h, from, 1);
-    mnavConfineSearch(query, h->inside, true, false);
-    const int32_t goal[4] = {t->slot, t->tag, t->runLow, t->runHigh};
-    mnavAimSearch(query, t->at, -1, -1, goal);
-    mnavResult result = Run(query, navmesh, foundOut);
-    Mark(h, from, 0);
-    if (result == mnav_success && *foundOut)
-    {
-        mnavRestartSearch(query, query->search.found);
-    }
-    return result;
-}
-
-// Refines the abstract path step by step, each step's search confined to
-// one cluster and started over from where the last one ended, so that
-// the nodes held are the way so far and one cluster's; then the last
-// cluster to the end. Whether every step found its way.
-static mnavResult Refine(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh,
-                         mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
-                         mnavPos3 end, bool* foundOut)
-{
-    // The transitions in order, into the abstract search's heap.
-    int32_t count = 0;
-    for (int32_t u = h->parents[h->transitionCount]; u >= 0; u = h->parents[u])
-    {
-        h->heap[count++] = u;
-    }
-    mnavResult result =
-        mnavBeginPath(query, navmesh, &h->filter, startPolygon, start, endPolygon, end);
-    int32_t cluster = h->clusterOf[startPolygon.slot - 1];
-    *foundOut = true;
-    for (int32_t i = count - 1; i >= 0 && result == mnav_success && *foundOut; --i)
-    {
-        const Transition* t = &h->transitions[h->heap[i]];
-        result = Step(h, query, navmesh, cluster, t, foundOut);
-        cluster = t->cluster;
-    }
-    if (result != mnav_success || !*foundOut)
-    {
-        return result;
-    }
-    Mark(h, cluster, 1);
-    mnavConfineSearch(query, h->inside, false, false);
-    const int32_t none[4] = {-1, -1, -1, -1};
-    mnavAimSearch(query, end, (int32_t)endPolygon.slot - 1, (int32_t)endPolygon.polygon, none);
-    result = Run(query, navmesh, foundOut);
-    Mark(h, cluster, 0);
-    return result;
-}
-
-static bool FinitePoint(mnavPos3 p)
-{
-    return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
-}
-
-static mnavResult CheckQuery(const mnavQuery* query, const mnavHierarchy* h,
-                             const mnavNavmesh* navmesh, mnavPolygonId startPolygon, mnavPos3 start,
-                             mnavPolygonId endPolygon, mnavPos3 end)
-{
-    if (query == nullptr || h == nullptr || navmesh == nullptr || !FinitePoint(start) ||
-        !FinitePoint(end) || h->navmesh != navmesh)
-    {
-        return mnav_errorInvalid;
-    }
-    if (h->commits != navmesh->commits)
-    {
-        return mnav_errorStale;
-    }
-    mnavResult result = mnavCheckPolygon(navmesh, startPolygon);
-    return result == mnav_success ? mnavCheckPolygon(navmesh, endPolygon) : result;
-}
-
-// Whether two points lie within a cluster's side of each other on the
-// ground.
-static bool Near(const mnavHierarchy* h, const mnavNavmesh* navmesh, mnavPos3 a, mnavPos3 b)
-{
-    double side = (double)h->def.clusterTiles * (double)navmesh->def.cellSize *
-                  (double)navmesh->def.tileCells;
-    double dx = a.x - b.x;
-    double dz = a.z - b.z;
-    return dx * dx + dz * dz <= side * side;
-}
-
-mnavResult mnavFindHierarchicalPath(mnavQuery* query, mnavHierarchy* hierarchy,
-                                    const mnavNavmesh* navmesh, mnavPolygonId startPolygon,
-                                    mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
-                                    mnavPath* pathOut)
-{
-    mnavHierarchy* h = hierarchy;
-    if (pathOut == nullptr)
-    {
-        return mnav_errorInvalid;
-    }
-    mnavResult result = CheckQuery(query, h, navmesh, startPolygon, start, endPolygon, end);
-    if (result != mnav_success)
-    {
-        return result;
-    }
-    int32_t first = h->clusterOf[startPolygon.slot - 1];
-    if (first == h->clusterOf[endPolygon.slot - 1])
-    {
-        return mnavFindPath(query, navmesh, &h->filter, startPolygon, start, endPolygon, end,
-                            pathOut);
-    }
-    // Ends within a cluster's side of each other try the plain search
-    // first, which finds the cheapest way where it has the nodes.
-    if (Near(h, navmesh, start, end))
-    {
-        result =
-            mnavFindPath(query, navmesh, &h->filter, startPolygon, start, endPolygon, end, pathOut);
-        if (result != mnav_success || pathOut->end != mnav_pathOutOfNodes)
-        {
-            return result;
-        }
-    }
-    result = Join(h, query, navmesh, startPolygon, start, endPolygon, end);
-    if (result != mnav_success)
-    {
-        return result;
-    }
-    if (!SearchGraph(h, end))
-    {
-        return mnavFindPath(query, navmesh, &h->filter, startPolygon, start, endPolygon, end,
-                            pathOut);
-    }
-    bool found = false;
-    result = Refine(h, query, navmesh, startPolygon, start, endPolygon, end, &found);
-    if (result != mnav_success)
-    {
-        return result;
-    }
-    if (!found)
-    {
-        return mnavFindPath(query, navmesh, &h->filter, startPolygon, start, endPolygon, end,
-                            pathOut);
-    }
-    return mnavFinishPath(query, navmesh, pathOut);
 }

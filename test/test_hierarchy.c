@@ -263,6 +263,46 @@ static void TestRandomPairs(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestLinksBetweenClusters(void)
+{
+    // A link over the wall at z = 60, from one cluster into the next: the
+    // way through it is far shorter than round by the wall's gap.
+    mnavNavmesh* navmesh = Load(false);
+    mnavQuery* query = Query(1024);
+    mnavHierarchy* hierarchy = Hierarchy(2);
+    mnavHierarchyReport before;
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &before) == mnav_success, "built");
+    mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, false};
+    mnavLinkId id;
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+          "linked");
+    mnavHierarchyReport after;
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &after) == mnav_success &&
+              after.transitions == before.transitions + 1,
+          "one transition, one way");
+    mnavNearest a = On(navmesh, 40.0, 30.0);
+    mnavNearest b = On(navmesh, 40.0, 110.0);
+    mnavPath path;
+    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                   b.point, &path) == mnav_success &&
+              path.end == mnav_pathFound && path.linkCount == 1 && path.length < 100.0,
+          "over the wall");
+    // Back the other way the link does not go: round by the gap.
+    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, b.polygon, b.point, a.polygon,
+                                   a.point, &path) == mnav_success &&
+              path.end == mnav_pathFound && path.linkCount == 0 && path.length > 300.0,
+          "round the wall");
+    // A filter that does not cross the link's kind leaves it out.
+    mnavQueryFilter walkers = mnavDefaultQueryFilter();
+    walkers.kinds = 0;
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, &walkers, &after) == mnav_success &&
+              after.transitions == before.transitions,
+          "no transition for a kind not crossed");
+    mnavDestroyHierarchy(hierarchy);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestNegativePlaces(void)
 {
     // The same world 4 tiles back on both axes, at negative places: the
@@ -456,6 +496,7 @@ int main(void)
     TestLoadOrder();
     TestStaleAndFallbacks();
     TestLimitsAndChecks();
+    TestLinksBetweenClusters();
     TestNegativePlaces();
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {

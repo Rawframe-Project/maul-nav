@@ -205,3 +205,4 @@ format.
   links leaving a cluster, edges by searches confined to a cluster) and
   mnavFindHierarchicalPath (A* over the transitions, refined step by
   step within one cluster at a time into an ordinary path).
+- Hierarchies take off-mesh links between clusters as transitions.

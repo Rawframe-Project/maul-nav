@@ -24,13 +24,18 @@ local search.
   way, is an entrance; its middle link is a transition, the search node
   of crossing it, standing at the portal's midpoint. Transitions are
   numbered by tile place, side and position, never by load order.
+  Each off-mesh link, one way, that the filter crosses from one cluster
+  into another is a transition too, standing at its landing; they come
+  after the portals', in the attachments' order.
 - **Edges:** from each transition, Dijkstra's search confined to the
   cluster it enters, opening nodes beyond but never expanding them,
   gives the cost to each transition leaving that cluster.
 - **Queries:** `mnavFindHierarchicalPath` joins the end to the
   transitions entering its cluster by a confined search from the end,
-  the walk's cost being symmetric, and the start to those leaving its
-  cluster; A* over the transitions, with the straight distance times
+  the walk's cost being symmetric: a portal through the cost found to
+  cross it the other way, a link's landing through the cheapest node
+  reached in its polygon and then straight on; and the start to those
+  leaving its cluster; A* over the transitions, with the straight distance times
   the search's heuristic scale, ties to the lower index, picks them;
   then the navmesh search refines step by step, each step confined to
   one cluster, aimed at the next transition and ending on crossing any
@@ -49,6 +54,4 @@ local search.
   world of 64 tiles, forty random pairs came out at most 4.8% longer
   than the plain paths, most within 2%.
 - Each query's searches hold one cluster's nodes and the way so far.
-- Off-mesh links between clusters are not transitions yet, so ways
-  that need one fall back to the plain search; rebuilding only the
-  clusters a commit changes is later work.
+- Rebuilding only the clusters a commit changes is later work.

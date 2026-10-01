@@ -63,6 +63,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/height_patch.c
     src/heightfield.c
     src/hierarchy.c
+    src/hierarchy_path.c
     src/holes.c
     src/input.c
     src/navmesh.c

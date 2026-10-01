@@ -94,9 +94,10 @@ extern "C"
     /// transitions leaving the cluster it enters cost what the navmesh
     /// search finds within that cluster. Transitions are numbered by tile
     /// place, side and position, so the graph does not depend on the order
-    /// tiles were loaded in. Off-mesh links between clusters are not
-    /// transitions. A later commit to the navmesh makes the hierarchy
-    /// stale until it is built again.
+    /// tiles were loaded in. Each off-mesh link, one way, that the filter
+    /// crosses from one cluster into another is a transition too. A later
+    /// commit to the navmesh makes the hierarchy stale until it is built
+    /// again.
     ///
     /// @param hierarchy The hierarchy; its last graph is replaced.
     /// @param query     A context for the searches within clusters; its
