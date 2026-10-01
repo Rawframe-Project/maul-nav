@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Triangulating a simple ring by ear clipping (N18).
+// Triangulating a simple ring by ear clipping.
 
 #ifndef MAUL_NAV_SRC_TRIANGULATE_H
 #define MAUL_NAV_SRC_TRIANGULATE_H

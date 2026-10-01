@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The walkable filters (N13): which spans of a heightfield an agent can
+// The walkable filters: which spans of a heightfield an agent can
 // stand on.
 
 #ifndef MAUL_NAV_SRC_FILTER_H

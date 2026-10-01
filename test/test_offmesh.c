@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Off-mesh links (N29): staging, removal, snapping at each commit, and
+// Off-mesh links (mnav-0004): staging, removal, snapping at each commit, and
 // the attachments the search will follow. Hand cells are 0.25 m.
 
 #include "hand_tile.h"

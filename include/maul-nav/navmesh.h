@@ -157,7 +157,7 @@ extern "C"
 // The dearest off-mesh link, in the filter's cost units.
 #define MNAV_MAX_LINK_COST 1.0e9f
 
-    // How an agent traverses an off-mesh link (N29): kinds 0 to 5 are the
+    // How an agent traverses an off-mesh link (mnav-0004): kinds 0 to 5 are the
     // library's, 6 to MNAV_LINK_KINDS - 1 the host's to name.
     typedef uint8_t mnavLinkKind;
 

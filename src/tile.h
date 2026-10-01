@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The tile format (N21): a baked tile's polygon mesh and detail mesh as
+// The tile format (mnav-0003): a baked tile's polygon mesh and detail mesh as
 // little-endian integers behind a versioned, fingerprinted header, and
 // the loader that checks every byte of it as hostile.
 

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The floor heights under one polygon, read from the open-space field for
-// its detail mesh (N20).
+// its detail mesh.
 
 #ifndef MAUL_NAV_SRC_HEIGHT_PATCH_H
 #define MAUL_NAV_SRC_HEIGHT_PATCH_H

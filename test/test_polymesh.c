@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Triangulating rings and merging them into a linked polygon mesh (N18).
+// Triangulating rings and merging them into a linked polygon mesh.
 
 #include "allocator.h"
 #include "border_vertices.h"

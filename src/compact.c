@@ -79,7 +79,7 @@ static uint16_t FindLink(const mnavCompactField* field, const mnavOpenSpan* span
         int32_t rise = (int32_t)other->floor - (int32_t)span->floor;
         if (shared >= height && rise >= -step && rise <= step)
         {
-            // Fewer than 32,768 walkable spans fit in one column (N14).
+            // Fewer than 32,768 walkable spans fit in one column.
             return (uint16_t)(k - first);
         }
     }

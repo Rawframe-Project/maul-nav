@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The open-space field, its links, and erosion (N14).
+// The open-space field, its links, and erosion.
 
 #include "allocator.h"
 #include "compact.h"

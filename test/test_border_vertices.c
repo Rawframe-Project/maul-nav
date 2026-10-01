@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Removing tile-border vertices from a tile's polygons (N19).
+// Removing tile-border vertices from a tile's polygons.
 
 #include "allocator.h"
 #include "border_vertices.h"

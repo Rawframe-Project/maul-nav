@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Tracing and simplifying region contours (N16).
+// Tracing and simplifying region contours.
 
 #include "allocator.h"
 #include "compact.h"

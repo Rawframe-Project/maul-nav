@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The detail mesh's triangulation kept Delaunay by flips (N20).
+// The detail mesh's triangulation kept Delaunay by flips.
 
 #include "delaunay.h"
 #include "test_harness.h"

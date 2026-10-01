@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Partitioning open space into regions by layers (N15).
+// Partitioning open space into regions by layers.
 
 #include "allocator.h"
 #include "compact.h"

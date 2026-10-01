@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Raycasts (N27) on hand-built tiles and the baked world. Hand cells are
+// Raycasts (mnav-0005) on hand-built tiles and the baked world. Hand cells are
 // 0.25 m.
 
 #include "hand_tile.h"

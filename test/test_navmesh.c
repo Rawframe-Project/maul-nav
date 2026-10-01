@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The navmesh: staged tiles, atomic commits, generation ids and links
-// across tile sides (N23).
+// across tile sides (mnav-0004).
 
 #include "allocator.h"
 #include "hand_tile.h"

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Merging hole contours into their outlines (N17).
+// Merging hole contours into their outlines.
 
 #include "allocator.h"
 #include "compact.h"

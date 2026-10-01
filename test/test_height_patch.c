@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The floor heights under one polygon (N20).
+// The floor heights under one polygon.
 
 #include "allocator.h"
 #include "compact.h"

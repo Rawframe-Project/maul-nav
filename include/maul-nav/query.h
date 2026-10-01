@@ -24,7 +24,7 @@ extern "C"
 #define MNAV_MAX_AREA_COST 1000000.0f
 
     // Which polygons a query may use and what crossing them costs, by area
-    // type (N9). Build it with mnavDefaultQueryFilter.
+    // type (mnav-0002). Build it with mnavDefaultQueryFilter.
     typedef struct mnavQueryFilter
     {
         uint32_t cookie;
@@ -210,7 +210,7 @@ extern "C"
     /// area's cost; polygons of excluded areas other than the start
     /// polygon are not entered. Attached off-mesh links of included kinds are
     /// crossed at their declared cost, the heuristic scaled down to the
-    /// lowest cost per meter among them (N30). The corridor found is pulled
+    /// lowest cost per meter among them (mnav-0005). The corridor found is pulled
     /// tight into a straight path with the funnel algorithm, stretch by
     /// stretch between links.
     ///

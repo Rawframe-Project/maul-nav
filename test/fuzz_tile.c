@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes the tile loader (N21), the bytes a program reads from disk or a
+// Fuzzes the tile loader (mnav-0003), the bytes a program reads from disk or a
 // network and hands the library. The input's payload size and hash are
 // set to match before the load, so that mutations reach the sections and
 // the mesh checks instead of stopping at the seal, which the unit tests

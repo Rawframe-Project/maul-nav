@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The navmesh's commit (N23, N29): tiles and off-mesh links together, all
+// The navmesh's commit (mnav-0004): tiles and off-mesh links together, all
 // or nothing.
 
 #include "navmesh.h"

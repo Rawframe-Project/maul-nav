@@ -22,15 +22,15 @@ format.
 - Tile rasterization (internal): triangles clip into per-cell fragments,
   which sort and merge into each column's solid spans, so a tile's
   heightfield depends only on the set of input triangles, not their
-  order (N12). Its hash is pinned across platforms.
+  order. Its hash is pinned across platforms.
 - The walkable filters (internal): spans within a step above walkable
   ground become walkable, ledges and steep neighbors are removed, and
-  so is ground without the agent's height of free space (N13).
+  so is ground without the agent's height of free space.
 - The open-space field and erosion (internal): walkable spans become
   open space linked to the neighbors an agent can step to, and space
   closer than the agent's radius to a boundary is removed. Heights,
   links and distances are 16 bits, which always suffice, so nothing is
-  truncated (N14). Pipeline hashes over a soup and a small level are
+  truncated. Pipeline hashes over a soup and a small level are
   pinned.
 - `mnavHash64` and `MNAV_HASH_INIT`, the family's frozen 64-bit hash,
   for determinism checks and navmesh fingerprints.
@@ -38,28 +38,28 @@ format.
   region partitioning by layers (internal): monotone sweeps merged into
   non-overlapping layers of one area, small islands off the tile's
   border dropped, with 32-bit ids and sweep storage sized by the row's
-  spans (N15).
+  spans.
 - `mnavBakeDef.maxEdgeError` and `maxEdgeLength`, in meters (0.3 and
   12 by default), and region contours (internal): each region's
   boundary traced edge by edge with corner heights and the region
   across each edge, simplified along walls and area borders, walls
-  split past the maximum length (N16).
+  split past the maximum length.
 - Hole merging (internal): each region's holes are bridged into its
   outline left to right through the nearest vertex whose diagonal
   crosses nothing, every tie broken by an index, and a hole that cannot
-  be bridged is dropped and counted for the bake report (N17).
+  be bridged is dropped and counted for the bake report.
 - The polygon mesh (internal): each region's ring cut into triangles by
   ear clipping, shortest diagonal first, its vertices welded across the
   tile, merged into convex polygons of at most 6 vertices along their
   longest shared edges, and linked to the polygons across each edge or
   marked with the tile side it lies on. A ring that cannot be finished
-  keeps its triangles and is counted (N18).
+  keeps its triangles and is counted.
 - Removing tile-border vertices (internal): a vertex where two regions
   meet only because of the border around the tile is removed when its
   polygons keep more than 2 edges, share one area, leave at most 2
   edges at it unshared and the outline keeps its shape; the hole is
   triangulated, merged and checked before any polygon changes, and a
-  vertex that cannot be replaced stays flagged (N19). Linking polygons
+  vertex that cannot be replaced stays flagged. Linking polygons
   is now its own step after removal, and ear clipping refuses ears with
   a ring vertex inside them.
 - The height patch under a polygon (internal), the first part of the
@@ -68,7 +68,7 @@ format.
   from the spans nearest its vertices. A lookup in a cell without a
   height takes the nearest height in the first ring of cells that has
   one, and says so when none is within its radius rather than
-  returning a marker as a height (N20).
+  returning a marker as a height.
 - Two bake settings, detailSampleDistance (1.5 m, 0 for none) and
   detailMaxError (0.125 m), with mnav_settingDetailSampleDistance and
   mnav_settingDetailMaxError; mnavBakeCells reports them in sixteenths
@@ -78,14 +78,14 @@ format.
   samples, heights from the height patch, samples within the maximum
   error dropped, and the outline triangulated; all in sixteenths of a
   cell with integer arithmetic, so both sides of an edge get the same
-  points and the result is the same on every platform (N20).
+  points and the result is the same on every platform.
 - The detail mesh's interior (internal): the outline's triangulation
   made Delaunay by edge flips with an exact in-circle test, then grid
   samples well inside each polygon added worst first until every
   sample lies within the maximum error or the polygon holds 127
   vertices (counted); each insertion restores the Delaunay property
   round the new vertex, and only samples in changed triangles are
-  measured again (N20).
+  measured again.
 - mnav_errorVersion: data written in a format version this library does
   not read.
 - The tile format (internal): a baked tile's polygon and detail meshes
@@ -95,7 +95,7 @@ format.
   checks every count against its cap and the bytes left before
   allocating, then the mesh itself (convex polygons, walkable areas,
   neighbors that link back, tile sides, detail indices), and names the
-  section and element it refuses (N21). A libFuzzer target,
+  section and element it refuses (mnav-0003). A libFuzzer target,
   fuzz_tile, runs with MAUL_NAV_FUZZ; test_tile --seed writes its
   seed.
 - The public bake call (mnav-0003): mnavCreateBaker, mnavDestroyBaker,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Off-mesh links (N29): staging them, and attaching them to polygons at
+// Off-mesh links (mnav-0004): staging them, and attaching them to polygons at
 // each commit.
 
 #include "offmesh.h"

@@ -3,7 +3,7 @@
 //
 // A tile's solid heightfield: the merged spans of every column, built
 // from the tile's fragments so that it depends only on the set of input
-// triangles (N12).
+// triangles.
 
 #ifndef MAUL_NAV_SRC_HEIGHTFIELD_H
 #define MAUL_NAV_SRC_HEIGHTFIELD_H

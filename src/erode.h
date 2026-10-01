@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Erosion by the agent's radius (N14): walkable space closer to a
+// Erosion by the agent's radius: walkable space closer to a
 // boundary than the radius becomes unwalkable.
 
 #ifndef MAUL_NAV_SRC_ERODE_H

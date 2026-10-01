@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The path search (N25): corridors, costs, how a search ends, and its
+// The path search (mnav-0005): corridors, costs, how a search ends, and its
 // named limits.
 
 #include "hand_tile.h"

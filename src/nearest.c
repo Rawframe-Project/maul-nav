@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The nearest point on the navmesh (N24).
+// The nearest point on the navmesh (mnav-0005).
 
 #include "detail.h"
 #include "navmesh.h"

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Query filters (N28): area costs and inclusion in the nearest point, the
+// Query filters (mnav-0005): area costs and inclusion in the nearest point, the
 // path search and the raycast. Hand cells are 0.25 m.
 
 #include "hand_tile.h"

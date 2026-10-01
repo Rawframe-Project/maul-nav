@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The path's rules on hand-built tiles: the funnel's corners (N26), and
-// the search's ties (N25). Cells are 0.25 m; heights are 0.
+// The path's rules on hand-built tiles: the funnel's corners (mnav-0005), and
+// the search's ties (mnav-0005). Cells are 0.25 m; heights are 0.
 
 #include "hand_tile.h"
 #include "test_harness.h"

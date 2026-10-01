@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The navmesh's insides (N23), for the modules that query it: tiles in
+// The navmesh's insides (mnav-0004), for the modules that query it: tiles in
 // slots, their links across tile sides, and the sorted index of places.
 
 #ifndef MAUL_NAV_SRC_NAVMESH_H
@@ -119,7 +119,7 @@ struct mnavNavmesh
     int32_t attachmentCapacity;
     // For each link kind, the lowest cost per meter of its attached links'
     // spans, INFINITY when it has none: what scales the search's
-    // heuristic (N30).
+    // heuristic (mnav-0005).
     double costPerMeter[MNAV_LINK_KINDS];
 };
 

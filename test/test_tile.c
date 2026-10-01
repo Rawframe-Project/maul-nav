@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The tile format and its loader (N21). Run as test_tile --seed <file> it
+// The tile format and its loader (mnav-0003). Run as test_tile --seed <file> it
 // also writes the level's tile, the fuzz target's seed.
 
 #include "allocator.h"

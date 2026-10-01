@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The detail mesh's outline: edge samples and their triangulation (N20).
+// The detail mesh's outline: edge samples and their triangulation.
 
 #include "allocator.h"
 #include "border_vertices.h"

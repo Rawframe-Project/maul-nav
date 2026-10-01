@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // A small triangulation kept Delaunay by edge flips, with exact integer
-// predicates, for the detail mesh (N20).
+// predicates, for the detail mesh.
 
 #ifndef MAUL_NAV_SRC_DELAUNAY_H
 #define MAUL_NAV_SRC_DELAUNAY_H

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Query filters (N28).
+// Query filters (mnav-0005).
 
 #include "query_filter.h"
 

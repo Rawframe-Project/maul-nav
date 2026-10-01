@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Region contours (N16): the boundary of each region traced along its
+// Region contours: the boundary of each region traced along its
 // cells and simplified, each vertex remembering what lies across the edge
 // that starts at it.
 

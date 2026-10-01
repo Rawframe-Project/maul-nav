@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Partitioning a tile's open space into regions by layers (N15):
+// Partitioning a tile's open space into regions by layers:
 // monotone sweeps per row, merged into non-overlapping layers of one
 // area.
 

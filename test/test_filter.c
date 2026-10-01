@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The walkable filters on small heightfields built by hand (N13).
+// The walkable filters on small heightfields built by hand.
 
 #include "filter.h"
 #include "hand_field.h"

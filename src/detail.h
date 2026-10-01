@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A tile's detail mesh (N20): the floor's heights laid over each polygon
+// A tile's detail mesh: the floor's heights laid over each polygon
 // as small triangles, in sixteenths of a cell on the ground and cell
 // heights up, with exact integer geometry.
 

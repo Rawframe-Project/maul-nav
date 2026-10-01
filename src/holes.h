@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Merging hole contours into their outlines (N17), so that every region
+// Merging hole contours into their outlines, so that every region
 // is one simple polygon.
 
 #ifndef MAUL_NAV_SRC_HOLES_H

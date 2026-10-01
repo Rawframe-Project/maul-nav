@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The open-space field (N14): the walkable spans of a heightfield as the
+// The open-space field: the walkable spans of a heightfield as the
 // open space above them, each linked to the spans an agent can step to
 // in the four directions.
 

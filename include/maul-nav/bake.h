@@ -54,7 +54,7 @@ extern "C"
         mnav_areaWalkable = 1,
     };
 
-    // The agent a navmesh is baked for, in meters and degrees (N6: one
+    // The agent a navmesh is baked for, in meters and degrees (one
     // profile per navmesh).
     typedef struct mnavAgentProfile
     {
@@ -82,7 +82,7 @@ extern "C"
         // Input triangles that touch one tile.
         int32_t tileTriangles;
         // Span fragments rasterized into one tile: one per cell a triangle
-        // covers, before they merge into spans (N12).
+        // covers, before they merge into spans.
         int32_t tileSpans;
         // Polygons in one tile.
         int32_t tilePolygons;
@@ -92,7 +92,7 @@ extern "C"
         int32_t tileLinks;
         // Tiles in one navmesh.
         int32_t tiles;
-        // Off-mesh links in one navmesh, staged or committed (N29).
+        // Off-mesh links in one navmesh, staged or committed (mnav-0004).
         int32_t links;
         // Bytes the bake may hold allocated at once.
         uint64_t memoryBytes;
@@ -175,7 +175,7 @@ extern "C"
         mnavBakeSetting setting;
     } mnavBakeDefResult;
 
-    // What a def's meters become in cells (N8). A quotient within 2^-10 of
+    // What a def's meters become in cells (mnav-0002). A quotient within 2^-10 of
     // an integer counts as that integer; heights and the radius then round
     // up and the step height rounds down.
     typedef struct mnavBakeCells

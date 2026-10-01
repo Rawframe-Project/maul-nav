@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Rasterizing triangles into a tile's heightfield (N12).
+// Rasterizing triangles into a tile's heightfield.
 
 #include "allocator.h"
 #include "heightfield.h"

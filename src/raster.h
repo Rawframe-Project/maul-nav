@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Rasterizing triangles into the fragments of one tile (N12): every cell
+// Rasterizing triangles into the fragments of one tile: every cell
 // a triangle covers gets the lowest and highest cell height of the part
 // of the triangle inside it.
 

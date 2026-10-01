@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Removing the tile-border vertices from a tile's polygons (N19).
+// Removing the tile-border vertices from a tile's polygons.
 
 #ifndef MAUL_NAV_SRC_BORDER_VERTICES_H
 #define MAUL_NAV_SRC_BORDER_VERTICES_H

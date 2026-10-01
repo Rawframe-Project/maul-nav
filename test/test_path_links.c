@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Paths across off-mesh links (N30). Hand cells are 0.25 m.
+// Paths across off-mesh links (mnav-0005). Hand cells are 0.25 m.
 
 #include "hand_tile.h"
 #include "test_harness.h"

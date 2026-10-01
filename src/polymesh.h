@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A tile's polygon mesh (N18): the rings of its regions triangulated,
+// A tile's polygon mesh: the rings of its regions triangulated,
 // welded into one vertex list, merged into convex polygons of at most
 // MNAV_POLYGON_VERTICES vertices and linked to their neighbors.
 

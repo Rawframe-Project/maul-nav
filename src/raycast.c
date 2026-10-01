@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Raycasts along the navmesh (N27).
+// Raycasts along the navmesh (mnav-0005).
 
 #include "navmesh.h"
 #include "polymesh.h"

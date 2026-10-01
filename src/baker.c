@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The baker: one call runs every stage of the bake for a tile (N22).
+// The baker: one call runs every stage of the bake for a tile (mnav-0003).
 
 #include "allocator.h"
 #include "bake_def.h"
