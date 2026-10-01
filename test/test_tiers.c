@@ -130,6 +130,15 @@ static void TestAreas(void)
     CHECK(mnavStageArea(navmesh, middle.polygon, mnav_areaWalkable) == mnav_success &&
               mnavCommit(navmesh) == mnav_success && Reach(query, navmesh, 18.0) == mnav_pathFound,
           "open again");
+    // Applied changes are not staged any more: a commit with nothing
+    // staged changes nothing, and a search begun before it goes on.
+    mnavNearest a = On(navmesh, 6.0, 7.5);
+    bool ended = false;
+    CHECK(mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, middle.polygon,
+                        middle.point) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success &&
+              mnavContinuePath(query, navmesh, 1, &ended) == mnav_success,
+          "an empty commit after a change");
     CHECK(mnavStageArea(navmesh, middle.polygon, MNAV_AREA_TYPES) == mnav_errorInvalid &&
               mnavStageArea(nullptr, middle.polygon, 1) == mnav_errorInvalid &&
               mnavGetArea(navmesh, middle.polygon, nullptr) == mnav_errorInvalid,
