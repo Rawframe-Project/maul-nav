@@ -20,6 +20,7 @@
 // same on every platform (mnav-0001).
 #define SOUP_OPEN_HASH  0x2af461f001197c4full
 #define LEVEL_OPEN_HASH 0xd6c58bf04b95682bull
+#define WIDE_OPEN_HASH  0x1c515047590b7d08ull
 
 static mnavMemory s_memory;
 
@@ -161,9 +162,10 @@ static int32_t AreaAt(const mnavCompactField* compact, float x, float z, int32_t
 
 // Runs the bake's stages so far over one mesh and returns the hash of
 // the eroded open-space field; checks the level's landmarks when level.
-static uint64_t Pipeline(const mnavTriangleMesh* mesh, const char* name, bool level)
+static uint64_t Pipeline(const mnavTriangleMesh* mesh, const char* name, bool level, float radius)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
+    def.agent.radius = radius;
     mnavBakeCells cells;
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
     CHECK(mnavValidateTriangleMesh(&def, mesh).result == mnav_success, "mesh");
@@ -209,13 +211,16 @@ static void TestPipelineHashesArePinned(void)
         indices[i] = i;
     }
     mnavTriangleMesh soup = {vertices, SOUP_TRIANGLES * 3, indices, SOUP_TRIANGLES, areas};
-    CHECK(Pipeline(&soup, "SOUP", false) == SOUP_OPEN_HASH, "the soup's pinned hash");
+    CHECK(Pipeline(&soup, "SOUP", false, 0.5f) == SOUP_OPEN_HASH, "the soup's pinned hash");
     static mnavVec3 levelVertices[LEVEL_VERTICES];
     static int32_t levelIndices[LEVEL_TRIANGLES * 3];
     MakeLevel(levelVertices, levelIndices);
     mnavTriangleMesh level = {levelVertices, LEVEL_VERTICES, levelIndices, LEVEL_TRIANGLES,
                               nullptr};
-    CHECK(Pipeline(&level, "LEVEL", true) == LEVEL_OPEN_HASH, "the level's pinned hash");
+    CHECK(Pipeline(&level, "LEVEL", true, 0.5f) == LEVEL_OPEN_HASH, "the level's pinned hash");
+    // At 4 cells the chamfer's diagonal weight first decides spans (two
+    // diagonals and a step are 8 half cells, not 6).
+    CHECK(Pipeline(&level, "WIDE", false, 1.0f) == WIDE_OPEN_HASH, "the wide agent's hash");
 }
 
 int main(void)
