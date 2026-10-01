@@ -39,6 +39,7 @@ surface: navmesh nearest polymesh query query_filter
 corridor: funnel navmesh offmesh polymesh query query_filter
 modifiers: allocator navmesh
 grid: query query_filter
+flow: allocator query_filter
 # Avoidance (mnav-0006) uses the base alone, never a navmesh module.
 orca:
 obstacle: orca

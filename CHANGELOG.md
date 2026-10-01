@@ -194,3 +194,7 @@ format.
 - Avoidance finds obstacle candidates through a grid of their bounds:
   1,000 agents among 4,096 obstacle points went from 15.2 ms a step to
   0.57 ms; the lines are the same for any cell size.
+- Flow fields (mnav-0007): flow.h with mnavFlowField, mnavBuildFlowField
+  (Dijkstra from every goal over an mnavGrid with the grid path's steps
+  and costs) and mnavFlowAt (a cell's cost to the nearest goal and its
+  next cell).

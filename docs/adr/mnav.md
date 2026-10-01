@@ -11,3 +11,4 @@ are listed in [README.md](README.md).
 | [mnav-0004](mnav-0004-navmesh-and-commits.md) | The navmesh and its commits | Accepted |
 | [mnav-0005](mnav-0005-queries.md) | Queries | Accepted |
 | [mnav-0006](mnav-0006-avoidance.md) | Avoidance | Accepted |
+| [mnav-0007](mnav-0007-flow-fields.md) | Flow fields | Accepted |

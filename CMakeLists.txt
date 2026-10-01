@@ -57,6 +57,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/filter.c
     src/hash.c
     src/funnel.c
+    src/flow.c
     src/grid.c
     src/modifiers.c
     src/height_patch.c
@@ -119,6 +120,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(resnap WHITEBOX)
     maul_add_test(bake2d)
     maul_add_test(grid)
+    maul_add_test(flow)
     maul_add_test(avoidance)
     maul_add_test(orca WHITEBOX)
     maul_add_test(obstacle WHITEBOX)
