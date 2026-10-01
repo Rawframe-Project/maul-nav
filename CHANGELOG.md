@@ -149,3 +149,6 @@ format.
   and mnavFinishPath, with mnav_pathUnfinished; the result of any
   slicing equals mnavFindPath's, and a commit to the navmesh makes a
   search in progress stale. The funnel moves to its own module.
+- Moving along the surface (mnav-0005): mnavMoveAlongSurface with
+  mnavMove and mnavMoveEnd; a tile side's stretches no link covers are
+  walls. The query context's code moves to its own module.

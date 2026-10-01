@@ -63,6 +63,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/nearest.c
     src/offmesh.c
     src/path.c
+    src/query.c
     src/query_filter.c
     src/raycast.c
     src/planar.c
@@ -71,6 +72,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/region.c
     src/scalar.c
     src/sort.c
+    src/surface.c
     src/tile.c
     src/triangulate.c)
 maul_configure_library(maul-nav)
@@ -104,6 +106,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(offmesh WHITEBOX)
     maul_add_test(path_links WHITEBOX)
     maul_add_test(sliced WHITEBOX)
+    maul_add_test(surface WHITEBOX)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)

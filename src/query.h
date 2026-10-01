@@ -108,4 +108,9 @@ struct mnavQuery
     mnavQueryFilter filter;
 };
 
+// The table cell holding the node with a key, or the empty cell where it
+// would go.
+uint32_t mnavFindNode(const mnavQuery* query, int32_t slot, int32_t polygon, int32_t tag,
+                      int32_t low);
+
 #endif // MAUL_NAV_SRC_QUERY_H

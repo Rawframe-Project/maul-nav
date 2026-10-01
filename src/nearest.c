@@ -3,6 +3,8 @@
 //
 // The nearest point on the navmesh (mnav-0005).
 
+#include "nearest.h"
+
 #include "detail.h"
 #include "navmesh.h"
 #include "polymesh.h"
@@ -111,6 +113,15 @@ static double DetailHeight(const mnavTile* tile, int32_t p, Flat at)
         best = d;
     }
     return height;
+}
+
+double mnavSurfaceHeight(const mnavNavmesh* navmesh, int32_t slot, int32_t polygon, double x,
+                         double z)
+{
+    const mnavSlot* s = &navmesh->slots[slot];
+    mnavFrame f = mnavFrameOf(navmesh, s->x, s->z);
+    Flat at = {(x - f.x0) / f.cell, (z - f.z0) / f.cell};
+    return f.y0 + (DetailHeight(s->tile, polygon, at) - MNAV_HEIGHT_OFFSET) * f.height;
 }
 
 // The search: the query, the box in world meters, and the best so far.

@@ -87,6 +87,16 @@ that are not loaded must say so rather than treat them as walls.
   navmesh versions. Finished early, a search gives the corridor toward
   the node nearest the end, ended `mnav_pathUnfinished`.
 
+- **Moving along the surface:** `mnavMoveAlongSurface` walks
+  breadth-first, in edge order, from a point on a polygon over the
+  included polygons whose shared edges meet the circle round the move.
+  It reaches the wanted point in the polygon holding it, or ends at the
+  nearest point on the walls met, ties to the wall met first. Walls are
+  every edge, and every part of a tile-side edge, with no included
+  polygon across, so gaps between linked polygons are walls. It ends
+  reached, at a wall, at a side with no tile loaded, or out of nodes,
+  with the point on the detail surface and the polygons walked.
+
 ## Consequences
 
 - Queries scan the polygons of each loaded tile in their box; a search

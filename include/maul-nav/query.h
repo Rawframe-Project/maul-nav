@@ -299,6 +299,65 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh,
                                                       mnavPath* pathOut);
 
+    // How a move along the surface ended.
+    typedef uint8_t mnavMoveEnd;
+
+    enum
+    {
+        // The wanted point was reached.
+        mnav_moveReached = 0,
+        // Walls stopped the move; the point is the nearest on them.
+        mnav_moveWall = 1,
+        // As at a wall, the nearest point lying on a tile side with no
+        // tile loaded beyond.
+        mnav_moveNotLoaded = 2,
+        // The polygons visited reached the context's node limit; the point
+        // is the nearest on the walls met so far.
+        mnav_moveOutOfNodes = 3,
+    };
+
+    // A move along the surface's result.
+    typedef struct mnavMove
+    {
+        mnavMoveEnd end;
+        // The point reached, on the detail surface, and its polygon.
+        mnavPos3 point;
+        mnavPolygonId polygon;
+        // The polygons from the start polygon to the one reached, in the
+        // context's memory until its next query.
+        const mnavPolygonId* polygons;
+        int32_t polygonCount;
+    } mnavMove;
+
+    /// Moves from a point on a polygon toward a wanted point along the
+    /// navmesh, as far as the walls allow (mnav-0005): a breadth-first
+    /// walk over the polygons the filter includes whose shared edges meet
+    /// the circle round the move, in edge order. In the polygon holding the
+    /// wanted point the move reaches it; otherwise it ends at the point
+    /// nearest it on the walls met, ties to the wall met first.
+    ///
+    /// @param query        The context; its memory holds the polygons.
+    /// @param navmesh      The navmesh.
+    /// @param filter       The areas usable, or NULL for every walkable one.
+    /// @param startPolygon The polygon the start point lies on.
+    /// @param start        The start point.
+    /// @param end          The wanted point; only its ground position
+    ///                     counts.
+    /// @param moveOut      Receives the result.
+    /// @return `mnav_success` whenever the move ran, however it ended;
+    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite,
+    /// a polygon id that never existed or a filter not built from
+    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of
+    /// its range; `mnav_errorStale` for a polygon id whose tile has been
+    /// replaced or removed.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    /// Any number of contexts may move on one navmesh at once between
+    /// commits.
+    MNAV_NODISCARD MNAV_API mnavResult mnavMoveAlongSurface(
+        mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+        mnavPolygonId startPolygon, mnavPos3 start, mnavPos3 end, mnavMove* moveOut);
+
     // How a raycast ended.
     typedef uint8_t mnavRayEnd;
 
