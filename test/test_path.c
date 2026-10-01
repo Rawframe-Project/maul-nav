@@ -20,7 +20,7 @@
 #include <string.h>
 
 // The hash of a set of searches' results, the same on every platform.
-#define SEARCH_HASH 0x543f400c92d8458eull
+#define SEARCH_HASH 0xa47d1d3088ade276ull
 
 static mnavNavmesh* Load(const int32_t* tiles, int32_t count)
 {
@@ -332,8 +332,11 @@ static void TestSearchesArePinned(void)
 {
     mnavNavmesh* navmesh = LoadAll();
     mnavQuery* query = MakeQuery(8192, 1000.0f);
+    // Searches short of nodes end at the node nearest the end.
+    mnavQuery* small = MakeQuery(12, 1000.0f);
     uint64_t hash = MNAV_HASH_INIT;
     int32_t found = 0;
+    int32_t partial = 0;
     uint32_t state = 5;
     for (int32_t i = 0; i < 200; ++i)
     {
@@ -353,6 +356,10 @@ static void TestSearchesArePinned(void)
         {
             continue;
         }
+        mnavPath cut = Search(small, navmesh, a, b);
+        partial += cut.end == mnav_pathOutOfNodes ? 1 : 0;
+        hash = mnavHash64(hash, &cut.cost, (int32_t)sizeof(cut.cost));
+        hash = mnavHash64(hash, cut.polygons, cut.polygonCount * (int32_t)sizeof(mnavPolygonId));
         mnavPath path = Search(query, navmesh, a, b);
         found += path.end == mnav_pathFound ? 1 : 0;
         CHECK(Connected(navmesh, &path), "connected");
@@ -360,8 +367,9 @@ static void TestSearchesArePinned(void)
         hash = mnavHash64(hash, &path.cost, (int32_t)sizeof(path.cost));
         hash = mnavHash64(hash, path.polygons, path.polygonCount * (int32_t)sizeof(mnavPolygonId));
     }
-    printf("SEARCH_HASH=%016llx found=%d\n", (unsigned long long)hash, found);
+    printf("SEARCH_HASH=%016llx found=%d partial=%d\n", (unsigned long long)hash, found, partial);
     CHECK(hash == SEARCH_HASH, "the pinned hash");
+    mnavDestroyQuery(small);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
