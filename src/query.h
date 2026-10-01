@@ -50,6 +50,23 @@ typedef struct mnavSearchNode
     int32_t heap;
 } mnavSearchNode;
 
+// A grid search's node (mnav-0005): a cell reached, the way it came, its
+// cost and length so far and the heuristic, and its place in the open
+// list, MNAV_NO_NODE before it enters it, or MNAV_CLOSED.
+typedef struct mnavGridNode
+{
+    int32_t x;
+    int32_t y;
+    int32_t parent;
+    int32_t heap;
+    double cost;
+    double length;
+    double remaining;
+} mnavGridNode;
+
+// A grid node out of the open list, its cost final.
+#define MNAV_CLOSED (-2)
+
 // A portal's ends as the funnel sees them, walking into the polygon: the
 // left one, then the right one.
 typedef struct mnavPortal
@@ -89,7 +106,13 @@ struct mnavQuery
 {
     mnavMemory memory;
     mnavQueryLimits limits;
-    mnavSearchNode* nodes;
+    // One block of nodes serves a navmesh or a grid search, whichever ran
+    // last; grid nodes are the smaller.
+    union
+    {
+        mnavSearchNode* nodes;
+        mnavGridNode* gridNodes;
+    };
     int32_t nodeCount;
     int32_t* heap;
     int32_t heapCount;
@@ -101,7 +124,12 @@ struct mnavQuery
     // portal, an off-mesh link two, and the end one more, so twice the
     // nodes plus one bound both. Then the links crossed.
     mnavPortal* portals;
-    mnavPos3* points;
+    // The straight path's points, or a grid path's cells.
+    union
+    {
+        mnavPos3* points;
+        mnavCell* cells;
+    };
     mnavPathLink* links;
     // The search, and its own copy of the filter it began with.
     mnavSearch search;

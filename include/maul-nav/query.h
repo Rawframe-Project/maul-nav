@@ -581,6 +581,70 @@ extern "C"
                                                           mnavCorridor* corridor,
                                                           mnavVec3 halfExtents, mnavPath* pathOut);
 
+    // The longest side a grid may have, in cells.
+#define MNAV_MAX_GRID_SIDE 32768
+
+    // A grid for grid pathfinding (mnav-0005): cells in rows from (0, 0),
+    // each an area; mnav_areaNone, and areas a filter leaves out, block a
+    // cell.
+    typedef struct mnavGrid
+    {
+        // width times height areas, x fastest. Only read during a call.
+        const mnavAreaType* areas;
+        // The cells across and down, 1 to MNAV_MAX_GRID_SIDE.
+        int32_t width;
+        int32_t height;
+        // A cell's side, in meters, more than 0.
+        float cellSize;
+    } mnavGrid;
+
+    // A cell of a grid.
+    typedef struct mnavCell
+    {
+        int32_t x;
+        int32_t y;
+    } mnavCell;
+
+    // A grid path: how its search ended, its cost and length, and the
+    // cells it turns at, the start first and the last cell reached last,
+    // in a query context's memory until its next query.
+    typedef struct mnavGridPath
+    {
+        mnavPathEnd end;
+        double cost;
+        double length;
+        const mnavCell* cells;
+        int32_t cellCount;
+    } mnavGridPath;
+
+    /// Finds the cheapest path between two cells of a grid, moving to the
+    /// 8 neighbours and never across a blocked corner: a diagonal step
+    /// needs both cells beside it open. A step costs its length times the
+    /// mean of its two cells' area costs. When every area the filter
+    /// includes costs the same, the search is jump point search, else A*;
+    /// both keep the context's node limit and path length, and end as
+    /// mnavFindPath does, with the path to the cell nearest the end when
+    /// the end is not reached. A grid search ends any sliced search.
+    ///
+    /// @param query   The context; its memory holds the path.
+    /// @param grid    The grid.
+    /// @param filter  The areas usable and their costs, or NULL.
+    /// @param start   The start cell.
+    /// @param end     The end cell.
+    /// @param pathOut Receives the path; mnav_pathNone with the start
+    ///                alone when the start is blocked.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// grid with no areas, a side out of range or a cell size not more than
+    /// 0 or not finite, a cell outside the grid, or a filter not built from
+    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of
+    /// its range.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindGridPath(mnavQuery* query, const mnavGrid* grid,
+                                                        const mnavQueryFilter* filter,
+                                                        mnavCell start, mnavCell end,
+                                                        mnavGridPath* pathOut);
+
     // How a raycast ended.
     typedef uint8_t mnavRayEnd;
 

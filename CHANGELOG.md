@@ -176,3 +176,6 @@ format.
   mnav_elementPoint, mnavValidateOutline and mnavBakeTile2D; a 2D
   navmesh is an ordinary navmesh with a flat floor, served by every
   query.
+- Grid paths (mnav-0005): mnavGrid, mnavCell, mnavGridPath,
+  MNAV_MAX_GRID_SIDE and mnavFindGridPath, jump point search or A* by
+  the filter's costs.

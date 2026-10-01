@@ -56,6 +56,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/filter.c
     src/hash.c
     src/funnel.c
+    src/grid.c
     src/modifiers.c
     src/height_patch.c
     src/heightfield.c
@@ -114,6 +115,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(tiers WHITEBOX)
     maul_add_test(resnap WHITEBOX)
     maul_add_test(bake2d)
+    maul_add_test(grid)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)

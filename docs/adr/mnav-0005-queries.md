@@ -120,6 +120,14 @@ that are not loaded must say so rather than treat them as walls.
   between the corridor's ends, finding their polygons again within a
   box when their own have gone.
 
+- **Grid paths:** `mnavFindGridPath` searches a caller's grid of cell
+  areas in a query context: eight neighbours, no blocked corner cut, a
+  step costing its length times the mean of its cells' area costs.
+  Jump point search when every included area costs the same, A*
+  otherwise; the context's node limit and path length, the navmesh
+  search's ends, closed nodes final, and the turning cells as the
+  path.
+
 ## Consequences
 
 - Queries scan the polygons of each loaded tile in their box; a search
