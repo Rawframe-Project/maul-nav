@@ -96,7 +96,8 @@ extern "C"
     /// element for malformed bytes, a tile baked with other settings
     /// (the header) or a NULL argument; `mnav_errorVersion` for another
     /// tile format version; `mnav_errorLimit` past the memory limit;
-    /// `mnav_errorCapacity` when the allocator fails.
+    /// `mnav_errorCapacity` when the allocator fails; `mnav_errorTier` for
+    /// a tile at a place where one is committed, below mnav_tierDynamic.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
     /// Staging changes nothing queries read, but it may not run beside
@@ -134,6 +135,50 @@ extern "C"
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a commit.
     MNAV_NODISCARD MNAV_API mnavResult mnavCommit(mnavNavmesh* navmesh);
+
+    /// Reads a navmesh's runtime tier.
+    ///
+    /// @param navmesh The navmesh.
+    /// @return Its tier; mnav_tierStatic for NULL.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read it and query
+    /// at once between commits; none may while a stage or commit call
+    /// runs.
+    MNAV_API mnavTier mnavGetTier(const mnavNavmesh* navmesh);
+
+    /// Stages a change of a polygon's area, applied at the next commit;
+    /// mnav_areaNone blocks it. The change lasts while the polygon's tile
+    /// is loaded, and is dropped when the commit replaces or removes it.
+    /// Staged again before the commit, the last area counts.
+    ///
+    /// @param navmesh The navmesh, of mnav_tierModifiers or above.
+    /// @param polygon The polygon.
+    /// @param area    Its new area, below MNAV_AREA_TYPES.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh, an
+    /// area out of range or an id never handed out; `mnav_errorStale` for
+    /// a polygon whose tile has been replaced or removed;
+    /// `mnav_errorTier` for a static navmesh; `mnav_errorCapacity` when
+    /// memory runs out.
+    /// @par Thread safety
+    /// Safe from any thread; the navmesh is used by one thread at a time,
+    /// so no query may run during a stage call.
+    MNAV_NODISCARD MNAV_API mnavResult mnavStageArea(mnavNavmesh* navmesh, mnavPolygonId polygon,
+                                                     mnavAreaType area);
+
+    /// Reads a polygon's area as committed.
+    ///
+    /// @param navmesh The navmesh.
+    /// @param polygon The polygon.
+    /// @param areaOut Receives its area.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or
+    /// an id never handed out; `mnav_errorStale` for a polygon whose tile
+    /// has been replaced or removed.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read areas and
+    /// query at once between commits; none may while a stage or commit
+    /// call runs.
+    MNAV_NODISCARD MNAV_API mnavResult mnavGetArea(const mnavNavmesh* navmesh,
+                                                   mnavPolygonId polygon, mnavAreaType* areaOut);
 
     /// Finds the tile at a place.
     ///
@@ -204,6 +249,9 @@ extern "C"
         // Whether both ends snapped to polygons at the last commit; a
         // detached link is not crossed.
         bool attached;
+        // Whether the link may be crossed; a disabled link is still
+        // snapped and reported.
+        bool enabled;
         // The polygons the ends snapped to and the points on them; zeroed
         // when detached.
         mnavPolygonId startPolygon;
@@ -241,6 +289,22 @@ extern "C"
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run while a removal is staged.
     MNAV_NODISCARD MNAV_API mnavResult mnavStageLinkRemoval(mnavNavmesh* navmesh, mnavLinkId link);
+
+    /// Stages enabling or disabling an off-mesh link, applied at the next
+    /// commit; a link is enabled when added. A disabled link stays snapped
+    /// but is not crossed.
+    ///
+    /// @param navmesh The navmesh, of mnav_tierModifiers or above.
+    /// @param link    The link, committed or staged.
+    /// @param enabled Whether it may be crossed.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh or an
+    /// id never handed out; `mnav_errorStale` for a link removed or staged
+    /// for removal; `mnav_errorTier` for a static navmesh.
+    /// @par Thread safety
+    /// Safe from any thread; the navmesh is used by one thread at a time,
+    /// so no query may run during a stage call.
+    MNAV_NODISCARD MNAV_API mnavResult mnavStageLinkEnabled(mnavNavmesh* navmesh, mnavLinkId link,
+                                                            bool enabled);
 
     /// Reads an off-mesh link as committed.
     ///

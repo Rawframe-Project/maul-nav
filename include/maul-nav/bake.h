@@ -99,6 +99,21 @@ extern "C"
     } mnavBakeLimits;
 
     // How a bake runs. Build it with mnavDefaultBakeDef.
+    // A navmesh's runtime tier (mnav-0004): what may change once loaded.
+    // Tiles and off-mesh links load and unload in every tier.
+    typedef uint8_t mnavTier;
+
+    enum
+    {
+        // Nothing loaded changes.
+        mnav_tierStatic = 0,
+        // Polygons' areas change, and off-mesh links are enabled and
+        // disabled.
+        mnav_tierModifiers = 1,
+        // Also, a loaded tile is replaced in one commit.
+        mnav_tierDynamic = 2,
+    };
+
     typedef struct mnavBakeDef
     {
         uint32_t cookie;
@@ -134,6 +149,9 @@ extern "C"
         float detailMaxError;
         // The limits on the work.
         mnavBakeLimits limits;
+        // The runtime tier of a navmesh made with this def,
+        // mnav_tierStatic by default; the bake ignores it.
+        mnavTier tier;
     } mnavBakeDef;
 
     // The setting a def check refused.
@@ -166,6 +184,7 @@ extern "C"
         mnav_settingDetailSampleDistance = 22,
         mnav_settingDetailMaxError = 23,
         mnav_settingLinks = 24,
+        mnav_settingTier = 25,
     };
 
     // A def check's outcome: the status, and the first setting it refused.

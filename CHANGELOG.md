@@ -162,3 +162,8 @@ format.
   neighbours to rounding and go nowhere.
 - Corridor upkeep (mnav-0005): mnavShortcutCorridor and
   mnavReplanCorridor.
+- Runtime tiers (mnav-0004): mnavTier and mnavBakeDef.tier
+  (mnav_settingTier), mnavGetTier, mnavStageArea, mnavGetArea,
+  mnavStageLinkEnabled and mnavLinkState.enabled, and the result
+  mnav_errorTier. The default tier is static: replacing a loaded tile
+  now needs mnav_tierDynamic.

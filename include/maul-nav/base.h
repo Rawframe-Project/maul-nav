@@ -82,6 +82,8 @@ extern "C"
         // An id names a tile or polygon that has been replaced or
         // removed since it was handed out (record 0016).
         mnav_errorStale = -7,
+        // The navmesh's runtime tier does not allow the change.
+        mnav_errorTier = -8,
     };
 
     // A library version: major, minor and patch.

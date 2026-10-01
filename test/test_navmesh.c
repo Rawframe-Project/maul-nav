@@ -25,6 +25,8 @@
 static mnavNavmesh* Make(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
+    // Tests here replace loaded tiles.
+    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     return navmesh;
@@ -234,6 +236,7 @@ static void TestDestroyGivesEverythingBack(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     def.allocator = CountingAllocator();
+    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
@@ -241,7 +244,12 @@ static void TestDestroyGivesEverythingBack(void)
         CHECK(StageAt(navmesh, t) == mnav_success, "staged");
     }
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
-    CHECK(StageAt(navmesh, 2) == mnav_success, "staged, not committed");
+    mnavTileId tile;
+    CHECK(StageAt(navmesh, 2) == mnav_success &&
+              mnavGetTile(navmesh, 0, 0, &tile) == mnav_success &&
+              mnavStageArea(navmesh, (mnavPolygonId){tile.slot, tile.generation, 0}, 3) ==
+                  mnav_success,
+          "staged, not committed");
     CHECK(s_held > 0, "held");
     mnavDestroyNavmesh(navmesh);
     CHECK(s_held == 0, "all given back");

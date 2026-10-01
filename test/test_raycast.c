@@ -25,6 +25,8 @@ static mnavNavmesh* Make(const HandSquare* first, int32_t firstCount, const Hand
                          int32_t secondCount)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
+    // Tests here replace loaded tiles.
+    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     size_t size = HandTileBytes(s_bytes[0], 0, first, firstCount);

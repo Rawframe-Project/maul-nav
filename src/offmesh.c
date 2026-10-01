@@ -102,7 +102,7 @@ mnavResult mnavStageLink(mnavNavmesh* navmesh, const mnavLinkDef* def, mnavLinkI
         navmesh->links[navmesh->linkSlots++] = (mnavOffLink){0};
     }
     mnavOffLink* link = &navmesh->links[s];
-    *link = (mnavOffLink){*def, link->generation + 1, MNAV_LINK_ADDING, {0}};
+    *link = (mnavOffLink){*def, link->generation + 1, MNAV_LINK_ADDING, true, {0}};
     navmesh->linksHeld += 1;
     navmesh->linksPending += 1;
     *linkOut = (mnavLinkId){(uint32_t)s + 1, link->generation};
@@ -134,6 +134,31 @@ mnavResult mnavStageLinkRemoval(mnavNavmesh* navmesh, mnavLinkId id)
         navmesh->linksPending += 1;
     }
     return mnav_success;
+}
+
+mnavResult mnavStageLinkEnabled(mnavNavmesh* navmesh, mnavLinkId id, bool enabled)
+{
+    if (navmesh == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    int32_t s = 0;
+    mnavResult result = Find(navmesh, id, &s);
+    mnavOffLink* link = result == mnav_success ? &navmesh->links[s] : nullptr;
+    if (link != nullptr && link->phase == MNAV_LINK_REMOVING)
+    {
+        result = mnav_errorStale;
+    }
+    if (result == mnav_success && navmesh->def.tier < mnav_tierModifiers)
+    {
+        result = mnav_errorTier;
+    }
+    if (result == mnav_success && link->enabled != enabled)
+    {
+        link->enabled = enabled;
+        navmesh->linksPending += 1;
+    }
+    return result;
 }
 
 mnavResult mnavGetLink(const mnavNavmesh* navmesh, mnavLinkId id, mnavLinkState* stateOut)
@@ -214,7 +239,12 @@ static int32_t Attach(mnavNavmesh* navmesh, int32_t s, uint64_t* keys, int32_t c
         return count;
     }
     state.attached = true;
+    state.enabled = link->enabled;
     link->state = state;
+    if (!link->enabled)
+    {
+        return count;
+    }
     keys[count++] = mnavAttachmentKey((mnavAttachment){
         (int32_t)state.startPolygon.slot - 1, (int32_t)state.startPolygon.polygon, s, false});
     if (link->def.twoWay)
@@ -265,7 +295,7 @@ void mnavApplyAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
         double dy = link->state.end.y - link->state.start.y;
         double dz = link->state.end.z - link->state.start.z;
         double span = sqrt(dx * dx + dy * dy + dz * dz);
-        if (link->state.attached && span > 0.0)
+        if (link->state.attached && link->state.enabled && span > 0.0)
         {
             double perMeter = (double)link->def.cost / span;
             double* lowest = &navmesh->costPerMeter[link->def.kind];

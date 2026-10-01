@@ -118,6 +118,10 @@ static mnavBakeSetting CheckGrid(const mnavBakeDef* def)
     {
         return mnav_settingTileCells;
     }
+    if (def->tier > mnav_tierDynamic)
+    {
+        return mnav_settingTier;
+    }
     return mnav_settingNone;
 }
 

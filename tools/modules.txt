@@ -32,7 +32,8 @@ raycast: navmesh polymesh query query_filter
 query: allocator
 query_filter:
 offmesh: allocator navmesh sort
-commit: navmesh offmesh
+commit: modifiers navmesh offmesh
 funnel: navmesh query
 surface: navmesh nearest polymesh query query_filter
 corridor: funnel navmesh offmesh polymesh query query_filter
+modifiers: allocator navmesh

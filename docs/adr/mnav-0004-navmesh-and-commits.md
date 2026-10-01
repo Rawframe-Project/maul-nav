@@ -47,6 +47,16 @@ is gone (record 0016).
   both ends' tiles are loaded and detaches when one leaves;
   `mnavGetLink` reads which. A navmesh holds at most `limits.links`.
 
+- **Runtime tiers:** the def's `tier` declares what may change once
+  loaded; tiles and off-mesh links stream in and out in every tier.
+  `mnav_tierModifiers` adds `mnavStageArea` (a whole polygon's area,
+  `mnav_areaNone` to block it; shapes are marked on the input at bake
+  time so polygons end where they do) and `mnavStageLinkEnabled` (a
+  disabled link stays snapped but is not crossed);
+  `mnav_tierDynamic` adds replacing a loaded tile in one commit. Both
+  changes go through the commit; anything else is refused with
+  `mnav_errorTier`. A changed area lasts while its tile is loaded.
+
 ## Consequences
 
 - A commit costs work proportional to the tiles next to its changes,

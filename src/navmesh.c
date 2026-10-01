@@ -93,6 +93,8 @@ void mnavDestroyNavmesh(mnavNavmesh* navmesh)
                 alignof(mnavStaged));
     mnavRelease(memory, navmesh->links, (size_t)navmesh->linkCapacity, sizeof(mnavOffLink),
                 alignof(mnavOffLink));
+    mnavRelease(memory, navmesh->areaChanges, (size_t)navmesh->areaChangeCapacity,
+                sizeof(mnavAreaChange), alignof(mnavAreaChange));
     mnavRelease(memory, navmesh->attachments, (size_t)navmesh->attachmentCapacity, sizeof(uint64_t),
                 alignof(uint64_t));
     mnavRelease(memory, navmesh->places, (size_t)navmesh->placeCapacity, sizeof(mnavPlace),
@@ -240,6 +242,12 @@ mnavTileResult mnavStageTile(mnavNavmesh* navmesh, const uint8_t* bytes, size_t 
     if (result.result == mnav_success && !Matches(navmesh, &tile->info))
     {
         result = (mnavTileResult){mnav_errorInvalid, mnav_tileHeader, -1};
+    }
+    int32_t held = 0;
+    if (result.result == mnav_success && navmesh->def.tier < mnav_tierDynamic &&
+        mnavTileAt(navmesh, tile->info.x, tile->info.z, &held) != nullptr)
+    {
+        result = (mnavTileResult){mnav_errorTier, mnav_tileHeader, -1};
     }
     if (result.result == mnav_success)
     {

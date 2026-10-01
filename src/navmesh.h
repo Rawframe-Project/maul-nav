@@ -41,6 +41,13 @@ typedef struct mnavTile
     int32_t* firstLink;
 } mnavTile;
 
+// A staged change of a polygon's area (mnav-0004).
+typedef struct mnavAreaChange
+{
+    mnavPolygonId polygon;
+    mnavAreaType area;
+} mnavAreaChange;
+
 // A slot: its generation, its tile (NULL when free) and the tile's place.
 // A retired slot is never used again.
 typedef struct mnavSlot
@@ -87,6 +94,8 @@ typedef struct mnavOffLink
     mnavLinkDef def;
     uint32_t generation;
     mnavLinkPhase phase;
+    // Whether it is to be enabled at the next commit.
+    bool enabled;
     mnavLinkState state;
 } mnavOffLink;
 
@@ -117,6 +126,10 @@ struct mnavNavmesh
     uint64_t* attachments;
     int32_t attachmentCount;
     int32_t attachmentCapacity;
+    // The areas staged to change, in staging order.
+    mnavAreaChange* areaChanges;
+    int32_t areaChangeCount;
+    int32_t areaChangeCapacity;
     // For each link kind, the lowest cost per meter of its attached links'
     // spans, INFINITY when it has none: what scales the search's
     // heuristic (mnav-0005).

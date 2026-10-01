@@ -4,6 +4,7 @@
 // The navmesh's commit (mnav-0004): tiles and off-mesh links together, all
 // or nothing.
 
+#include "modifiers.h"
 #include "navmesh.h"
 #include "offmesh.h"
 
@@ -16,7 +17,7 @@ mnavResult mnavCommit(mnavNavmesh* navmesh)
     {
         return mnav_errorInvalid;
     }
-    if (navmesh->stagedCount == 0 && navmesh->linksPending == 0)
+    if (navmesh->stagedCount == 0 && navmesh->linksPending == 0 && navmesh->areaChangeCount == 0)
     {
         return mnav_success;
     }
@@ -35,6 +36,7 @@ mnavResult mnavCommit(mnavNavmesh* navmesh)
     if (result == mnav_success)
     {
         mnavApplyTiles(navmesh, &tiles);
+        mnavApplyAreas(navmesh);
         mnavApplyAttachments(navmesh, &links);
         navmesh->commits += 1;
     }

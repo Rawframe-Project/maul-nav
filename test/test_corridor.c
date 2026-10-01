@@ -22,6 +22,8 @@
 static mnavNavmesh* LoadWorld(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
+    // Tests here replace loaded tiles.
+    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
@@ -412,6 +414,8 @@ static void TestShortcuts(void)
     static uint8_t bytes[8192];
     size_t size = HandTileBytes(bytes, 0, grid, 9);
     mnavBakeDef def = mnavDefaultBakeDef();
+    // Tests here replace loaded tiles.
+    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
               mnavStageTile(navmesh, bytes, size).result == mnav_success &&

@@ -18,6 +18,8 @@
 static mnavNavmesh* LoadWorld(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
+    // Tests here replace loaded tiles.
+    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
