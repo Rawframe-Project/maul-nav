@@ -26,3 +26,4 @@ delaunay: invariant
 tile: allocator detail polymesh
 baker: allocator bake_def border_vertices compact contour detail erode filter heightfield holes input polymesh raster region tile
 navmesh: allocator bake_def detail polymesh tile
+nearest: detail navmesh polymesh raster

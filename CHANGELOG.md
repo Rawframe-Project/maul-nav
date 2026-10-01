@@ -111,3 +111,9 @@ format.
   ids go stale through their slot's generation, and polygons on facing
   tile sides are linked wherever their edges overlap within the agent's
   step, computed exactly.
+- The first query (mnav-0005): mnavFindNearest in the new header
+  maul-nav/query.h, with mnavNearest. It returns the polygon whose
+  nearest point lies in a box and scores best (over a polygon, the
+  height beyond the agent's step; otherwise the distance), with ties
+  broken by distance, tile place and polygon index, and reports when
+  part of the box lies on places with no tile loaded.
