@@ -33,7 +33,9 @@ enum
     TILE_CELLS_AT = 44,
     CELL_SIZE_AT = 48,
     ORIGIN_AT = 64,
-    VERTICES_AT = 88
+    VERTICES_AT = 88,
+    // The offset cell height of a hand tile's floor.
+    BASE = 32768
 };
 
 static void PutLittle(uint8_t* at, uint64_t value, int32_t bytes)
@@ -395,6 +397,153 @@ static void TestMeshRefusals(void)
     Unbake(&f);
 }
 
+// A tile built by hand: up to 8 vertices and 2 polygons, unlinked, with
+// detail triangles fanned from each polygon's first vertex and any extra
+// detail vertices given.
+typedef struct Hand
+{
+    mnavMeshVertex vertices[8];
+    mnavPolygon polygons[2];
+    mnavPolyMesh mesh;
+    mnavDetailPart parts[2];
+    mnavDetailVertex detailVertices[24];
+    mnavDetailTriangle triangles[16];
+    mnavDetailMesh detail;
+    mnavTileInfo info;
+} Hand;
+
+static void HandBegin(Hand* h, const int32_t* points, int32_t count)
+{
+    *h = (Hand){0};
+    for (int32_t v = 0; v < count; ++v)
+    {
+        h->vertices[v] =
+            (mnavMeshVertex){(uint16_t)points[2 * v], BASE, (uint16_t)points[2 * v + 1]};
+    }
+    h->mesh = (mnavPolyMesh){h->vertices, nullptr, count, count, h->polygons, 0, 2, 32, 0};
+    h->detail =
+        (mnavDetailMesh){h->parts, 0, h->detailVertices, 0, 24, h->triangles, 0, 16, 0, 0, 0};
+    h->info = (mnavTileInfo){(mnavVersion){1, 2, 3},   7, 0, 0, 32, 0.25f, 0.125f, 16, 2, 6,
+                             (mnavPos3){0.0, 0.0, 0.0}};
+}
+
+// Adds a polygon over the given vertex indices, with extra detail vertices.
+static void HandPolygon(Hand* h, const uint16_t* corners, int32_t count,
+                        const mnavDetailVertex* extra, int32_t extraCount)
+{
+    mnavPolygon* polygon = &h->polygons[h->mesh.polygonCount];
+    *polygon = (mnavPolygon){{0}, {0}, {0}, (uint8_t)count, 1, 1};
+    memset(polygon->vertices, 0xFF, sizeof(polygon->vertices));
+    memset(polygon->neighbors, 0xFF, sizeof(polygon->neighbors));
+    mnavDetailPart* part = &h->parts[h->mesh.polygonCount];
+    *part = (mnavDetailPart){h->detail.vertexCount, h->detail.triangleCount,
+                             (uint8_t)(count + extraCount), (uint8_t)(count - 2)};
+    for (int32_t k = 0; k < count; ++k)
+    {
+        polygon->vertices[k] = corners[k];
+        const mnavMeshVertex* v = &h->vertices[corners[k]];
+        h->detailVertices[h->detail.vertexCount++] = (mnavDetailVertex){v->x * 16, v->y, v->z * 16};
+    }
+    for (int32_t k = 0; k < extraCount; ++k)
+    {
+        h->detailVertices[h->detail.vertexCount++] = extra[k];
+    }
+    for (int32_t k = 1; k + 1 < count; ++k)
+    {
+        h->triangles[h->detail.triangleCount++] =
+            (mnavDetailTriangle){{0, (uint8_t)k, (uint8_t)(k + 1)}, 0};
+    }
+    h->mesh.polygonCount += 1;
+    h->detail.partCount += 1;
+}
+
+// Encodes the hand tile and loads it.
+static mnavTileResult HandLoad(Hand* h)
+{
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    CHECK(mnavEncodeTile(&memory, &h->info, &h->mesh, &h->detail, &bytes, &size) == mnav_success,
+          "encoded");
+    mnavTileResult result = Load(&memory, bytes, size);
+    mnavReleaseTileBytes(&memory, bytes, size);
+    CHECK(memory.used == 0, "nothing held");
+    return result;
+}
+
+static bool Names(mnavTileResult r, mnavTileSection section, int32_t index)
+{
+    return r.result == mnav_errorInvalid && r.section == section && r.index == index;
+}
+
+static void TestHandTilesRefuseOneFlawEach(void)
+{
+    // Vertices well inside a 32-cell tile.
+    const int32_t points[10] = {4, 4, 4, 8, 8, 8, 8, 4, 6, 6};
+    const uint16_t square[4] = {0, 1, 2, 3};
+    static Hand h;
+    HandBegin(&h, points, 5);
+    HandPolygon(&h, square, 4, nullptr, 0);
+    CHECK(HandLoad(&h).result == mnav_success, "a sound square loads");
+    // A vertex past the tile's +Z side.
+    h.vertices[4].z = 33;
+    CHECK(Names(HandLoad(&h), mnav_tileVertices, 4), "a vertex past the tile");
+    h.vertices[4].z = 6;
+    // A reflex corner: (6, 6) between (8, 8) and (8, 4) pulls the
+    // square's +X side in.
+    HandBegin(&h, points, 5);
+    const uint16_t reflex[5] = {0, 1, 2, 4, 3};
+    HandPolygon(&h, reflex, 5, nullptr, 0);
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "not convex");
+    // Two vertices at one place: an edge of zero length.
+    HandBegin(&h, (const int32_t[]){4, 4, 4, 8, 8, 8, 8, 8}, 4);
+    HandPolygon(&h, square, 4, nullptr, 0);
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "an edge of zero length");
+    // Three vertices on a line: no area.
+    HandBegin(&h, (const int32_t[]){4, 4, 4, 6, 4, 8}, 3);
+    HandPolygon(&h, square, 3, nullptr, 0);
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "no area");
+    // Wound the other way.
+    const uint16_t backward[4] = {3, 2, 1, 0};
+    HandBegin(&h, points, 5);
+    HandPolygon(&h, backward, 4, nullptr, 0);
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "wound backward");
+    // A polygon naming itself across an edge.
+    HandBegin(&h, points, 5);
+    HandPolygon(&h, square, 4, nullptr, 0);
+    h.polygons[0].neighbors[1] = 0;
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "its own neighbor");
+    // A vertex used twice.
+    const uint16_t twice[4] = {0, 1, 0, 2};
+    HandBegin(&h, points, 5);
+    HandPolygon(&h, twice, 4, nullptr, 0);
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "a vertex used twice");
+    // A detail vertex past the tile's +Z side.
+    HandBegin(&h, points, 5);
+    const mnavDetailVertex far = {96, BASE, 32 * 16 + 1};
+    HandPolygon(&h, square, 4, &far, 1);
+    CHECK(Names(HandLoad(&h), mnav_tileDetailVertices, 0), "a detail vertex past the tile");
+}
+
+static void TestHeaderSettingsAreChecked(void)
+{
+    const int32_t points[8] = {4, 4, 4, 8, 8, 8, 8, 4};
+    const uint16_t square[4] = {0, 1, 2, 3};
+    static Hand h;
+    HandBegin(&h, points, 4);
+    HandPolygon(&h, square, 4, nullptr, 0);
+    h.info.agentRadius = 33;
+    CHECK(Names(HandLoad(&h), mnav_tileHeader, -1), "a radius wider than the tile");
+    h.info.agentRadius = 2;
+    h.info.x = MNAV_MAX_EXTENT_CELLS / 32 + 1;
+    CHECK(Names(HandLoad(&h), mnav_tileHeader, -1), "a tile past the extent");
+    h.info.x = -(MNAV_MAX_EXTENT_CELLS / 32);
+    CHECK(HandLoad(&h).result == mnav_success, "the last tile within it");
+    h.info.x = 0;
+    h.info.agentHeight = 0;
+    CHECK(Names(HandLoad(&h), mnav_tileHeader, -1), "an agent of no height");
+}
+
 static void TestMemoryLimitIsTyped(void)
 {
     static Fixture f;
@@ -434,6 +583,8 @@ int main(int argc, char** argv)
     TestEveryByteChangeIsRefusedOrCanonical();
     TestHeaderRefusals();
     TestMeshRefusals();
+    TestHandTilesRefuseOneFlawEach();
+    TestHeaderSettingsAreChecked();
     TestMemoryLimitIsTyped();
     return s_failures == 0 ? 0 : 1;
 }

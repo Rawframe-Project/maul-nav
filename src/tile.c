@@ -423,13 +423,6 @@ static bool ReadPolygon(Reader* r, const mnavPolyMesh* mesh, int32_t polygons, m
         {
             return false;
         }
-        for (int32_t j = 0; j < k; ++j)
-        {
-            if (polygon->vertices[j] == vertex)
-            {
-                return false;
-            }
-        }
         polygon->vertices[k] = (uint16_t)vertex;
         polygon->neighbors[k] = (uint16_t)neighbor;
         polygon->sides[k] = (uint8_t)side;
@@ -443,7 +436,8 @@ static int64_t Area2(const mnavMeshVertex* a, const mnavMeshVertex* b, const mna
 }
 
 // Whether the polygon is convex with a positive area: no edge of zero
-// length, and every vertex on the inner side of every edge or on it.
+// length, and every vertex on the inner side of every edge or on it. A
+// vertex used twice fails it too, as the edges round it double back.
 static bool Convex(const mnavPolyMesh* mesh, const mnavPolygon* polygon)
 {
     int64_t area = 0;
@@ -487,7 +481,8 @@ static uint8_t SideOf(const mnavMeshVertex* a, const mnavMeshVertex* b, int32_t 
 }
 
 // Whether each edge's neighbor runs the same edge back to it, and each
-// edge without one carries exactly the tile side it lies on.
+// edge without one carries exactly the tile side it lies on. A polygon
+// naming itself fails, as it never runs its own edge backward.
 static bool Linked(const mnavPolyMesh* mesh, int32_t p)
 {
     const mnavPolygon* polygon = &mesh->polygons[p];
@@ -513,7 +508,7 @@ static bool Linked(const mnavPolyMesh* mesh, int32_t p)
                 back || (other->vertices[j] == b && other->vertices[(j + 1) % other->count] == a &&
                          other->neighbors[j] == p);
         }
-        if (n == p || polygon->sides[k] != 0 || !back)
+        if (polygon->sides[k] != 0 || !back)
         {
             return false;
         }
