@@ -227,6 +227,18 @@ static void TestHillInsideIsSampled(void)
     CHECK(HasVertex(&detail, 0, 48, BASE + 9, 48), "the hilltop added first");
     CHECK(detail.cappedPolygons == 0 && Sound(&detail, &rects.mesh), "sound");
     mnavReleaseDetailMesh(&setup.memory, &detail);
+    mnavReleaseCompactField(&setup.memory, &setup.field);
+    // A hill exactly the maximum error tall is within it.
+    Bumped(&hand, 3, 3, 5);
+    Prepare(&setup, &hand);
+    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
+                              (mnavDetailSettings){16, 16, 1, 0}, &detail) == mnav_success,
+          "built");
+    CHECK(detail.parts[0].vertexCount == 4, "one cell height is within 16 sixteenths");
+    mnavReleaseDetailMesh(&setup.memory, &detail);
+    mnavReleaseCompactField(&setup.memory, &setup.field);
+    Bumped(&hand, 3, 3, 9);
+    Prepare(&setup, &hand);
     // With samples twice as far apart the grid misses the hill's cell.
     CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
                               (mnavDetailSettings){32, 16, 1, 0}, &detail) == mnav_success,
