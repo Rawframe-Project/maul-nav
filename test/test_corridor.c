@@ -302,6 +302,22 @@ static void TestMovingTheEnds(void)
                                  nullptr) == mnav_errorCapacity &&
               Indices(&corridor) == 1234 && corridor.target.x == 22.0,
           "a fifth does not fit; nothing changed");
+    // Forward to the second square, then back: the first would not fit.
+    CHECK(mnavMoveCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){12.0, 0.0, 7.5},
+                           nullptr) == mnav_success &&
+              mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor, (mnavPos3){28.0, 0.0, 7.5},
+                                     nullptr) == mnav_success &&
+              Indices(&corridor) == 2345,
+          "the second square on");
+    CHECK(mnavMoveCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){8.0, 0.0, 7.5},
+                           nullptr) == mnav_errorCapacity &&
+              Indices(&corridor) == 2345 && corridor.position.x == 12.0,
+          "back to the first does not fit; nothing changed");
+    // A target moved into the row's side stops there.
+    CHECK(mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor, (mnavPos3){28.0, 0.0, 12.0},
+                                 nullptr) == mnav_success &&
+              corridor.target.x == 28.0 && corridor.target.z == 10.0,
+          "the target held at the wall");
     CHECK(mnavMoveCorridor(query, navmesh, nullptr, nullptr, a.point, nullptr) ==
                   mnav_errorInvalid &&
               mnavMoveCorridorTarget(query, navmesh, nullptr, nullptr, a.point, nullptr) ==
