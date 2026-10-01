@@ -199,6 +199,42 @@ static void TestTangledRingIsCounted(void)
     mnavReleaseContours(&memory, &set);
 }
 
+static void TestBridgedRingWithAHiddenVertex(void)
+{
+    // A square of 20 with three holes bridged in, found by searching
+    // random holes. Vertex (9, 12) lies inside the ear (0, 20), (20, 20),
+    // (9, 10), but both its edges run to the positions of that ear's
+    // diagonal (one to the other copy of (0, 20)), so the edge test alone
+    // let the ear through and the rest of the ring was lost.
+    const int32_t points[44] = {8,  6, 6,  6, 6,  4,  0,  0,  0,  20, 1, 14, 3, 14, 3,
+                                16, 1, 16, 1, 14, 0,  20, 20, 20, 20, 0, 0,  0, 6,  4,
+                                8,  4, 8,  6, 7,  10, 9,  10, 9,  12, 7, 12, 7, 10};
+    const int32_t counts[1] = {22};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = Rings(&memory, points, counts, 1);
+    mnavPolyMesh mesh;
+    CHECK(mnavBuildPolyMesh(&memory, &set, 20, 100, 100, &mesh) == mnav_success, "built");
+    CHECK(mesh.failedRings == 0, "the ring is complete");
+    CHECK(Valid(&mesh) && TwiceArea(&mesh) == 776, "the square less three holes");
+    mnavReleasePolyMesh(&memory, &mesh);
+    mnavReleaseContours(&memory, &set);
+}
+
+static void TestPinchedRingNeedsTheLooseTest(void)
+{
+    // Two loops touching at (3, 2), as a region touching itself at a
+    // corner traces: only a diagonal that touches the pinch finishes it.
+    const int32_t points[12] = {4, 0, 3, 2, 2, 1, 0, 1, 5, 5, 3, 2};
+    const int32_t counts[1] = {6};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = Rings(&memory, points, counts, 1);
+    mnavPolyMesh mesh;
+    CHECK(mnavBuildPolyMesh(&memory, &set, 20, 100, 100, &mesh) == mnav_success, "built");
+    CHECK(mesh.failedRings == 0, "the ring is complete");
+    mnavReleasePolyMesh(&memory, &mesh);
+    mnavReleaseContours(&memory, &set);
+}
+
 static void TestLevelMeshIsPinned(void)
 {
     static mnavVec3 vertices[LEVEL_VERTICES];
@@ -267,6 +303,8 @@ int main(void)
     TestRingsWeldAndLinkAcrossRegions();
     TestLimitsAreTyped();
     TestTangledRingIsCounted();
+    TestBridgedRingWithAHiddenVertex();
+    TestPinchedRingNeedsTheLooseTest();
     TestLevelMeshIsPinned();
     return s_failures == 0 ? 0 : 1;
 }

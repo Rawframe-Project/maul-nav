@@ -62,13 +62,39 @@ static bool Clear(const Ring* ring, int32_t i, int32_t j, bool loose)
     return true;
 }
 
-// Whether i to j is a diagonal inside the ring.
+// Whether no other vertex of the ring lies strictly inside the triangle
+// of i, the vertex after it, and j. The edge test above skips edges that
+// touch the positions of i and j, as it must for the two copies of a hole
+// bridge's ends, and so cannot see a vertex both of whose edges run to
+// those positions; this test can.
+static bool Empty(const Ring* ring, int32_t i, int32_t j)
+{
+    int32_t middle = Next(i, ring->n);
+    const mnavContourVertex* a = At(ring, i);
+    const mnavContourVertex* b = At(ring, middle);
+    const mnavContourVertex* c = At(ring, j);
+    for (int32_t k = 0; k < ring->n; ++k)
+    {
+        if (k == i || k == middle || k == j)
+        {
+            continue;
+        }
+        const mnavContourVertex* p = At(ring, k);
+        if (mnavLeft(a, b, p) && mnavLeft(b, c, p) && mnavLeft(c, a, p))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Whether i to j, which skips one vertex, is a diagonal inside the ring.
 static bool Diagonal(const Ring* ring, int32_t i, int32_t j, bool loose)
 {
     int32_t n = ring->n;
     bool inCone =
         mnavInCone(At(ring, Prev(i, n)), At(ring, i), At(ring, Next(i, n)), At(ring, j), loose);
-    return inCone && Clear(ring, i, j, loose);
+    return inCone && Clear(ring, i, j, loose) && Empty(ring, i, j);
 }
 
 static int64_t Length2(const Ring* ring, int32_t i, int32_t j)
