@@ -32,3 +32,5 @@ format.
   links and distances are 16 bits, which always suffice, so nothing is
   truncated (N14). Pipeline hashes over a soup and a small level are
   pinned.
+- `mnavHash64` and `MNAV_HASH_INIT`, the family's frozen 64-bit hash,
+  for determinism checks and navmesh fingerprints.

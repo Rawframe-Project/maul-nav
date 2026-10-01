@@ -118,6 +118,22 @@ extern "C"
     /// Safe from any thread.
     MNAV_API mnavVersion mnavGetVersion(void);
 
+    // The seed of a hash that starts from nothing.
+#define MNAV_HASH_INIT 0xCBF29CE484222325ull
+
+    /// Hashes bytes into a 64-bit value, the hash every determinism check
+    /// and navmesh fingerprint is built on: eight bytes a round, read in the
+    /// host's byte order, xored in, multiplied by an odd constant and
+    /// folded, the leftover bytes one at a time. Its constants are frozen.
+    ///
+    /// @param seed       MNAV_HASH_INIT, or a hash to continue.
+    /// @param data       The bytes. May be NULL when byteCount is 0.
+    /// @param byteCount  The number of bytes, at least 0.
+    /// @return The hash.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MNAV_API uint64_t mnavHash64(uint64_t seed, const void* data, int32_t byteCount);
+
     /// Returns the name of a result code, for diagnostics.
     ///
     /// @param result  Any value; an unknown one is named as such.

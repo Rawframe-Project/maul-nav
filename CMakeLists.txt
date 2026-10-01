@@ -46,6 +46,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/compact.c
     src/erode.c
     src/filter.c
+    src/hash.c
     src/heightfield.c
     src/input.c
     src/raster.c
