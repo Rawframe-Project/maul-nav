@@ -415,14 +415,11 @@ void mnavAimSearch(mnavQuery* query, mnavPos3 end, int32_t endSlot, int32_t endP
     {
         s->goal[i] = goal[i];
     }
+    // Aimed just after it began or started over, the search holds one open
+    // node, whose order does not matter.
     s->end = end;
     s->endSlot = endSlot;
     s->endPolygon = endPolygon;
-    for (int32_t i = 0; i < query->heapCount; ++i)
-    {
-        mnavSearchNode* node = &query->nodes[query->heap[i]];
-        node->remaining = Distance(node->at, end) * s->cheapest;
-    }
 }
 
 // The rank of node index v among the sorted indices.
