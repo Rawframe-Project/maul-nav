@@ -5,9 +5,9 @@
 // across tile sides (N23).
 
 #include "allocator.h"
+#include "hand_tile.h"
 #include "navmesh.h"
 #include "test_harness.h"
-#include "tile.h"
 #include "world.h"
 
 #include "maul-nav/bake.h"
@@ -267,54 +267,6 @@ static void TestDestroyGivesEverythingBack(void)
     CHECK(s_held == 0, "all given back");
 }
 
-// A tile of one square polygon from cell (x0, 0) to (x1, 10) at its
-// place, its four corners at the heights given, -X side first: (x0, 0),
-// (x0, 10), (x1, 10), (x1, 0). Edges on the tile's sides carry them.
-static size_t HandTile(uint8_t* out, int32_t place, int32_t x0, int32_t x1, const int32_t* y)
-{
-    mnavBakeDef def = mnavDefaultBakeDef();
-    mnavBakeCells cells;
-    CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
-    mnavMeshVertex vertices[4] = {{(uint16_t)x0, (uint16_t)(32768 + y[0]), 0},
-                                  {(uint16_t)x0, (uint16_t)(32768 + y[1]), 10},
-                                  {(uint16_t)x1, (uint16_t)(32768 + y[2]), 10},
-                                  {(uint16_t)x1, (uint16_t)(32768 + y[3]), 0}};
-    mnavPolygon polygon = {
-        {0, 1, 2, 3, 0xFFFF, 0xFFFF}, {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF}, {0}, 4, 1, 0};
-    polygon.sides[0] = x0 == 0 ? 1 : 0;
-    polygon.sides[2] = x1 == def.tileCells ? 3 : 0;
-    polygon.sides[3] = 4;
-    uint8_t removable[4] = {0};
-    mnavPolyMesh mesh = {vertices, removable, 4, 4, &polygon, 1, 1, def.tileCells, 0};
-    mnavDetailVertex detailVertices[4];
-    for (int32_t k = 0; k < 4; ++k)
-    {
-        detailVertices[k] =
-            (mnavDetailVertex){vertices[k].x * 16, vertices[k].y, vertices[k].z * 16};
-    }
-    mnavDetailPart part = {0, 0, 4, 2};
-    mnavDetailTriangle triangles[2] = {{{0, 1, 2}, 0}, {{0, 2, 3}, 0}};
-    mnavDetailMesh detail = {&part, 1, detailVertices, 4, 4, triangles, 2, 2, 0, 0, 0};
-    mnavTileInfo info = {mnavGetVersion(),
-                         0,
-                         place,
-                         0,
-                         def.tileCells,
-                         def.cellSize,
-                         def.cellHeight,
-                         cells.agentHeight,
-                         cells.agentRadius,
-                         cells.agentStep,
-                         def.origin};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    uint8_t* bytes = nullptr;
-    size_t size = 0;
-    CHECK(mnavEncodeTile(&memory, &info, &mesh, &detail, &bytes, &size) == mnav_success, "encoded");
-    memcpy(out, bytes, size);
-    mnavReleaseTileBytes(&memory, bytes, size);
-    return size;
-}
-
 // The links between hand tiles (0, 0) and (1, 0) facing each other, the
 // left one's +X edge at heights left, the right one's -X edge at right.
 static int32_t HandLinks(const int32_t* left, const int32_t* right)
@@ -323,8 +275,12 @@ static int32_t HandLinks(const int32_t* left, const int32_t* right)
     static uint8_t b[1024];
     const int32_t flatLeft[4] = {0, 0, left[1], left[0]};
     const int32_t flatRight[4] = {right[0], right[1], 0, 0};
-    size_t sizeA = HandTile(a, 0, 100, 128, flatLeft);
-    size_t sizeB = HandTile(b, 1, 0, 20, flatRight);
+    const HandSquare left4 = {
+        100, 0, 128, 10, {flatLeft[0], flatLeft[1], flatLeft[2], flatLeft[3]}};
+    const HandSquare right4 = {
+        0, 0, 20, 10, {flatRight[0], flatRight[1], flatRight[2], flatRight[3]}};
+    size_t sizeA = HandTileBytes(a, 0, &left4, 1);
+    size_t sizeB = HandTileBytes(b, 1, &right4, 1);
     mnavNavmesh* navmesh = Make();
     CHECK(mnavStageTile(navmesh, a, sizeA).result == mnav_success &&
               mnavStageTile(navmesh, b, sizeB).result == mnav_success &&
