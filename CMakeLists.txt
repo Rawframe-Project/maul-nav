@@ -40,9 +40,12 @@ else()
     set(MAUL_LIBRARY_KIND STATIC)
 endif()
 add_library(maul-nav ${MAUL_LIBRARY_KIND}
+    src/allocator.c
     src/bake_def.c
     src/base.c
+    src/heightfield.c
     src/input.c
+    src/raster.c
     src/scalar.c)
 maul_configure_library(maul-nav)
 # floor, ceil, fabs and sqrt, the exactly rounded functions the library
@@ -55,6 +58,7 @@ if(MAUL_NAV_BUILD_TESTS)
     enable_testing()
     maul_add_test(base)
     maul_add_test(bake)
+    maul_add_test(heightfield WHITEBOX)
     maul_add_test(scalar WHITEBOX)
     maul_add_header_tests()
 endif()

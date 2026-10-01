@@ -19,3 +19,7 @@ format.
   checked as hostile input by `mnavValidateTriangleMesh`.
 - Results `mnav_errorLimit` and `mnav_errorRange`, the allocator, and
   the `mnavVec3` and `mnavPos3` types.
+- Tile rasterization (internal): triangles clip into per-cell fragments,
+  which sort and merge into each column's solid spans, so a tile's
+  heightfield depends only on the set of input triangles, not their
+  order (N12). Its hash is pinned across platforms.

@@ -80,7 +80,8 @@ extern "C"
         int32_t inputTriangles;
         // Input triangles that touch one tile.
         int32_t tileTriangles;
-        // Solid spans in one tile after rasterization.
+        // Span fragments rasterized into one tile: one per cell a triangle
+        // covers, before they merge into spans (N12).
         int32_t tileSpans;
         // Polygons in one tile.
         int32_t tilePolygons;
