@@ -454,7 +454,7 @@ mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPath
                           query->nodes[last].cost,
                           query->nodes[last].length,
                           query->corridor,
-                          mnavCorridor(query, navmesh, last),
+                          mnavPathPolygons(query, navmesh, last),
                           query->points,
                           pointCount,
                           query->links,

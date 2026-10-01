@@ -358,6 +358,96 @@ extern "C"
         mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
         mnavPolygonId startPolygon, mnavPos3 start, mnavPos3 end, mnavMove* moveOut);
 
+    // A path corridor (mnav-0005): the polygons from the agent's to its
+    // target's, in a buffer the caller owns, with the agent's position on
+    // the first and the target on the last.
+    typedef struct mnavCorridor
+    {
+        mnavPos3 position;
+        mnavPos3 target;
+        mnavPolygonId* polygons;
+        int32_t count;
+        int32_t capacity;
+    } mnavCorridor;
+
+    // A corridor's straight path: from the position, its corners, to the
+    // target, with the off-mesh links crossed, in a query context's memory
+    // until its next query.
+    typedef struct mnavCorners
+    {
+        const mnavPos3* points;
+        int32_t pointCount;
+        const mnavPathLink* links;
+        int32_t linkCount;
+    } mnavCorners;
+
+    /// Starts a corridor over a buffer: one polygon, the position and the
+    /// target both at a point on it.
+    ///
+    /// @param corridor The corridor.
+    /// @param buffer   Room for capacity polygons, kept by the corridor.
+    /// @param capacity The buffer's polygons, at least 1.
+    /// @param polygon  The polygon the point lies on.
+    /// @param position The point.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// capacity below 1 or a point that is not finite.
+    /// @par Thread safety
+    /// Safe from any thread; the corridor is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavResetCorridor(mnavCorridor* corridor,
+                                                         mnavPolygonId* buffer, int32_t capacity,
+                                                         mnavPolygonId polygon, mnavPos3 position);
+
+    /// Loads a path into a corridor: its polygons, its first point as the
+    /// position and its last as the target.
+    ///
+    /// @param corridor The corridor.
+    /// @param path     A path from mnavFindPath or mnavFinishPath.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// path with no polygon or point; `mnav_errorCapacity` when the path
+    /// has more polygons than the corridor's buffer, which is unchanged.
+    /// @par Thread safety
+    /// Safe from any thread; the corridor is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavSetCorridor(mnavCorridor* corridor,
+                                                       const mnavPath* path);
+
+    /// Counts a corridor's leading polygons that are still current, of
+    /// areas the filter includes, and joined to the one before by an
+    /// edge, a tile link or an off-mesh link of a kind it includes. Fewer
+    /// than all means the corridor needs trimming there and replanning.
+    ///
+    /// @param navmesh  The navmesh.
+    /// @param filter   The areas and kinds usable, or NULL for all.
+    /// @param corridor The corridor.
+    /// @param validOut Receives the count.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// filter not built from mnavDefaultQueryFilter; `mnav_errorRange` for
+    /// a filter cost out of its range.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may check corridors at
+    /// once between commits.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCheckCorridor(const mnavNavmesh* navmesh,
+                                                         const mnavQueryFilter* filter,
+                                                         const mnavCorridor* corridor,
+                                                         int32_t* validOut);
+
+    /// Finds a corridor's straight path from its position to its target:
+    /// the funnel over the portals between its polygons.
+    ///
+    /// @param query    The context; its memory holds the corners.
+    /// @param navmesh  The navmesh.
+    /// @param corridor The corridor.
+    /// @param cornersOut Receives the straight path.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or
+    /// polygons not joined; `mnav_errorStale` for a polygon whose tile has
+    /// been replaced or removed; `mnav_errorLimit` for a corridor of more
+    /// polygons than the context's node limit.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCorridorCorners(mnavQuery* query,
+                                                           const mnavNavmesh* navmesh,
+                                                           const mnavCorridor* corridor,
+                                                           mnavCorners* cornersOut);
+
     // How a raycast ended.
     typedef uint8_t mnavRayEnd;
 

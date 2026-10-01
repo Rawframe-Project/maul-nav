@@ -16,7 +16,7 @@
 #include <stdint.h>
 
 // Writes the polygons from the start to node last into the corridor.
-int32_t mnavCorridor(mnavQuery* query, const mnavNavmesh* navmesh, int32_t last)
+int32_t mnavPathPolygons(mnavQuery* query, const mnavNavmesh* navmesh, int32_t last)
 {
     int32_t count = 0;
     for (int32_t n = last; n != MNAV_NO_NODE; n = query->nodes[n].parent)
@@ -154,7 +154,12 @@ static int32_t Pull(mnavQuery* query, int32_t first, int32_t last, int32_t count
 int32_t mnavStraighten(mnavQuery* query, const mnavNavmesh* navmesh, int32_t last,
                        int32_t* linkCount)
 {
-    int32_t portals = Portals(query, last);
+    return mnavPullPortals(query, navmesh, Portals(query, last), linkCount);
+}
+
+int32_t mnavPullPortals(mnavQuery* query, const mnavNavmesh* navmesh, int32_t portals,
+                        int32_t* linkCount)
+{
     int32_t count = 0;
     int32_t first = 0;
     *linkCount = 0;

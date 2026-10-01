@@ -35,3 +35,4 @@ offmesh: allocator navmesh sort
 commit: navmesh offmesh
 funnel: navmesh query
 surface: navmesh nearest polymesh query query_filter
+corridor: funnel navmesh offmesh polymesh query query_filter

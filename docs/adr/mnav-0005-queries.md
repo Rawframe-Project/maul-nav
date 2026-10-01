@@ -97,6 +97,15 @@ that are not loaded must say so rather than treat them as walls.
   reached, at a wall, at a side with no tile loaded, or out of nodes,
   with the point on the detail surface and the polygons walked.
 
+- **Path corridors:** `mnavCorridor` is a plain struct over a polygon
+  buffer the caller owns, with the agent's position and its target:
+  `mnavResetCorridor` starts one, `mnavSetCorridor` loads a path (one
+  longer than the buffer is refused, never cut), `mnavCorridorCorners`
+  pulls it tight with the funnel over the portals between its polygons
+  (edges, tile links, off-mesh links), and `mnavCheckCorridor` counts
+  the leading polygons still current, included and joined, where the
+  caller trims and replans.
+
 ## Consequences
 
 - Queries scan the polygons of each loaded tile in their box; a search

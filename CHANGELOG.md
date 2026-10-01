@@ -152,3 +152,7 @@ format.
 - Moving along the surface (mnav-0005): mnavMoveAlongSurface with
   mnavMove and mnavMoveEnd; a tile side's stretches no link covers are
   walls. The query context's code moves to its own module.
+- Path corridors (mnav-0005): mnavCorridor, mnavCorners,
+  mnavResetCorridor, mnavSetCorridor, mnavCheckCorridor and
+  mnavCorridorCorners. A loaded path's corners equal its straight path
+  bit for bit.

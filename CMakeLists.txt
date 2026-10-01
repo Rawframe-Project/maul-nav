@@ -48,6 +48,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/border_vertices.c
     src/commit.c
     src/compact.c
+    src/corridor.c
     src/contour.c
     src/delaunay.c
     src/detail.c
@@ -107,6 +108,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(path_links WHITEBOX)
     maul_add_test(sliced WHITEBOX)
     maul_add_test(surface WHITEBOX)
+    maul_add_test(corridor WHITEBOX)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)
