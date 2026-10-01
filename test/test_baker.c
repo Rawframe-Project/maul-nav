@@ -107,6 +107,9 @@ static void TestBakesDoNotDependOnWhatCameBefore(void)
     CHECK(BakeCopy(baker, &level, 1, 0, 0, again, &againSize, &report) == mnav_success, "again");
     CHECK(againSize == firstSize && memcmp(first, again, firstSize) == 0, "the same bytes");
     CHECK(report.memoryPeak == peak, "the same memory, nothing kept from before");
+    CHECK(mnavBakeTile(baker, nullptr, 0, 0, 0, &report) == mnav_success &&
+              report.memoryPeak < peak,
+          "an empty tile's peak is its own");
     mnavBaker* other = nullptr;
     CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "a second baker");
     CHECK(BakeCopy(other, &level, 1, 0, 0, again, &againSize, &report) == mnav_success, "baked");
@@ -138,6 +141,12 @@ static void TestFingerprintFollowsTheTilesInput(void)
     CHECK(mnavBakeTile(baker, meshes, 2, 0, 0, &report) == mnav_success, "baked");
     CHECK(report.fingerprint != base && report.triangles == triangles + 1,
           "geometry on the tile moves it");
+    uint64_t withNear = report.fingerprint;
+    // The same triangle with another area type.
+    const mnavAreaType kind[1] = {2};
+    meshes[1].areas = kind;
+    CHECK(mnavBakeTile(baker, meshes, 2, 0, 0, &report) == mnav_success, "baked");
+    CHECK(report.fingerprint != withNear && report.fingerprint != base, "its area type moves it");
     // Another setting.
     mnavBakeDef coarse = def;
     coarse.detailMaxError = 0.25f;
@@ -149,6 +158,22 @@ static void TestFingerprintFollowsTheTilesInput(void)
               report.fingerprint != base,
           "so does the tile's place");
     mnavDestroyBaker(other);
+    mnavDestroyBaker(baker);
+}
+
+static void TestDetailSearchesAsFarAsWallsStray(void)
+{
+    // Walls simplified within 2 m of the cells leave edge samples up to 8
+    // cells from any height; the lookup searches that far.
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.maxEdgeError = 2.0f;
+    def.detailSampleDistance = 0.25f;
+    mnavBaker* baker = nullptr;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
+    mnavTriangleMesh level = Level();
+    mnavBakeReport report;
+    CHECK(mnavBakeTile(baker, &level, 1, 0, 0, &report) == mnav_success, "baked");
+    CHECK(report.fallbackHeights == 0, "every sample found a height");
     mnavDestroyBaker(baker);
 }
 
@@ -221,6 +246,7 @@ int main(void)
     TestLevelBakesAndCopies();
     TestBakesDoNotDependOnWhatCameBefore();
     TestFingerprintFollowsTheTilesInput();
+    TestDetailSearchesAsFarAsWallsStray();
     TestBadInputIsNamed();
     TestLimitsEndInAStage();
     return s_failures == 0 ? 0 : 1;
