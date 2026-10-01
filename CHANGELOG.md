@@ -216,3 +216,7 @@ format.
 - Spatial queries: mnavGetHeight, mnavFindWallDistance,
   mnavFindRandomPoint and mnavFindRandomPointAround (from a 64-bit seed,
   uniform by area, the latter within its circle), mnavCheckReachable.
+- Link generation (mnav-0009): linkgen.h with mnavGenerateLinks, drops
+  off ledges and jumps across gaps from a committed navmesh, kept by
+  the host's clearance test, a walking-detour rule and a near-duplicate
+  filter, for the host to stage.

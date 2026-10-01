@@ -40,6 +40,7 @@ corridor: funnel navmesh offmesh polymesh query query_filter
 modifiers: allocator navmesh
 grid: query query_filter
 spatial: navmesh nearest query query_filter
+linkgen: navmesh path query query_filter
 flow: allocator query_filter
 hierarchy: allocator navmesh offmesh path query query_filter sort
 hierarchy_path: hierarchy navmesh path query

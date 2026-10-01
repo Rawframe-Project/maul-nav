@@ -13,3 +13,4 @@ are listed in [README.md](README.md).
 | [mnav-0006](mnav-0006-avoidance.md) | Avoidance | Accepted |
 | [mnav-0007](mnav-0007-flow-fields.md) | Flow fields | Accepted |
 | [mnav-0008](mnav-0008-hierarchical-paths.md) | Hierarchical paths | Accepted |
+| [mnav-0009](mnav-0009-link-generation.md) | Link generation | Accepted |
