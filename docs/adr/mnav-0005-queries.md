@@ -37,12 +37,19 @@ that are not loaded must say so rather than treat them as walls.
   a point on another. Its nodes are the portals between polygons, at
   their midpoints, and the two points; costs and the heuristic are 3D
   distances, so the heuristic is consistent and no node is reopened.
-  Ties go to the node nearer the end, then the node made first. The
+  Ties go to the node made first. The
   result names how the search ended (found, out of nodes, too long,
   stopped at places with no tile loaded, no path, checked in that
   order), its cost, and the corridor of polygons, which short of the
   end runs to the node nearest it. A stale polygon id is
   `mnav_errorStale`.
+- **Straight path:** the corridor is pulled tight with the funnel
+  algorithm over its portals, in binary64 world coordinates with exact
+  side tests and no tolerance: a portal end on a funnel side narrows
+  it, one on or past the other side makes that side's point a corner.
+  The points live in the context, sized from the node limit, so a
+  straight path is never cut short; short of the end it ends at the
+  midpoint of the last portal crossed.
 
 ## Consequences
 

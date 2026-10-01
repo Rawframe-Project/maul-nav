@@ -117,6 +117,12 @@ extern "C"
         // until its next search.
         const mnavPolygonId* polygons;
         int32_t polygonCount;
+        // The straight path from the start point, the corridor pulled
+        // tight: its corners and, last, the end point or, short of it, the
+        // midpoint of the last edge crossed. In the context's memory until
+        // its next search; never cut short.
+        const mnavPos3* points;
+        int32_t pointCount;
     } mnavPath;
 
     /// Returns a query def with 8,192 nodes per search and paths up to
@@ -149,7 +155,8 @@ extern "C"
     /// Searches for the shortest way from a point on one polygon to a point
     /// on another (mnav-0005): A* over the edges between polygons, its
     /// heuristic the straight distance to the end point; ties go to the
-    /// node nearer the end, then the node made first.
+    /// node made first. The corridor found is
+    /// pulled tight into a straight path with the funnel algorithm.
     ///
     /// @param query        The context; its memory holds the result.
     /// @param navmesh      The navmesh.

@@ -20,7 +20,7 @@
 #include <string.h>
 
 // The hash of a set of searches' results, the same on every platform.
-#define SEARCH_HASH 0xa47d1d3088ade276ull
+#define SEARCH_HASH 0x2dcfb43f488d206full
 
 static mnavNavmesh* Load(const int32_t* tiles, int32_t count)
 {
@@ -110,6 +110,43 @@ static bool Connected(const mnavNavmesh* navmesh, const mnavPath* path)
     return true;
 }
 
+static double Length(mnavPos3 a, mnavPos3 b)
+{
+    double dx = a.x - b.x;
+    double dy = a.y - b.y;
+    double dz = a.z - b.z;
+    return sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+// Whether the straight path stays on the navmesh, sampled every 0.25 m, to
+// within a nanometer, and is no longer than the way the search costed.
+static bool Walkable(const mnavNavmesh* navmesh, const mnavPath* path)
+{
+    double length = 0.0;
+    for (int32_t i = 0; i + 1 < path->pointCount; ++i)
+    {
+        mnavPos3 a = path->points[i];
+        mnavPos3 b = path->points[i + 1];
+        double d = Length(a, b);
+        length += d;
+        int32_t steps = (int32_t)(d / 0.25) + 1;
+        for (int32_t k = 0; k <= steps; ++k)
+        {
+            double t = (double)k / steps;
+            mnavPos3 p = {a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z)};
+            // Segments along walls touch the navmesh's edge, where
+            // rounding leaves samples a few ulps outside.
+            mnavNearest n;
+            if (mnavFindNearest(navmesh, p, (mnavVec3){0.5f, 1.0f, 0.5f}, &n) != mnav_success ||
+                n.polygon.slot == 0 || hypot(p.x - n.point.x, p.z - n.point.z) > 1.0e-9)
+            {
+                return false;
+            }
+        }
+    }
+    return length <= path->cost + 1.0e-9;
+}
+
 static double Straight(mnavNearest a, mnavNearest b)
 {
     double dx = a.point.x - b.point.x;
@@ -130,6 +167,9 @@ static void TestAcrossTheWorld(void)
               SameId(path.polygons[path.polygonCount - 1], b.polygon),
           "from the start polygon to the end polygon");
     CHECK(Connected(navmesh, &path), "each polygon next to the one before");
+    CHECK(path.pointCount >= 2 && path.points[0].x == a.point.x &&
+              path.points[path.pointCount - 1].z == b.point.z && Walkable(navmesh, &path),
+          "a straight path from start to end, on the navmesh");
     double straight = Straight(a, b);
     CHECK(path.cost >= straight && path.cost < straight * 1.15, "close to the straight line");
     // The way back costs the same: the search is optimal over its graph.
@@ -189,8 +229,7 @@ static int32_t FewestNodes(const mnavNavmesh* navmesh, mnavNearest a, mnavNeares
 static void TestSearchWorkIsPinned(void)
 {
     // The nodes a search needs follow from its rules: the way just come
-    // through is never opened again, and ties go to the node nearer the
-    // end.
+    // through is never opened again, and ties go to the node made first.
     mnavNavmesh* navmesh = LoadAll();
     int32_t across = FewestNodes(navmesh, On(navmesh, 2.0, 0.0, 2.0), On(navmesh, 62.0, 0.0, 62.0));
     int32_t around =
@@ -363,6 +402,9 @@ static void TestSearchesArePinned(void)
         mnavPath path = Search(query, navmesh, a, b);
         found += path.end == mnav_pathFound ? 1 : 0;
         CHECK(Connected(navmesh, &path), "connected");
+        CHECK(Walkable(navmesh, &path) && Walkable(navmesh, &cut), "on the navmesh");
+        hash = mnavHash64(hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));
+        hash = mnavHash64(hash, cut.points, cut.pointCount * (int32_t)sizeof(mnavPos3));
         hash = mnavHash64(hash, &path.end, (int32_t)sizeof(path.end));
         hash = mnavHash64(hash, &path.cost, (int32_t)sizeof(path.cost));
         hash = mnavHash64(hash, path.polygons, path.polygonCount * (int32_t)sizeof(mnavPolygonId));

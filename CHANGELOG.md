@@ -123,3 +123,8 @@ format.
   the portals between polygons that returns the polygon corridor, its
   cost and how the search ended (mnavPathEnd); mnav_errorStale for
   polygon ids whose tile was replaced or removed.
+- Straight paths (mnav-0005): mnavPath gains the straight path, the
+  corridor pulled tight with the funnel algorithm in binary64 with
+  exact side tests, held in the query context and never cut short.
+  The search's ties now go to the node made first; a tie on the
+  distance still to go never decided anything and was dropped.

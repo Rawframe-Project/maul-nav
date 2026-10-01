@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Tiles built by hand for white-box tests: up to four unlinked square
-// polygons, each flat or sloped, encoded with the default def's settings.
+// Tiles built by hand for white-box tests: up to HAND_SQUARES rectangular
+// polygons, each flat or sloped, their shared corners welded and the
+// polygons sharing a whole edge linked, encoded with the default def's
+// settings.
 
 #ifndef MAUL_NAV_TEST_HAND_TILE_H
 #define MAUL_NAV_TEST_HAND_TILE_H
@@ -17,6 +19,11 @@
 
 #include <stdint.h>
 #include <string.h>
+
+enum
+{
+    HAND_SQUARES = 16
+};
 
 // A square from cell (x0, z0) to (x1, z1); heights in cell heights above
 // the offset at its corners (x0, z0), (x0, z1), (x1, z1), (x1, z0).
@@ -46,6 +53,40 @@ static inline uint8_t HandSide(int32_t ax, int32_t az, int32_t bx, int32_t bz, i
     return az == 0 && bz == 0 ? 4 : 0;
 }
 
+// The index of a vertex among the first count, added when new.
+static inline uint16_t HandWeld(mnavMeshVertex* vertices, int32_t* count, mnavMeshVertex v)
+{
+    for (int32_t i = 0; i < *count; ++i)
+    {
+        if (vertices[i].x == v.x && vertices[i].y == v.y && vertices[i].z == v.z)
+        {
+            return (uint16_t)i;
+        }
+    }
+    vertices[*count] = v;
+    return (uint16_t)(*count)++;
+}
+
+// Links polygons whose edges run between the same two vertices.
+static inline void HandLink(mnavPolygon* polygons, int32_t count)
+{
+    for (int32_t p = 0; p < count; ++p)
+    {
+        for (int32_t k = 0; k < 4; ++k)
+        {
+            for (int32_t q = 0; q < count; ++q)
+            {
+                for (int32_t j = 0; j < 4; ++j)
+                {
+                    bool shared = polygons[q].vertices[j] == polygons[p].vertices[(k + 1) % 4] &&
+                                  polygons[q].vertices[(j + 1) % 4] == polygons[p].vertices[k];
+                    polygons[p].neighbors[k] = shared ? (uint16_t)q : polygons[p].neighbors[k];
+                }
+            }
+        }
+    }
+}
+
 // Encodes the squares as the tile at (place, 0) into out; returns its size.
 static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare* squares,
                                    int32_t count)
@@ -53,12 +94,13 @@ static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBakeCells cells;
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
-    mnavMeshVertex vertices[16];
-    uint8_t removable[16] = {0};
-    mnavPolygon polygons[4];
-    mnavDetailVertex detailVertices[16];
-    mnavDetailPart parts[4];
-    mnavDetailTriangle triangles[8];
+    mnavMeshVertex vertices[HAND_SQUARES * 4];
+    uint8_t removable[HAND_SQUARES * 4] = {0};
+    mnavPolygon polygons[HAND_SQUARES];
+    mnavDetailVertex detailVertices[HAND_SQUARES * 4];
+    mnavDetailPart parts[HAND_SQUARES];
+    mnavDetailTriangle triangles[HAND_SQUARES * 2];
+    int32_t vertexCount = 0;
     for (int32_t s = 0; s < count; ++s)
     {
         const HandSquare* q = &squares[s];
@@ -71,10 +113,9 @@ static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare
         for (int32_t k = 0; k < 4; ++k)
         {
             int32_t v = s * 4 + k;
-            vertices[v] =
-                (mnavMeshVertex){(uint16_t)xs[k], (uint16_t)(32768 + q->y[k]), (uint16_t)zs[k]};
+            mnavMeshVertex corner = {(uint16_t)xs[k], (uint16_t)(32768 + q->y[k]), (uint16_t)zs[k]};
             detailVertices[v] = (mnavDetailVertex){xs[k] * 16, 32768 + q->y[k], zs[k] * 16};
-            polygon->vertices[k] = (uint16_t)v;
+            polygon->vertices[k] = HandWeld(vertices, &vertexCount, corner);
             polygon->sides[k] =
                 HandSide(xs[k], zs[k], xs[(k + 1) % 4], zs[(k + 1) % 4], def.tileCells);
         }
@@ -82,9 +123,13 @@ static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare
         triangles[s * 2] = (mnavDetailTriangle){{0, 1, 2}, 3};
         triangles[s * 2 + 1] = (mnavDetailTriangle){{0, 2, 3}, 6};
     }
-    mnavPolyMesh mesh = {vertices, removable, count * 4, 16, polygons, count, 4, def.tileCells, 0};
-    mnavDetailMesh detail = {
-        parts, count, detailVertices, count * 4, 16, triangles, count * 2, 8, 0, 0, 0};
+    HandLink(polygons, count);
+    mnavPolyMesh mesh = {vertices,         removable,     vertexCount,
+                         HAND_SQUARES * 4, polygons,      count,
+                         HAND_SQUARES,     def.tileCells, 0};
+    mnavDetailMesh detail = {parts,     count,     detailVertices,   count * 4, HAND_SQUARES * 4,
+                             triangles, count * 2, HAND_SQUARES * 2, 0,         0,
+                             0};
     mnavTileInfo info = {mnavGetVersion(),
                          0,
                          place,
