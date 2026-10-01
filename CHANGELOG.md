@@ -160,3 +160,5 @@ format.
   mnavMoveCorridorTarget. mnavMoveAlongSurface's search circle is
   widened by one cell: a move starting on a vertex could lose its
   neighbours to rounding and go nowhere.
+- Corridor upkeep (mnav-0005): mnavShortcutCorridor and
+  mnavReplanCorridor.

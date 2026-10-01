@@ -110,6 +110,11 @@ that are not loaded must say so rather than treat them as walls.
   `mnavMoveCorridorTarget` move its ends along the surface and merge
   the polygons walked into its start or end; a merge that would
   outgrow the buffer is refused and changes nothing.
+  `mnavShortcutCorridor` casts a ray toward a point the caller picks
+  and, when it reaches it, puts the polygons it crossed in place of
+  the corridor's start if fewer; `mnavReplanCorridor` searches again
+  between the corridor's ends, finding their polygons again within a
+  box when their own have gone.
 
 ## Consequences
 

@@ -494,6 +494,56 @@ extern "C"
                                                               mnavCorridor* corridor,
                                                               mnavPos3 wanted, mnavMove* moveOut);
 
+    /// Shortens a corridor where the agent can see ahead: casts a ray from
+    /// its position toward a point, usually a corner a few ahead; when the
+    /// ray reaches it, the polygons it crossed replace the corridor's
+    /// start up to the last corridor polygon it passed, if that is fewer.
+    ///
+    /// @param query        The context, for the ray.
+    /// @param navmesh      The navmesh.
+    /// @param filter       The areas usable, or NULL for every walkable one.
+    /// @param corridor     The corridor.
+    /// @param toward       The point to look toward.
+    /// @param shortenedOut Receives whether the corridor changed.
+    /// @return As mnavRaycast; also `mnav_errorInvalid` for a corridor
+    /// with no buffer or a NULL shortenedOut.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    /// So is the corridor.
+    MNAV_NODISCARD MNAV_API mnavResult mnavShortcutCorridor(mnavQuery* query,
+                                                            const mnavNavmesh* navmesh,
+                                                            const mnavQueryFilter* filter,
+                                                            mnavCorridor* corridor, mnavPos3 toward,
+                                                            bool* shortenedOut);
+
+    /// Plans a corridor again from its position to its target and loads
+    /// the path found: from its first and last polygons while they are
+    /// current, else from the polygons nearest the position and the target
+    /// within a box round each. A corridor whose position or target finds
+    /// no polygon is left as it was, the path's end saying why.
+    ///
+    /// @param query       The context, for the search; it holds the path.
+    /// @param navmesh     The navmesh.
+    /// @param filter      The areas usable and their costs, or NULL.
+    /// @param corridor    The corridor.
+    /// @param halfExtents The box's half sizes for finding polygons again.
+    /// @param pathOut     Receives the path, or an empty one ended
+    ///                    mnav_pathNotLoaded or mnav_pathNone when an end
+    ///                    found no polygon.
+    /// @return `mnav_success` whenever the corridor was looked at;
+    /// `mnav_errorInvalid` for a NULL argument or a corridor with no
+    /// buffer; `mnav_errorCapacity` when the path has more polygons than
+    /// the buffer, which leaves the corridor as it was; the errors of
+    /// mnavFindNearest and mnavFindPath otherwise.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    /// So is the corridor.
+    MNAV_NODISCARD MNAV_API mnavResult mnavReplanCorridor(mnavQuery* query,
+                                                          const mnavNavmesh* navmesh,
+                                                          const mnavQueryFilter* filter,
+                                                          mnavCorridor* corridor,
+                                                          mnavVec3 halfExtents, mnavPath* pathOut);
+
     // How a raycast ended.
     typedef uint8_t mnavRayEnd;
 

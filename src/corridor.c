@@ -353,3 +353,100 @@ mnavResult mnavMoveCorridorTarget(mnavQuery* query, const mnavNavmesh* navmesh,
     }
     return result;
 }
+
+mnavResult mnavShortcutCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
+                                const mnavQueryFilter* filter, mnavCorridor* corridor,
+                                mnavPos3 toward, bool* shortenedOut)
+{
+    if (corridor == nullptr || corridor->polygons == nullptr || corridor->count < 1 ||
+        shortenedOut == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    *shortenedOut = false;
+    mnavRay ray;
+    mnavResult result = mnavRaycast(query, navmesh, filter, corridor->polygons[0],
+                                    corridor->position, toward, &ray);
+    if (result != mnav_success || ray.end != mnav_rayReached)
+    {
+        return result;
+    }
+    // The last corridor polygon the ray passed, and where it passed it.
+    int32_t last = -1;
+    int32_t at = -1;
+    for (int32_t i = corridor->count - 1; i >= 0 && last < 0; --i)
+    {
+        at = IndexOf(ray.polygons, ray.polygonCount, corridor->polygons[i]);
+        last = at >= 0 ? i : -1;
+    }
+    if (at >= last)
+    {
+        return mnav_success;
+    }
+    int32_t rest = corridor->count - last - 1;
+    memmove(corridor->polygons + at + 1, corridor->polygons + last + 1,
+            (size_t)rest * sizeof(mnavPolygonId));
+    memcpy(corridor->polygons, ray.polygons, (size_t)(at + 1) * sizeof(mnavPolygonId));
+    corridor->count = at + 1 + rest;
+    *shortenedOut = true;
+    return mnav_success;
+}
+
+// The polygon to plan from at a corridor end: its own while current,
+// else the nearest within the box.
+static mnavResult EndPolygon(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                             mnavPolygonId own, mnavPos3* point, mnavVec3 halfExtents,
+                             mnavNearest* nearest)
+{
+    if (mnavCheckPolygon(navmesh, own) == mnav_success)
+    {
+        *nearest = (mnavNearest){own, *point, true, false};
+        return mnav_success;
+    }
+    mnavResult result = mnavFindNearest(navmesh, filter, *point, halfExtents, nearest);
+    *point = nearest->polygon.slot != 0 ? nearest->point : *point;
+    return result;
+}
+
+mnavResult mnavReplanCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
+                              const mnavQueryFilter* filter, mnavCorridor* corridor,
+                              mnavVec3 halfExtents, mnavPath* pathOut)
+{
+    if (query == nullptr || navmesh == nullptr || corridor == nullptr || pathOut == nullptr ||
+        corridor->polygons == nullptr || corridor->count < 1)
+    {
+        return mnav_errorInvalid;
+    }
+    mnavPos3 start = corridor->position;
+    mnavPos3 end = corridor->target;
+    mnavNearest from;
+    mnavNearest to;
+    mnavResult result =
+        EndPolygon(navmesh, filter, corridor->polygons[0], &start, halfExtents, &from);
+    if (result == mnav_success)
+    {
+        result = EndPolygon(navmesh, filter, corridor->polygons[corridor->count - 1], &end,
+                            halfExtents, &to);
+    }
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    if (from.polygon.slot == 0 || to.polygon.slot == 0)
+    {
+        bool unloaded =
+            (from.polygon.slot == 0 && from.incomplete) || (to.polygon.slot == 0 && to.incomplete);
+        *pathOut = (mnavPath){unloaded ? mnav_pathNotLoaded : mnav_pathNone,
+                              0.0,
+                              0.0,
+                              nullptr,
+                              0,
+                              nullptr,
+                              0,
+                              nullptr,
+                              0};
+        return mnav_success;
+    }
+    result = mnavFindPath(query, navmesh, filter, from.polygon, start, to.polygon, end, pathOut);
+    return result == mnav_success ? mnavSetCorridor(corridor, pathOut) : result;
+}

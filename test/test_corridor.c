@@ -397,6 +397,109 @@ static void TestFollowingCorridors(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestShortcuts(void)
+{
+    // A 3 by 3 grid of squares from (5, 5) to (20, 20), its centre of
+    // area 2. Planned without the centre, the corridor goes round it; a
+    // ray across the centre then shortens it.
+    HandSquare grid[9];
+    for (int32_t i = 0; i < 9; ++i)
+    {
+        int32_t x = 20 + (i % 3) * 20;
+        int32_t z = 20 + (i / 3) * 20;
+        grid[i] = (HandSquare){x, z, x + 20, z + 20, {0}, i == 4 ? 2 : 0};
+    }
+    static uint8_t bytes[8192];
+    size_t size = HandTileBytes(bytes, 0, grid, 9);
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "loaded");
+    mnavQuery* query = MakeQuery(64);
+    mnavNearest a = On(navmesh, 6.0, 12.5, 0.1f);
+    mnavNearest b = On(navmesh, 19.0, 12.5, 0.1f);
+    mnavQueryFilter round = mnavDefaultQueryFilter();
+    round.areas &= ~((uint64_t)1 << 2);
+    mnavPath path;
+    mnavPolygonId buffer[16];
+    mnavCorridor corridor;
+    CHECK(mnavFindPath(query, navmesh, &round, a.polygon, a.point, b.polygon, b.point, &path) ==
+                  mnav_success &&
+              mnavResetCorridor(&corridor, buffer, 16, a.polygon, a.point) == mnav_success &&
+              mnavSetCorridor(&corridor, &path) == mnav_success && corridor.count == 5,
+          "round the centre, five squares");
+    bool shortened = true;
+    CHECK(mnavShortcutCorridor(query, navmesh, &round, &corridor, (mnavPos3){19.0, 0.0, 12.5},
+                               &shortened) == mnav_success &&
+              !shortened && corridor.count == 5,
+          "without the centre the ray meets a wall");
+    CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){19.0, 0.0, 12.5},
+                               &shortened) == mnav_success &&
+              shortened && Indices(&corridor) == 456,
+          "straight across the centre");
+    mnavCorners corners;
+    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+              corners.pointCount == 2,
+          "a straight line now");
+    CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){19.0, 0.0, 12.5},
+                               &shortened) == mnav_success &&
+              !shortened,
+          "nothing shorter left");
+    CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, a.point, nullptr) ==
+              mnav_errorInvalid,
+          "nowhere to say");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
+static void TestReplanning(void)
+{
+    mnavNavmesh* navmesh = LoadWorld();
+    mnavQuery* query = MakeQuery(8192);
+    mnavNearest a = On(navmesh, 2.0, 2.0, 2.0f);
+    mnavNearest b = On(navmesh, 62.0, 62.0, 2.0f);
+    mnavPath path;
+    static mnavPolygonId buffer[256];
+    mnavCorridor corridor;
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
+                  mnav_success &&
+              mnavResetCorridor(&corridor, buffer, 256, a.polygon, a.point) == mnav_success &&
+              mnavSetCorridor(&corridor, &path) == mnav_success,
+          "loaded");
+    mnavVec3 box = {1.0f, 2.0f, 1.0f};
+    // Every tile replaced, the start's and the target's too: the ends
+    // are found again and the corridor planned anew.
+    for (int32_t t = 0; t < 4; ++t)
+    {
+        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "replaced");
+    int32_t valid = -1;
+    CHECK(mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success && valid == 0,
+          "nothing valid");
+    mnavPos3 target = corridor.target;
+    CHECK(mnavReplanCorridor(query, navmesh, nullptr, &corridor, box, &path) == mnav_success &&
+              path.end == mnav_pathFound &&
+              mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success &&
+              valid == corridor.count && corridor.position.x == a.point.x &&
+              corridor.target.x == target.x && corridor.target.z == target.z,
+          "planned again between the same points");
+    // The target's tile gone: no polygon to plan to, the corridor kept.
+    int32_t count = corridor.count;
+    CHECK(mnavStageTileRemoval(navmesh, 1, 1) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "tile (1, 1) removed");
+    CHECK(mnavReplanCorridor(query, navmesh, nullptr, &corridor, box, &path) == mnav_success &&
+              path.end == mnav_pathNotLoaded && path.polygonCount == 0 && corridor.count == count,
+          "nothing loaded at the target");
+    CHECK(mnavReplanCorridor(query, navmesh, nullptr, nullptr, box, &path) == mnav_errorInvalid,
+          "no corridor");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     BakeWorld();
@@ -405,5 +508,7 @@ int main(void)
     TestFiltersAndLinks();
     TestMovingTheEnds();
     TestFollowingCorridors();
+    TestShortcuts();
+    TestReplanning();
     return s_failures == 0 ? 0 : 1;
 }
