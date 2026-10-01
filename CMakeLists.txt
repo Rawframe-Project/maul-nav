@@ -49,6 +49,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/filter.c
     src/hash.c
     src/heightfield.c
+    src/holes.c
     src/input.c
     src/raster.c
     src/region.c
@@ -69,6 +70,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(contour WHITEBOX)
     maul_add_test(filter WHITEBOX)
     maul_add_test(heightfield WHITEBOX)
+    maul_add_test(holes WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)
     maul_add_header_tests()

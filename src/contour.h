@@ -53,6 +53,9 @@ typedef struct mnavContourSet
     mnavContourVertex* vertices;
     int32_t vertexCount;
     int32_t vertexCapacity;
+    // Holes dropped by mnavMergeHoles: without a bridge to their outline,
+    // or without an outline.
+    int32_t droppedHoles;
 } mnavContourSet;
 
 // Traces and simplifies the contours of every region of a field with a

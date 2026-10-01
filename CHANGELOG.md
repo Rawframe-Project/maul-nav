@@ -44,3 +44,7 @@ format.
   boundary traced edge by edge with corner heights and the region
   across each edge, simplified along walls and area borders, walls
   split past the maximum length (N16).
+- Hole merging (internal): each region's holes are bridged into its
+  outline left to right through the nearest vertex whose diagonal
+  crosses nothing, every tie broken by an index, and a hole that cannot
+  be bridged is dropped and counted for the bake report (N17).
