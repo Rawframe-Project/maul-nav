@@ -4,6 +4,7 @@
 // Off-mesh links (mnav-0004): staging, removal, snapping at each commit, and
 // the attachments the search will follow. Hand cells are 0.25 m.
 
+#include "counting_allocator.h"
 #include "hand_tile.h"
 #include "navmesh.h"
 #include "offmesh.h"
@@ -210,30 +211,10 @@ static void TestFailedCommitKeepsLinksStaged(void)
     mnavDestroyNavmesh(navmesh);
 }
 
-// Counts the bytes held through the def's allocator.
-static size_t s_held;
-
-static void* Alloc(size_t size, size_t alignment, void* context)
-{
-    (void)context;
-    alignment = alignment < sizeof(void*) ? sizeof(void*) : alignment;
-    void* block = aligned_alloc(alignment, (size + alignment - 1) / alignment * alignment);
-    s_held += block != nullptr ? size : 0;
-    return block;
-}
-
-static void Free(void* block, size_t size, size_t alignment, void* context)
-{
-    (void)alignment;
-    (void)context;
-    s_held -= size;
-    free(block);
-}
-
 static void TestDestroyGivesLinksBack(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.allocator = (mnavAllocator){Alloc, Free, nullptr};
+    def.allocator = CountingAllocator();
     mnavNavmesh* navmesh = Make(def);
     for (int32_t i = 0; i < 9; ++i)
     {

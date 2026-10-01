@@ -4,6 +4,9 @@
 // The tile format and its loader (mnav-0003). Run as test_tile --seed <file> it
 // also writes the level's tile, the fuzz target's seed.
 
+// The seed writer uses fopen, which the Microsoft C library deprecates.
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "allocator.h"
 #include "bake_tile.h"
 #include "detail.h"

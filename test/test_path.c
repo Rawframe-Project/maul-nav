@@ -4,6 +4,7 @@
 // The path search (mnav-0005): corridors, costs, how a search ends, and its
 // named limits.
 
+#include "counting_allocator.h"
 #include "hand_tile.h"
 #include "navmesh.h"
 #include "test_harness.h"
@@ -320,26 +321,6 @@ static void TestIdsAreChecked(void)
     mnavDestroyNavmesh(navmesh);
 }
 
-// Counts the bytes held through the def's allocator.
-static size_t s_held;
-
-static void* Alloc(size_t size, size_t alignment, void* context)
-{
-    (void)context;
-    alignment = alignment < sizeof(void*) ? sizeof(void*) : alignment;
-    void* block = aligned_alloc(alignment, (size + alignment - 1) / alignment * alignment);
-    s_held += block != nullptr ? size : 0;
-    return block;
-}
-
-static void Free(void* block, size_t size, size_t alignment, void* context)
-{
-    (void)alignment;
-    (void)context;
-    s_held -= size;
-    free(block);
-}
-
 static void TestQueryDefsAreChecked(void)
 {
     mnavQueryDef def = mnavDefaultQueryDef();
@@ -362,7 +343,7 @@ static void TestQueryDefsAreChecked(void)
               mnavCreateQuery(&def, nullptr) == mnav_errorInvalid,
           "NULL arguments");
     def = mnavDefaultQueryDef();
-    def.allocator = (mnavAllocator){Alloc, Free, nullptr};
+    def.allocator = CountingAllocator();
     CHECK(mnavCreateQuery(&def, &query) == mnav_success && s_held > 0, "made");
     mnavDestroyQuery(query);
     mnavDestroyQuery(nullptr);

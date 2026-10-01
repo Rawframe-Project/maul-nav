@@ -5,6 +5,7 @@
 // across tile sides (mnav-0004).
 
 #include "allocator.h"
+#include "counting_allocator.h"
 #include "hand_tile.h"
 #include "navmesh.h"
 #include "test_harness.h"
@@ -229,31 +230,10 @@ static void TestTilesMustMatchTheDef(void)
     mnavDestroyNavmesh(nullptr);
 }
 
-// Counts the bytes held through the def's allocator.
-static size_t s_held;
-
-static void* Alloc(size_t size, size_t alignment, void* context)
-{
-    (void)context;
-    // Some C libraries refuse alignments below a pointer's.
-    alignment = alignment < sizeof(void*) ? sizeof(void*) : alignment;
-    void* block = aligned_alloc(alignment, (size + alignment - 1) / alignment * alignment);
-    s_held += block != nullptr ? size : 0;
-    return block;
-}
-
-static void Free(void* block, size_t size, size_t alignment, void* context)
-{
-    (void)alignment;
-    (void)context;
-    s_held -= size;
-    free(block);
-}
-
 static void TestDestroyGivesEverythingBack(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.allocator = (mnavAllocator){Alloc, Free, nullptr};
+    def.allocator = CountingAllocator();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
