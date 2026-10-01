@@ -4,9 +4,11 @@
 // Grid paths (mnav-0005): jump point search and A*, their limits and ends.
 
 #include "test_harness.h"
+#include "world.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
 #include <math.h>
@@ -70,6 +72,17 @@ static void TestOpenGround(void)
               path.end == mnav_pathFound &&
               fabs(path.length - (4.0 * 1.4142135623730951 + 5.0) * 0.5) < 1e-12,
           "A* finds the same length");
+    // One cost for every area, though not 1: still jump point search, at
+    // that cost.
+    mnavQueryFilter doubled = mnavDefaultQueryFilter();
+    for (int32_t a = 0; a < MNAV_AREA_TYPES; ++a)
+    {
+        doubled.costs[a] = 2.0f;
+    }
+    CHECK(mnavFindGridPath(query, &grid, &doubled, (mnavCell){0, 0}, (mnavCell){9, 9}, &path) ==
+                  mnav_success &&
+              path.cellCount == 2 && fabs(path.cost - 9.0 * 1.4142135623730951) < 1e-12,
+          "twice the cost");
     CHECK(mnavFindGridPath(query, &grid, nullptr, (mnavCell){3, 3}, (mnavCell){3, 3}, &path) ==
                   mnav_success &&
               path.end == mnav_pathFound && path.cellCount == 1 && path.cost == 0.0,
@@ -95,6 +108,13 @@ static void TestCornersAndBlocks(void)
                   mnav_success &&
               path.end == mnav_pathNone && path.cellCount == 1,
           "nor does A*");
+    // A filter that wants mnav_areaNone still finds those cells blocked.
+    mnavQueryFilter none = mnavDefaultQueryFilter();
+    none.areas |= 1u;
+    CHECK(mnavFindGridPath(query, &grid, &none, (mnavCell){0, 0}, (mnavCell){1, 0}, &path) ==
+                  mnav_success &&
+              path.end == mnav_pathNone,
+          "mnav_areaNone always blocks");
     // A blocked start: the start alone.
     CHECK(mnavFindGridPath(query, &grid, nullptr, (mnavCell){1, 0}, (mnavCell){1, 1}, &path) ==
                   mnav_success &&
@@ -127,6 +147,14 @@ static void TestCostsSteerA(void)
               path.end == mnav_pathFound && path.cellCount == 2 &&
               fabs(path.cost - (3.0 + 2.0 * 1.25 + 3.0) * 0.5) < 1e-12,
           "straight across a cheap band");
+    // A path costs the same both ways, starting or ending on the band.
+    mnavGridPath back;
+    CHECK(mnavFindGridPath(query, &grid, &dear, (mnavCell){0, 4}, (mnavCell){0, 8}, &path) ==
+                  mnav_success &&
+              mnavFindGridPath(query, &grid, &dear, (mnavCell){0, 8}, (mnavCell){0, 4}, &back) ==
+                  mnav_success &&
+              path.cost == back.cost && fabs(path.cost - (1.25 + 3.0) * 0.5) < 1e-12,
+          "the same cost both ways");
     mnavQueryFilter without = mnavDefaultQueryFilter();
     without.areas &= ~((uint64_t)1 << 3);
     CHECK(mnavFindGridPath(query, &grid, &without, (mnavCell){0, 0}, (mnavCell){0, 8}, &path) ==
@@ -162,8 +190,12 @@ static void TestLimitsAndEnds(void)
     query = MakeQuery(4096, 5.0f);
     CHECK(mnavFindGridPath(query, &grid, nullptr, (mnavCell){0, 0}, (mnavCell){19, 39}, &path) ==
                   mnav_success &&
-              path.end == mnav_pathTooLong && path.length <= 5.0,
-          "too long");
+              path.end == mnav_pathTooLong && path.cellCount == 1,
+          "too long: no first step leads within the length");
+    CHECK(mnavFindGridPath(query, &grid, &weighted, (mnavCell){0, 0}, (mnavCell){19, 39}, &path) ==
+                  mnav_success &&
+              path.end == mnav_pathTooLong && path.cellCount == 1,
+          "nor under A*");
     CHECK(mnavFindGridPath(query, &grid, nullptr, (mnavCell){0, 0}, (mnavCell){40, 0}, &path) ==
                   mnav_errorInvalid &&
               mnavFindGridPath(query, &grid, nullptr, (mnavCell){-1, 0}, (mnavCell){1, 0}, &path) ==
@@ -244,6 +276,38 @@ static void TestJumpsMatchAStar(void)
     mnavDestroyQuery(query);
 }
 
+static void TestEndsASlicedSearch(void)
+{
+    // A grid search in a context ends the navmesh search sliced in it.
+    BakeWorld();
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+              mnavStageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "a navmesh");
+    mnavNearest a;
+    mnavNearest b;
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){2.0, 0.0, 2.0}, (mnavVec3){1.0f, 2.0f, 1.0f},
+                          &a) == mnav_success &&
+              mnavFindNearest(navmesh, nullptr, (mnavPos3){28.0, 0.0, 28.0},
+                              (mnavVec3){1.0f, 2.0f, 1.0f}, &b) == mnav_success,
+          "ends");
+    mnavQuery* query = MakeQuery(4096, 1000.0f);
+    memset(s_areas, mnav_areaWalkable, sizeof(s_areas));
+    mnavGrid grid = Grid(4, 4);
+    mnavGridPath path;
+    bool ended = false;
+    CHECK(mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point) ==
+                  mnav_success &&
+              mnavFindGridPath(query, &grid, nullptr, (mnavCell){0, 0}, (mnavCell){3, 3}, &path) ==
+                  mnav_success &&
+              mnavContinuePath(query, navmesh, 16, &ended) == mnav_errorInvalid,
+          "the sliced search ended");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     TestOpenGround();
@@ -251,5 +315,6 @@ int main(void)
     TestCostsSteerA();
     TestLimitsAndEnds();
     TestJumpsMatchAStar();
+    TestEndsASlicedSearch();
     return s_failures == 0 ? 0 : 1;
 }
