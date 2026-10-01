@@ -211,6 +211,34 @@ static uint32_t RegionAtWorld(const mnavCompactField* compact, const mnavRegionM
     return MNAV_BORDER_REGION;
 }
 
+static void TestTwoSweepsOverOneRegionStaySeparate(void)
+{
+    // Row 1 is one sweep rising from 100 to 113. Row 2 has a low sweep at
+    // 100 over x 1 to 3 and a high one from 118 over x 3 to 5, both
+    // stepping down onto row 1, and column 3 holds both. Neither may
+    // continue row 1's region, or that region would hold two spans of
+    // column 3.
+    static Field field;
+    field = (Field){0};
+    const int32_t rowOne[5] = {100, 100, 101, 107, 113};
+    for (int32_t x = 1; x <= 5; ++x)
+    {
+        AddSpan(&field, x, 1, rowOne[x - 1] - 1, rowOne[x - 1], 1);
+    }
+    for (int32_t x = 1; x <= 3; ++x)
+    {
+        AddSpan(&field, x, 2, 99, 100, 1);
+    }
+    AddSpan(&field, 3, 2, 117, 118, 1);
+    AddSpan(&field, 4, 2, 112, 113, 1);
+    AddSpan(&field, 5, 2, 118, 119, 1);
+    Built built;
+    Build(&field, 0, &built);
+    CHECK(RegionAt(&built, 3, 2, 0) != 0 && RegionAt(&built, 3, 2, 1) != 0, "both sweeps");
+    CHECK(NoColumnRepeatsARegion(&built.compact, &built.map), "no region holds both");
+    Release(&built);
+}
+
 static uint64_t HashRegions(const mnavRegionMap* map)
 {
     uint64_t hash = MNAV_HASH_INIT;
@@ -264,6 +292,7 @@ int main(void)
     TestStackedFloorsJoinedByARampAreTwoLayers();
     TestSmallIslandsAreDropped();
     TestRowWithMoreSweepsThanCells();
+    TestTwoSweepsOverOneRegionStaySeparate();
     TestLevelRegionsArePinned();
     return s_failures == 0 ? 0 : 1;
 }
