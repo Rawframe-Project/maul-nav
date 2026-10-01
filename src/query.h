@@ -61,6 +61,30 @@ typedef struct mnavPortal
     int32_t link;
 } mnavPortal;
 
+// A search in progress: the end it heads for, what stopped ways on, and
+// what it has found; kept in the context between slices.
+typedef struct mnavSearch
+{
+    mnavQuery* query;
+    const mnavNavmesh* navmesh;
+    // The navmesh's commits when the search began.
+    uint64_t commits;
+    const mnavQueryFilter* filter;
+    // The heuristic's scale (mnav-0005).
+    double cheapest;
+    mnavPos3 end;
+    int32_t endSlot;
+    int32_t endPolygon;
+    double limit;
+    bool outOfNodes;
+    bool tooLong;
+    bool notLoaded;
+    bool active;
+    // The node nearest the end so far, and the end's node once found.
+    int32_t best;
+    int32_t found;
+} mnavSearch;
+
 struct mnavQuery
 {
     mnavMemory memory;
@@ -79,6 +103,9 @@ struct mnavQuery
     mnavPortal* portals;
     mnavPos3* points;
     mnavPathLink* links;
+    // The search, and its own copy of the filter it began with.
+    mnavSearch search;
+    mnavQueryFilter filter;
 };
 
 #endif // MAUL_NAV_SRC_QUERY_H

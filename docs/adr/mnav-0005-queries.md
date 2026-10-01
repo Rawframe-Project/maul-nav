@@ -78,6 +78,15 @@ that are not loaded must say so rather than treat them as walls.
   stretch between links, and the path lists each link crossed with its
   id, its kind and the index of its takeoff point.
 
+- **Sliced searches:** `mnavBeginPath`, `mnavContinuePath` (up to a
+  budget of nodes per call) and `mnavFinishPath` run the path search
+  across calls; `mnavFindPath` is the three at once, and any slicing
+  gives its result bit for bit. The context keeps its own copy of the
+  filter. The navmesh counts its commits, and a search on a navmesh
+  committed to since it began is `mnav_errorStale`, so no search mixes
+  navmesh versions. Finished early, a search gives the corridor toward
+  the node nearest the end, ended `mnav_pathUnfinished`.
+
 ## Consequences
 
 - Queries scan the polygons of each loaded tile in their box; a search

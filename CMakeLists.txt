@@ -54,6 +54,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/erode.c
     src/filter.c
     src/hash.c
+    src/funnel.c
     src/height_patch.c
     src/heightfield.c
     src/holes.c
@@ -102,6 +103,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(query_filter WHITEBOX)
     maul_add_test(offmesh WHITEBOX)
     maul_add_test(path_links WHITEBOX)
+    maul_add_test(sliced WHITEBOX)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)

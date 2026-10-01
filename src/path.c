@@ -4,6 +4,7 @@
 // The path search: A* over portals, with named limits (mnav-0005).
 
 #include "allocator.h"
+#include "funnel.h"
 #include "navmesh.h"
 #include "offmesh.h"
 #include "polymesh.h"
@@ -220,21 +221,6 @@ static int32_t Pop(mnavQuery* query)
 }
 
 // One search: the end it heads for and what stopped ways on.
-typedef struct Search
-{
-    mnavQuery* query;
-    const mnavNavmesh* navmesh;
-    const mnavQueryFilter* filter;
-    // The cheapest included area's cost, scaling the heuristic.
-    double cheapest;
-    mnavPos3 end;
-    int32_t endSlot;
-    int32_t endPolygon;
-    double limit;
-    bool outOfNodes;
-    bool tooLong;
-    bool notLoaded;
-} Search;
 
 static double Distance(mnavPos3 a, mnavPos3 b)
 {
@@ -251,7 +237,7 @@ static mnavPos3 Midpoint(mnavPos3 a, mnavPos3 b)
 
 // Opens the node behind a portal from node from, or lowers its cost when
 // this way is cheaper; closed nodes are final.
-static void Open(Search* s, int32_t from, const mnavSearchNode* key, mnavPos3 a, mnavPos3 b,
+static void Open(mnavSearch* s, int32_t from, const mnavSearchNode* key, mnavPos3 a, mnavPos3 b,
                  double linkCost)
 {
     mnavQuery* query = s->query;
@@ -304,7 +290,7 @@ static void Open(Search* s, int32_t from, const mnavSearchNode* key, mnavPos3 a,
 }
 
 // Opens the polygon across an inner edge j of node n's polygon.
-static void ExpandInner(Search* s, int32_t n, const mnavTile* tile, int32_t j)
+static void ExpandInner(mnavSearch* s, int32_t n, const mnavTile* tile, int32_t j)
 {
     const mnavSearchNode* node = &s->query->nodes[n];
     const mnavPolygon* polygon = &tile->mesh.polygons[node->polygon];
@@ -339,7 +325,7 @@ static mnavPos3 AlongSide(mnavPos3 a, mnavPos3 b, double au, double bu, double u
 
 // Opens the polygons the tile links of edge j of node n's polygon reach,
 // or notes that no tile is loaded across it.
-static void ExpandSide(Search* s, int32_t n, const mnavTile* tile, int32_t j)
+static void ExpandSide(mnavSearch* s, int32_t n, const mnavTile* tile, int32_t j)
 {
     const mnavSearchNode* node = &s->query->nodes[n];
     const mnavSlot* slot = &s->navmesh->slots[node->slot];
@@ -387,7 +373,7 @@ static void ExpandSide(Search* s, int32_t n, const mnavTile* tile, int32_t j)
 
 // Opens the polygons the off-mesh links leaving node n's polygon land on,
 // for the kinds and areas the filter includes.
-static void ExpandOffMesh(Search* s, int32_t n)
+static void ExpandOffMesh(mnavSearch* s, int32_t n)
 {
     const mnavNavmesh* navmesh = s->navmesh;
     const mnavSearchNode* node = &s->query->nodes[n];
@@ -414,7 +400,7 @@ static void ExpandOffMesh(Search* s, int32_t n)
     }
 }
 
-static void Expand(Search* s, int32_t n)
+static void Expand(mnavSearch* s, int32_t n)
 {
     const mnavSearchNode* node = &s->query->nodes[n];
     const mnavTile* tile = s->navmesh->slots[node->slot].tile;
@@ -473,168 +459,7 @@ static double Scale(const mnavNavmesh* navmesh, const mnavQueryFilter* filter)
     return scale;
 }
 
-// Writes the polygons from the start to node last into the corridor.
-static int32_t Corridor(mnavQuery* query, const mnavNavmesh* navmesh, int32_t last)
-{
-    int32_t count = 0;
-    for (int32_t n = last; n != MNAV_NO_NODE; n = query->nodes[n].parent)
-    {
-        const mnavSearchNode* node = &query->nodes[n];
-        mnavPolygonId id = {(uint32_t)node->slot + 1, navmesh->slots[node->slot].generation,
-                            (uint32_t)node->polygon};
-        const mnavPolygonId* previous = count > 0 ? &query->corridor[count - 1] : nullptr;
-        if (previous == nullptr || previous->slot != id.slot || previous->polygon != id.polygon)
-        {
-            query->corridor[count++] = id;
-        }
-    }
-    for (int32_t i = 0; i < count / 2; ++i)
-    {
-        mnavPolygonId swap = query->corridor[i];
-        query->corridor[i] = query->corridor[count - 1 - i];
-        query->corridor[count - 1 - i] = swap;
-    }
-    return count;
-}
-
-// Writes the portals from the start point to node last, and the end point
-// or, short of it, the last portal's midpoint as a portal of one point.
-static int32_t Portals(mnavQuery* query, int32_t last)
-{
-    int32_t count = 0;
-    for (int32_t n = last; n != MNAV_NO_NODE; n = query->nodes[n].parent)
-    {
-        // A portal's ends are in the order of the polygon walked out of,
-        // whose inside lies to the right of each edge: the first end is on
-        // the walker's left. An off-mesh link gives its takeoff point, then
-        // its landing point; written backward here.
-        const mnavSearchNode* node = &query->nodes[n];
-        if (node->tag == MNAV_TAG_OFFMESH)
-        {
-            query->portals[count++] = (mnavPortal){node->b, node->b, -1};
-            query->portals[count++] = (mnavPortal){node->a, node->a, node->low};
-            continue;
-        }
-        query->portals[count++] = (mnavPortal){node->a, node->b, -1};
-    }
-    for (int32_t i = 0; i < count / 2; ++i)
-    {
-        mnavPortal swap = query->portals[i];
-        query->portals[i] = query->portals[count - 1 - i];
-        query->portals[count - 1 - i] = swap;
-    }
-    const mnavSearchNode* node = &query->nodes[last];
-    if (node->tag != MNAV_TAG_END)
-    {
-        query->portals[count++] = (mnavPortal){node->at, node->at, -1};
-    }
-    return count;
-}
-
-// Twice the signed area of triangle abc on the ground: positive when c lies
-// to the left of the way from a to b.
-static double Area2(mnavPos3 a, mnavPos3 b, mnavPos3 c)
-{
-    return (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
-}
-
-static bool Same(mnavPos3 a, mnavPos3 b)
-{
-    return a.x == b.x && a.y == b.y && a.z == b.z;
-}
-
-static void Push(mnavQuery* query, int32_t* count, mnavPos3 p)
-{
-    if (*count == 0 || !Same(query->points[*count - 1], p))
-    {
-        query->points[(*count)++] = p;
-    }
-}
-
-// The funnel: its apex and two sides, each with the portal it came from.
-typedef struct Funnel
-{
-    mnavPos3 apex;
-    mnavPos3 left;
-    mnavPos3 right;
-    int32_t apexAt;
-    int32_t leftAt;
-    int32_t rightAt;
-} Funnel;
-
-// Makes a side's point the funnel's new apex, a corner of the path.
-static void Corner(mnavQuery* query, int32_t* count, Funnel* f, mnavPos3 p, int32_t at)
-{
-    Push(query, count, p);
-    *f = (Funnel){p, p, p, at, at, at};
-}
-
-// Pulls portals first to last tight into a straight path: a portal end on
-// or inside a side of the funnel narrows it; one on or past the other side
-// makes that side's point a corner, and the scan goes on from there. The
-// first portal is a point, always kept: the start or a landing point.
-static int32_t Pull(mnavQuery* query, int32_t first, int32_t last, int32_t count)
-{
-    const mnavPortal* p = query->portals;
-    query->points[count++] = p[first].left;
-    Funnel f = {p[first].left, p[first].left, p[first].right, first, first, first};
-    for (int32_t i = first + 1; i <= last; ++i)
-    {
-        if (Area2(f.apex, f.right, p[i].right) >= 0.0)
-        {
-            if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) >= 0.0)
-            {
-                Corner(query, &count, &f, f.left, f.leftAt);
-                i = f.apexAt;
-                continue;
-            }
-            f.right = p[i].right;
-            f.rightAt = i;
-        }
-        if (Area2(f.apex, f.left, p[i].left) <= 0.0)
-        {
-            if (!Same(f.apex, f.left) && Area2(f.apex, f.right, p[i].left) <= 0.0)
-            {
-                Corner(query, &count, &f, f.right, f.rightAt);
-                i = f.apexAt;
-                continue;
-            }
-            f.left = p[i].left;
-            f.leftAt = i;
-        }
-    }
-    Push(query, &count, p[last].left);
-    return count;
-}
-
-// The straight path, stretch by stretch between off-mesh links: each
-// stretch ends at a takeoff point, the next begins at its landing point.
-static int32_t Straighten(mnavQuery* query, const mnavNavmesh* navmesh, int32_t portals,
-                          int32_t* linkCount)
-{
-    int32_t count = 0;
-    int32_t first = 0;
-    *linkCount = 0;
-    for (int32_t i = 0; i < portals; ++i)
-    {
-        int32_t crossed = query->portals[i].link;
-        if (crossed < 0 && i + 1 < portals)
-        {
-            continue;
-        }
-        count = Pull(query, first, i, count);
-        first = i + 1;
-        if (crossed >= 0)
-        {
-            const mnavOffLink* link = &navmesh->links[crossed / 2];
-            query->links[(*linkCount)++] = (mnavPathLink){
-                {(uint32_t)crossed / 2 + 1, link->generation}, link->def.kind, count - 1};
-        }
-    }
-    return count;
-}
-
-static mnavPathEnd EndOf(const Search* s)
+static mnavPathEnd EndOf(const mnavSearch* s)
 {
     if (s->outOfNodes)
     {
@@ -647,12 +472,11 @@ static mnavPathEnd EndOf(const Search* s)
     return s->notLoaded ? mnav_pathNotLoaded : mnav_pathNone;
 }
 
-mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                        mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
-                        mnavPos3 end, mnavPath* pathOut)
+mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
+                         const mnavQueryFilter* filter, mnavPolygonId startPolygon, mnavPos3 start,
+                         mnavPolygonId endPolygon, mnavPos3 end)
 {
-    if (query == nullptr || navmesh == nullptr || pathOut == nullptr || !FinitePoint(start) ||
-        !FinitePoint(end))
+    if (query == nullptr || navmesh == nullptr || !FinitePoint(start) || !FinitePoint(end))
     {
         return mnav_errorInvalid;
     }
@@ -664,24 +488,31 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnav
     {
         return result;
     }
+    // The search keeps its own copy: the caller's filter may change.
+    query->filter = *usable;
     memset(query->table, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
-    Search s = {query,
-                navmesh,
-                usable,
-                Scale(navmesh, usable),
-                end,
-                (int32_t)endPolygon.slot - 1,
-                (int32_t)endPolygon.polygon,
-                (double)query->limits.pathLength,
-                false,
-                false,
-                false};
+    mnavSearch* s = &query->search;
+    *s = (mnavSearch){query,
+                      navmesh,
+                      navmesh->commits,
+                      &query->filter,
+                      Scale(navmesh, &query->filter),
+                      end,
+                      (int32_t)endPolygon.slot - 1,
+                      (int32_t)endPolygon.polygon,
+                      (double)query->limits.pathLength,
+                      false,
+                      false,
+                      false,
+                      true,
+                      0,
+                      MNAV_NO_NODE};
     query->nodes[0] = (mnavSearchNode){start,
                                        start,
                                        start,
                                        0.0,
                                        0.0,
-                                       Distance(start, end) * s.cheapest,
+                                       Distance(start, end) * s->cheapest,
                                        (int32_t)startPolygon.slot - 1,
                                        (int32_t)startPolygon.polygon,
                                        MNAV_TAG_START,
@@ -692,30 +523,98 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnav
     query->heap[0] = 0;
     query->nodeCount = 1;
     query->heapCount = 1;
-    int32_t best = 0;
-    int32_t found = MNAV_NO_NODE;
-    while (query->heapCount > 0 && found == MNAV_NO_NODE)
+    return mnav_success;
+}
+
+// Whether a search began and may go on on this navmesh: no commit to it
+// since.
+static mnavResult CheckSearch(const mnavQuery* query, const mnavNavmesh* navmesh)
+{
+    if (query == nullptr || navmesh == nullptr || !query->search.active)
+    {
+        return mnav_errorInvalid;
+    }
+    const mnavSearch* s = &query->search;
+    return s->navmesh == navmesh && s->commits == navmesh->commits ? mnav_success : mnav_errorStale;
+}
+
+static bool Ended(const mnavQuery* query)
+{
+    return query->search.found != MNAV_NO_NODE || query->heapCount == 0;
+}
+
+mnavResult mnavContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, int32_t nodes,
+                            bool* endedOut)
+{
+    if (endedOut == nullptr || nodes < 1)
+    {
+        return mnav_errorInvalid;
+    }
+    mnavResult result = CheckSearch(query, navmesh);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    mnavSearch* s = &query->search;
+    for (int32_t closed = 0; closed < nodes && !Ended(query); ++closed)
     {
         int32_t n = Pop(query);
         if (query->nodes[n].tag == MNAV_TAG_END)
         {
-            found = n;
+            s->found = n;
             continue;
         }
-        best = Nearer(query, n, best) ? n : best;
-        Expand(&s, n);
+        s->best = Nearer(query, n, s->best) ? n : s->best;
+        Expand(s, n);
     }
-    int32_t last = found != MNAV_NO_NODE ? found : best;
+    *endedOut = Ended(query);
+    return mnav_success;
+}
+
+mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPath* pathOut)
+{
+    if (pathOut == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    mnavResult result = CheckSearch(query, navmesh);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    mnavSearch* s = &query->search;
+    mnavPathEnd end = s->found != MNAV_NO_NODE ? mnav_pathFound
+                      : Ended(query)           ? EndOf(s)
+                                               : mnav_pathUnfinished;
+    int32_t last = s->found != MNAV_NO_NODE ? s->found : s->best;
     int32_t linkCount = 0;
-    int32_t pointCount = Straighten(query, navmesh, Portals(query, last), &linkCount);
-    *pathOut = (mnavPath){found != MNAV_NO_NODE ? mnav_pathFound : EndOf(&s),
+    int32_t pointCount = mnavStraighten(query, navmesh, last, &linkCount);
+    *pathOut = (mnavPath){end,
                           query->nodes[last].cost,
                           query->nodes[last].length,
                           query->corridor,
-                          Corridor(query, navmesh, last),
+                          mnavCorridor(query, navmesh, last),
                           query->points,
                           pointCount,
                           query->links,
                           linkCount};
+    s->active = false;
     return mnav_success;
+}
+
+mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                        mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
+                        mnavPos3 end, mnavPath* pathOut)
+{
+    if (pathOut == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    mnavResult result = mnavBeginPath(query, navmesh, filter, startPolygon, start, endPolygon, end);
+    bool ended = false;
+    while (result == mnav_success && !ended)
+    {
+        result = mnavContinuePath(query, navmesh, INT32_MAX, &ended);
+    }
+    return result == mnav_success ? mnavFinishPath(query, navmesh, pathOut) : result;
 }

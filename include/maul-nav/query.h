@@ -137,6 +137,8 @@ extern "C"
         mnav_pathNotLoaded = 3,
         // The end point cannot be reached from the start.
         mnav_pathNone = 4,
+        // The caller finished a sliced search before it ended.
+        mnav_pathUnfinished = 5,
     };
 
     // An off-mesh link a path crosses: the link, its kind, and the index of
@@ -239,6 +241,63 @@ extern "C"
                                                     mnavPolygonId startPolygon, mnavPos3 start,
                                                     mnavPolygonId endPolygon, mnavPos3 end,
                                                     mnavPath* pathOut);
+
+    /// Begins a path search to run in slices (mnav-0005): the same search
+    /// as mnavFindPath, with its own copy of the filter, continued by
+    /// mnavContinuePath and ended by mnavFinishPath. Whatever the slices,
+    /// the result is the one mnavFindPath gives.
+    ///
+    /// @param query        The context; it holds the search until the next
+    ///                     begins.
+    /// @param navmesh      The navmesh.
+    /// @param filter       The areas usable and their costs, or NULL for
+    ///                     every walkable area at a cost of 1; copied.
+    /// @param startPolygon The polygon the start point lies on.
+    /// @param start        The start point.
+    /// @param endPolygon   The polygon the end point lies on.
+    /// @param end          The end point.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// point that is not finite, a polygon id that never existed or a
+    /// filter not built from mnavDefaultQueryFilter; `mnav_errorRange` for a
+    /// filter cost out of its range; `mnav_errorStale` for a polygon id
+    /// whose tile has been replaced or removed.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                     const mnavQueryFilter* filter,
+                                                     mnavPolygonId startPolygon, mnavPos3 start,
+                                                     mnavPolygonId endPolygon, mnavPos3 end);
+
+    /// Continues a search begun by mnavBeginPath: closes up to a number of
+    /// nodes, fewer when the search ends first.
+    ///
+    /// @param query    The context.
+    /// @param navmesh  The navmesh the search began on.
+    /// @param nodes    The most nodes to close, at least 1.
+    /// @param endedOut Receives whether the search has ended.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, no
+    /// search begun, or fewer than 1 node; `mnav_errorStale` for another
+    /// navmesh, or one committed to since the search began: begin again.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavContinuePath(mnavQuery* query,
+                                                        const mnavNavmesh* navmesh, int32_t nodes,
+                                                        bool* endedOut);
+
+    /// Ends a search begun by mnavBeginPath and writes its result: as
+    /// mnavFindPath's when it has ended; otherwise toward the node nearest
+    /// the end, its end mnav_pathUnfinished.
+    ///
+    /// @param query    The context; its memory holds the result.
+    /// @param navmesh  The navmesh the search began on.
+    /// @param pathOut  Receives the result.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or no
+    /// search begun; `mnav_errorStale` for another navmesh, or one
+    /// committed to since the search began.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                      mnavPath* pathOut);
 
     // How a raycast ended.
     typedef uint8_t mnavRayEnd;

@@ -121,6 +121,9 @@ struct mnavNavmesh
     // spans, INFINITY when it has none: what scales the search's
     // heuristic (mnav-0005).
     double costPerMeter[MNAV_LINK_KINDS];
+    // The commits that changed something, so a search can tell the
+    // navmesh it began on from a later one.
+    uint64_t commits;
 };
 
 // The committed tile at a place, or NULL; slotOut receives its 0-based

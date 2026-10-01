@@ -145,3 +145,7 @@ format.
 - Paths across off-mesh links (mnav-0005): mnavQueryFilter gains
   kinds, the link kinds an agent may cross; mnavPath gains links, an
   mnavPathLink per link crossed (its id, kind and takeoff point).
+- Sliced path searches (mnav-0005): mnavBeginPath, mnavContinuePath
+  and mnavFinishPath, with mnav_pathUnfinished; the result of any
+  slicing equals mnavFindPath's, and a commit to the navmesh makes a
+  search in progress stale. The funnel moves to its own module.

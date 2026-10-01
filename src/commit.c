@@ -36,6 +36,7 @@ mnavResult mnavCommit(mnavNavmesh* navmesh)
     {
         mnavApplyTiles(navmesh, &tiles);
         mnavApplyAttachments(navmesh, &links);
+        navmesh->commits += 1;
     }
     return result;
 }
