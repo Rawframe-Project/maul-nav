@@ -49,6 +49,25 @@ static bool HasVertex(const mnavPolyMesh* mesh, int32_t x, int32_t z)
     return false;
 }
 
+// Whether polygon p has the given ground points, in order.
+static bool PolygonIs(const mnavPolyMesh* mesh, int32_t p, const int32_t* points, int32_t count)
+{
+    if (p >= mesh->polygonCount || mesh->polygons[p].count != count)
+    {
+        return false;
+    }
+    const mnavPolygon* polygon = &mesh->polygons[p];
+    for (int32_t k = 0; k < count; ++k)
+    {
+        const mnavMeshVertex* v = &mesh->vertices[polygon->vertices[k]];
+        if (v->x != points[2 * k] || v->z != points[2 * k + 1])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Builds, removes and links; returns the removal's result.
 static mnavResult Run(mnavMemory* memory, mnavContourSet* set, int32_t maxPolygons,
                       mnavPolyMesh* mesh)
@@ -103,6 +122,13 @@ static void TestVertexInsideTheMeshIsRemoved(void)
     CHECK(Run(&memory, &set, 100, &mesh) == mnav_success, "removed");
     CHECK(mesh.vertexCount == 8 && !HasVertex(&mesh, 5, 5), "the vertex is gone");
     CHECK(Valid(&mesh) && TwiceArea(&mesh) == 200, "valid, the same area");
+    // The closed chain's ring has each of its 8 vertices once.
+    const int32_t hexagon[12] = {10, 5, 5, 0, 0, 0, 0, 5, 5, 10, 10, 10};
+    const int32_t left[6] = {0, 5, 0, 10, 5, 10};
+    const int32_t right[6] = {10, 5, 10, 0, 5, 0};
+    CHECK(mesh.polygonCount == 3 && PolygonIs(&mesh, 0, hexagon, 6) &&
+              PolygonIs(&mesh, 1, left, 3) && PolygonIs(&mesh, 2, right, 3),
+          "the hole's polygons");
     Finish(&memory, &set, &mesh);
 }
 

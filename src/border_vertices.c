@@ -61,14 +61,6 @@ static int32_t Find(const mnavPolygon* polygon, uint16_t vertex)
     return -1;
 }
 
-// The vertex before (side 0) or after (side 1) a vertex of a polygon.
-static uint16_t Beside(const mnavPolygon* polygon, uint16_t vertex, int32_t side)
-{
-    int32_t k = Find(polygon, vertex);
-    int32_t step = side == 0 ? polygon->count - 1 : 1;
-    return polygon->vertices[(k + step) % polygon->count];
-}
-
 static mnavResult CollectTouching(Work* work, uint16_t vertex)
 {
     const mnavPolyMesh* mesh = work->mesh;
@@ -91,36 +83,18 @@ static mnavResult CollectTouching(Work* work, uint16_t vertex)
     return mnav_success;
 }
 
-// Whether the polygons around the vertex keep more than 2 edges without
-// it, share one area, and leave at most 2 of the edges at it unshared.
-static bool Removable(const Work* work, uint16_t vertex)
+// Whether the polygons around the vertex share one area type.
+static bool SameArea(const Work* work)
 {
     const mnavPolygon* polygons = work->mesh->polygons;
-    int32_t remaining = 0;
-    int32_t unshared = 0;
-    for (int32_t t = 0; t < work->touchingCount; ++t)
+    for (int32_t t = 1; t < work->touchingCount; ++t)
     {
-        const mnavPolygon* polygon = &polygons[work->touching[t]];
-        remaining += polygon->count - 2;
-        if (polygon->area != polygons[work->touching[0]].area)
+        if (polygons[work->touching[t]].area != polygons[work->touching[0]].area)
         {
             return false;
         }
-        for (int32_t side = 0; side < 2; ++side)
-        {
-            // An edge at the vertex is shared when another polygon around
-            // it has an edge to the same far end.
-            uint16_t end = Beside(polygon, vertex, side);
-            int32_t seen = 0;
-            for (int32_t u = 0; u < work->touchingCount; ++u)
-            {
-                const mnavPolygon* other = &polygons[work->touching[u]];
-                seen += Beside(other, vertex, 0) == end || Beside(other, vertex, 1) == end ? 1 : 0;
-            }
-            unshared += seen == 1 ? 1 : 0;
-        }
     }
-    return remaining > 2 && unshared <= 2;
+    return true;
 }
 
 static void ReleaseHole(Work* work)
@@ -371,7 +345,7 @@ static mnavResult Commit(Work* work, int32_t added, int32_t maxPolygons)
 static mnavResult RemoveVertex(Work* work, uint16_t vertex, int32_t maxPolygons)
 {
     mnavResult result = CollectTouching(work, vertex);
-    if (result != mnav_success || work->touchingCount == 0 || !Removable(work, vertex))
+    if (result != mnav_success || work->touchingCount == 0 || !SameArea(work))
     {
         return result;
     }

@@ -13,10 +13,12 @@
 
 #include <stdint.h>
 
-// Removes each removable vertex, in index order, whose polygons keep more
-// than 2 edges, have at most 2 unshared edges at it and share one area,
-// replacing those polygons with the merged triangulation of the hole left.
-// A vertex whose replacement cannot be built stays, still removable.
+// Removes each removable vertex, in index order, whose polygons share one
+// area, replacing them with the merged triangulation of the hole left.
+// The hole's edges must form one chain, which the polygons round a vertex
+// form only when they are joined edge to edge; an open chain must close
+// across the vertex's place, so the outline keeps its shape. A vertex
+// whose replacement cannot be built stays, still removable.
 // Polygons must not be linked yet. Returns mnav_errorLimit when the new
 // polygons would pass maxPolygons.
 mnavResult mnavRemoveBorderVertices(mnavMemory* memory, mnavPolyMesh* mesh, int32_t maxPolygons);
