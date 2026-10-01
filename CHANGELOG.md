@@ -168,3 +168,7 @@ format.
   mnav_errorTier. The default tier is static: replacing a loaded tile
   now needs mnav_tierDynamic.
 - Polygons in a box (mnav-0005): mnavFindPolygons and mnavFound.
+- A commit snaps again only the off-mesh links it adds and those near
+  the places it changes; on the streaming benchmark with 512 links a
+  step went from about 630 us to 200 us. bench/bench_main.c: baking,
+  streaming and path timings.

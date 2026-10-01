@@ -57,6 +57,11 @@ is gone (record 0016).
   changes go through the commit; anything else is refused with
   `mnav_errorTier`. A changed area lasts while its tile is loaded.
 
+- **Snapping links near changes:** a commit snaps again only the
+  off-mesh links it adds and those whose snap boxes cover a place it
+  changes (a tile in or out, an area); the result equals snapping
+  every link, and the commit's cost follows the places changed.
+
 ## Consequences
 
 - A commit costs work proportional to the tiles next to its changes,

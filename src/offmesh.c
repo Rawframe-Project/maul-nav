@@ -8,6 +8,7 @@
 
 #include "allocator.h"
 #include "navmesh.h"
+#include "nearest.h"
 #include "sort.h"
 
 #include "maul-nav/base.h"
@@ -177,6 +178,42 @@ mnavResult mnavGetLink(const mnavNavmesh* navmesh, mnavLinkId id, mnavLinkState*
     return result;
 }
 
+// The half sizes of the box a link end snaps within: its radius on the
+// ground and the agent's step in height.
+static mnavPos3 SnapHalf(const mnavNavmesh* navmesh, float radius)
+{
+    double step =
+        (double)(float)((double)navmesh->cells.agentStep * (double)navmesh->def.cellHeight);
+    return (mnavPos3){(double)radius, step, (double)radius};
+}
+
+static bool Covers(mnavCover c, int32_t x, int32_t z)
+{
+    return x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1;
+}
+
+// Whether the snap box round a point covers a place the commit changes.
+static bool Changed(const mnavNavmesh* navmesh, mnavPos3 p, float radius)
+{
+    mnavCover c = mnavCoverOf(navmesh, p, SnapHalf(navmesh, radius));
+    for (int32_t s = 0; s < navmesh->stagedCount; ++s)
+    {
+        if (Covers(c, navmesh->staged[s].x, navmesh->staged[s].z))
+        {
+            return true;
+        }
+    }
+    for (int32_t a = 0; a < navmesh->areaChangeCount; ++a)
+    {
+        const mnavSlot* slot = &navmesh->slots[navmesh->areaChanges[a].polygon.slot - 1];
+        if (Covers(c, slot->x, slot->z))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 mnavResult mnavPlanAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
 {
     *plan = (mnavAttachmentPlan){0};
@@ -191,17 +228,38 @@ mnavResult mnavPlanAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
         return mnav_success;
     }
     // Two directions per link, and as much again to sort with.
-    plan->capacity = 4 * kept;
-    mnavResult result = mnavAllocate(&navmesh->memory, (size_t)plan->capacity, sizeof(uint64_t),
+    int32_t capacity = 4 * kept;
+    mnavResult result = mnavAllocate(&navmesh->memory, (size_t)capacity, sizeof(uint64_t),
                                      alignof(uint64_t), (void**)&plan->keys);
-    plan->capacity = result == mnav_success ? plan->capacity : 0;
-    return result;
+    if (result == mnav_success)
+    {
+        plan->capacity = capacity;
+        result = mnavAllocate(&navmesh->memory, (size_t)navmesh->linkSlots, sizeof(bool),
+                              alignof(bool), (void**)&plan->resnap);
+    }
+    if (result != mnav_success)
+    {
+        mnavDropAttachmentPlan(navmesh, plan);
+        return result;
+    }
+    plan->resnapCount = navmesh->linkSlots;
+    for (int32_t s = 0; s < navmesh->linkSlots; ++s)
+    {
+        const mnavOffLink* link = &navmesh->links[s];
+        plan->resnap[s] = link->phase == MNAV_LINK_ADDING ||
+                          (link->phase == MNAV_LINK_LIVE &&
+                           (Changed(navmesh, link->def.start, link->def.radius) ||
+                            Changed(navmesh, link->def.end, link->def.radius)));
+    }
+    return mnav_success;
 }
 
 void mnavDropAttachmentPlan(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
 {
     mnavRelease(&navmesh->memory, plan->keys, (size_t)plan->capacity, sizeof(uint64_t),
                 alignof(uint64_t));
+    mnavRelease(&navmesh->memory, plan->resnap, (size_t)plan->resnapCount, sizeof(bool),
+                alignof(bool));
     *plan = (mnavAttachmentPlan){0};
 }
 
@@ -210,9 +268,9 @@ void mnavDropAttachmentPlan(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
 static bool Snap(const mnavNavmesh* navmesh, mnavPos3 p, float radius, mnavPolygonId* polygon,
                  mnavPos3* at)
 {
-    float step = (float)((double)navmesh->cells.agentStep * (double)navmesh->def.cellHeight);
+    mnavPos3 half = SnapHalf(navmesh, radius);
     mnavNearest n;
-    if (mnavFindNearest(navmesh, nullptr, p, (mnavVec3){radius, step, radius}, &n) !=
+    if (mnavFindNearest(navmesh, nullptr, p, (mnavVec3){radius, (float)half.y, radius}, &n) !=
             mnav_success ||
         n.polygon.slot == 0)
     {
@@ -225,32 +283,32 @@ static bool Snap(const mnavNavmesh* navmesh, mnavPos3 p, float radius, mnavPolyg
     return dx * dx + dz * dz <= (double)radius * (double)radius;
 }
 
-// Snaps a committed link's ends and writes its attachments.
+// Snaps a committed link's ends again.
+static void Resnap(mnavNavmesh* navmesh, mnavOffLink* link)
+{
+    mnavLinkState state = {0};
+    state.attached =
+        Snap(navmesh, link->def.start, link->def.radius, &state.startPolygon, &state.start) &&
+        Snap(navmesh, link->def.end, link->def.radius, &state.endPolygon, &state.end);
+    link->state = state.attached ? state : (mnavLinkState){0};
+}
+
+// Writes a committed link's attachments, when attached and enabled.
 static int32_t Attach(mnavNavmesh* navmesh, int32_t s, uint64_t* keys, int32_t count)
 {
     mnavOffLink* link = &navmesh->links[s];
-    mnavLinkState state = {0};
-    bool attached =
-        Snap(navmesh, link->def.start, link->def.radius, &state.startPolygon, &state.start) &&
-        Snap(navmesh, link->def.end, link->def.radius, &state.endPolygon, &state.end);
-    if (!attached)
-    {
-        link->state = (mnavLinkState){0};
-        return count;
-    }
-    state.attached = true;
-    state.enabled = link->enabled;
-    link->state = state;
-    if (!link->enabled)
+    const mnavLinkState* state = &link->state;
+    link->state.enabled = link->enabled;
+    if (!state->attached || !link->enabled)
     {
         return count;
     }
     keys[count++] = mnavAttachmentKey((mnavAttachment){
-        (int32_t)state.startPolygon.slot - 1, (int32_t)state.startPolygon.polygon, s, false});
+        (int32_t)state->startPolygon.slot - 1, (int32_t)state->startPolygon.polygon, s, false});
     if (link->def.twoWay)
     {
         keys[count++] = mnavAttachmentKey((mnavAttachment){
-            (int32_t)state.endPolygon.slot - 1, (int32_t)state.endPolygon.polygon, s, true});
+            (int32_t)state->endPolygon.slot - 1, (int32_t)state->endPolygon.polygon, s, true});
     }
     return count;
 }
@@ -275,15 +333,22 @@ void mnavApplyAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
                 sizeof(uint64_t), alignof(uint64_t));
     navmesh->attachments = plan->keys;
     navmesh->attachmentCapacity = plan->capacity;
-    *plan = (mnavAttachmentPlan){0};
+    plan->keys = nullptr;
+    plan->capacity = 0;
     int32_t count = 0;
     for (int32_t s = 0; s < navmesh->linkSlots; ++s)
     {
-        if (navmesh->links[s].phase == MNAV_LINK_LIVE)
+        mnavOffLink* link = &navmesh->links[s];
+        if (link->phase == MNAV_LINK_LIVE)
         {
+            if (plan->resnap[s])
+            {
+                Resnap(navmesh, link);
+            }
             count = Attach(navmesh, s, navmesh->attachments, count);
         }
     }
+    mnavDropAttachmentPlan(navmesh, plan);
     for (int32_t k = 0; k < MNAV_LINK_KINDS; ++k)
     {
         navmesh->costPerMeter[k] = (double)INFINITY;

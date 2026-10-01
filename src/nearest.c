@@ -259,21 +259,12 @@ static bool GoodBox(mnavPos3 point, mnavVec3 half)
            isfinite(half.z);
 }
 
-// The tile places a box covers: columns x0 to x1, rows z0 to z1.
-typedef struct Cover
-{
-    int64_t x0;
-    int64_t x1;
-    int64_t z0;
-    int64_t z1;
-} Cover;
-
-static Cover CoverOf(const mnavNavmesh* navmesh, mnavPos3 point, mnavPos3 half)
+mnavCover mnavCoverOf(const mnavNavmesh* navmesh, mnavPos3 point, mnavPos3 half)
 {
     const mnavBakeDef* def = &navmesh->def;
     double size = (double)def->tileCells * (double)def->cellSize;
     int64_t reach = MNAV_MAX_EXTENT_CELLS / def->tileCells + 1;
-    Cover c = {0};
+    mnavCover c = {0};
     TileRange(point.x - half.x, point.x + half.x, def->origin.x, size, reach, &c.x0, &c.x1);
     TileRange(point.z - half.z, point.z + half.z, def->origin.z, size, reach, &c.z0, &c.z1);
     return c;
@@ -296,7 +287,7 @@ mnavResult mnavFindPolygons(const mnavNavmesh* navmesh, const mnavQueryFilter* f
     }
     mnavPos3 half = {(double)halfExtents.x, (double)halfExtents.y, (double)halfExtents.z};
     Search s = {navmesh, center, half, 0.0, 0.0, 0.0, nullptr};
-    Cover c = CoverOf(navmesh, center, half);
+    mnavCover c = mnavCoverOf(navmesh, center, half);
     int64_t loaded = 0;
     int32_t count = 0;
     for (int32_t i = FirstColumn(navmesh, c.x0);
@@ -351,7 +342,7 @@ mnavResult mnavFindNearest(const mnavNavmesh* navmesh, const mnavQueryFilter* fi
                 (double)INFINITY,
                 (double)INFINITY,
                 nearestOut};
-    Cover c = CoverOf(navmesh, point, half);
+    mnavCover c = mnavCoverOf(navmesh, point, half);
     int64_t loaded = 0;
     for (int32_t i = FirstColumn(navmesh, c.x0);
          i < navmesh->placeCount && navmesh->places[i].x <= c.x1; ++i)
