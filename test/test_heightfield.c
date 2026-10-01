@@ -6,6 +6,7 @@
 #include "allocator.h"
 #include "heightfield.h"
 #include "raster.h"
+#include "soup.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -297,41 +298,6 @@ static void TestAllocatorFailureIsCapacity(void)
 
 // The hash of the soup below, the same on every platform (mnav-0001).
 #define SOUP_HASH 0xe955dec170776113ull
-
-enum
-{
-    SOUP_TRIANGLES = 600
-};
-
-static uint32_t Next(uint32_t* state)
-{
-    *state = *state * 1664525u + 1013904223u;
-    return *state >> 8;
-}
-
-// Triangles of every orientation and area, each within 4 m, over tile
-// (0, 0) and its border, from a fixed generator.
-static void MakeSoup(mnavVec3* vertices, mnavAreaType* areas)
-{
-    uint32_t state = 7;
-    for (int32_t t = 0; t < SOUP_TRIANGLES; ++t)
-    {
-        float cx = (float)(Next(&state) % 34000u) / 1000.0f - 1.0f;
-        float cy = (float)(Next(&state) % 8000u) / 1000.0f - 2.0f;
-        float cz = (float)(Next(&state) % 34000u) / 1000.0f - 1.0f;
-        for (int32_t k = 0; k < 3; ++k)
-        {
-            float x = cx + (float)(Next(&state) % 4000u) / 1000.0f - 2.0f;
-            float y = cy + (float)(Next(&state) % 4000u) / 1000.0f - 2.0f;
-            float z = cz + (float)(Next(&state) % 4000u) / 1000.0f - 2.0f;
-            vertices[t * 3 + k] = (mnavVec3){x, y, z};
-        }
-    }
-    for (int32_t t = 0; t < SOUP_TRIANGLES; ++t)
-    {
-        areas[t] = (mnavAreaType)(Next(&state) % 8u);
-    }
-}
 
 static void TestSoupDependsOnlyOnTheTriangleSet(void)
 {

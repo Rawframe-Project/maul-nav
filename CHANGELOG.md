@@ -26,3 +26,9 @@ format.
 - The walkable filters (internal): spans within a step above walkable
   ground become walkable, ledges and steep neighbors are removed, and
   so is ground without the agent's height of free space (N13).
+- The open-space field and erosion (internal): walkable spans become
+  open space linked to the neighbors an agent can step to, and space
+  closer than the agent's radius to a boundary is removed. Heights,
+  links and distances are 16 bits, which always suffice, so nothing is
+  truncated (N14). Pipeline hashes over a soup and a small level are
+  pinned.

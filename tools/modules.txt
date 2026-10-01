@@ -8,3 +8,5 @@ input: bake_def
 raster: allocator
 heightfield: allocator raster
 filter: heightfield
+compact: allocator heightfield raster
+erode: allocator compact
