@@ -158,6 +158,35 @@ static void TestAreas(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestABlockedBox(void)
+{
+    // A host blocks what a box covers, then finds the blocked polygons
+    // again, with a filter that wants mnav_areaNone, to reopen them.
+    mnavNavmesh* navmesh = Load(mnav_tierModifiers);
+    mnavQuery* query = MakeQuery();
+    mnavPolygonId found[8];
+    mnavFound count;
+    mnavPos3 door = {12.5, 0.0, 7.5};
+    mnavVec3 half = {1.0f, 1.0f, 1.0f};
+    CHECK(mnavFindPolygons(navmesh, nullptr, door, half, found, 8, &count) == mnav_success &&
+              count.count == 1 && !count.incomplete,
+          "the middle square");
+    CHECK(mnavStageArea(navmesh, found[0], mnav_areaNone) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success && Reach(query, navmesh, 18.0) == mnav_pathNone &&
+              mnavFindPolygons(navmesh, nullptr, door, half, found, 8, &count) == mnav_success &&
+              count.count == 0,
+          "blocked, and no longer walkable");
+    mnavQueryFilter blocked = mnavDefaultQueryFilter();
+    blocked.areas = (uint64_t)1 << mnav_areaNone;
+    CHECK(mnavFindPolygons(navmesh, &blocked, door, half, found, 8, &count) == mnav_success &&
+              count.count == 1 &&
+              mnavStageArea(navmesh, found[0], mnav_areaWalkable) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success && Reach(query, navmesh, 18.0) == mnav_pathFound,
+          "found blocked, and reopened");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestLinkToggles(void)
 {
     mnavNavmesh* navmesh = Load(mnav_tierModifiers);
@@ -213,6 +242,7 @@ int main(void)
     TestTheDef();
     TestStatic();
     TestAreas();
+    TestABlockedBox();
     TestLinkToggles();
     TestDynamic();
     return s_failures == 0 ? 0 : 1;

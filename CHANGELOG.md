@@ -167,3 +167,4 @@ format.
   mnavStageLinkEnabled and mnavLinkState.enabled, and the result
   mnav_errorTier. The default tier is static: replacing a loaded tile
   now needs mnav_tierDynamic.
+- Polygons in a box (mnav-0005): mnavFindPolygons and mnavFound.

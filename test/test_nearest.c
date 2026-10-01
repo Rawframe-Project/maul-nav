@@ -18,6 +18,9 @@
 // The hash of a grid of queries' results, the same on every platform.
 #define GRID_HASH 0xd0083298e4d1be5eull
 
+// The hash of a grid of box queries' polygons.
+#define BOXES_HASH 0xf1b644f71e37d37cull
+
 static mnavNavmesh* Load(int32_t tiles)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
@@ -148,6 +151,86 @@ static void TestGridIsPinned(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestPolygonsInBoxes(void)
+{
+    // Over the world, every box's polygons come in tile order and index
+    // order, hold the nearest polygon whenever there is one, and agree on
+    // what is loaded; the lists are pinned.
+    mnavNavmesh* navmesh = Load(3);
+    static mnavPolygonId list[1024];
+    uint64_t hash = MNAV_HASH_INIT;
+    int32_t total = 0;
+    bool ordered = true;
+    bool holdsNearest = true;
+    bool agrees = true;
+    for (int32_t i = 0; i < 24; ++i)
+    {
+        for (int32_t j = 0; j < 24; ++j)
+        {
+            mnavPos3 c = {-2.0 + i * 2.9, 0.1 * ((i + j) % 9), -2.0 + j * 2.9};
+            mnavVec3 half = {1.0f + (float)(i % 3), 1.5f, 1.0f + (float)(j % 4)};
+            mnavFound found;
+            mnavNearest n;
+            CHECK(mnavFindPolygons(navmesh, nullptr, c, half, list, 1024, &found) == mnav_success &&
+                      mnavFindNearest(navmesh, nullptr, c, half, &n) == mnav_success,
+                  "queried");
+            bool held = n.polygon.slot == 0;
+            for (int32_t k = 0; k < found.count; ++k)
+            {
+                held = held ||
+                       (list[k].slot == n.polygon.slot && list[k].polygon == n.polygon.polygon);
+                ordered = ordered && (k == 0 || list[k].slot != list[k - 1].slot ||
+                                      list[k].polygon > list[k - 1].polygon);
+            }
+            holdsNearest = holdsNearest && held;
+            agrees = agrees && found.incomplete == n.incomplete;
+            total += found.count;
+            hash = mnavHash64(hash, &found.count, (int32_t)sizeof(found.count));
+            hash = mnavHash64(hash, list, (int32_t)((size_t)found.count * sizeof(list[0])));
+        }
+    }
+    printf("BOXES_HASH=%016llx polygons=%d\n", (unsigned long long)hash, total);
+    CHECK(ordered && holdsNearest && agrees, "ordered, holding the nearest, agreeing");
+    CHECK(hash == BOXES_HASH, "the pinned hash");
+    // A buffer too small holds the first polygons and counts them all.
+    mnavPos3 c = {32.0, 0.5, 16.0};
+    mnavVec3 half = {20.0f, 3.0f, 20.0f};
+    mnavFound all;
+    mnavFound some;
+    mnavPolygonId few[3];
+    CHECK(mnavFindPolygons(navmesh, nullptr, c, half, list, 1024, &all) == mnav_success &&
+              all.count > 3 && all.incomplete,
+          "many, the fourth tile not loaded");
+    CHECK(mnavFindPolygons(navmesh, nullptr, c, half, few, 3, &some) == mnav_errorCapacity &&
+              some.count == all.count && memcmp(few, list, sizeof(few)) == 0,
+          "the first three, and the count of all");
+    CHECK(mnavFindPolygons(navmesh, nullptr, c, half, nullptr, 0, &some) == mnav_errorCapacity &&
+              some.count == all.count,
+          "counted without a buffer");
+    CHECK(mnavFindPolygons(navmesh, nullptr, (mnavPos3){500.0, 0.0, 500.0}, half, nullptr, 0,
+                           &some) == mnav_success &&
+              some.count == 0 && some.incomplete,
+          "nothing loaded there");
+    mnavQueryFilter none = mnavDefaultQueryFilter();
+    none.areas = 0;
+    CHECK(mnavFindPolygons(navmesh, &none, c, half, list, 1024, &some) == mnav_success &&
+              some.count == 0,
+          "no area wanted");
+    CHECK(mnavFindPolygons(navmesh, nullptr, c, half, nullptr, 2, &some) == mnav_errorInvalid &&
+              mnavFindPolygons(navmesh, nullptr, c, half, list, -1, &some) == mnav_errorInvalid &&
+              mnavFindPolygons(navmesh, nullptr, c, (mnavVec3){-1.0f, 1.0f, 1.0f}, list, 4,
+                               &some) == mnav_errorInvalid &&
+              mnavFindPolygons(navmesh, nullptr, (mnavPos3){(double)NAN, 0.0, 0.0}, half, list, 4,
+                               &some) == mnav_errorInvalid &&
+              mnavFindPolygons(navmesh, nullptr, c, half, list, 4, nullptr) == mnav_errorInvalid &&
+              mnavFindPolygons(nullptr, nullptr, c, half, list, 4, &some) == mnav_errorInvalid,
+          "bad arguments");
+    none.cookie = 0;
+    CHECK(mnavFindPolygons(navmesh, &none, c, half, list, 4, &some) == mnav_errorInvalid,
+          "a filter not from the default");
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     BakeWorld();
@@ -156,5 +239,6 @@ int main(void)
     TestNothingInTheBox();
     TestBadArgumentsAreRefused();
     TestGridIsPinned();
+    TestPolygonsInBoxes();
     return s_failures == 0 ? 0 : 1;
 }

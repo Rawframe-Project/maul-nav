@@ -251,13 +251,87 @@ static bool Finite(double v)
     return isfinite(v);
 }
 
+// Whether a box is well formed: finite, with half sizes at least 0.
+static bool GoodBox(mnavPos3 point, mnavVec3 half)
+{
+    return Finite(point.x) && Finite(point.y) && Finite(point.z) && half.x >= 0.0f &&
+           half.y >= 0.0f && half.z >= 0.0f && isfinite(half.x) && isfinite(half.y) &&
+           isfinite(half.z);
+}
+
+// The tile places a box covers: columns x0 to x1, rows z0 to z1.
+typedef struct Cover
+{
+    int64_t x0;
+    int64_t x1;
+    int64_t z0;
+    int64_t z1;
+} Cover;
+
+static Cover CoverOf(const mnavNavmesh* navmesh, mnavPos3 point, mnavPos3 half)
+{
+    const mnavBakeDef* def = &navmesh->def;
+    double size = (double)def->tileCells * (double)def->cellSize;
+    int64_t reach = MNAV_MAX_EXTENT_CELLS / def->tileCells + 1;
+    Cover c = {0};
+    TileRange(point.x - half.x, point.x + half.x, def->origin.x, size, reach, &c.x0, &c.x1);
+    TileRange(point.z - half.z, point.z + half.z, def->origin.z, size, reach, &c.z0, &c.z1);
+    return c;
+}
+
+mnavResult mnavFindPolygons(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                            mnavPos3 center, mnavVec3 halfExtents, mnavPolygonId* polygons,
+                            int32_t capacity, mnavFound* foundOut)
+{
+    if (navmesh == nullptr || foundOut == nullptr || capacity < 0 ||
+        (polygons == nullptr && capacity > 0) || !GoodBox(center, halfExtents))
+    {
+        return mnav_errorInvalid;
+    }
+    const mnavQueryFilter* usable = nullptr;
+    mnavResult checked = mnavCheckFilter(filter, &usable);
+    if (checked != mnav_success)
+    {
+        return checked;
+    }
+    mnavPos3 half = {(double)halfExtents.x, (double)halfExtents.y, (double)halfExtents.z};
+    Search s = {navmesh, center, half, 0.0, 0.0, 0.0, nullptr};
+    Cover c = CoverOf(navmesh, center, half);
+    int64_t loaded = 0;
+    int32_t count = 0;
+    for (int32_t i = FirstColumn(navmesh, c.x0);
+         i < navmesh->placeCount && navmesh->places[i].x <= c.x1; ++i)
+    {
+        const mnavPlace* place = &navmesh->places[i];
+        if (place->z < c.z0 || place->z > c.z1)
+        {
+            continue;
+        }
+        loaded += 1;
+        const mnavTile* tile = navmesh->slots[place->slot].tile;
+        mnavFrame f = mnavFrameOf(navmesh, place->x, place->z);
+        for (int32_t p = 0; p < tile->mesh.polygonCount; ++p)
+        {
+            if (!mnavIncludes(usable, tile->mesh.polygons[p].area) || !InBox(&s, &f, tile, p))
+            {
+                continue;
+            }
+            if (count < capacity)
+            {
+                polygons[count] = (mnavPolygonId){
+                    (uint32_t)place->slot + 1, navmesh->slots[place->slot].generation, (uint32_t)p};
+            }
+            count += 1;
+        }
+    }
+    *foundOut = (mnavFound){count, loaded < (c.x1 - c.x0 + 1) * (c.z1 - c.z0 + 1)};
+    return count > capacity ? mnav_errorCapacity : mnav_success;
+}
+
 mnavResult mnavFindNearest(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
                            mnavPos3 point, mnavVec3 halfExtents, mnavNearest* nearestOut)
 {
-    if (navmesh == nullptr || nearestOut == nullptr || !Finite(point.x) || !Finite(point.y) ||
-        !Finite(point.z) ||
-        !(halfExtents.x >= 0.0f && halfExtents.y >= 0.0f && halfExtents.z >= 0.0f) ||
-        !isfinite(halfExtents.x) || !isfinite(halfExtents.y) || !isfinite(halfExtents.z))
+    if (navmesh == nullptr || nearestOut == nullptr || !GoodBox(point, halfExtents))
     {
         return mnav_errorInvalid;
     }
@@ -277,20 +351,13 @@ mnavResult mnavFindNearest(const mnavNavmesh* navmesh, const mnavQueryFilter* fi
                 (double)INFINITY,
                 (double)INFINITY,
                 nearestOut};
-    double size = (double)def->tileCells * (double)def->cellSize;
-    int64_t reach = MNAV_MAX_EXTENT_CELLS / def->tileCells + 1;
-    int64_t x0 = 0;
-    int64_t x1 = 0;
-    int64_t z0 = 0;
-    int64_t z1 = 0;
-    TileRange(point.x - half.x, point.x + half.x, def->origin.x, size, reach, &x0, &x1);
-    TileRange(point.z - half.z, point.z + half.z, def->origin.z, size, reach, &z0, &z1);
+    Cover c = CoverOf(navmesh, point, half);
     int64_t loaded = 0;
-    for (int32_t i = FirstColumn(navmesh, x0);
-         i < navmesh->placeCount && navmesh->places[i].x <= x1; ++i)
+    for (int32_t i = FirstColumn(navmesh, c.x0);
+         i < navmesh->placeCount && navmesh->places[i].x <= c.x1; ++i)
     {
         const mnavPlace* place = &navmesh->places[i];
-        if (place->z < z0 || place->z > z1)
+        if (place->z < c.z0 || place->z > c.z1)
         {
             continue;
         }
@@ -305,6 +372,6 @@ mnavResult mnavFindNearest(const mnavNavmesh* navmesh, const mnavQueryFilter* fi
             }
         }
     }
-    nearestOut->incomplete = loaded < (x1 - x0 + 1) * (z1 - z0 + 1);
+    nearestOut->incomplete = loaded < (c.x1 - c.x0 + 1) * (c.z1 - c.z0 + 1);
     return mnav_success;
 }

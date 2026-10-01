@@ -64,6 +64,43 @@ extern "C"
         bool incomplete;
     } mnavNearest;
 
+    // What a box query found.
+    typedef struct mnavFound
+    {
+        // The polygons found, also beyond the buffer's capacity.
+        int32_t count;
+        // Whether part of the box lies on places with no tile loaded.
+        bool incomplete;
+    } mnavFound;
+
+    /// Lists the polygons the filter includes whose bounds meet a box:
+    /// their vertices on the ground and their detail's heights. They come
+    /// by tile, in place order (x, then z), then by polygon index.
+    ///
+    /// @param navmesh     The navmesh.
+    /// @param filter      The areas wanted, or NULL for every walkable one;
+    ///                    one including mnav_areaNone finds blocked polygons.
+    /// @param center      The box's center.
+    /// @param halfExtents The box's half sizes, in meters, at least 0.
+    /// @param polygons    Room for capacity ids, or NULL when capacity is 0.
+    /// @param capacity    The room, at least 0.
+    /// @param foundOut    Receives the count and whether the box was all
+    ///                    loaded.
+    /// @return `mnav_success`; `mnav_errorCapacity` when more polygons meet
+    /// the box than the buffer holds: it holds the first ones and foundOut
+    /// counts all; `mnav_errorInvalid` for a NULL argument, a negative
+    /// capacity, a center or extent that is not finite or a negative
+    /// extent, or a filter not built from mnavDefaultQueryFilter;
+    /// `mnav_errorRange` for a filter cost out of its range.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of queries may run at once between
+    /// commits.
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindPolygons(const mnavNavmesh* navmesh,
+                                                        const mnavQueryFilter* filter,
+                                                        mnavPos3 center, mnavVec3 halfExtents,
+                                                        mnavPolygonId* polygons, int32_t capacity,
+                                                        mnavFound* foundOut);
+
     /// Finds the polygon, among those the filter includes, nearest a point
     /// whose nearest point lies within a box round it, and that point. A
     /// point over a polygon scores the height it lies beyond the agent's

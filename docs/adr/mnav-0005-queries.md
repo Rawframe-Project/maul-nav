@@ -29,6 +29,10 @@ that are not loaded must say so rather than treat them as walls.
   the lower polygon index. The result tells whether the point lies over
   the polygon and whether part of the box is not loaded.
 
+- **Polygons in a box:** `mnavFindPolygons` lists the included
+  polygons whose bounds meet a box, by tile in place order then by
+  index; a buffer too small holds the first ones, the count covers
+  all, and the result is `mnav_errorCapacity`.
 - **Query contexts:** searches run in a caller-owned `mnavQuery` whose
   memory is sized by its named limits when it is made: nodes per search
   and the longest path in meters. Searches never allocate; one thread
