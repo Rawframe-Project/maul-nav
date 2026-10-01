@@ -288,6 +288,134 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateTriangleMesh(const mnavBakeDef* def,
                                                                      const mnavTriangleMesh* mesh);
 
+// The tile format version this library writes and reads (mnav-0003).
+#define MNAV_TILE_FORMAT 1
+
+    // A baker: the def it was made with, its memory, and the last tile it
+    // baked. Made by mnavCreateBaker.
+    typedef struct mnavBaker mnavBaker;
+
+    // The stage a bake ended in.
+    typedef uint8_t mnavBakeStage;
+
+    enum
+    {
+        mnav_stageInput = 0,
+        mnav_stageRasterize = 1,
+        mnav_stageCompact = 2,
+        mnav_stageErode = 3,
+        mnav_stageRegions = 4,
+        mnav_stageContours = 5,
+        mnav_stageHoles = 6,
+        mnav_stagePolygons = 7,
+        mnav_stageBorderVertices = 8,
+        mnav_stageLinks = 9,
+        mnav_stageDetail = 10,
+        mnav_stageEncode = 11,
+        // Every stage ran.
+        mnav_stageDone = 12,
+    };
+
+    // What a bake did: its result and the stage it ended in, the first
+    // input refused, what the tile holds, and every piece of work it gave
+    // up on rather than fail.
+    typedef struct mnavBakeReport
+    {
+        mnavResult result;
+        mnavBakeStage stage;
+        // The first mesh refused, or -1, and what its check found.
+        int32_t mesh;
+        mnavInputResult input;
+        // The hash of everything that shaped the tile: the generator's
+        // version, the def's settings, the tile's place and the input
+        // triangles that reach it, in input order. Written into the tile.
+        uint64_t fingerprint;
+        // Input triangles that reach the tile, walkable open spans,
+        // regions, polygons, vertices, detail vertices and triangles.
+        int32_t triangles;
+        int32_t spans;
+        int32_t regions;
+        int32_t polygons;
+        int32_t vertices;
+        int32_t detailVertices;
+        int32_t detailTriangles;
+        // The tile's bytes, and the most memory the bake held at once.
+        uint64_t tileBytes;
+        uint64_t memoryPeak;
+        // Holes that no bridge could join to their outline, polygon rings
+        // and detail outlines whose triangulation stopped short, detail
+        // samples that found no height and took the polygon's, and
+        // polygons whose detail reached its vertex cap.
+        int32_t droppedHoles;
+        int32_t partialRings;
+        int32_t fallbackHeights;
+        int32_t cappedDetail;
+    } mnavBakeReport;
+
+    /// Makes a baker from a def: checks the def and keeps a copy, its
+    /// allocator and its memory limit.
+    ///
+    /// @param def       The def.
+    /// @param bakerOut  Receives the baker, or NULL on failure.
+    /// @return `mnav_success`; `mnav_errorInvalid` with the setting for an
+    /// invalid def or a NULL argument; `mnav_errorLimit` when the baker
+    /// does not fit the def's memory limit; `mnav_errorCapacity` when the
+    /// allocator fails.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavCreateBaker(const mnavBakeDef* def,
+                                                              mnavBaker** bakerOut);
+
+    /// Destroys a baker and the tile it holds.
+    ///
+    /// @param baker  The baker, or NULL.
+    /// @par Thread safety
+    /// Safe from any thread; the baker is used by one thread at a time.
+    MNAV_API void mnavDestroyBaker(mnavBaker* baker);
+
+    /// Bakes tile (tileX, tileZ) of the meshes: checks every mesh, then
+    /// rasterizes, filters, partitions, traces and triangulates the tile
+    /// and lays its detail, and keeps the tile's bytes for
+    /// mnavCopyBakedTile, in place of any tile baked before. The same
+    /// meshes and def give the same bytes on every platform.
+    ///
+    /// @param baker      The baker.
+    /// @param meshes     The input meshes, in the def's frame.
+    /// @param meshCount  The number of meshes, at least 0.
+    /// @param tileX      The tile's column in the grid from the origin.
+    /// @param tileZ      The tile's row.
+    /// @param reportOut  Receives what the bake did. May be NULL.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker, a
+    /// negative count, NULL meshes with a positive count, or a mesh its
+    /// check refuses (the report names it); `mnav_errorRange` for a mesh
+    /// past the extent or a tile past it; `mnav_errorLimit` when a named
+    /// limit or the memory limit is reached (the report's stage says
+    /// where); `mnav_errorCapacity` when the allocator fails. On failure
+    /// the baker holds no tile.
+    /// @par Thread safety
+    /// Safe from any thread; the baker is used by one thread at a time.
+    /// Bakers share nothing, so one per thread bakes tiles in parallel.
+    MNAV_NODISCARD MNAV_API mnavResult mnavBakeTile(mnavBaker* baker,
+                                                    const mnavTriangleMesh* meshes,
+                                                    int32_t meshCount, int32_t tileX, int32_t tileZ,
+                                                    mnavBakeReport* reportOut);
+
+    /// Copies the last baked tile's bytes into caller memory.
+    ///
+    /// @param baker     The baker.
+    /// @param buffer    The memory, at least capacity bytes; may be NULL
+    ///                  when capacity is 0.
+    /// @param capacity  The buffer's size in bytes.
+    /// @param sizeOut   Receives the tile's size in bytes. May be NULL.
+    /// @return `mnav_success`; `mnav_errorCapacity` when the buffer is
+    /// smaller than the tile, with the size still written;
+    /// `mnav_errorInvalid` for a NULL baker, a NULL buffer with a
+    /// positive capacity, or a baker holding no tile.
+    /// @par Thread safety
+    /// Safe from any thread; the baker is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* buffer,
+                                                         size_t capacity, size_t* sizeOut);
+
 #ifdef __cplusplus
 }
 #endif

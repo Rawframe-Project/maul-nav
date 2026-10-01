@@ -7,3 +7,4 @@ are listed in [README.md](README.md).
 |---|---|---|
 | [mnav-0001](mnav-0001-library-profile.md) | Library profile | Accepted |
 | [mnav-0002](mnav-0002-bake-settings-and-input.md) | Bake settings and input | Accepted |
+| [mnav-0003](mnav-0003-bake-call-and-tile-format.md) | The bake call and the tile format | Accepted |

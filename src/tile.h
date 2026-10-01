@@ -12,13 +12,12 @@
 #include "detail.h"
 #include "polymesh.h"
 
+#include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
-// The format version this library writes and reads.
-#define MNAV_TILE_FORMAT 1
 // The header's size in bytes.
 #define MNAV_TILE_HEADER_BYTES 104
 

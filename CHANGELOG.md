@@ -98,3 +98,8 @@ format.
   section and element it refuses (N21). A libFuzzer target,
   fuzz_tile, runs with MAUL_NAV_FUZZ; test_tile --seed writes its
   seed.
+- The public bake call (mnav-0003): mnavCreateBaker, mnavDestroyBaker,
+  mnavBakeTile and mnavCopyBakedTile, with mnavBakeReport (result,
+  stage, refused input, counts, memory peak, work given up) and
+  mnavBakeStage; MNAV_TILE_FORMAT. A tile carries a fingerprint of the
+  input that reaches it.
