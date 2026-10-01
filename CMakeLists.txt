@@ -40,12 +40,22 @@ else()
     set(MAUL_LIBRARY_KIND STATIC)
 endif()
 add_library(maul-nav ${MAUL_LIBRARY_KIND}
-    src/base.c)
+    src/bake_def.c
+    src/base.c
+    src/input.c
+    src/scalar.c)
 maul_configure_library(maul-nav)
+# floor, ceil, fabs and sqrt, the exactly rounded functions the library
+# takes from libm (mnav-0001).
+if(NOT WIN32 AND NOT APPLE)
+    target_link_libraries(maul-nav PUBLIC m)
+endif()
 
 if(MAUL_NAV_BUILD_TESTS)
     enable_testing()
     maul_add_test(base)
+    maul_add_test(bake)
+    maul_add_test(scalar WHITEBOX)
     maul_add_header_tests()
 endif()
 
@@ -54,5 +64,8 @@ if(MAUL_NAV_BUILD_BENCH AND EXISTS ${PROJECT_SOURCE_DIR}/bench/bench_main.c)
 endif()
 
 if(MAUL_NAV_INSTALL)
+    if(NOT WIN32 AND NOT APPLE)
+        set(MAUL_PKG_LIBS_PRIVATE "-lm")
+    endif()
     include(cmake/Install.cmake)
 endif()

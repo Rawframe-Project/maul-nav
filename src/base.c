@@ -20,6 +20,10 @@ const char* mnavResultName(mnavResult result)
         return "mnav_errorInvalid";
     case mnav_errorCapacity:
         return "mnav_errorCapacity";
+    case mnav_errorLimit:
+        return "mnav_errorLimit";
+    case mnav_errorRange:
+        return "mnav_errorRange";
     default:
         return "unknown result";
     }

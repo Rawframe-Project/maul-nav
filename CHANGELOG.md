@@ -13,3 +13,9 @@ format.
 - The library skeleton: the build, the family rules and tools, the
   version and result API (`mnavGetVersion`, `mnavResultName`) and the
   library profile.
+- The bake's settings and input surface (`maul-nav/bake.h`): the bake
+  def with its agent profile and named limits, checked and converted
+  from meters to cells by `mnavValidateBakeDef`, and triangle meshes
+  checked as hostile input by `mnavValidateTriangleMesh`.
+- Results `mnav_errorLimit` and `mnav_errorRange`, the allocator, and
+  the `mnavVec3` and `mnavPos3` types.

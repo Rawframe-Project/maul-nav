@@ -22,6 +22,8 @@ static void TestResultNames(void)
     CHECK(strcmp(mnavResultName(mnav_success), "mnav_success") == 0, "success name");
     CHECK(strcmp(mnavResultName(mnav_errorInvalid), "mnav_errorInvalid") == 0, "invalid name");
     CHECK(strcmp(mnavResultName(mnav_errorCapacity), "mnav_errorCapacity") == 0, "capacity name");
+    CHECK(strcmp(mnavResultName(mnav_errorLimit), "mnav_errorLimit") == 0, "limit name");
+    CHECK(strcmp(mnavResultName(mnav_errorRange), "mnav_errorRange") == 0, "range name");
     CHECK(strcmp(mnavResultName(12345), "unknown result") == 0, "unknown name");
 }
 

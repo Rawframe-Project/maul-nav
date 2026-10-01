@@ -2,8 +2,12 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The base of the Maul Nav API: the library version, the export and
-// attribute macros, and the result codes every fallible function
-// returns.
+// attribute macros, the result codes every fallible function returns,
+// the allocator and the vector types.
+//
+// Coordinates are meters in a right-handed frame with +Y up and -Z
+// forward. World positions are doubles; positions within a frame the
+// library names (a bake's origin, a tile) are binary32.
 
 #ifndef MAUL_NAV_BASE_H
 #define MAUL_NAV_BASE_H
@@ -60,8 +64,15 @@ extern "C"
         // An argument is invalid: a null pointer where one is required, a
         // value out of range.
         mnav_errorInvalid = -1,
-        // A caller buffer or a named limit is too small for the result.
+        // A caller buffer is too small for the result, or the allocator
+        // failed.
         mnav_errorCapacity = -2,
+        // A named limit the caller set was reached: the work it bounds was
+        // not done.
+        mnav_errorLimit = -3,
+        // A coordinate is finite but lies past what the library can
+        // represent in the frame it belongs to.
+        mnav_errorRange = -4,
     };
 
     // A library version: major, minor and patch.
@@ -71,6 +82,33 @@ extern "C"
         uint16_t minor;
         uint16_t patch;
     } mnavVersion;
+
+    // The allocator an owner object takes in its def and keeps for its
+    // lifetime. Alignment is a power of two. A zeroed allocator means the C
+    // library's functions, which serve alignments up to that of max_align_t.
+    typedef struct mnavAllocator
+    {
+        void* (*alloc)(size_t size, size_t alignment, void* context);
+        void (*free)(void* memory, size_t size, size_t alignment, void* context);
+        void* context;
+    } mnavAllocator;
+
+    // A vector or a position within a frame, in meters, binary32.
+    typedef struct mnavVec3
+    {
+        float x;
+        float y;
+        float z;
+    } mnavVec3;
+
+    // A world position in meters, in doubles, so that precision does not
+    // depend on the distance from the world origin.
+    typedef struct mnavPos3
+    {
+        double x;
+        double y;
+        double z;
+    } mnavPos3;
 
     /// Returns the version of the library that was linked, which may differ
     /// from the MNAV_VERSION macros a program was compiled with.
