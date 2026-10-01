@@ -57,7 +57,7 @@ mnavResult mnavCheckFilter(const mnavQueryFilter* filter, const mnavQueryFilter*
 
 bool mnavIncludes(const mnavQueryFilter* filter, mnavAreaType area)
 {
-    return area != 0 && area < MNAV_AREA_TYPES && ((filter->areas >> area) & 1u) != 0;
+    return area < MNAV_AREA_TYPES && ((filter->areas >> area) & 1u) != 0;
 }
 
 double mnavCheapest(const mnavQueryFilter* filter)
@@ -68,5 +68,7 @@ double mnavCheapest(const mnavQueryFilter* filter)
         double cost = (double)filter->costs[a];
         cheapest = mnavIncludes(filter, (mnavAreaType)a) && cost < cheapest ? cost : cheapest;
     }
+    // With nothing included only the start polygon is usable and the
+    // heuristic never matters; 1 keeps it finite.
     return cheapest < (double)INFINITY ? cheapest : 1.0;
 }

@@ -111,6 +111,12 @@ static void TestCheapAreasKeepTheSearchExact(void)
     CHECK(path.end == mnav_pathFound && path.polygonCount == 3 && path.cost == 3.75 &&
               path.length == 10.0,
           "the cheapest way, 0.625 + 2.5 + 0.625");
+    // The bridge at 0.62: 1.25 + 3.1 = 4.35 against 0.25 * 17.07 = 4.27
+    // round it. A heuristic scaled by 1 rather than 0.25 would overstate
+    // what is left four times over and take the direct way.
+    filter.costs[2] = 0.62f;
+    path = Walk(query, navmesh, &filter);
+    CHECK(path.end == mnav_pathFound && path.polygonCount == 5, "round it, cheaper by a hair");
     // The length limit counts meters, not cost: 12 m allows the bridge
     // even at a cost of 1,000 per meter.
     mnavQueryDef def = mnavDefaultQueryDef();

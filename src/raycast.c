@@ -53,9 +53,12 @@ static bool Follow(Walk* w, int32_t j, double t, bool* notLoaded)
     if (polygon->neighbors[j] != MNAV_NO_INDEX)
     {
         uint16_t next = polygon->neighbors[j];
-        bool included = mnavIncludes(w->filter, tile->mesh.polygons[next].area);
-        w->polygon = included ? next : w->polygon;
-        return included;
+        if (!mnavIncludes(w->filter, tile->mesh.polygons[next].area))
+        {
+            return false;
+        }
+        w->polygon = next;
+        return true;
     }
     int32_t side = polygon->sides[j];
     if (side == 0)

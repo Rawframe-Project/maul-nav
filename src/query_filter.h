@@ -17,7 +17,7 @@
 // mnavDefaultQueryFilter, mnav_errorRange for a cost out of its range.
 mnavResult mnavCheckFilter(const mnavQueryFilter* filter, const mnavQueryFilter** usable);
 
-// Whether a filter includes an area type; area 0 never.
+// Whether a filter includes an area type. No polygon has area 0.
 bool mnavIncludes(const mnavQueryFilter* filter, mnavAreaType area);
 
 // The lowest cost among the areas a filter includes, 1 when it includes
