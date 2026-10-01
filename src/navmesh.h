@@ -94,4 +94,21 @@ const mnavTile* mnavTileAt(const mnavNavmesh* navmesh, int32_t x, int32_t z, int
 const mnavPolygon* mnavPolygonOf(const mnavNavmesh* navmesh, mnavPolygonId id,
                                  const mnavTile** tileOut);
 
+// The place one step from (x, z) across a side, 1 to 4 for -X, +Z, +X
+// and -Z, and the side facing back.
+void mnavAcross(int32_t side, int32_t* x, int32_t* z, int32_t* facing);
+
+// A tile's frame: its cell (0, 0) corner in world meters and its cells'
+// sizes.
+typedef struct mnavFrame
+{
+    double x0;
+    double z0;
+    double y0;
+    double cell;
+    double height;
+} mnavFrame;
+
+mnavFrame mnavFrameOf(const mnavNavmesh* navmesh, int32_t x, int32_t z);
+
 #endif // MAUL_NAV_SRC_NAVMESH_H

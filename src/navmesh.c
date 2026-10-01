@@ -275,9 +275,7 @@ typedef struct Plan
     int32_t relinkCapacity;
 } Plan;
 
-// The place one step from (x, z) across a side, 1 to 4 for -X, +Z, +X
-// and -Z, and the side facing back.
-static void Across(int32_t side, int32_t* x, int32_t* z, int32_t* facing)
+void mnavAcross(int32_t side, int32_t* x, int32_t* z, int32_t* facing)
 {
     *x += side == 1 ? -1 : (side == 3 ? 1 : 0);
     *z += side == 4 ? -1 : (side == 2 ? 1 : 0);
@@ -410,7 +408,7 @@ static void VisitLinks(const mnavNavmesh* navmesh, const Plan* plan, int32_t slo
             {
                 continue;
             }
-            Across(from.side, &x, &z, &from.facing);
+            mnavAcross(from.side, &x, &z, &from.facing);
             from.other = PlannedSlot(plan, x, z);
             if (from.other >= 0)
             {
@@ -698,4 +696,12 @@ mnavResult mnavCommit(mnavNavmesh* navmesh)
         ReleasePlan(&navmesh->memory, &plan);
     }
     return result;
+}
+
+mnavFrame mnavFrameOf(const mnavNavmesh* navmesh, int32_t x, int32_t z)
+{
+    const mnavBakeDef* def = &navmesh->def;
+    double size = (double)def->tileCells * (double)def->cellSize;
+    return (mnavFrame){def->origin.x + (double)x * size, def->origin.z + (double)z * size,
+                       def->origin.y, (double)def->cellSize, (double)def->cellHeight};
 }

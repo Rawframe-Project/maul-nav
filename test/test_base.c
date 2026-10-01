@@ -28,6 +28,7 @@ static void TestResultNames(void)
     CHECK(strcmp(mnavResultName(mnav_errorVersion), "mnav_errorVersion") == 0, "version name");
     CHECK(strcmp(mnavResultName(mnav_errorNotLoaded), "mnav_errorNotLoaded") == 0,
           "not loaded name");
+    CHECK(strcmp(mnavResultName(mnav_errorStale), "mnav_errorStale") == 0, "stale name");
     CHECK(strcmp(mnavResultName(12345), "unknown result") == 0, "unknown name");
 }
 

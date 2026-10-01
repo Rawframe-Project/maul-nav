@@ -18,25 +18,6 @@
 
 #define SUBCELLS 16.0
 
-// A tile's frame: its cell (0, 0) corner in world meters and its cells'
-// sizes.
-typedef struct Frame
-{
-    double x0;
-    double z0;
-    double y0;
-    double cell;
-    double height;
-} Frame;
-
-static Frame FrameOf(const mnavNavmesh* navmesh, int32_t x, int32_t z)
-{
-    const mnavBakeDef* def = &navmesh->def;
-    double size = (double)def->tileCells * (double)def->cellSize;
-    return (Frame){def->origin.x + (double)x * size, def->origin.z + (double)z * size,
-                   def->origin.y, (double)def->cellSize, (double)def->cellHeight};
-}
-
 // A point on the ground in a tile's cells.
 typedef struct Flat
 {
@@ -145,7 +126,7 @@ typedef struct Search
 
 // Whether polygon p of a tile can lie in the box: its vertices' bounds on
 // the ground and its detail's heights.
-static bool InBox(const Search* s, const Frame* f, const mnavTile* tile, int32_t p)
+static bool InBox(const Search* s, const mnavFrame* f, const mnavTile* tile, int32_t p)
 {
     const mnavPolygon* polygon = &tile->mesh.polygons[p];
     double minX = (double)INFINITY;
@@ -183,7 +164,7 @@ static bool InBox(const Search* s, const Frame* f, const mnavTile* tile, int32_t
 // Scores polygon p of the tile in slot when its nearest point lies in the
 // box, and keeps it when it beats the best: by score, then distance; the
 // first visited keeps ties.
-static void Consider(Search* s, const Frame* f, int32_t slot, const mnavTile* tile, int32_t p)
+static void Consider(Search* s, const mnavFrame* f, int32_t slot, const mnavTile* tile, int32_t p)
 {
     const mnavPolygon* polygon = &tile->mesh.polygons[p];
     Flat ring[MNAV_POLYGON_VERTICES];
@@ -297,7 +278,7 @@ mnavResult mnavFindNearest(const mnavNavmesh* navmesh, mnavPos3 point, mnavVec3 
         }
         loaded += 1;
         const mnavTile* tile = navmesh->slots[place->slot].tile;
-        Frame f = FrameOf(navmesh, place->x, place->z);
+        mnavFrame f = mnavFrameOf(navmesh, place->x, place->z);
         for (int32_t p = 0; p < tile->mesh.polygonCount; ++p)
         {
             if (InBox(&s, &f, tile, p))

@@ -79,6 +79,9 @@ extern "C"
         // The place asked about has no tile loaded: not a wall, nothing
         // is known there.
         mnav_errorNotLoaded = -6,
+        // An id names a tile or polygon that has been replaced or
+        // removed since it was handed out (record 0016).
+        mnav_errorStale = -7,
     };
 
     // A library version: major, minor and patch.

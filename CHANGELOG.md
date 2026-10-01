@@ -117,3 +117,9 @@ format.
   height beyond the agent's step; otherwise the distance), with ties
   broken by distance, tile place and polygon index, and reports when
   part of the box lies on places with no tile loaded.
+- Path search (mnav-0005): query contexts (mnavQueryDef,
+  mnavDefaultQueryDef, mnavCreateQuery, mnavDestroyQuery) sized by
+  named limits on nodes and path length, and mnavFindPath, an A* over
+  the portals between polygons that returns the polygon corridor, its
+  cost and how the search ended (mnavPathEnd); mnav_errorStale for
+  polygon ids whose tile was replaced or removed.

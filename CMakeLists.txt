@@ -59,6 +59,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/input.c
     src/navmesh.c
     src/nearest.c
+    src/path.c
     src/planar.c
     src/polymesh.c
     src/raster.c
@@ -91,6 +92,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(navmesh WHITEBOX)
     maul_add_test(nearest)
     maul_add_test(nearest_rules WHITEBOX)
+    maul_add_test(path WHITEBOX)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)
