@@ -34,12 +34,13 @@ static const mnavVec2 s_room[4] = {{2, 2}, {22, 2}, {22, 22}, {2, 22}};
 static const mnavVec2 s_pillar[4] = {{10, 10}, {14, 10}, {14, 14}, {10, 14}};
 static const mnavVec2 s_carpet[4] = {{2, 2}, {8, 2}, {8, 22}, {2, 22}};
 static const mnavVec2 s_rug[4] = {{3, 3}, {7, 3}, {7, 7}, {3, 7}};
-// Far away: reaches no tile baked here.
+// Far away, beyond and before the tile: reach no tile baked here.
 static const mnavVec2 s_far[3] = {{500, 500}, {501, 500}, {500, 501}};
+static const mnavVec2 s_left[3] = {{-500, 5}, {-499, 5}, {-500, 6}};
 
-static const mnavOutline s_outlines[5] = {
+static const mnavOutline s_outlines[6] = {
     {s_pillar, 4, mnav_areaNone},  {s_room, 4, mnav_areaWalkable}, {s_rug, 4, 5}, {s_carpet, 4, 3},
-    {s_far, 3, mnav_areaWalkable},
+    {s_far, 3, mnav_areaWalkable}, {s_left, 3, mnav_areaWalkable},
 };
 
 static mnavNavmesh* Load(int32_t tiles)
@@ -70,7 +71,7 @@ static void TestTheRoom(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, s_outlines, 5, 0, 0, &report) == mnav_success &&
+              mnavBakeTile2D(baker, s_outlines, 6, 0, 0, &report) == mnav_success &&
               report.triangles == 4 && report.polygons > 0 &&
               mnavCopyBakedTile(baker, s_bytes[0], CAPACITY, &s_sizes[0]) == mnav_success,
           "baked, four outlines reaching the tile");
@@ -176,6 +177,23 @@ static void TestFillRules(void)
     CHECK(mnavBakeTile2D(baker, &outlines[2], 1, 0, 0, &report) == mnav_success &&
               report.spans == 0,
           "a sliver between centers: no cell");
+    // A strip whose bottom edge lies on a row of centers (they sit at
+    // 0.125 m past each quarter here) holds that row: an edge end on the
+    // line counts as below it.
+    const mnavVec2 strip[4] = {{2, 2.125f}, {22, 2.125f}, {22, 2.3f}, {2, 2.3f}};
+    const mnavOutline onLine = {strip, 4, 1};
+    CHECK(mnavBakeTile2D(baker, &onLine, 1, 0, 0, &report) == mnav_success && report.spans == 80,
+          "a bottom edge on the centers' line holds its row");
+    // An outline past the tile on every side fills all its cells, border
+    // included, and none beyond.
+    const mnavVec2 huge[4] = {{-100, -100}, {100, -100}, {100, 100}, {-100, 100}};
+    const mnavOutline all = {huge, 4, 1};
+    mnavBakeCells cells;
+    CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success &&
+              mnavBakeTile2D(baker, &all, 1, 0, 0, &report) == mnav_success &&
+              report.spans ==
+                  (def.tileCells + 2 * cells.border) * (def.tileCells + 2 * cells.border),
+          "every cell of the tile and its border");
     CHECK(mnavBakeTile2D(baker, nullptr, 0, 0, 0, &report) == mnav_success &&
               report.polygons == 0 && report.triangles == 0,
           "nothing: an empty tile");
@@ -217,6 +235,18 @@ static void TestChecks(void)
               mnavBakeTile2D(baker, &outline, 1, 0, 0, &report) == mnav_errorInvalid &&
               report.mesh == 0 && report.input.index == 1,
           "the bake names the outline and point");
+    mnavDestroyBaker(baker);
+    // Four outlines reach the room's tile: past a limit of three.
+    def.limits.tileTriangles = 3;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTile2D(baker, s_outlines, 6, 0, 0, &report) == mnav_errorLimit &&
+              report.stage == mnav_stageRasterize,
+          "more outlines on the tile than the limit");
+    def.limits.tileTriangles = 4;
+    mnavDestroyBaker(baker);
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTile2D(baker, s_outlines, 6, 0, 0, &report) == mnav_success,
+          "as many as the limit");
     CHECK(mnavBakeTile2D(baker, nullptr, 1, 0, 0, &report) == mnav_errorInvalid &&
               mnavBakeTile2D(baker, &outline, -1, 0, 0, &report) == mnav_errorInvalid &&
               mnavBakeTile2D(nullptr, &outline, 1, 0, 0, &report) == mnav_errorInvalid,
