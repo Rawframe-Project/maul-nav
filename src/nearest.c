@@ -124,6 +124,15 @@ double mnavSurfaceHeight(const mnavNavmesh* navmesh, int32_t slot, int32_t polyg
     return f.y0 + (DetailHeight(s->tile, polygon, at) - MNAV_HEIGHT_OFFSET) * f.height;
 }
 
+mnavPos3 mnavDetailWorld(const mnavNavmesh* navmesh, int32_t slot, const mnavDetailVertex* v)
+{
+    const mnavSlot* s = &navmesh->slots[slot];
+    mnavFrame f = mnavFrameOf(navmesh, s->x, s->z);
+    return (mnavPos3){f.x0 + (double)v->x / SUBCELLS * f.cell,
+                      f.y0 + ((double)v->y - MNAV_HEIGHT_OFFSET) * f.height,
+                      f.z0 + (double)v->z / SUBCELLS * f.cell};
+}
+
 // The search: the query, the box in world meters, and the best so far.
 typedef struct Search
 {

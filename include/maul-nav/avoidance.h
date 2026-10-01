@@ -10,6 +10,7 @@
 #define MAUL_NAV_AVOIDANCE_H
 
 #include "maul-nav/base.h"
+#include "maul-nav/draw.h"
 
 #include <stdint.h>
 
@@ -167,6 +168,29 @@ extern "C"
                                                  int32_t agentCount, const mnavObstacle* obstacles,
                                                  int32_t obstacleCount, double step,
                                                  mnavPos2* velocitiesOut);
+
+    /// Appends each agent's outline, a 16-gon (mnav_debugAgent), and a line
+    /// to each neighbour mnavAvoid would give it (mnav_debugNeighbor), at a
+    /// height, agent X and Y lying at ground X and Z.
+    ///
+    /// @param avoidance  The set; its scratch is used.
+    /// @param agents     The agents.
+    /// @param agentCount How many, at least 0.
+    /// @param height     The lines' height.
+    /// @param buffer     The buffer appended to.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
+    /// agents, an agent as mnavAvoid refuses it, a height not finite, or a
+    /// buffer with a count out of range, an array missing or an origin not
+    /// finite; `mnav_errorLimit` for more agents than the set's limit;
+    /// `mnav_errorCapacity` when the buffer filled, its counts saying what
+    /// the whole needs.
+    /// @par Thread safety
+    /// Safe from any thread; the set and the buffer are used by one thread
+    /// at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance,
+                                                          const mnavAgent* agents,
+                                                          int32_t agentCount, double height,
+                                                          mnavDebugBuffer* buffer);
 
 #ifdef __cplusplus
 }

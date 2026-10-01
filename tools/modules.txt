@@ -12,6 +12,8 @@ filter: heightfield
 compact: allocator heightfield raster
 erode: allocator compact
 hash:
+draw:
+debug: draw navmesh nearest
 sort:
 region: allocator compact sort
 invariant:
@@ -41,10 +43,10 @@ modifiers: allocator navmesh
 grid: query query_filter
 spatial: navmesh nearest query query_filter
 linkgen: navmesh path query query_filter
-flow: allocator query_filter
+flow: allocator draw query_filter
 hierarchy: allocator navmesh offmesh path query query_filter sort
 hierarchy_path: hierarchy navmesh path query
 # Avoidance (mnav-0006) uses the base alone, never a navmesh module.
 orca:
 obstacle: orca
-avoidance: allocator obstacle orca
+avoidance: allocator draw obstacle orca

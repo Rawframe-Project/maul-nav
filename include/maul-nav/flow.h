@@ -10,6 +10,7 @@
 #define MAUL_NAV_FLOW_H
 
 #include "maul-nav/base.h"
+#include "maul-nav/draw.h"
 #include "maul-nav/query.h"
 
 #include <stdint.h>
@@ -110,6 +111,28 @@ extern "C"
     /// while no build runs on it.
     MNAV_NODISCARD MNAV_API mnavResult mnavFlowAt(const mnavFlowField* field, mnavCell cell,
                                                   mnavFlow* flowOut);
+
+    /// Appends an arrow for each cell of the field last built that has a
+    /// next cell (mnav_debugFlow): from the cell's center toward the next
+    /// one's, 0.8 of a cell long, with two barbs, at a height, cell (x, y)
+    /// lying at ground X and Z.
+    ///
+    /// @param field    The field.
+    /// @param cellSize A cell's side, in meters, more than 0 and finite.
+    /// @param height   The arrows' height.
+    /// @param buffer   The buffer appended to.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// cell size or height out of range, or a buffer with a count out of
+    /// range, an array missing or an origin not finite;
+    /// `mnav_errorCapacity` when the buffer filled, its counts saying what
+    /// the whole needs.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read a field at once
+    /// while no build runs on it; the buffer is used by one thread at a
+    /// time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavDebugFlowField(const mnavFlowField* field,
+                                                          double cellSize, double height,
+                                                          mnavDebugBuffer* buffer);
 
 #ifdef __cplusplus
 }

@@ -9,6 +9,7 @@
 #include "maul-nav/avoidance.h"
 
 #include "allocator.h"
+#include "draw.h"
 #include "obstacle.h"
 #include "orca.h"
 
@@ -422,4 +423,70 @@ mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t 
         velocitiesOut[i] = Solve(avoidance, agents, agentCount, step, i);
     }
     return mnav_success;
+}
+
+// The corners of a 16-gon on the unit circle, written out so that every
+// platform has the same.
+static const double s_outline[16][2] = {
+    {1.0, 0.0},
+    {0.9238795325112867, 0.3826834323650898},
+    {0.7071067811865476, 0.7071067811865475},
+    {0.38268343236508984, 0.9238795325112867},
+    {0.0, 1.0},
+    {-0.3826834323650897, 0.9238795325112867},
+    {-0.7071067811865475, 0.7071067811865476},
+    {-0.9238795325112867, 0.3826834323650899},
+    {-1.0, 0.0},
+    {-0.9238795325112868, -0.38268343236508967},
+    {-0.7071067811865477, -0.7071067811865475},
+    {-0.38268343236509034, -0.9238795325112865},
+    {0.0, -1.0},
+    {0.38268343236509, -0.9238795325112866},
+    {0.7071067811865474, -0.7071067811865477},
+    {0.9238795325112865, -0.3826834323650904},
+};
+
+mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount,
+                              double height, mnavDebugBuffer* buffer)
+{
+    if (avoidance == nullptr || agentCount < 0 || (agentCount > 0 && agents == nullptr) ||
+        !isfinite(height) || !mnavGoodBuffer(buffer))
+    {
+        return mnav_errorInvalid;
+    }
+    if (agentCount > avoidance->def.limits.agents)
+    {
+        return mnav_errorLimit;
+    }
+    double range = avoidance->def.neighborDistance;
+    for (int32_t i = 0; i < agentCount; ++i)
+    {
+        if (!GoodAgent(&agents[i]))
+        {
+            return mnav_errorInvalid;
+        }
+        avoidance->keys[i] = (Key){CellOf(agents[i].position.x, range),
+                                   CellOf(agents[i].position.y, range), agents[i].id, i};
+    }
+    SortKeys(avoidance->keys, avoidance->scratch, agentCount);
+    for (int32_t i = 0; i < agentCount; ++i)
+    {
+        const mnavAgent* a = &agents[i];
+        for (int32_t k = 0; k < 16; ++k)
+        {
+            mnavPos3 p = {a->position.x + a->radius * s_outline[k][0], height,
+                          a->position.y + a->radius * s_outline[k][1]};
+            mnavPos3 q = {a->position.x + a->radius * s_outline[(k + 1) % 16][0], height,
+                          a->position.y + a->radius * s_outline[(k + 1) % 16][1]};
+            mnavDrawLine(buffer, p, q, mnav_debugAgent, 0);
+        }
+        int32_t count = Neighbors(avoidance, agents, agentCount, i);
+        for (int32_t n = 0; n < count; ++n)
+        {
+            const mnavAgent* b = &agents[avoidance->neighbors[n].index];
+            mnavDrawLine(buffer, (mnavPos3){a->position.x, height, a->position.y},
+                         (mnavPos3){b->position.x, height, b->position.y}, mnav_debugNeighbor, 0);
+        }
+    }
+    return mnavDrawResult(buffer);
 }

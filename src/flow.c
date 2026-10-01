@@ -10,6 +10,7 @@
 #include "maul-nav/flow.h"
 
 #include "allocator.h"
+#include "draw.h"
 #include "query_filter.h"
 
 #include "maul-nav/bake.h"
@@ -341,4 +342,45 @@ mnavResult mnavFlowAt(const mnavFlowField* field, mnavCell cell, mnavFlow* flowO
     int32_t next = field->next[at];
     *flowOut = (mnavFlow){field->costs[at], {next % field->width, next / field->width}};
     return mnav_success;
+}
+
+mnavResult mnavDebugFlowField(const mnavFlowField* field, double cellSize, double height,
+                              mnavDebugBuffer* buffer)
+{
+    if (field == nullptr || !mnavGoodBuffer(buffer) || !isfinite(cellSize) || cellSize <= 0.0 ||
+        !isfinite(height))
+    {
+        return mnav_errorInvalid;
+    }
+    int32_t cells = field->width * field->height;
+    for (int32_t c = 0; c < cells; ++c)
+    {
+        int32_t next = field->next[c];
+        if (next == c)
+        {
+            continue;
+        }
+        int32_t column = c % field->width;
+        int32_t row = c / field->width;
+        int32_t nextColumn = next % field->width;
+        int32_t nextRow = next / field->width;
+        double x = ((double)column + 0.5) * cellSize;
+        double z = ((double)row + 0.5) * cellSize;
+        double dx = (double)(nextColumn - column);
+        double dz = (double)(nextRow - row);
+        double scale = 0.4 * cellSize / sqrt(dx * dx + dz * dz);
+        dx *= scale;
+        dz *= scale;
+        mnavPos3 tail = {x - dx, height, z - dz};
+        mnavPos3 head = {x + dx, height, z + dz};
+        mnavDrawLine(buffer, tail, head, mnav_debugFlow, 0);
+        // Barbs back from the head, a quarter turned either way.
+        mnavDrawLine(buffer, head,
+                     (mnavPos3){head.x - 0.5 * (dx - dz), height, head.z - 0.5 * (dz + dx)},
+                     mnav_debugFlow, 0);
+        mnavDrawLine(buffer, head,
+                     (mnavPos3){head.x - 0.5 * (dx + dz), height, head.z - 0.5 * (dz - dx)},
+                     mnav_debugFlow, 0);
+    }
+    return mnavDrawResult(buffer);
 }

@@ -220,3 +220,7 @@ format.
   off ledges and jumps across gaps from a committed navmesh, kept by
   the host's clearance test, a walking-detour rule and a near-duplicate
   filter, for the host to stage.
+- Debug output (mnav-0010): draw.h with mnavDebugBuffer and kinds;
+  mnavDebugNavmesh, mnavDebugLinks, mnavDebugPath and mnavDebugCorridor
+  in debug.h, mnavDebugFlowField in flow.h, mnavDebugAvoidance in
+  avoidance.h.
