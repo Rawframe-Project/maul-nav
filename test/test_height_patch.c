@@ -49,7 +49,7 @@ static void Prepare(Setup* setup, Field* hand)
             setup->ids[i] = !deck && c % WIDTH == 0 ? 0u : setup->ids[i];
         }
     }
-    setup->regions = (mnavRegionMap){setup->ids, setup->field.spanCount, 3};
+    setup->regions = (mnavRegionMap){setup->ids, setup->field.spanCount, 3, 0};
 }
 
 // A mesh of one square polygon from (x0, z0) to (x1, z1) at height y.

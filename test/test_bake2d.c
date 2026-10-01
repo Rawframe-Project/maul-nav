@@ -254,8 +254,33 @@ static void TestChecks(void)
     mnavDestroyBaker(baker);
 }
 
+static void TestIslands(void)
+{
+    // A patch apart from the floor: 1.6 m wide it is under the minimum
+    // region area once the radius is kept from its edges, and dropped and
+    // counted; 3 m wide it is kept.
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBaker* baker = nullptr;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
+    const mnavVec2 floor[4] = {{0, 0}, {20, 0}, {20, 20}, {0, 20}};
+    const float sides[2] = {1.6f, 3.0f};
+    for (int32_t k = 0; k < 2; ++k)
+    {
+        float s = sides[k];
+        const mnavVec2 patch[4] = {{24, 24}, {24 + s, 24}, {24 + s, 24 + s}, {24, 24 + s}};
+        const mnavOutline outlines[2] = {{floor, 4, mnav_areaWalkable},
+                                         {patch, 4, mnav_areaWalkable}};
+        mnavBakeReport report;
+        CHECK(mnavBakeTile2D(baker, outlines, 2, 0, 0, &report) == mnav_success, "baked");
+        CHECK(report.regions == 1 + k && report.droppedRegions == 1 - k,
+              "a small island dropped and counted, a larger one kept");
+    }
+    mnavDestroyBaker(baker);
+}
+
 int main(void)
 {
+    TestIslands();
     TestTheRoom();
     TestAcrossTiles();
     TestFillRules();

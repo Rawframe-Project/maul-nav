@@ -336,17 +336,19 @@ static uint32_t MergeLayers(Graph* graph, uint32_t* queue, uint32_t* marks, uint
     return layers;
 }
 
-// Drops small layers off the border, numbers the rest in layer order and
-// writes each span's final region. Returns the number of regions.
+// Drops small layers off the border, counting them, numbers the rest in
+// layer order and writes each span's final region. Returns the number of
+// regions.
 static uint32_t Renumber(const Graph* graph, uint32_t layers, const uint32_t* layerSpans,
                          const uint8_t* layerBorder, int32_t minRegion, uint32_t* final,
-                         uint32_t* ids, int32_t spanCount)
+                         uint32_t* ids, int32_t spanCount, uint32_t* dropped)
 {
     uint32_t count = 0;
     for (uint32_t layer = 1; layer < layers; ++layer)
     {
         bool keep = layerBorder[layer] != 0 || layerSpans[layer] >= (uint32_t)minRegion;
         final[layer] = keep ? ++count : 0;
+        *dropped += keep ? 0 : 1;
     }
     for (int32_t i = 0; i < spanCount; ++i)
     {
@@ -483,7 +485,7 @@ static mnavResult Layer(mnavMemory* memory, const mnavCompactField* field, uint3
     {
         uint32_t layers = MergeLayers(&graph, queue, marks, layerSpans, layerBorder);
         map->count = Renumber(&graph, layers, layerSpans, layerBorder, minRegion, final, map->ids,
-                              map->spanCount);
+                              map->spanCount, &map->dropped);
     }
     mnavRelease(memory, graph.overlaps, overlapCount, sizeof(uint64_t), alignof(uint64_t));
     mnavRelease(memory, graph.links, linkCount, sizeof(uint64_t), alignof(uint64_t));
@@ -494,7 +496,7 @@ static mnavResult Layer(mnavMemory* memory, const mnavCompactField* field, uint3
 mnavResult mnavBuildRegions(mnavMemory* memory, const mnavCompactField* field, int32_t border,
                             int32_t minRegion, mnavRegionMap* map)
 {
-    *map = (mnavRegionMap){nullptr, field->spanCount, 0};
+    *map = (mnavRegionMap){nullptr, field->spanCount, 0, 0};
     mnavResult result = mnavAllocate(memory, (size_t)field->spanCount, sizeof(uint32_t),
                                      alignof(uint32_t), (void**)&map->ids);
     if (result != mnav_success)

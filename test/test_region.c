@@ -162,6 +162,7 @@ static void TestSmallIslandsAreDropped(void)
         Build(&field, minRegion, &built);
         bool kept = RegionAt(&built, 3, 2, 0) != 0;
         CHECK(kept == (minRegion == 4), "an island of 4 cells against the minimum");
+        CHECK(built.map.dropped == (minRegion == 4 ? 0u : 1u), "a dropped island counted");
         CHECK(RegionAt(&built, 1, 3, 0) != 0, "a strip on the border is kept");
         Release(&built);
     }

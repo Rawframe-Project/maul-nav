@@ -48,6 +48,11 @@ when loaded.
   polygon). A malformed tile is `mnav_errorInvalid`; another format
   version is `mnav_errorVersion`. The loader is fuzzed on every push.
 
+- **Islands:** the report counts the regions dropped for being smaller
+  than the minimum region area and away from the tile's border
+  (`droppedRegions`), the disconnected islands the requirements ask to
+  be warned of. The library keeps no clock: hosts time the bake.
+
 ## Consequences
 
 - Tiles move between platforms and versions of a host unchanged, and a

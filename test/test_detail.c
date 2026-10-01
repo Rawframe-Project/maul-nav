@@ -47,7 +47,7 @@ static void Prepare(Setup* setup, Field* hand)
     {
         setup->ids[i] = 1;
     }
-    setup->regions = (mnavRegionMap){setup->ids, setup->field.spanCount, 1};
+    setup->regions = (mnavRegionMap){setup->ids, setup->field.spanCount, 1, 0};
 }
 
 // A floor at height 4, and at height top in cell (bx, bz).

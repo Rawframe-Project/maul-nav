@@ -409,6 +409,9 @@ extern "C"
         int32_t partialRings;
         int32_t fallbackHeights;
         int32_t cappedDetail;
+        // Islands of walkable space smaller than the minimum region area
+        // and away from the tile's border, dropped.
+        int32_t droppedRegions;
     } mnavBakeReport;
 
     /// Makes a baker from a def: checks the def and keeps a copy, its

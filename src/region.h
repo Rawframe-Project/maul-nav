@@ -23,6 +23,8 @@ typedef struct mnavRegionMap
     uint32_t* ids;
     int32_t spanCount;
     uint32_t count;
+    // Layers dropped for being small and off the border.
+    uint32_t dropped;
 } mnavRegionMap;
 
 // Partitions the open space of a field whose border is border cells wide,

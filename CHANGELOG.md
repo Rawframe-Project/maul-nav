@@ -224,3 +224,5 @@ format.
   mnavDebugNavmesh, mnavDebugLinks, mnavDebugPath and mnavDebugCorridor
   in debug.h, mnavDebugFlowField in flow.h, mnavDebugAvoidance in
   avoidance.h.
+- mnavBakeReport.droppedRegions counts the islands dropped under the
+  minimum region area.

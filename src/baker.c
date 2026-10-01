@@ -368,6 +368,7 @@ static void Count(const Stages* s, mnavBakeReport* report)
 {
     report->spans = s->compact.spanCount;
     report->regions = (int32_t)s->regions.count;
+    report->droppedRegions = (int32_t)s->regions.dropped;
     report->polygons = s->mesh.polygonCount;
     report->vertices = s->mesh.vertexCount;
     report->detailVertices = s->detail.vertexCount;
