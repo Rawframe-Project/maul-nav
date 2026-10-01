@@ -24,9 +24,11 @@ the grid path (mnav-0005) already has areas, filters and a step rule.
   cheapest grid path, each step strictly downhill.
 - **Order:** the open list is a heap by cost, then by cell index, so
   ties go the same way on every platform and in any goal order.
-- **Memory:** `mnavFlowField` owns arrays for `cells` cells (20 bytes
-  each), up to `MNAV_MAX_FLOW_CELLS`; a larger grid is refused with
-  `mnav_errorLimit`, and a failed build leaves no grid to read.
+- **Memory:** `mnavFlowField` owns arrays for `cells` cells (29 bytes
+  each: cost, next cell, heap place and heap entry, a goal list, a
+  repair's touched list and marks), up to `MNAV_MAX_FLOW_CELLS`; a
+  larger region is refused with `mnav_errorLimit`, and a failed begin
+  leaves nothing to read.
 - Blocked goals and goals in areas the filter leaves out are dropped.
 
 - **Regions and budgets:** a field covers a region of its grid, the

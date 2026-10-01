@@ -396,7 +396,7 @@ mnavResult mnavContinueFlowField(mnavFlowField* field, const mnavGrid* grid, int
     {
         Expand(&s, Pop(field));
     }
-    if (field->heapCount == 0 && field->repairing && n < cells)
+    if (field->heapCount == 0 && field->repairing)
     {
         mnavFlowFix(&s, cells - n);
     }

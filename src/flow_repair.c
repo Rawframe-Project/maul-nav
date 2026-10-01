@@ -4,7 +4,7 @@
 // Flow-field repairs (mnav-0007), after Ramalingam and Reps' incremental
 // shortest paths. Costs raised by what changed are those of the cells
 // whose next-cell chains run through it: they are reset and given the
-// best cost their unraised neighbours offer. Lowered costs spread from new
+// best cost their neighbours offer. Lowered costs spread from new
 // goals and the changed cells' neighbourhoods; the search then settles
 // them, opening done cells again. A cell's cost is the fixed point of its
 // neighbours' offers, whatever the order, and each touched cell and its
@@ -98,17 +98,16 @@ static void RaiseSubtrees(mnavFlowField* f)
     }
 }
 
-// Lowers a cell to the best cost its neighbours offer, those raised left
-// out when asked.
-static void Offer(const mnavFlowSearch* s, int32_t cell, bool skipRaised)
+// Lowers a cell to the best cost its neighbours offer. Every cost held is
+// that of a way the grid has, so any offer is one.
+static void Offer(const mnavFlowSearch* s, int32_t cell)
 {
     mnavFlowField* f = s->field;
     for (int32_t d = 0; d < 8; ++d)
     {
         int32_t n = 0;
         double length = 0.0;
-        if (!mnavFlowNeighbor(s, cell, d, &n, &length) || !isfinite(f->costs[n]) ||
-            (skipRaised && (f->marks[n] & mnav_flowRaised) != 0))
+        if (!mnavFlowNeighbor(s, cell, d, &n, &length) || !isfinite(f->costs[n]))
         {
             continue;
         }
@@ -139,7 +138,7 @@ static void OfferAround(const mnavFlowSearch* s, int32_t x, int32_t y)
             int32_t cell = CellAt(s->field, x + dx, y + dy);
             if (cell >= 0 && OpenCell(s, cell))
             {
-                Offer(s, cell, false);
+                Offer(s, cell);
             }
         }
     }
@@ -228,7 +227,7 @@ mnavResult mnavUpdateFlowField(mnavFlowField* field, const mnavGrid* grid, const
     {
         if (OpenCell(&s, field->touched[i]))
         {
-            Offer(&s, field->touched[i], true);
+            Offer(&s, field->touched[i]);
         }
     }
     for (int32_t i = 0; i < field->goalCount; ++i)
