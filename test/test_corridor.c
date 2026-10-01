@@ -206,6 +206,21 @@ static void TestFiltersAndLinks(void)
     filter.cookie = 0;
     CHECK(mnavCheckCorridor(navmesh, &filter, &corridor, &valid) == mnav_errorInvalid,
           "a filter not from the default");
+    // Standing on a square left out, the agent may still leave it: the
+    // corridor's first polygon counts whatever its area.
+    mnavNearest middle = On(navmesh, 12.5, 7.5, 0.1f);
+    filter = mnavDefaultQueryFilter();
+    filter.areas &= ~((uint64_t)1 << 2);
+    CHECK(mnavFindPath(query, navmesh, nullptr, middle.polygon, middle.point, b.polygon, b.point,
+                       &path) == mnav_success &&
+              mnavSetCorridor(&corridor, &path) == mnav_success &&
+              mnavCheckCorridor(navmesh, &filter, &corridor, &valid) == mnav_success &&
+              valid == corridor.count,
+          "starting on a square left out");
+    // An id never handed out is invalid, not stale.
+    buffer[1].slot = 99;
+    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &out) == mnav_errorInvalid,
+          "an id never handed out");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
