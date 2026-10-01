@@ -11,4 +11,7 @@
 // Checks a mesh against a def that is already valid.
 mnavInputResult mnavCheckTriangleMesh(const mnavBakeDef* def, const mnavTriangleMesh* mesh);
 
+// Checks an outline against a def that is already valid.
+mnavInputResult mnavCheckOutline(const mnavBakeDef* def, const mnavOutline* outline);
+
 #endif // MAUL_NAV_SRC_INPUT_H

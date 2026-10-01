@@ -14,6 +14,7 @@
 #include "heightfield.h"
 #include "holes.h"
 #include "input.h"
+#include "outline.h"
 #include "polymesh.h"
 #include "raster.h"
 #include "region.h"
@@ -37,6 +38,16 @@ struct mnavBaker
 };
 
 // The stages' results for one tile, released together.
+// A bake's input: triangle meshes, or for a flat (2D) bake, outlines.
+typedef struct Input
+{
+    const mnavTriangleMesh* meshes;
+    int32_t meshCount;
+    const mnavOutline* outlines;
+    int32_t outlineCount;
+    bool flat;
+} Input;
+
 typedef struct Stages
 {
     mnavHeightfield heightfield;
@@ -93,9 +104,36 @@ void mnavDestroyBaker(mnavBaker* baker)
 
 // Checks every mesh as hostile input and their total against the input
 // limit; names the first refused mesh in the report.
-static mnavResult CheckInput(const mnavBaker* baker, const mnavTriangleMesh* meshes,
-                             int32_t meshCount, mnavBakeReport* report)
+static mnavResult CheckOutlines(const mnavBaker* baker, const mnavOutline* outlines,
+                                int32_t outlineCount, mnavBakeReport* report)
 {
+    if (outlineCount < 0 || (outlineCount > 0 && outlines == nullptr))
+    {
+        return mnav_errorInvalid;
+    }
+    int64_t total = 0;
+    for (int32_t o = 0; o < outlineCount; ++o)
+    {
+        mnavInputResult input = mnavCheckOutline(&baker->def, &outlines[o]);
+        if (input.result != mnav_success)
+        {
+            report->mesh = o;
+            report->input = input;
+            return input.result;
+        }
+        total += outlines[o].pointCount;
+    }
+    return total > baker->def.limits.inputTriangles ? mnav_errorLimit : mnav_success;
+}
+
+static mnavResult CheckInput(const mnavBaker* baker, const Input* in, mnavBakeReport* report)
+{
+    if (in->flat)
+    {
+        return CheckOutlines(baker, in->outlines, in->outlineCount, report);
+    }
+    const mnavTriangleMesh* meshes = in->meshes;
+    int32_t meshCount = in->meshCount;
     if (meshCount < 0 || (meshCount > 0 && meshes == nullptr))
     {
         return mnav_errorInvalid;
@@ -206,6 +244,33 @@ static uint64_t HashInput(const mnavBaker* baker, const mnavTileFrame* frame,
 
 // The detail lookup's search radius: the wall error rounded up, at least
 // one cell.
+// Adds every outline that reaches the tile to the fingerprint, after a
+// word that keeps 2D input apart from 3D, and counts them.
+static uint64_t HashOutlines(const mnavTileFrame* frame, const mnavOutline* outlines,
+                             int32_t outlineCount, uint64_t hash, int32_t* count)
+{
+    const uint32_t tag = 0x32444E41u;
+    hash = HashWords(hash, &tag, 1);
+    *count = 0;
+    for (int32_t o = 0; o < outlineCount; ++o)
+    {
+        const mnavOutline* outline = &outlines[o];
+        if (!mnavOutlineTouchesTile(frame, outline))
+        {
+            continue;
+        }
+        *count += 1;
+        uint32_t head[2] = {(uint32_t)outline->pointCount, (uint32_t)outline->area};
+        hash = HashWords(hash, head, 2);
+        for (int32_t i = 0; i < outline->pointCount; ++i)
+        {
+            uint32_t words[2] = {Bits32(outline->points[i].x), Bits32(outline->points[i].y)};
+            hash = HashWords(hash, words, 2);
+        }
+    }
+    return hash;
+}
+
 static int32_t SearchRadius(float edgeError)
 {
     int32_t radius = (int32_t)ceilf(edgeError);
@@ -213,20 +278,29 @@ static int32_t SearchRadius(float edgeError)
 }
 
 // Runs the stages in order, recording each in the report before it runs.
-static mnavResult RunStages(mnavBaker* baker, const mnavTriangleMesh* meshes, int32_t meshCount,
-                            int32_t tileX, int32_t tileZ, Stages* s, mnavBakeReport* report)
+static mnavResult RunStages(mnavBaker* baker, const Input* in, int32_t tileX, int32_t tileZ,
+                            Stages* s, mnavBakeReport* report)
 {
     mnavMemory* memory = &baker->memory;
     const mnavBakeDef* def = &baker->def;
     const mnavBakeCells* cells = &baker->cells;
     report->stage = mnav_stageRasterize;
+    bool flat = in->flat;
     mnavResult result =
-        mnavBuildHeightfield(memory, def, cells, meshes, meshCount, tileX, tileZ, &s->heightfield);
+        flat ? mnavBuildHeightfield2D(memory, def, cells, in->outlines, in->outlineCount, tileX,
+                                      tileZ, &s->heightfield)
+             : mnavBuildHeightfield(memory, def, cells, in->meshes, in->meshCount, tileX, tileZ,
+                                    &s->heightfield);
     if (result != mnav_success)
     {
         return result;
     }
-    mnavFilterWalkable(&s->heightfield, cells->agentHeight, cells->agentStep);
+    // The walkable filters judge steps, ledges and clearance from heights;
+    // a 2D bake has none, and its edges are walls, not ledges.
+    if (!flat)
+    {
+        mnavFilterWalkable(&s->heightfield, cells->agentHeight, cells->agentStep);
+    }
     report->stage = mnav_stageCompact;
     result = mnavBuildCompactField(memory, &s->heightfield, cells->agentHeight, cells->agentStep,
                                    &s->compact);
@@ -317,8 +391,8 @@ static mnavResult Encode(mnavBaker* baker, int32_t tileX, int32_t tileZ, const S
                           &baker->tileSize);
 }
 
-mnavResult mnavBakeTile(mnavBaker* baker, const mnavTriangleMesh* meshes, int32_t meshCount,
-                        int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
+static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t tileZ,
+                       mnavBakeReport* reportOut)
 {
     mnavBakeReport report = {0};
     report.mesh = -1;
@@ -335,7 +409,7 @@ mnavResult mnavBakeTile(mnavBaker* baker, const mnavTriangleMesh* meshes, int32_
     DropTile(baker);
     baker->memory.peak = baker->memory.used;
     report.stage = mnav_stageInput;
-    mnavResult result = CheckInput(baker, meshes, meshCount, &report);
+    mnavResult result = CheckInput(baker, in, &report);
     mnavTileFrame frame = {0};
     if (result == mnav_success &&
         !mnavMakeTileFrame(&baker->def, &baker->cells, tileX, tileZ, &frame))
@@ -347,8 +421,10 @@ mnavResult mnavBakeTile(mnavBaker* baker, const mnavTriangleMesh* meshes, int32_
     {
         uint64_t settings = HashSettings(&baker->def, tileX, tileZ);
         report.fingerprint =
-            HashInput(baker, &frame, meshes, meshCount, settings, &report.triangles);
-        result = RunStages(baker, meshes, meshCount, tileX, tileZ, &stages, &report);
+            in->flat
+                ? HashOutlines(&frame, in->outlines, in->outlineCount, settings, &report.triangles)
+                : HashInput(baker, &frame, in->meshes, in->meshCount, settings, &report.triangles);
+        result = RunStages(baker, in, tileX, tileZ, &stages, &report);
     }
     if (result == mnav_success)
     {
@@ -369,6 +445,20 @@ mnavResult mnavBakeTile(mnavBaker* baker, const mnavTriangleMesh* meshes, int32_
         *reportOut = report;
     }
     return result;
+}
+
+mnavResult mnavBakeTile(mnavBaker* baker, const mnavTriangleMesh* meshes, int32_t meshCount,
+                        int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
+{
+    Input in = {meshes, meshCount, nullptr, 0, false};
+    return Bake(baker, &in, tileX, tileZ, reportOut);
+}
+
+mnavResult mnavBakeTile2D(mnavBaker* baker, const mnavOutline* outlines, int32_t outlineCount,
+                          int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
+{
+    Input in = {nullptr, 0, outlines, outlineCount, true};
+    return Bake(baker, &in, tileX, tileZ, reportOut);
 }
 
 mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* buffer, size_t capacity,

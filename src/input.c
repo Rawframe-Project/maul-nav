@@ -86,3 +86,39 @@ mnavInputResult mnavValidateTriangleMesh(const mnavBakeDef* def, const mnavTrian
     }
     return mnavCheckTriangleMesh(def, mesh);
 }
+
+mnavInputResult mnavCheckOutline(const mnavBakeDef* def, const mnavOutline* outline)
+{
+    if (outline->pointCount < 3 || outline->points == nullptr || outline->area >= MNAV_AREA_TYPES)
+    {
+        return Refuse(mnav_errorInvalid, mnav_elementNone, -1);
+    }
+    if (outline->pointCount > def->limits.inputTriangles)
+    {
+        return Refuse(mnav_errorLimit, mnav_elementNone, -1);
+    }
+    float ground = def->cellSize * (float)MNAV_MAX_EXTENT_CELLS;
+    for (int32_t i = 0; i < outline->pointCount; ++i)
+    {
+        mnavVec2 p = outline->points[i];
+        if (!isfinite(p.x) || !isfinite(p.y))
+        {
+            return Refuse(mnav_errorInvalid, mnav_elementPoint, i);
+        }
+        if (fabsf(p.x) > ground || fabsf(p.y) > ground)
+        {
+            return Refuse(mnav_errorRange, mnav_elementPoint, i);
+        }
+    }
+    return Refuse(mnav_success, mnav_elementNone, -1);
+}
+
+mnavInputResult mnavValidateOutline(const mnavBakeDef* def, const mnavOutline* outline)
+{
+    if (def == nullptr || outline == nullptr ||
+        mnavCheckBakeDef(def, nullptr).result != mnav_success)
+    {
+        return Refuse(mnav_errorInvalid, mnav_elementNone, -1);
+    }
+    return mnavCheckOutline(def, outline);
+}

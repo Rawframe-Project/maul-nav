@@ -6,6 +6,7 @@
 #include "heightfield.h"
 
 #include "allocator.h"
+#include "outline.h"
 #include "raster.h"
 
 #include "maul-nav/bake.h"
@@ -160,6 +161,9 @@ static mnavResult Merge(mnavMemory* memory, const mnavFragment* sorted, int32_t 
     return mnav_success;
 }
 
+static mnavResult Finish(mnavMemory* memory, const mnavBakeCells* cells, mnavResult result,
+                         mnavFragmentList* list, mnavHeightfield* heightfield);
+
 mnavResult mnavBuildHeightfield(mnavMemory* memory, const mnavBakeDef* def,
                                 const mnavBakeCells* cells, const mnavTriangleMesh* meshes,
                                 int32_t meshCount, int32_t tileX, int32_t tileZ,
@@ -172,6 +176,30 @@ mnavResult mnavBuildHeightfield(mnavMemory* memory, const mnavBakeDef* def,
     }
     mnavFragmentList list = {nullptr, 0, 0, def->limits.tileSpans};
     mnavResult result = Collect(memory, def, cells, meshes, meshCount, &heightfield->frame, &list);
+    return Finish(memory, cells, result, &list, heightfield);
+}
+
+mnavResult mnavBuildHeightfield2D(mnavMemory* memory, const mnavBakeDef* def,
+                                  const mnavBakeCells* cells, const mnavOutline* outlines,
+                                  int32_t outlineCount, int32_t tileX, int32_t tileZ,
+                                  mnavHeightfield* heightfield)
+{
+    *heightfield = (mnavHeightfield){0};
+    if (!mnavMakeTileFrame(def, cells, tileX, tileZ, &heightfield->frame))
+    {
+        return mnav_errorRange;
+    }
+    mnavFragmentList list = {nullptr, 0, 0, def->limits.tileSpans};
+    mnavResult result =
+        mnavCollectOutlines(memory, def, &heightfield->frame, outlines, outlineCount, &list);
+    return Finish(memory, cells, result, &list, heightfield);
+}
+
+// Sorts and merges the collected fragments into spans, when collecting
+// succeeded, and releases them.
+static mnavResult Finish(mnavMemory* memory, const mnavBakeCells* cells, mnavResult result,
+                         mnavFragmentList* list, mnavHeightfield* heightfield)
+{
     int32_t width = heightfield->frame.width;
     mnavFragment* sorted = nullptr;
     if (result == mnav_success)
@@ -181,17 +209,17 @@ mnavResult mnavBuildHeightfield(mnavMemory* memory, const mnavBakeDef* def,
     }
     if (result == mnav_success)
     {
-        result = mnavAllocate(memory, (size_t)list.count, sizeof(mnavFragment),
+        result = mnavAllocate(memory, (size_t)list->count, sizeof(mnavFragment),
                               alignof(mnavFragment), (void**)&sorted);
     }
     if (result == mnav_success)
     {
-        Sort(&list, width, heightfield->columns, sorted);
-        mnavReleaseFragments(memory, &list);
-        result = Merge(memory, sorted, list.count, cells->agentStep, heightfield);
+        Sort(list, width, heightfield->columns, sorted);
+        mnavReleaseFragments(memory, list);
+        result = Merge(memory, sorted, list->count, cells->agentStep, heightfield);
     }
-    mnavRelease(memory, sorted, (size_t)list.count, sizeof(mnavFragment), alignof(mnavFragment));
-    mnavReleaseFragments(memory, &list);
+    mnavRelease(memory, sorted, (size_t)list->count, sizeof(mnavFragment), alignof(mnavFragment));
+    mnavReleaseFragments(memory, list);
     if (result != mnav_success)
     {
         mnavReleaseHeightfield(memory, heightfield);

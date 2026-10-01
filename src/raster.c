@@ -185,6 +185,13 @@ static mnavResult Emit(mnavMemory* memory, const Poly* cell, int32_t x, int32_t 
     int32_t top = (int32_t)ceilf(high) + MNAV_HEIGHT_OFFSET;
     bottom = bottom < 0 ? 0 : (bottom > UINT16_MAX - 1 ? UINT16_MAX - 1 : bottom);
     top = top <= bottom ? bottom + 1 : (top > UINT16_MAX ? UINT16_MAX : top);
+    return mnavAddFragment(
+        memory, list,
+        (mnavFragment){(uint16_t)x, (uint16_t)z, (uint16_t)bottom, (uint16_t)top, area});
+}
+
+mnavResult mnavAddFragment(mnavMemory* memory, mnavFragmentList* list, mnavFragment fragment)
+{
     if (list->count == list->capacity)
     {
         mnavResult result = Grow(memory, list);
@@ -193,8 +200,7 @@ static mnavResult Emit(mnavMemory* memory, const Poly* cell, int32_t x, int32_t 
             return result;
         }
     }
-    list->items[list->count++] =
-        (mnavFragment){(uint16_t)x, (uint16_t)z, (uint16_t)bottom, (uint16_t)top, area};
+    list->items[list->count++] = fragment;
     return mnav_success;
 }
 

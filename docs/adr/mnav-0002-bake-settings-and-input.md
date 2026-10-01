@@ -40,6 +40,15 @@ be the same on every platform (mnav-0001).
   naming the first offending vertex, then triangle. Degenerate and
   duplicate triangles are accepted and contribute nothing.
 
+- **2D input:** `mnavOutline` is a closed ring of `mnavVec2` points,
+  `(x, y)` being the navmesh point `(x, 0, y)`, with an area;
+  `mnav_areaNone` cuts an obstruction. `mnavBakeTile2D` fills the cells
+  whose centers a walkable outline holds (even-odd) and no obstruction
+  does, with the highest area among them, as a flat floor at height
+  0, skips the walkable filters, which judge heights, and runs every
+  later stage as in 3D, so a 2D navmesh serves every query.
+  `mnavValidateOutline` checks an outline as hostile input.
+
 ## Consequences
 
 A host picks settings in the units of its world and sees what cells

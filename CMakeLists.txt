@@ -64,6 +64,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/navmesh.c
     src/nearest.c
     src/offmesh.c
+    src/outline.c
     src/path.c
     src/query.c
     src/query_filter.c
@@ -112,6 +113,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(corridor WHITEBOX)
     maul_add_test(tiers WHITEBOX)
     maul_add_test(resnap WHITEBOX)
+    maul_add_test(bake2d)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)

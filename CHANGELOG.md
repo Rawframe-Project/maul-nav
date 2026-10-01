@@ -172,3 +172,7 @@ format.
   the places it changes; on the streaming benchmark with 512 links a
   step went from about 630 us to 200 us. bench/bench_main.c: baking,
   streaming and path timings.
+- 2D generation (mnav-0002): mnavVec2, mnavOutline,
+  mnav_elementPoint, mnavValidateOutline and mnavBakeTile2D; a 2D
+  navmesh is an ordinary navmesh with a flat floor, served by every
+  query.

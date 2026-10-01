@@ -245,6 +245,27 @@ extern "C"
         const mnavAreaType* areas;
     } mnavTriangleMesh;
 
+    // A point of a 2D outline, in meters relative to the bake's origin:
+    // (x, y) is the navmesh point (x, 0, y) (mnav-0002).
+    typedef struct mnavVec2
+    {
+        float x;
+        float y;
+    } mnavVec2;
+
+    // A closed ring of points in a 2D bake's input. The cells whose
+    // centers it holds, by the even-odd rule, take its area; one of area
+    // mnav_areaNone cuts them out of every other outline.
+    typedef struct mnavOutline
+    {
+        // The points, the last joined back to the first. Only read during
+        // the call.
+        const mnavVec2* points;
+        // The number of points, at least 3.
+        int32_t pointCount;
+        mnavAreaType area;
+    } mnavOutline;
+
     // The kind of input element a check refused.
     typedef uint8_t mnavInputElement;
 
@@ -254,6 +275,7 @@ extern "C"
         mnav_elementNone = 0,
         mnav_elementVertex = 1,
         mnav_elementTriangle = 2,
+        mnav_elementPoint = 3,
     };
 
     // An input check's outcome: the status, and the first element it
@@ -265,6 +287,20 @@ extern "C"
         // The element's index, or -1 for mnav_elementNone.
         int32_t index;
     } mnavInputResult;
+
+    /// Checks a 2D outline as hostile input to a bake with a def.
+    ///
+    /// @param def     The bake def the outline is for.
+    /// @param outline The outline.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, an
+    /// invalid def, fewer than 3 points, an area of MNAV_AREA_TYPES or more,
+    /// or a point that is not finite (the point); `mnav_errorRange` for a
+    /// point past the extent input may have (the point); `mnav_errorLimit`
+    /// for more points than the inputTriangles limit.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateOutline(const mnavBakeDef* def,
+                                                                const mnavOutline* outline);
 
     /// Returns the default bake def: cells of 0.25 m by 0.125 m, tiles of
     /// 128 cells, an agent 0.5 m in radius and 2 m tall that steps 0.75 m
@@ -422,6 +458,30 @@ extern "C"
                                                     const mnavTriangleMesh* meshes,
                                                     int32_t meshCount, int32_t tileX, int32_t tileZ,
                                                     mnavBakeReport* reportOut);
+
+    /// Bakes tile (tileX, tileZ) of 2D outlines (mnav-0002): checks every
+    /// outline, fills the cells whose centers a walkable outline holds and
+    /// no obstruction does as a flat floor at height 0, with the highest
+    /// area among the outlines holding them, then erodes, partitions,
+    /// traces and triangulates as mnavBakeTile does; the walkable filters,
+    /// which judge heights, do not run. The report's mesh names a refused
+    /// outline and its triangles count the outlines reaching the tile.
+    ///
+    /// @param baker        The baker.
+    /// @param outlines     The input outlines, in the def's frame.
+    /// @param outlineCount The number of outlines, at least 0.
+    /// @param tileX        The tile's column in the grid from the origin.
+    /// @param tileZ        The tile's row.
+    /// @param reportOut    Receives what the bake did. May be NULL.
+    /// @return As mnavBakeTile, for outlines; also `mnav_errorLimit` for
+    /// more points in all than the inputTriangles limit, or more outlines
+    /// reaching the tile than the tileTriangles limit.
+    /// @par Thread safety
+    /// Safe from any thread; the baker is used by one thread at a time.
+    /// Bakers share nothing, so one per thread bakes tiles in parallel.
+    MNAV_NODISCARD MNAV_API mnavResult mnavBakeTile2D(mnavBaker* baker, const mnavOutline* outlines,
+                                                      int32_t outlineCount, int32_t tileX,
+                                                      int32_t tileZ, mnavBakeReport* reportOut);
 
     /// Copies the last baked tile's bytes into caller memory.
     ///

@@ -68,6 +68,9 @@ mnavResult mnavRasterizeTriangle(mnavMemory* memory, const mnavTileFrame* frame,
                                  const mnavVec3 corners[3], mnavAreaType area,
                                  mnavFragmentList* list);
 
+// Adds one fragment, growing the list; mnav_errorLimit past its limit.
+mnavResult mnavAddFragment(mnavMemory* memory, mnavFragmentList* list, mnavFragment fragment);
+
 void mnavReleaseFragments(mnavMemory* memory, mnavFragmentList* list);
 
 #endif // MAUL_NAV_SRC_RASTER_H
