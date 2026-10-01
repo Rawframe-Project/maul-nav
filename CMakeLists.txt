@@ -46,6 +46,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/border_vertices.c
     src/compact.c
     src/contour.c
+    src/delaunay.c
     src/detail.c
     src/erode.c
     src/filter.c
@@ -75,6 +76,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(border_vertices WHITEBOX)
     maul_add_test(compact WHITEBOX)
     maul_add_test(contour WHITEBOX)
+    maul_add_test(delaunay WHITEBOX)
     maul_add_test(detail WHITEBOX)
     maul_add_test(filter WHITEBOX)
     maul_add_test(height_patch WHITEBOX)

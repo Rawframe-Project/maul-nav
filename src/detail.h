@@ -10,6 +10,7 @@
 
 #include "allocator.h"
 #include "compact.h"
+#include "delaunay.h"
 #include "polymesh.h"
 #include "region.h"
 
@@ -22,24 +23,6 @@
 #define MNAV_DETAIL_VERTICES 127
 // The most samples inside one polygon edge.
 #define MNAV_DETAIL_EDGE_SAMPLES 20
-
-// x and z in sixteenths of a cell of the tile without its border, y in
-// offset cell heights.
-typedef struct mnavDetailVertex
-{
-    int32_t x;
-    int32_t y;
-    int32_t z;
-} mnavDetailVertex;
-
-// Three corners, indices into the polygon's part of the vertices, and in
-// bit k whether the edge from corner k to the next lies on the polygon's
-// outline.
-typedef struct mnavDetailTriangle
-{
-    uint8_t corners[3];
-    uint8_t outline;
-} mnavDetailTriangle;
 
 // A polygon's detail: its vertices (the polygon's own first) and
 // triangles.
@@ -66,6 +49,9 @@ typedef struct mnavDetailMesh
     int32_t fallbackHeights;
     // Polygons whose outline could not be triangulated to the end.
     int32_t failedPolygons;
+    // Polygons that reached MNAV_DETAIL_VERTICES with samples still
+    // beyond the maximum error.
+    int32_t cappedPolygons;
 } mnavDetailMesh;
 
 // What the detail mesh samples, from the bake's cells: the sample

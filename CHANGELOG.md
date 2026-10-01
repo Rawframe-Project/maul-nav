@@ -79,3 +79,10 @@ format.
   error dropped, and the outline triangulated; all in sixteenths of a
   cell with integer arithmetic, so both sides of an edge get the same
   points and the result is the same on every platform (N20).
+- The detail mesh's interior (internal): the outline's triangulation
+  made Delaunay by edge flips with an exact in-circle test, then grid
+  samples well inside each polygon added worst first until every
+  sample lies within the maximum error or the polygon holds 127
+  vertices (counted); each insertion restores the Delaunay property
+  round the new vertex, and only samples in changed triangles are
+  measured again (N20).

@@ -8,6 +8,7 @@
 #include "allocator.h"
 #include "compact.h"
 #include "contour.h"
+#include "delaunay.h"
 #include "height_patch.h"
 #include "polymesh.h"
 #include "region.h"
@@ -38,10 +39,28 @@ typedef struct Part
     int32_t indices[MNAV_DETAIL_VERTICES];
     uint8_t ears[MNAV_DETAIL_VERTICES];
     int32_t corners[3 * MNAV_DETAIL_VERTICES];
-    // An edge's points: position, height and whether it is kept.
+    // An edge's points and those kept.
     mnavDetailVertex points[EDGE_POINTS];
     int32_t kept[EDGE_POINTS];
+    // The flips' stack: each flip adds one edge, and an insertion flips
+    // at most once per triangle.
+    int32_t stack[PART_TRIANGLES + 8];
+    // The triangles an insertion wrote.
+    uint8_t changed[PART_TRIANGLES];
 } Part;
+
+// A grid sample inside a polygon: the triangle holding it (-1 for none)
+// and the edge it lies on, its height off the detail surface in whole
+// sixteenths of a cell height when beyond the maximum error (-1 when
+// within), and whether it is in the detail.
+typedef struct Candidate
+{
+    mnavDetailVertex point;
+    int32_t triangle;
+    int32_t edge;
+    int64_t value;
+    bool added;
+} Candidate;
 
 typedef struct Builder
 {
@@ -53,6 +72,9 @@ typedef struct Builder
     mnavDetailMesh* detail;
     mnavHeightPatch patch;
     Part* part;
+    Candidate* candidates;
+    int32_t candidateCount;
+    int32_t candidateCapacity;
 } Builder;
 
 // The integer square root, rounded down, of v from 0 to 2^62.
@@ -239,6 +261,15 @@ static void TriangulateOutline(Builder* builder)
         {
             triangle->corners[c] = part->hull[part->corners[t * 3 + c]];
         }
+    }
+}
+
+// Flags each triangle's edges that run along the outline.
+static void MarkOutline(Part* part)
+{
+    for (int32_t t = 0; t < part->triangleCount; ++t)
+    {
+        mnavDetailTriangle* triangle = &part->triangles[t];
         triangle->outline = 0;
         for (int32_t c = 0; c < 3; ++c)
         {
@@ -246,6 +277,174 @@ static void TriangulateOutline(Builder* builder)
             triangle->outline |= (uint8_t)(on ? 1u << c : 0u);
         }
     }
+}
+
+// Whether p lies inside the polygon's first n vertices at least half a
+// sample distance from every edge: strictly on each edge's inner side,
+// with 4 area^2 at least sample^2 length^2.
+static bool WellInside(const Part* part, int32_t n, const mnavDetailVertex* p, int64_t sample)
+{
+    for (int32_t j = n - 1, i = 0; i < n; j = i++)
+    {
+        const mnavDetailVertex* a = &part->vertices[j];
+        const mnavDetailVertex* b = &part->vertices[i];
+        int64_t area = mnavDetailArea2(a, b, p);
+        int64_t dx = b->x - a->x;
+        int64_t dz = b->z - a->z;
+        if (area >= 0 || 4 * area * area < sample * sample * (dx * dx + dz * dz))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Lists the grid points, every sample distance from the tile's corner,
+// well inside the polygon, with their heights, in grid order.
+static mnavResult Collect(Builder* builder, int32_t n)
+{
+    Part* part = builder->part;
+    int64_t sample = builder->settings.sample;
+    builder->candidateCount = 0;
+    int32_t minX = INT32_MAX;
+    int32_t minZ = INT32_MAX;
+    int32_t maxX = 0;
+    int32_t maxZ = 0;
+    int64_t heights = 0;
+    for (int32_t k = 0; k < n; ++k)
+    {
+        const mnavDetailVertex* v = &part->vertices[k];
+        minX = v->x < minX ? v->x : minX;
+        minZ = v->z < minZ ? v->z : minZ;
+        maxX = v->x > maxX ? v->x : maxX;
+        maxZ = v->z > maxZ ? v->z : maxZ;
+        heights += v->y;
+    }
+    // No point lies half a sample distance from both sides of a polygon
+    // narrower than the distance; the test also keeps the products below
+    // within 64 bits.
+    if (n < 3 || sample == 0 || maxX - minX < sample || maxZ - minZ < sample)
+    {
+        return mnav_success;
+    }
+    int32_t reference = (int32_t)(heights / n);
+    for (int64_t gz = minZ / sample; gz * sample <= maxZ; ++gz)
+    {
+        for (int64_t gx = minX / sample; gx * sample <= maxX; ++gx)
+        {
+            mnavDetailVertex p = {(int32_t)(gx * sample), 0, (int32_t)(gz * sample)};
+            if (!WellInside(part, n, &p, sample))
+            {
+                continue;
+            }
+            mnavResult result =
+                mnavReserve(builder->memory, (void**)&builder->candidates,
+                            &builder->candidateCapacity, builder->candidateCount,
+                            builder->candidateCount + 1, sizeof(Candidate), alignof(Candidate));
+            if (result != mnav_success)
+            {
+                return result;
+            }
+            p.y = Height(builder, p.x, p.z, reference);
+            builder->candidates[builder->candidateCount++] = (Candidate){p, -1, -1, -1, false};
+        }
+    }
+    return mnav_success;
+}
+
+// Locates a candidate and measures its height off the triangle holding
+// it, against the maximum error.
+static void Measure(const Builder* builder, const mnavTriangulation* tr, Candidate* candidate)
+{
+    const mnavDetailVertex* p = &candidate->point;
+    candidate->value = -1;
+    candidate->triangle = mnavLocate(tr, p->x, p->z, &candidate->edge);
+    if (candidate->triangle < 0)
+    {
+        return;
+    }
+    const mnavDetailTriangle* triangle = &tr->triangles[candidate->triangle];
+    const mnavDetailVertex* a = &tr->vertices[triangle->corners[0]];
+    const mnavDetailVertex* b = &tr->vertices[triangle->corners[1]];
+    const mnavDetailVertex* c = &tr->vertices[triangle->corners[2]];
+    // Barycentric weights, each times the triangle's signed area.
+    int64_t wa = mnavDetailArea2(p, b, c);
+    int64_t wb = mnavDetailArea2(a, p, c);
+    int64_t wc = mnavDetailArea2(a, b, p);
+    int64_t signedArea = wa + wb + wc;
+    if (signedArea == 0)
+    {
+        return;
+    }
+    // The height off the plane, in sixteenths times twice the area.
+    int64_t difference = (int64_t)p->y * signedArea - (wa * a->y + wb * b->y + wc * c->y);
+    int64_t off = SUBCELLS * (difference < 0 ? -difference : difference);
+    int64_t area = signedArea < 0 ? -signedArea : signedArea;
+    if (off > (int64_t)builder->settings.error * area)
+    {
+        candidate->value = off / area;
+    }
+}
+
+// The candidate farthest off the detail surface beyond the maximum error,
+// the first in grid order on ties, or -1.
+static int32_t Worst(const Builder* builder)
+{
+    int32_t worst = -1;
+    for (int32_t s = 0; s < builder->candidateCount; ++s)
+    {
+        const Candidate* candidate = &builder->candidates[s];
+        if (!candidate->added && candidate->value >= 0 &&
+            (worst < 0 || candidate->value > builder->candidates[worst].value))
+        {
+            worst = s;
+        }
+    }
+    return worst;
+}
+
+// Makes the outline's triangulation Delaunay, then adds the worst sample
+// at a time until every sample is within the maximum error or the part is
+// full. A sample is measured again only when its triangle changed.
+static void AddInterior(Builder* builder)
+{
+    Part* part = builder->part;
+    mnavTriangulation tr = {
+        part->vertices, part->triangles, part->triangleCount,
+        PART_TRIANGLES, part->stack,     (int32_t)(sizeof(part->stack) / sizeof(part->stack[0])),
+        part->changed};
+    mnavMakeDelaunay(&tr);
+    for (int32_t s = 0; s < builder->candidateCount; ++s)
+    {
+        Measure(builder, &tr, &builder->candidates[s]);
+    }
+    for (int32_t s = Worst(builder); s >= 0; s = Worst(builder))
+    {
+        if (part->vertexCount >= MNAV_DETAIL_VERTICES)
+        {
+            builder->detail->cappedPolygons += 1;
+            break;
+        }
+        Candidate* chosen = &builder->candidates[s];
+        chosen->added = true;
+        memset(part->changed, 0, sizeof(part->changed));
+        part->vertices[part->vertexCount] = chosen->point;
+        if (!mnavInsertVertex(&tr, part->vertexCount, chosen->triangle, chosen->edge))
+        {
+            continue;
+        }
+        part->vertexCount += 1;
+        for (int32_t c = 0; c < builder->candidateCount; ++c)
+        {
+            Candidate* candidate = &builder->candidates[c];
+            if (!candidate->added && candidate->triangle >= 0 &&
+                part->changed[candidate->triangle] != 0)
+            {
+                Measure(builder, &tr, candidate);
+            }
+        }
+    }
+    part->triangleCount = tr.count;
 }
 
 // Appends the part to the detail mesh as polygon p's.
@@ -292,6 +491,13 @@ static mnavResult BuildPart(Builder* builder, int32_t p)
     }
     BuildOutline(builder, &builder->mesh->polygons[p]);
     TriangulateOutline(builder);
+    result = Collect(builder, builder->mesh->polygons[p].count);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    AddInterior(builder);
+    MarkOutline(builder->part);
     return Store(builder, p);
 }
 
@@ -300,7 +506,7 @@ mnavResult mnavBuildDetailMesh(mnavMemory* memory, const mnavCompactField* field
                                mnavDetailSettings settings, mnavDetailMesh* detail)
 {
     *detail = (mnavDetailMesh){0};
-    Builder builder = {memory, field, regions, mesh, settings, detail, {0}, nullptr};
+    Builder builder = {memory, field, regions, mesh, settings, detail, {0}, nullptr, nullptr, 0, 0};
     size_t parts = (size_t)mesh->polygonCount;
     mnavResult result = mnavAllocate(memory, parts, sizeof(mnavDetailPart), alignof(mnavDetailPart),
                                      (void**)&detail->parts);
@@ -313,6 +519,8 @@ mnavResult mnavBuildDetailMesh(mnavMemory* memory, const mnavCompactField* field
     {
         result = BuildPart(&builder, p);
     }
+    mnavRelease(memory, builder.candidates, (size_t)builder.candidateCapacity, sizeof(Candidate),
+                alignof(Candidate));
     mnavRelease(memory, builder.part, 1, sizeof(Part), alignof(Part));
     mnavReleaseHeightPatch(memory, &builder.patch);
     if (result != mnav_success)
