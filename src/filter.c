@@ -58,12 +58,12 @@ static int32_t Max(int32_t a, int32_t b)
     return a > b ? a : b;
 }
 
-// What one neighbor column offers a span with floor and ceiling: the
-// lowest floor difference of any space the agent fits through, and the
-// range of floors within a step. Returns true when the neighbor is a drop.
+// Widens the range of floors within a step that one neighbor column
+// offers a span with floor and ceiling. Returns true when the neighbor
+// drops more than a step into space the agent fits through.
 static bool ScanNeighbor(const mnavHeightfield* heightfield, int32_t column, int32_t floor,
-                         int32_t ceiling, int32_t height, int32_t step, int32_t* lowest,
-                         int32_t* reachLow, int32_t* reachHigh)
+                         int32_t ceiling, int32_t height, int32_t step, int32_t* reachLow,
+                         int32_t* reachHigh)
 {
     uint32_t first = heightfield->columns[column];
     uint32_t end = heightfield->columns[column + 1];
@@ -82,7 +82,6 @@ static bool ScanNeighbor(const mnavHeightfield* heightfield, int32_t column, int
             continue;
         }
         int32_t difference = neighborFloor - floor;
-        *lowest = Min(*lowest, difference);
         if (difference >= -step && difference <= step)
         {
             *reachLow = Min(*reachLow, neighborFloor);
@@ -102,7 +101,6 @@ static bool IsLedge(const mnavHeightfield* heightfield, int32_t x, int32_t z, ui
     int32_t width = heightfield->frame.width;
     int32_t floor = heightfield->spans[i].top;
     int32_t ceiling = Ceiling(heightfield, i, end);
-    int32_t lowest = OPEN_TOP;
     int32_t reachLow = floor;
     int32_t reachHigh = floor;
     for (int32_t direction = 0; direction < 4; ++direction)
@@ -113,13 +111,13 @@ static bool IsLedge(const mnavHeightfield* heightfield, int32_t x, int32_t z, ui
         {
             return true;
         }
-        if (ScanNeighbor(heightfield, nx + nz * width, floor, ceiling, height, step, &lowest,
-                         &reachLow, &reachHigh))
+        if (ScanNeighbor(heightfield, nx + nz * width, floor, ceiling, height, step, &reachLow,
+                         &reachHigh))
         {
             return true;
         }
     }
-    return lowest < -step || reachHigh - reachLow > step;
+    return reachHigh - reachLow > step;
 }
 
 void mnavFilterLedges(mnavHeightfield* heightfield, int32_t height, int32_t step)
