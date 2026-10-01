@@ -114,6 +114,9 @@ extern "C"
         int32_t tileCells;
         // The agent the navmesh is for.
         mnavAgentProfile agent;
+        // The smallest walkable region kept, in square meters, at least 0:
+        // smaller islands away from a tile's edge are dropped.
+        float minRegionArea;
         // The limits on the work.
         mnavBakeLimits limits;
     } mnavBakeDef;
@@ -142,6 +145,7 @@ extern "C"
         mnav_settingTileLinks = 16,
         mnav_settingTiles = 17,
         mnav_settingMemoryBytes = 18,
+        mnav_settingMinRegionArea = 19,
     };
 
     // A def check's outcome: the status, and the first setting it refused.
@@ -170,6 +174,8 @@ extern "C"
         float cosMaxSlope;
         // A tile's side, in meters.
         float tileSize;
+        // The minimum region area, in cells.
+        int32_t minRegion;
     } mnavBakeCells;
 
     // A triangle mesh in a bake's input.
@@ -212,8 +218,8 @@ extern "C"
 
     /// Returns the default bake def: cells of 0.25 m by 0.125 m, tiles of
     /// 128 cells, an agent 0.5 m in radius and 2 m tall that steps 0.75 m
-    /// and walks slopes up to 45 degrees, and limits sized for a large
-    /// level.
+    /// and walks slopes up to 45 degrees, regions of at least 2 square
+    /// meters, and limits sized for a large level.
     ///
     /// @return The def, with a valid cookie.
     /// @par Thread safety

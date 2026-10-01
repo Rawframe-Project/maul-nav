@@ -32,6 +32,7 @@ mnavBakeDef mnavDefaultBakeDef(void)
     def.agent.height = 2.0f;
     def.agent.stepHeight = 0.75f;
     def.agent.maxSlopeDegrees = 45.0f;
+    def.minRegionArea = 2.0f;
     def.limits.inputTriangles = 4194304;
     def.limits.tileTriangles = 1048576;
     def.limits.tileSpans = 4194304;
@@ -144,6 +145,15 @@ static mnavBakeSetting ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cells
     if (cells->agentHeight == 0)
     {
         cells->agentHeight = 1;
+    }
+    // A cell's area rounds once; every platform rounds it the same. An
+    // area larger than any tile is valid (it drops every island) up to
+    // 2^30 cells, past which it can only be a mistake.
+    float cellArea = def->cellSize * def->cellSize;
+    if (!InRange(def->minRegionArea, 0.0f, INFINITY) ||
+        !mnavToCells(def->minRegionArea, cellArea, true, 1 << 30, &cells->minRegion))
+    {
+        return mnav_settingMinRegionArea;
     }
     cells->border = cells->agentRadius + BORDER_MARGIN_CELLS;
     cells->cosMaxSlope = mnavCosDegrees(agent->maxSlopeDegrees);

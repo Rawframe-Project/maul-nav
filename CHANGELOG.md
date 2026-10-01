@@ -34,3 +34,8 @@ format.
   pinned.
 - `mnavHash64` and `MNAV_HASH_INIT`, the family's frozen 64-bit hash,
   for determinism checks and navmesh fingerprints.
+- `mnavBakeDef.minRegionArea`, in square meters (2 by default), and
+  region partitioning by layers (internal): monotone sweeps merged into
+  non-overlapping layers of one area, small islands off the tile's
+  border dropped, with 32-bit ids and sweep storage sized by the row's
+  spans (N15).

@@ -11,3 +11,5 @@ filter: heightfield
 compact: allocator heightfield raster
 erode: allocator compact
 hash:
+sort:
+region: allocator compact sort
