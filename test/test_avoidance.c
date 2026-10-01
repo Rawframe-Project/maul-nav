@@ -16,6 +16,9 @@
 // The hash of the circle's final positions, the same on every platform.
 #define CIRCLE_HASH 0x303f5c6f58dde75aull
 
+// The hash of the mixed scene's velocities.
+#define SCENE_HASH 0xefaa93993d05e5daull
+
 enum
 {
     CIRCLE = 24
@@ -391,6 +394,82 @@ static void TestObstaclesInAnyOrder(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+static void TestMixedScene(void)
+{
+    // Forty agents cross a yard among an L and a U (both concave), a
+    // triangle, two segments, a still circle, a moving circle and a moving
+    // segment, the static part as checked against RVO2 by hand; every
+    // velocity is pinned, as the edge rules' only full witness here.
+    enum
+    {
+        AGENTS = 40
+    };
+    mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
+    def.limits.agents = AGENTS;
+    def.neighborDistance = 8.0;
+    def.timeHorizon = 3.0;
+    def.obstacleTimeHorizon = 3.0;
+    def.limits.obstacleNeighbors = 64;
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
+    static const mnavPos2 l[6] = {{-8, -8}, {-2, -8}, {-2, -6}, {-6, -6}, {-6, -2}, {-8, -2}};
+    static const mnavPos2 u[8] = {{2, 2}, {9, 2}, {9, 8}, {7, 8}, {7, 4}, {4, 4}, {4, 8}, {2, 8}};
+    static const mnavPos2 triangle[3] = {{-8, 4}, {-3, 5}, {-6, 9}};
+    static const mnavPos2 slope[2] = {{3, -9}, {8, -4}};
+    static const mnavPos2 bar[2] = {{-1, -1}, {1, 1}};
+    static const mnavPos2 still = {11, -11};
+    mnavPos2 rolling = {-12, 0};
+    mnavPos2 gate[2] = {{0, 10}, {3, 10}};
+    mnavObstacle obstacles[8] = {{l, 6, 0.0, {0, 0}, 0},
+                                 {u, 8, 0.0, {0, 0}, 1},
+                                 {triangle, 3, 0.0, {0, 0}, 2},
+                                 {slope, 2, 0.0, {0, 0}, 3},
+                                 {bar, 2, 0.0, {0, 0}, 4},
+                                 {&still, 1, 1.0, {0, 0}, 5},
+                                 {&rolling, 1, 0.8, {0.8, 0.1}, 6},
+                                 {gate, 2, 0.0, {0.4, -0.6}, 7}};
+    mnavAgent agents[AGENTS];
+    mnavPos2 goals[AGENTS];
+    uint32_t state = 12345;
+    for (int32_t i = 0; i < AGENTS; ++i)
+    {
+        double p[4];
+        for (int32_t k = 0; k < 4; ++k)
+        {
+            state = state * 1664525u + 1013904223u;
+            p[k] = -14.0 + 28.0 * (double)(state >> 8 & 0xFFFFu) / 65536.0;
+        }
+        agents[i] = Agent(p[0], p[1], (uint64_t)i);
+        agents[i].radius = 0.4;
+        goals[i] = (mnavPos2){p[2], p[3]};
+    }
+    uint64_t hash = MNAV_HASH_INIT;
+    mnavPos2 velocities[AGENTS];
+    for (int32_t s = 0; s < 200; ++s)
+    {
+        Prefer(agents, goals, AGENTS);
+        CHECK(mnavAvoid(avoidance, agents, AGENTS, obstacles, 8, 0.1, velocities) == mnav_success,
+              "stepped");
+        hash = mnavHash64(hash, velocities, (int32_t)sizeof(velocities));
+        for (int32_t i = 0; i < AGENTS; ++i)
+        {
+            agents[i].velocity = velocities[i];
+            agents[i].position.x += velocities[i].x * 0.1;
+            agents[i].position.y += velocities[i].y * 0.1;
+        }
+        rolling.x += 0.08;
+        rolling.y += 0.01;
+        for (int32_t k = 0; k < 2; ++k)
+        {
+            gate[k].x += 0.04;
+            gate[k].y -= 0.06;
+        }
+    }
+    printf("SCENE_HASH=%016llx\n", (unsigned long long)hash);
+    CHECK(hash == SCENE_HASH, "the pinned hash");
+    mnavDestroyAvoidance(avoidance);
+}
+
 static void TestObstacleChecks(void)
 {
     mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
@@ -440,6 +519,7 @@ int main(void)
     TestWallsAndBlocks();
     TestMovingObstacles();
     TestObstaclesInAnyOrder();
+    TestMixedScene();
     TestObstacleChecks();
     return s_failures == 0 ? 0 : 1;
 }
