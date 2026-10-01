@@ -10,3 +10,4 @@ are listed in [README.md](README.md).
 | [mnav-0003](mnav-0003-bake-call-and-tile-format.md) | The bake call and the tile format | Accepted |
 | [mnav-0004](mnav-0004-navmesh-and-commits.md) | The navmesh and its commits | Accepted |
 | [mnav-0005](mnav-0005-queries.md) | Queries | Accepted |
+| [mnav-0006](mnav-0006-avoidance.md) | Avoidance | Accepted |

@@ -42,6 +42,7 @@ else()
 endif()
 add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/allocator.c
+    src/avoidance.c
     src/bake_def.c
     src/base.c
     src/baker.c
@@ -65,6 +66,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/navmesh.c
     src/nearest.c
     src/offmesh.c
+    src/orca.c
     src/outline.c
     src/path.c
     src/query.c
@@ -116,6 +118,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(resnap WHITEBOX)
     maul_add_test(bake2d)
     maul_add_test(grid)
+    maul_add_test(avoidance)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)
     maul_add_test(scalar WHITEBOX)

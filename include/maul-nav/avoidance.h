@@ -1,0 +1,137 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Sirac Ozmen
+//
+// Avoidance (mnav-0006): local steering among agents by velocity
+// obstacles (ORCA), apart from the navmesh: nothing here uses a navmesh,
+// and a host may use it without one. It works on the ground plane, a 3D
+// world's (x, z) or a 2D world's (x, y), in meters and seconds.
+
+#ifndef MAUL_NAV_AVOIDANCE_H
+#define MAUL_NAV_AVOIDANCE_H
+
+#include "maul-nav/base.h"
+
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+// The most agents and neighbours per agent an avoidance set may have.
+#define MNAV_MAX_AVOIDANCE_AGENTS    1048576
+#define MNAV_MAX_AVOIDANCE_NEIGHBORS 256
+
+    // A point or a velocity on the ground plane, binary64.
+    typedef struct mnavPos2
+    {
+        double x;
+        double y;
+    } mnavPos2;
+
+    // An agent as the host sees it this step.
+    typedef struct mnavAgent
+    {
+        mnavPos2 position;
+        mnavPos2 velocity;
+        // Where the agent would go, in meters per second.
+        mnavPos2 preferred;
+        // More than 0.
+        double radius;
+        // At least 0.
+        double maxSpeed;
+        // More than 0: of each avoidance between two agents, one takes
+        // the other's priority over the sum of both.
+        double priority;
+        // The host's id for the agent, which orders neighbours at equal
+        // distances; ids should differ, or the input's order counts.
+        uint64_t id;
+    } mnavAgent;
+
+    // The limits of an avoidance set.
+    typedef struct mnavAvoidanceLimits
+    {
+        // Agents in one call, 1 to MNAV_MAX_AVOIDANCE_AGENTS.
+        int32_t agents;
+        // Neighbours each agent avoids, the nearest first, 1 to
+        // MNAV_MAX_AVOIDANCE_NEIGHBORS.
+        int32_t neighbors;
+    } mnavAvoidanceLimits;
+
+    // How an avoidance set is made. Build it with mnavDefaultAvoidanceDef.
+    typedef struct mnavAvoidanceDef
+    {
+        uint32_t cookie;
+        // The allocator the set uses; zeroed for the C library's.
+        mnavAllocator allocator;
+        mnavAvoidanceLimits limits;
+        // How far away, center to center, another agent counts as a
+        // neighbour, in meters, more than 0.
+        double neighborDistance;
+        // How far ahead agents avoid each other, in seconds, more than 0.
+        double timeHorizon;
+    } mnavAvoidanceDef;
+
+    // An avoidance set: the memory its limits need.
+    typedef struct mnavAvoidance mnavAvoidance;
+
+    /// Returns the default avoidance def: up to 4096 agents, each avoiding
+    /// its 10 nearest neighbours within 10 m, 2 s ahead.
+    ///
+    /// @return The def.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MNAV_API mnavAvoidanceDef mnavDefaultAvoidanceDef(void);
+
+    /// Makes an avoidance set with the memory its limits need.
+    ///
+    /// @param def         The def, from mnavDefaultAvoidanceDef.
+    /// @param avoidanceOut Receives the set, or NULL on failure.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// def not from mnavDefaultAvoidanceDef; `mnav_errorRange` for a limit,
+    /// distance or horizon out of its range; `mnav_errorCapacity` when the
+    /// allocator fails.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def,
+                                                           mnavAvoidance** avoidanceOut);
+
+    /// Destroys an avoidance set.
+    ///
+    /// @param avoidance The set, or NULL.
+    /// @par Thread safety
+    /// Safe from any thread; the set is used by one thread at a time.
+    MNAV_API void mnavDestroyAvoidance(mnavAvoidance* avoidance);
+
+    /// Finds each agent's new velocity: the one nearest its preferred
+    /// velocity, no faster than its maximum speed, that avoids colliding
+    /// with its neighbours within the time horizon if they do their share
+    /// (ORCA); when none does, the one that breaks those constraints least.
+    /// An agent held back from its preferred velocity aims 1% of its speed
+    /// to the right of it, so that agents meeting in perfect symmetry pass
+    /// rather than stop face to face. The same agents give the same
+    /// velocities in any order, on every platform.
+    ///
+    /// @param avoidance     The set.
+    /// @param agents        The agents.
+    /// @param agentCount    How many, at least 0.
+    /// @param step          The step the velocities are for, in seconds,
+    ///                      more than 0: agents already overlapping part
+    ///                      within it.
+    /// @param velocitiesOut Receives agentCount velocities, in the agents'
+    ///                      order.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
+    /// agents, a negative count, a step not more than 0 or not finite, or
+    /// an agent with a value not finite or out of its range;
+    /// `mnav_errorLimit` for more agents than the set's limit.
+    /// @par Thread safety
+    /// Safe from any thread; the set is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents,
+                                                 int32_t agentCount, double step,
+                                                 mnavPos2* velocitiesOut);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // MAUL_NAV_AVOIDANCE_H

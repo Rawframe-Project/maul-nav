@@ -179,3 +179,7 @@ format.
 - Grid paths (mnav-0005): mnavGrid, mnavCell, mnavGridPath,
   MNAV_MAX_GRID_SIDE and mnavFindGridPath, jump point search or A* by
   the filter's costs.
+- Avoidance (mnav-0006): avoidance.h with mnavPos2, mnavAgent,
+  mnavAvoidanceLimits, mnavAvoidanceDef, mnavDefaultAvoidanceDef,
+  mnavCreateAvoidance, mnavDestroyAvoidance and mnavAvoid: ORCA in
+  binary64 among agents, ordered by ids and split by priority.
