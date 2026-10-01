@@ -109,6 +109,20 @@ static void TestVertexBetweenTwoRegionsIsRemoved(void)
     Finish(&memory, &set, &mesh);
 }
 
+static void TestNewPolygonsCountAgainstTheLimit(void)
+{
+    const int32_t points[16] = {0, 0, 0, 5, 5, 5, 5, 0, 5, 0, 5, 5, 10, 5, 10, 0};
+    const int32_t counts[2] = {4, 4};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = Rings(&memory, points, counts, 2);
+    Flag(&set, 5, 0);
+    mnavPolyMesh mesh;
+    CHECK(Run(&memory, &set, 1, &mesh) == mnav_errorLimit, "two polygons past a limit of one");
+    mnavReleasePolyMesh(&memory, &mesh);
+    CHECK(Run(&memory, &set, 2, &mesh) == mnav_success, "at the limit");
+    Finish(&memory, &set, &mesh);
+}
+
 static void TestVertexInsideTheMeshIsRemoved(void)
 {
     // Four squares round (5, 5), each its own region: a closed chain.
@@ -300,6 +314,7 @@ static void TestRampLevelLosesItsBorderVertex(void)
 int main(void)
 {
     TestVertexBetweenTwoRegionsIsRemoved();
+    TestNewPolygonsCountAgainstTheLimit();
     TestVertexInsideTheMeshIsRemoved();
     TestTipOfALonePolygonStays();
     TestDifferentAreasStay();
