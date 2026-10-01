@@ -179,6 +179,64 @@ extern "C"
                                                     mnavPolygonId endPolygon, mnavPos3 end,
                                                     mnavPath* pathOut);
 
+    // How a raycast ended.
+    typedef uint8_t mnavRayEnd;
+
+    enum
+    {
+        // The ray reached its end point.
+        mnav_rayReached = 0,
+        // A wall stopped it.
+        mnav_rayWall = 1,
+        // It came to a tile side with no tile loaded beyond.
+        mnav_rayNotLoaded = 2,
+        // The polygons it crossed reached the context's node limit.
+        mnav_rayOutOfNodes = 3,
+    };
+
+    // A raycast's result.
+    typedef struct mnavRay
+    {
+        mnavRayEnd end;
+        // How far the ray went, as a fraction of the way from its start to
+        // its end point on the ground: 1 when it reached the end point.
+        double t;
+        // At a wall, the wall's normal on the ground, pointing back to
+        // where the ray came from; 0 otherwise.
+        double normalX;
+        double normalZ;
+        // The polygons crossed, from the start polygon to the one where the
+        // ray ended, in the context's memory until its next query.
+        const mnavPolygonId* polygons;
+        int32_t polygonCount;
+    } mnavRay;
+
+    /// Casts a ray along the navmesh on the ground from a point on a polygon
+    /// toward an end point (mnav-0005): polygon to polygon through the
+    /// first edge it crosses, until it reaches the end point, meets a wall
+    /// or a tile side with no tile loaded, or crosses as many polygons as
+    /// the context's node limit. Where it leaves through a corner, it goes
+    /// on through an edge that leads on, the lowest-numbered first.
+    ///
+    /// @param query        The context; its memory holds the polygons.
+    /// @param navmesh      The navmesh.
+    /// @param startPolygon The polygon the start point lies on, as
+    ///                     mnavFindNearest gives it.
+    /// @param start        The start point.
+    /// @param end          The end point; only its ground position counts.
+    /// @param rayOut       Receives the result.
+    /// @return `mnav_success` whenever the ray was cast, however it ended;
+    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite
+    /// or a polygon id that never existed; `mnav_errorStale` for a polygon
+    /// id whose tile has been replaced or removed.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    /// Any number of contexts may cast on one navmesh at once between
+    /// commits.
+    MNAV_NODISCARD MNAV_API mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                   mnavPolygonId startPolygon, mnavPos3 start,
+                                                   mnavPos3 end, mnavRay* rayOut);
+
 #ifdef __cplusplus
 }
 #endif

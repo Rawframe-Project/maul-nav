@@ -111,4 +111,12 @@ typedef struct mnavFrame
 
 mnavFrame mnavFrameOf(const mnavNavmesh* navmesh, int32_t x, int32_t z);
 
+// Whether a polygon id names a polygon of the navmesh now:
+// mnav_errorInvalid for one never handed out, mnav_errorStale for one whose
+// tile was replaced or removed.
+mnavResult mnavCheckPolygon(const mnavNavmesh* navmesh, mnavPolygonId id);
+
+// A mesh vertex's world position in a tile's frame.
+mnavPos3 mnavVertexWorld(const mnavFrame* f, const mnavMeshVertex* v);
+
 #endif // MAUL_NAV_SRC_NAVMESH_H

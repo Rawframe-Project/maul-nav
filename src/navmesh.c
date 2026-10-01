@@ -705,3 +705,28 @@ mnavFrame mnavFrameOf(const mnavNavmesh* navmesh, int32_t x, int32_t z)
     return (mnavFrame){def->origin.x + (double)x * size, def->origin.z + (double)z * size,
                        def->origin.y, (double)def->cellSize, (double)def->cellHeight};
 }
+
+// Whether a polygon id names a polygon of the navmesh now.
+mnavResult mnavCheckPolygon(const mnavNavmesh* navmesh, mnavPolygonId id)
+{
+    if (id.slot == 0 || id.slot > (uint32_t)navmesh->slotCount || id.generation == 0)
+    {
+        return mnav_errorInvalid;
+    }
+    const mnavSlot* slot = &navmesh->slots[id.slot - 1];
+    if (id.generation > slot->generation)
+    {
+        return mnav_errorInvalid;
+    }
+    if (id.generation != slot->generation || slot->tile == nullptr)
+    {
+        return mnav_errorStale;
+    }
+    return id.polygon < (uint32_t)slot->tile->mesh.polygonCount ? mnav_success : mnav_errorInvalid;
+}
+
+mnavPos3 mnavVertexWorld(const mnavFrame* f, const mnavMeshVertex* v)
+{
+    return (mnavPos3){f->x0 + v->x * f->cell, f->y0 + (v->y - MNAV_HEIGHT_OFFSET) * f->height,
+                      f->z0 + v->z * f->cell};
+}

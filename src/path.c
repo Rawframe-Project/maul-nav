@@ -6,6 +6,7 @@
 #include "allocator.h"
 #include "navmesh.h"
 #include "polymesh.h"
+#include "query.h"
 #include "raster.h"
 
 #include "maul-nav/base.h"
@@ -18,62 +19,6 @@
 
 // Marks a def built by mnavDefaultQueryDef.
 #define QUERY_DEF_COOKIE 0x4E415651u
-
-// A node's way in: an edge index below 8, 8 plus the side for a tile link,
-// or the start or end point.
-#define TAG_LINK  8
-#define TAG_START 0xFE
-#define TAG_END   0xFF
-
-// No node, or a node that has left the open list.
-#define NO_NODE (-1)
-
-// A portal into a polygon, or the start or end point: where the search
-// stands, the way it came, and its cost so far.
-typedef struct Node
-{
-    // The portal's ends, in the order of the polygon left, and its midpoint.
-    mnavPos3 a;
-    mnavPos3 b;
-    mnavPos3 at;
-    double cost;
-    double remaining;
-    // The polygon entered: its 0-based slot and index.
-    int32_t slot;
-    int32_t polygon;
-    // The portal: TAG_ values, and the link's start along the side.
-    int32_t tag;
-    int32_t low;
-    int32_t parent;
-    // The node's place in the open list, or NO_NODE once closed.
-    int32_t heap;
-} Node;
-
-// A portal's ends as the funnel sees them, walking into the polygon: the
-// left one, then the right one.
-typedef struct Portal
-{
-    mnavPos3 left;
-    mnavPos3 right;
-} Portal;
-
-struct mnavQuery
-{
-    mnavMemory memory;
-    mnavQueryLimits limits;
-    Node* nodes;
-    int32_t nodeCount;
-    int32_t* heap;
-    int32_t heapCount;
-    // Open addressing over node keys: node indices, NO_NODE for empty.
-    int32_t* table;
-    uint32_t tableMask;
-    mnavPolygonId* corridor;
-    // The corridor's portals, then the straight path; a corridor of n
-    // polygons has n + 1 of each at most.
-    Portal* portals;
-    mnavPos3* points;
-};
 
 mnavQueryDef mnavDefaultQueryDef(void)
 {
@@ -93,12 +38,12 @@ void mnavDestroyQuery(mnavQuery* query)
     mnavMemory* memory = &query->memory;
     size_t nodes = (size_t)query->limits.nodes;
     mnavRelease(memory, query->points, nodes + 1, sizeof(mnavPos3), alignof(mnavPos3));
-    mnavRelease(memory, query->portals, nodes + 1, sizeof(Portal), alignof(Portal));
+    mnavRelease(memory, query->portals, nodes + 1, sizeof(mnavPortal), alignof(mnavPortal));
     mnavRelease(memory, query->corridor, nodes, sizeof(mnavPolygonId), alignof(mnavPolygonId));
     mnavRelease(memory, query->table, (size_t)query->tableMask + 1, sizeof(int32_t),
                 alignof(int32_t));
     mnavRelease(memory, query->heap, nodes, sizeof(int32_t), alignof(int32_t));
-    mnavRelease(memory, query->nodes, nodes, sizeof(Node), alignof(Node));
+    mnavRelease(memory, query->nodes, nodes, sizeof(mnavSearchNode), alignof(mnavSearchNode));
     mnavMemory last = *memory;
     mnavRelease(&last, query, 1, sizeof(mnavQuery), alignof(mnavQuery));
 }
@@ -139,8 +84,8 @@ mnavResult mnavCreateQuery(const mnavQueryDef* def, mnavQuery** queryOut)
     }
     query->tableMask = table - 1;
     size_t nodes = (size_t)limits->nodes;
-    result =
-        mnavAllocate(&query->memory, nodes, sizeof(Node), alignof(Node), (void**)&query->nodes);
+    result = mnavAllocate(&query->memory, nodes, sizeof(mnavSearchNode), alignof(mnavSearchNode),
+                          (void**)&query->nodes);
     if (result == mnav_success)
     {
         result = mnavAllocate(&query->memory, nodes, sizeof(int32_t), alignof(int32_t),
@@ -158,7 +103,7 @@ mnavResult mnavCreateQuery(const mnavQueryDef* def, mnavQuery** queryOut)
     }
     if (result == mnav_success)
     {
-        result = mnavAllocate(&query->memory, nodes + 1, sizeof(Portal), alignof(Portal),
+        result = mnavAllocate(&query->memory, nodes + 1, sizeof(mnavPortal), alignof(mnavPortal),
                               (void**)&query->portals);
     }
     if (result == mnav_success)
@@ -193,11 +138,11 @@ static uint32_t Find(const mnavQuery* query, int32_t slot, int32_t polygon, int3
     for (;;)
     {
         int32_t n = query->table[cell];
-        if (n == NO_NODE)
+        if (n == MNAV_NO_NODE)
         {
             return cell;
         }
-        const Node* node = &query->nodes[n];
+        const mnavSearchNode* node = &query->nodes[n];
         if (node->slot == slot && node->polygon == polygon && node->tag == tag && node->low == low)
         {
             return cell;
@@ -210,8 +155,8 @@ static uint32_t Find(const mnavQuery* query, int32_t slot, int32_t polygon, int3
 // the one made first.
 static bool Sooner(const mnavQuery* query, int32_t a, int32_t b)
 {
-    const Node* na = &query->nodes[a];
-    const Node* nb = &query->nodes[b];
+    const mnavSearchNode* na = &query->nodes[a];
+    const mnavSearchNode* nb = &query->nodes[b];
     double ta = na->cost + na->remaining;
     double tb = nb->cost + nb->remaining;
     return ta != tb ? ta < tb : a < b;
@@ -237,7 +182,7 @@ static void SiftUp(mnavQuery* query, int32_t at)
 static int32_t Pop(mnavQuery* query)
 {
     int32_t top = query->heap[0];
-    query->nodes[top].heap = NO_NODE;
+    query->nodes[top].heap = MNAV_NO_NODE;
     int32_t last = query->heap[--query->heapCount];
     int32_t at = 0;
     while (query->heapCount > 0)
@@ -293,21 +238,15 @@ static mnavPos3 Midpoint(mnavPos3 a, mnavPos3 b)
     return (mnavPos3){(a.x + b.x) * 0.5, (a.y + b.y) * 0.5, (a.z + b.z) * 0.5};
 }
 
-static mnavPos3 World(const mnavFrame* f, const mnavMeshVertex* v)
-{
-    return (mnavPos3){f->x0 + v->x * f->cell, f->y0 + (v->y - MNAV_HEIGHT_OFFSET) * f->height,
-                      f->z0 + v->z * f->cell};
-}
-
 // Opens the node behind a portal from node from, or lowers its cost when
 // this way is cheaper; closed nodes are final.
-static void Open(Search* s, int32_t from, const Node* key, mnavPos3 a, mnavPos3 b)
+static void Open(Search* s, int32_t from, const mnavSearchNode* key, mnavPos3 a, mnavPos3 b)
 {
     mnavQuery* query = s->query;
-    const Node* parent = &query->nodes[from];
-    mnavPos3 at = key->tag == TAG_END ? s->end : Midpoint(a, b);
+    const mnavSearchNode* parent = &query->nodes[from];
+    mnavPos3 at = key->tag == MNAV_TAG_END ? s->end : Midpoint(a, b);
     double cost = parent->cost + Distance(parent->at, at);
-    double remaining = key->tag == TAG_END ? 0.0 : Distance(at, s->end);
+    double remaining = key->tag == MNAV_TAG_END ? 0.0 : Distance(at, s->end);
     if (cost + remaining > s->limit)
     {
         s->tooLong = true;
@@ -315,10 +254,10 @@ static void Open(Search* s, int32_t from, const Node* key, mnavPos3 a, mnavPos3 
     }
     uint32_t cell = Find(query, key->slot, key->polygon, key->tag, key->low);
     int32_t n = query->table[cell];
-    if (n != NO_NODE)
+    if (n != MNAV_NO_NODE)
     {
-        Node* node = &query->nodes[n];
-        if (node->heap != NO_NODE && cost < node->cost)
+        mnavSearchNode* node = &query->nodes[n];
+        if (node->heap != MNAV_NO_NODE && cost < node->cost)
         {
             node->cost = cost;
             node->parent = from;
@@ -332,8 +271,8 @@ static void Open(Search* s, int32_t from, const Node* key, mnavPos3 a, mnavPos3 
         return;
     }
     n = query->nodeCount++;
-    query->nodes[n] = (Node){a,        b,        at,   cost,   remaining, key->slot, key->polygon,
-                             key->tag, key->low, from, NO_NODE};
+    query->nodes[n] = (mnavSearchNode){
+        a, b, at, cost, remaining, key->slot, key->polygon, key->tag, key->low, from, MNAV_NO_NODE};
     query->table[cell] = n;
     query->heap[query->heapCount] = n;
     SiftUp(query, query->heapCount++);
@@ -342,7 +281,7 @@ static void Open(Search* s, int32_t from, const Node* key, mnavPos3 a, mnavPos3 
 // Opens the polygon across an inner edge j of node n's polygon.
 static void ExpandInner(Search* s, int32_t n, const mnavTile* tile, int32_t j)
 {
-    const Node* node = &s->query->nodes[n];
+    const mnavSearchNode* node = &s->query->nodes[n];
     const mnavPolygon* polygon = &tile->mesh.polygons[node->polygon];
     int32_t next = polygon->neighbors[j];
     uint16_t from = polygon->vertices[j];
@@ -354,9 +293,9 @@ static void ExpandInner(Search* s, int32_t n, const mnavTile* tile, int32_t j)
         {
             mnavFrame f = mnavFrameOf(s->navmesh, s->navmesh->slots[node->slot].x,
                                       s->navmesh->slots[node->slot].z);
-            Node key = {.slot = node->slot, .polygon = next, .tag = i, .low = 0};
-            Open(s, n, &key, World(&f, &tile->mesh.vertices[from]),
-                 World(&f, &tile->mesh.vertices[to]));
+            mnavSearchNode key = {.slot = node->slot, .polygon = next, .tag = i, .low = 0};
+            Open(s, n, &key, mnavVertexWorld(&f, &tile->mesh.vertices[from]),
+                 mnavVertexWorld(&f, &tile->mesh.vertices[to]));
             return;
         }
     }
@@ -373,7 +312,7 @@ static mnavPos3 AlongSide(mnavPos3 a, mnavPos3 b, double au, double bu, double u
 // or notes that no tile is loaded across it.
 static void ExpandSide(Search* s, int32_t n, const mnavTile* tile, int32_t j)
 {
-    const Node* node = &s->query->nodes[n];
+    const mnavSearchNode* node = &s->query->nodes[n];
     const mnavSlot* slot = &s->navmesh->slots[node->slot];
     const mnavPolygon* polygon = &tile->mesh.polygons[node->polygon];
     int32_t side = polygon->sides[j];
@@ -393,12 +332,12 @@ static void ExpandSide(Search* s, int32_t n, const mnavTile* tile, int32_t j)
     bool alongZ = side == 1 || side == 3;
     double au = alongZ ? va->z : va->x;
     double bu = alongZ ? vb->z : vb->x;
-    mnavPos3 a = World(&f, va);
-    mnavPos3 b = World(&f, vb);
+    mnavPos3 a = mnavVertexWorld(&f, va);
+    mnavPos3 b = mnavVertexWorld(&f, vb);
     for (int32_t l = tile->firstLink[node->polygon]; l < tile->firstLink[node->polygon + 1]; ++l)
     {
         const mnavLink* link = &tile->links[l];
-        bool back = node->tag == TAG_LINK + side && node->low == link->low;
+        bool back = node->tag == MNAV_TAG_LINK + side && node->low == link->low;
         if (link->edge != j || back)
         {
             continue;
@@ -407,25 +346,26 @@ static void ExpandSide(Search* s, int32_t n, const mnavTile* tile, int32_t j)
         bool rising = bu > au;
         mnavPos3 first = AlongSide(a, b, au, bu, rising ? link->low : link->high);
         mnavPos3 second = AlongSide(a, b, au, bu, rising ? link->high : link->low);
-        Node key = {.slot = (int32_t)link->target.slot - 1,
-                    .polygon = (int32_t)link->target.polygon,
-                    .tag = TAG_LINK + facing,
-                    .low = link->low};
+        mnavSearchNode key = {.slot = (int32_t)link->target.slot - 1,
+                              .polygon = (int32_t)link->target.polygon,
+                              .tag = MNAV_TAG_LINK + facing,
+                              .low = link->low};
         Open(s, n, &key, first, second);
     }
 }
 
 static void Expand(Search* s, int32_t n)
 {
-    const Node* node = &s->query->nodes[n];
+    const mnavSearchNode* node = &s->query->nodes[n];
     const mnavTile* tile = s->navmesh->slots[node->slot].tile;
     const mnavPolygon* polygon = &tile->mesh.polygons[node->polygon];
     if (node->slot == s->endSlot && node->polygon == s->endPolygon)
     {
-        Node key = {.slot = node->slot, .polygon = node->polygon, .tag = TAG_END, .low = 0};
+        mnavSearchNode key = {
+            .slot = node->slot, .polygon = node->polygon, .tag = MNAV_TAG_END, .low = 0};
         Open(s, n, &key, s->end, s->end);
     }
-    // Node pointers stay valid as nodes are added: the array never moves.
+    // mnavSearchNode pointers stay valid as nodes are added: the array never moves.
     // The edge the node came in through leads only back.
     for (int32_t j = 0; j < polygon->count; ++j)
     {
@@ -441,25 +381,6 @@ static void Expand(Search* s, int32_t n)
     }
 }
 
-// Whether a polygon id names a polygon of the navmesh now.
-static mnavResult CheckPolygon(const mnavNavmesh* navmesh, mnavPolygonId id)
-{
-    if (id.slot == 0 || id.slot > (uint32_t)navmesh->slotCount || id.generation == 0)
-    {
-        return mnav_errorInvalid;
-    }
-    const mnavSlot* slot = &navmesh->slots[id.slot - 1];
-    if (id.generation > slot->generation)
-    {
-        return mnav_errorInvalid;
-    }
-    if (id.generation != slot->generation || slot->tile == nullptr)
-    {
-        return mnav_errorStale;
-    }
-    return id.polygon < (uint32_t)slot->tile->mesh.polygonCount ? mnav_success : mnav_errorInvalid;
-}
-
 static bool FinitePoint(mnavPos3 p)
 {
     return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
@@ -469,8 +390,8 @@ static bool FinitePoint(mnavPos3 p)
 // the lower cost, then made first.
 static bool Nearer(const mnavQuery* query, int32_t a, int32_t b)
 {
-    const Node* na = &query->nodes[a];
-    const Node* nb = &query->nodes[b];
+    const mnavSearchNode* na = &query->nodes[a];
+    const mnavSearchNode* nb = &query->nodes[b];
     if (na->remaining != nb->remaining)
     {
         return na->remaining < nb->remaining;
@@ -482,9 +403,9 @@ static bool Nearer(const mnavQuery* query, int32_t a, int32_t b)
 static int32_t Corridor(mnavQuery* query, const mnavNavmesh* navmesh, int32_t last)
 {
     int32_t count = 0;
-    for (int32_t n = last; n != NO_NODE; n = query->nodes[n].parent)
+    for (int32_t n = last; n != MNAV_NO_NODE; n = query->nodes[n].parent)
     {
-        const Node* node = &query->nodes[n];
+        const mnavSearchNode* node = &query->nodes[n];
         mnavPolygonId id = {(uint32_t)node->slot + 1, navmesh->slots[node->slot].generation,
                             (uint32_t)node->polygon};
         const mnavPolygonId* previous = count > 0 ? &query->corridor[count - 1] : nullptr;
@@ -507,23 +428,23 @@ static int32_t Corridor(mnavQuery* query, const mnavNavmesh* navmesh, int32_t la
 static int32_t Portals(mnavQuery* query, int32_t last)
 {
     int32_t count = 0;
-    for (int32_t n = last; n != NO_NODE; n = query->nodes[n].parent)
+    for (int32_t n = last; n != MNAV_NO_NODE; n = query->nodes[n].parent)
     {
         // A portal's ends are in the order of the polygon walked out of,
         // whose inside lies to the right of each edge: the first end is on
         // the walker's left.
-        query->portals[count++] = (Portal){query->nodes[n].a, query->nodes[n].b};
+        query->portals[count++] = (mnavPortal){query->nodes[n].a, query->nodes[n].b};
     }
     for (int32_t i = 0; i < count / 2; ++i)
     {
-        Portal swap = query->portals[i];
+        mnavPortal swap = query->portals[i];
         query->portals[i] = query->portals[count - 1 - i];
         query->portals[count - 1 - i] = swap;
     }
-    const Node* node = &query->nodes[last];
-    if (node->tag != TAG_END)
+    const mnavSearchNode* node = &query->nodes[last];
+    if (node->tag != MNAV_TAG_END)
     {
-        query->portals[count++] = (Portal){node->at, node->at};
+        query->portals[count++] = (mnavPortal){node->at, node->at};
     }
     return count;
 }
@@ -571,7 +492,7 @@ static void Corner(mnavQuery* query, int32_t* count, Funnel* f, mnavPos3 p, int3
 // makes that side's point a corner, and the scan goes on from there.
 static int32_t Straighten(mnavQuery* query, int32_t portals)
 {
-    const Portal* p = query->portals;
+    const mnavPortal* p = query->portals;
     int32_t count = 0;
     Push(query, &count, p[0].left);
     Funnel f = {p[0].left, p[0].left, p[0].right, 0, 0, 0};
@@ -625,8 +546,8 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygo
     {
         return mnav_errorInvalid;
     }
-    mnavResult result = CheckPolygon(navmesh, startPolygon);
-    result = result == mnav_success ? CheckPolygon(navmesh, endPolygon) : result;
+    mnavResult result = mnavCheckPolygon(navmesh, startPolygon);
+    result = result == mnav_success ? mnavCheckPolygon(navmesh, endPolygon) : result;
     if (result != mnav_success)
     {
         return result;
@@ -641,27 +562,27 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygo
                 false,
                 false,
                 false};
-    query->nodes[0] = (Node){start,
-                             start,
-                             start,
-                             0.0,
-                             Distance(start, end),
-                             (int32_t)startPolygon.slot - 1,
-                             (int32_t)startPolygon.polygon,
-                             TAG_START,
-                             0,
-                             NO_NODE,
-                             0};
-    query->table[Find(query, query->nodes[0].slot, query->nodes[0].polygon, TAG_START, 0)] = 0;
+    query->nodes[0] = (mnavSearchNode){start,
+                                       start,
+                                       start,
+                                       0.0,
+                                       Distance(start, end),
+                                       (int32_t)startPolygon.slot - 1,
+                                       (int32_t)startPolygon.polygon,
+                                       MNAV_TAG_START,
+                                       0,
+                                       MNAV_NO_NODE,
+                                       0};
+    query->table[Find(query, query->nodes[0].slot, query->nodes[0].polygon, MNAV_TAG_START, 0)] = 0;
     query->heap[0] = 0;
     query->nodeCount = 1;
     query->heapCount = 1;
     int32_t best = 0;
-    int32_t found = NO_NODE;
-    while (query->heapCount > 0 && found == NO_NODE)
+    int32_t found = MNAV_NO_NODE;
+    while (query->heapCount > 0 && found == MNAV_NO_NODE)
     {
         int32_t n = Pop(query);
-        if (query->nodes[n].tag == TAG_END)
+        if (query->nodes[n].tag == MNAV_TAG_END)
         {
             found = n;
             continue;
@@ -669,8 +590,8 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygo
         best = Nearer(query, n, best) ? n : best;
         Expand(&s, n);
     }
-    int32_t last = found != NO_NODE ? found : best;
-    *pathOut = (mnavPath){found != NO_NODE ? mnav_pathFound : EndOf(&s),
+    int32_t last = found != MNAV_NO_NODE ? found : best;
+    *pathOut = (mnavPath){found != MNAV_NO_NODE ? mnav_pathFound : EndOf(&s),
                           query->nodes[last].cost,
                           query->corridor,
                           Corridor(query, navmesh, last),

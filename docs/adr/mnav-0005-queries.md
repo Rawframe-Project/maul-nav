@@ -50,6 +50,14 @@ that are not loaded must say so rather than treat them as walls.
   The points live in the context, sized from the node limit, so a
   straight path is never cut short; short of the end it ends at the
   midpoint of the last portal crossed.
+- **Raycast:** `mnavRaycast` walks a segment on the ground from a point
+  on a polygon, polygon to polygon through the first edge it crosses
+  outward, across tile sides where a link's exact cell range holds the
+  exit point; at a corner it goes on through an edge that leads on,
+  the lowest-numbered first. It ends reached, at a wall (with the
+  wall's normal), at a side with no tile loaded, or out of nodes when
+  the polygons crossed reach the node limit, and reports the fraction
+  travelled and the polygons crossed.
 
 ## Consequences
 

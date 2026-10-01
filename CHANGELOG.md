@@ -128,3 +128,7 @@ format.
   exact side tests, held in the query context and never cut short.
   The search's ties now go to the node made first; a tie on the
   distance still to go never decided anything and was dropped.
+- Raycasts (mnav-0005): mnavRaycast with mnavRay and mnavRayEnd walks
+  a segment along the navmesh in binary64 with exact link ranges, and
+  ends reached, at a wall with its normal, at a side with no tile
+  loaded, or out of nodes.
