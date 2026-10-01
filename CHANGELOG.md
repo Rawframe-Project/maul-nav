@@ -226,3 +226,5 @@ format.
   avoidance.h.
 - mnavBakeReport.droppedRegions counts the islands dropped under the
   minimum region area.
+- Terrains (mnav-0003): mnavTerrain, mnavBakeInput and
+  mnavBakeTileInput bake heightfields in a compact form beside meshes.

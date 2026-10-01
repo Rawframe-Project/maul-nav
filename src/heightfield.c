@@ -8,40 +8,95 @@
 #include "allocator.h"
 #include "outline.h"
 #include "raster.h"
+#include "terrain.h"
 
 #include "maul-nav/bake.h"
 
 #include <string.h>
 
+// Rasterizes one input triangle when it has area and touches the tile,
+// counting it against the tile's limit.
+static mnavResult AddTriangle(mnavMemory* memory, const mnavBakeDef* def,
+                              const mnavBakeCells* cells, const mnavTileFrame* frame,
+                              const mnavVec3 corners[3], mnavAreaType given, int32_t* touching,
+                              mnavFragmentList* list)
+{
+    int32_t area = mnavTriangleArea(corners, given, cells->cosMaxSlope);
+    if (area < 0 || !mnavTriangleTouchesTile(frame, corners))
+    {
+        return mnav_success;
+    }
+    if (++*touching > def->limits.tileTriangles)
+    {
+        return mnav_errorLimit;
+    }
+    return mnavRasterizeTriangle(memory, frame, corners, (mnavAreaType)area, list);
+}
+
+// The cells of a terrain that may reach the tile, two triangles each.
+static mnavResult AddTerrain(mnavMemory* memory, const mnavBakeDef* def, const mnavBakeCells* cells,
+                             const mnavTileFrame* frame, const mnavTerrain* terrain,
+                             int32_t* touching, mnavFragmentList* list)
+{
+    int32_t c0 = 0;
+    int32_t c1 = -1;
+    int32_t r0 = 0;
+    int32_t r1 = -1;
+    if (!mnavTerrainCells(terrain, frame, &c0, &c1, &r0, &r1))
+    {
+        return mnav_success;
+    }
+    for (int32_t r = r0; r <= r1; ++r)
+    {
+        for (int32_t c = c0; c <= c1; ++c)
+        {
+            for (int32_t k = 0; k < 2; ++k)
+            {
+                mnavVec3 corners[3];
+                mnavAreaType given = 0;
+                mnavResult result =
+                    mnavTerrainTriangle(terrain, c, r, k, corners, &given)
+                        ? AddTriangle(memory, def, cells, frame, corners, given, touching, list)
+                        : mnav_success;
+                if (result != mnav_success)
+                {
+                    return result;
+                }
+            }
+        }
+    }
+    return mnav_success;
+}
+
 static mnavResult Collect(mnavMemory* memory, const mnavBakeDef* def, const mnavBakeCells* cells,
-                          const mnavTriangleMesh* meshes, int32_t meshCount,
-                          const mnavTileFrame* frame, mnavFragmentList* list)
+                          const mnavBakeInput* input, const mnavTileFrame* frame,
+                          mnavFragmentList* list)
 {
     int32_t touching = 0;
-    for (int32_t m = 0; m < meshCount; ++m)
+    for (int32_t m = 0; m < input->meshCount; ++m)
     {
-        const mnavTriangleMesh* mesh = &meshes[m];
+        const mnavTriangleMesh* mesh = &input->meshes[m];
         for (int32_t t = 0; t < mesh->triangleCount; ++t)
         {
             const int32_t* index = mesh->indices + (size_t)t * 3;
             const mnavVec3 corners[3] = {mesh->vertices[index[0]], mesh->vertices[index[1]],
                                          mesh->vertices[index[2]]};
             mnavAreaType given = mesh->areas != nullptr ? mesh->areas[t] : mnav_areaWalkable;
-            int32_t area = mnavTriangleArea(corners, given, cells->cosMaxSlope);
-            if (area < 0 || !mnavTriangleTouchesTile(frame, corners))
-            {
-                continue;
-            }
-            if (++touching > def->limits.tileTriangles)
-            {
-                return mnav_errorLimit;
-            }
             mnavResult result =
-                mnavRasterizeTriangle(memory, frame, corners, (mnavAreaType)area, list);
+                AddTriangle(memory, def, cells, frame, corners, given, &touching, list);
             if (result != mnav_success)
             {
                 return result;
             }
+        }
+    }
+    for (int32_t i = 0; i < input->terrainCount; ++i)
+    {
+        mnavResult result =
+            AddTerrain(memory, def, cells, frame, &input->terrains[i], &touching, list);
+        if (result != mnav_success)
+        {
+            return result;
         }
     }
     return mnav_success;
@@ -169,13 +224,21 @@ mnavResult mnavBuildHeightfield(mnavMemory* memory, const mnavBakeDef* def,
                                 int32_t meshCount, int32_t tileX, int32_t tileZ,
                                 mnavHeightfield* heightfield)
 {
+    const mnavBakeInput input = {meshes, meshCount, nullptr, 0};
+    return mnavBuildHeightfieldInput(memory, def, cells, &input, tileX, tileZ, heightfield);
+}
+
+mnavResult mnavBuildHeightfieldInput(mnavMemory* memory, const mnavBakeDef* def,
+                                     const mnavBakeCells* cells, const mnavBakeInput* input,
+                                     int32_t tileX, int32_t tileZ, mnavHeightfield* heightfield)
+{
     *heightfield = (mnavHeightfield){0};
     if (!mnavMakeTileFrame(def, cells, tileX, tileZ, &heightfield->frame))
     {
         return mnav_errorRange;
     }
     mnavFragmentList list = {nullptr, 0, 0, def->limits.tileSpans};
-    mnavResult result = Collect(memory, def, cells, meshes, meshCount, &heightfield->frame, &list);
+    mnavResult result = Collect(memory, def, cells, input, &heightfield->frame, &list);
     return Finish(memory, cells, result, &list, heightfield);
 }
 

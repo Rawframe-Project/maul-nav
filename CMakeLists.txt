@@ -87,6 +87,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/sort.c
     src/spatial.c
     src/surface.c
+    src/terrain.c
     src/tile.c
     src/triangulate.c)
 maul_configure_library(maul-nav)
@@ -131,6 +132,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(spatial)
     maul_add_test(linkgen)
     maul_add_test(debug)
+    maul_add_test(terrain)
     maul_add_test(avoidance)
     maul_add_test(orca WHITEBOX)
     maul_add_test(obstacle WHITEBOX)

@@ -53,6 +53,13 @@ when loaded.
   (`droppedRegions`), the disconnected islands the requirements ask to
   be warned of. The library keeps no clock: hosts time the bake.
 
+- **Terrains:** `mnavTerrain` is heights on a regular grid with an
+  area per cell, `mnav_areaNone` cutting a hole. `mnavBakeTileInput`
+  bakes meshes and terrains together; each cell is two triangles split
+  from its lowest X and Z corner, made only for the cells near the
+  tile, and the tile is byte for byte the one the same triangles as a
+  mesh give.
+
 ## Consequences
 
 - Tiles move between platforms and versions of a host unchanged, and a

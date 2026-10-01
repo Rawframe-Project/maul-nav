@@ -18,6 +18,7 @@
 #include "polymesh.h"
 #include "raster.h"
 #include "region.h"
+#include "terrain.h"
 #include "tile.h"
 
 #include "maul-nav/bake.h"
@@ -38,11 +39,11 @@ struct mnavBaker
 };
 
 // The stages' results for one tile, released together.
-// A bake's input: triangle meshes, or for a flat (2D) bake, outlines.
+// A bake's input: triangle meshes and terrains, or for a flat (2D) bake,
+// outlines.
 typedef struct Input
 {
-    const mnavTriangleMesh* meshes;
-    int32_t meshCount;
+    mnavBakeInput solid;
     const mnavOutline* outlines;
     int32_t outlineCount;
     bool flat;
@@ -132,9 +133,11 @@ static mnavResult CheckInput(const mnavBaker* baker, const Input* in, mnavBakeRe
     {
         return CheckOutlines(baker, in->outlines, in->outlineCount, report);
     }
-    const mnavTriangleMesh* meshes = in->meshes;
-    int32_t meshCount = in->meshCount;
-    if (meshCount < 0 || (meshCount > 0 && meshes == nullptr))
+    const mnavTriangleMesh* meshes = in->solid.meshes;
+    int32_t meshCount = in->solid.meshCount;
+    int32_t terrainCount = in->solid.terrainCount;
+    if (meshCount < 0 || (meshCount > 0 && meshes == nullptr) || terrainCount < 0 ||
+        (terrainCount > 0 && in->solid.terrains == nullptr))
     {
         return mnav_errorInvalid;
     }
@@ -149,6 +152,17 @@ static mnavResult CheckInput(const mnavBaker* baker, const Input* in, mnavBakeRe
             return input.result;
         }
         total += meshes[m].triangleCount;
+    }
+    for (int32_t i = 0; i < terrainCount; ++i)
+    {
+        mnavInputResult input = mnavCheckTerrain(&baker->def, &in->solid.terrains[i]);
+        if (input.result != mnav_success)
+        {
+            report->mesh = meshCount + i;
+            report->input = input;
+            return input.result;
+        }
+        total += mnavTerrainTriangles(&in->solid.terrains[i]);
     }
     return total > baker->def.limits.inputTriangles ? mnav_errorLimit : mnav_success;
 }
@@ -206,38 +220,79 @@ static uint64_t HashSettings(const mnavBakeDef* def, int32_t tileX, int32_t tile
     return HashWords(MNAV_HASH_INIT, words, (int32_t)(sizeof(words) / sizeof(words[0])));
 }
 
+// Adds a triangle that reaches the tile, as rasterization picks it, to
+// the fingerprint, and counts it.
+static uint64_t HashTriangle(const mnavBaker* baker, const mnavTileFrame* frame,
+                             const mnavVec3 corners[3], mnavAreaType given, uint64_t hash,
+                             int32_t* count)
+{
+    int32_t area = mnavTriangleArea(corners, given, baker->cells.cosMaxSlope);
+    if (area < 0 || !mnavTriangleTouchesTile(frame, corners))
+    {
+        return hash;
+    }
+    uint32_t words[10];
+    for (int32_t c = 0; c < 3; ++c)
+    {
+        words[c * 3 + 0] = Bits32(corners[c].x);
+        words[c * 3 + 1] = Bits32(corners[c].y);
+        words[c * 3 + 2] = Bits32(corners[c].z);
+    }
+    words[9] = (uint32_t)area;
+    *count += 1;
+    return HashWords(hash, words, 10);
+}
+
+static uint64_t HashTerrain(const mnavBaker* baker, const mnavTileFrame* frame,
+                            const mnavTerrain* terrain, uint64_t hash, int32_t* count)
+{
+    int32_t c0 = 0;
+    int32_t c1 = -1;
+    int32_t r0 = 0;
+    int32_t r1 = -1;
+    if (!mnavTerrainCells(terrain, frame, &c0, &c1, &r0, &r1))
+    {
+        return hash;
+    }
+    for (int32_t r = r0; r <= r1; ++r)
+    {
+        for (int32_t c = c0; c <= c1; ++c)
+        {
+            for (int32_t k = 0; k < 2; ++k)
+            {
+                mnavVec3 corners[3];
+                mnavAreaType given = 0;
+                if (mnavTerrainTriangle(terrain, c, r, k, corners, &given))
+                {
+                    hash = HashTriangle(baker, frame, corners, given, hash, count);
+                }
+            }
+        }
+    }
+    return hash;
+}
+
 // Adds every input triangle that reaches the tile, as rasterization picks
-// them, to the fingerprint, and counts them.
+// them, meshes' then terrains', to the fingerprint, and counts them.
 static uint64_t HashInput(const mnavBaker* baker, const mnavTileFrame* frame,
-                          const mnavTriangleMesh* meshes, int32_t meshCount, uint64_t hash,
-                          int32_t* count)
+                          const mnavBakeInput* input, uint64_t hash, int32_t* count)
 {
     *count = 0;
-    for (int32_t m = 0; m < meshCount; ++m)
+    for (int32_t m = 0; m < input->meshCount; ++m)
     {
-        const mnavTriangleMesh* mesh = &meshes[m];
+        const mnavTriangleMesh* mesh = &input->meshes[m];
         for (int32_t t = 0; t < mesh->triangleCount; ++t)
         {
             const int32_t* index = mesh->indices + (size_t)t * 3;
             const mnavVec3 corners[3] = {mesh->vertices[index[0]], mesh->vertices[index[1]],
                                          mesh->vertices[index[2]]};
             mnavAreaType given = mesh->areas != nullptr ? mesh->areas[t] : mnav_areaWalkable;
-            int32_t area = mnavTriangleArea(corners, given, baker->cells.cosMaxSlope);
-            if (area < 0 || !mnavTriangleTouchesTile(frame, corners))
-            {
-                continue;
-            }
-            uint32_t words[10];
-            for (int32_t c = 0; c < 3; ++c)
-            {
-                words[c * 3 + 0] = Bits32(corners[c].x);
-                words[c * 3 + 1] = Bits32(corners[c].y);
-                words[c * 3 + 2] = Bits32(corners[c].z);
-            }
-            words[9] = (uint32_t)area;
-            hash = HashWords(hash, words, 10);
-            *count += 1;
+            hash = HashTriangle(baker, frame, corners, given, hash, count);
         }
+    }
+    for (int32_t i = 0; i < input->terrainCount; ++i)
+    {
+        hash = HashTerrain(baker, frame, &input->terrains[i], hash, count);
     }
     return hash;
 }
@@ -289,8 +344,8 @@ static mnavResult RunStages(mnavBaker* baker, const Input* in, int32_t tileX, in
     mnavResult result =
         flat ? mnavBuildHeightfield2D(memory, def, cells, in->outlines, in->outlineCount, tileX,
                                       tileZ, &s->heightfield)
-             : mnavBuildHeightfield(memory, def, cells, in->meshes, in->meshCount, tileX, tileZ,
-                                    &s->heightfield);
+             : mnavBuildHeightfieldInput(memory, def, cells, &in->solid, tileX, tileZ,
+                                         &s->heightfield);
     if (result != mnav_success)
     {
         return result;
@@ -424,7 +479,7 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
         report.fingerprint =
             in->flat
                 ? HashOutlines(&frame, in->outlines, in->outlineCount, settings, &report.triangles)
-                : HashInput(baker, &frame, in->meshes, in->meshCount, settings, &report.triangles);
+                : HashInput(baker, &frame, &in->solid, settings, &report.triangles);
         result = RunStages(baker, in, tileX, tileZ, &stages, &report);
     }
     if (result == mnav_success)
@@ -451,14 +506,26 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
 mnavResult mnavBakeTile(mnavBaker* baker, const mnavTriangleMesh* meshes, int32_t meshCount,
                         int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
 {
-    Input in = {meshes, meshCount, nullptr, 0, false};
+    Input in = {{meshes, meshCount, nullptr, 0}, nullptr, 0, false};
+    return Bake(baker, &in, tileX, tileZ, reportOut);
+}
+
+mnavResult mnavBakeTileInput(mnavBaker* baker, const mnavBakeInput* input, int32_t tileX,
+                             int32_t tileZ, mnavBakeReport* reportOut)
+{
+    if (input == nullptr)
+    {
+        Input none = {{nullptr, -1, nullptr, 0}, nullptr, 0, false};
+        return Bake(baker, &none, tileX, tileZ, reportOut);
+    }
+    Input in = {*input, nullptr, 0, false};
     return Bake(baker, &in, tileX, tileZ, reportOut);
 }
 
 mnavResult mnavBakeTile2D(mnavBaker* baker, const mnavOutline* outlines, int32_t outlineCount,
                           int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
 {
-    Input in = {nullptr, 0, outlines, outlineCount, true};
+    Input in = {{nullptr, 0, nullptr, 0}, outlines, outlineCount, true};
     return Bake(baker, &in, tileX, tileZ, reportOut);
 }
 

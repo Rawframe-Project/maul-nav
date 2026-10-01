@@ -245,6 +245,41 @@ extern "C"
         const mnavAreaType* areas;
     } mnavTriangleMesh;
 
+// The most samples a terrain may have along either side.
+#define MNAV_MAX_TERRAIN_SIDE 65536
+
+    // A terrain (mnav-0003): heights sampled on a regular grid, the compact
+    // form of the largest input. Each cell between four samples is two
+    // triangles split along the diagonal from its lowest X and Z corner.
+    typedef struct mnavTerrain
+    {
+        // The first sample's place, in meters relative to the bake's origin.
+        mnavVec3 origin;
+        // The distance between samples along X and along Z, in meters,
+        // more than 0.
+        float spacingX;
+        float spacingZ;
+        // The samples along X and along Z, 2 to MNAV_MAX_TERRAIN_SIDE.
+        int32_t columns;
+        int32_t rows;
+        // columns times rows heights added to the origin's Y, X fastest.
+        // Only read during the call.
+        const float* heights;
+        // One area type per cell, (columns - 1) times (rows - 1), X
+        // fastest, or NULL for mnav_areaWalkable everywhere; a cell of
+        // mnav_areaNone is a hole, with no ground at all.
+        const mnavAreaType* areas;
+    } mnavTerrain;
+
+    // Everything a 3D bake reads: triangle meshes and terrains.
+    typedef struct mnavBakeInput
+    {
+        const mnavTriangleMesh* meshes;
+        int32_t meshCount;
+        const mnavTerrain* terrains;
+        int32_t terrainCount;
+    } mnavBakeInput;
+
     // A point of a 2D outline, in meters relative to the bake's origin:
     // (x, y) is the navmesh point (x, 0, y) (mnav-0002).
     typedef struct mnavVec2
@@ -276,6 +311,9 @@ extern "C"
         mnav_elementVertex = 1,
         mnav_elementTriangle = 2,
         mnav_elementPoint = 3,
+        // A terrain's height sample, and its cell.
+        mnav_elementSample = 4,
+        mnav_elementCell = 5,
     };
 
     // An input check's outcome: the status, and the first element it
@@ -434,6 +472,28 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_API void mnavDestroyBaker(mnavBaker* baker);
+
+    /// Bakes one tile from triangle meshes and terrains, as mnavBakeTile
+    /// does from meshes alone; a terrain's triangles count as input
+    /// triangles, after the meshes', toward the limits and the
+    /// fingerprint, and a refused terrain is reported as the mesh at its
+    /// index after the meshes.
+    ///
+    /// @param baker     The baker; the tile it held before is dropped.
+    /// @param input     The meshes and terrains.
+    /// @param tileX     The tile's column.
+    /// @param tileZ     The tile's row.
+    /// @param reportOut Receives the report. May be NULL.
+    /// @return As mnavBakeTile; a terrain with a side out of range, a
+    /// spacing not more than 0 or not finite, a height not finite (the
+    /// sample) or an area of MNAV_AREA_TYPES or more (the cell) is
+    /// `mnav_errorInvalid`, a sample past the extent input may have
+    /// `mnav_errorRange`.
+    /// @par Thread safety
+    /// Safe from any thread; the baker is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavBakeTileInput(mnavBaker* baker,
+                                                         const mnavBakeInput* input, int32_t tileX,
+                                                         int32_t tileZ, mnavBakeReport* reportOut);
 
     /// Bakes tile (tileX, tileZ) of the meshes: checks every mesh, then
     /// rasterizes, filters, partitions, traces and triangulates the tile

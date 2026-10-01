@@ -46,6 +46,12 @@ mnavResult mnavBuildHeightfield(mnavMemory* memory, const mnavBakeDef* def,
                                 int32_t meshCount, int32_t tileX, int32_t tileZ,
                                 mnavHeightfield* heightfield);
 
+// The same from meshes and terrains: the terrains' triangles of the cells
+// that may reach the tile, after the meshes'.
+mnavResult mnavBuildHeightfieldInput(mnavMemory* memory, const mnavBakeDef* def,
+                                     const mnavBakeCells* cells, const mnavBakeInput* input,
+                                     int32_t tileX, int32_t tileZ, mnavHeightfield* heightfield);
+
 // The same from 2D outlines, which must be valid for def: every cell one
 // holds becomes a span at height 0 (mnav-0002). Returns mnav_errorLimit
 // past the tileTriangles limit on outlines touching the tile, otherwise as
