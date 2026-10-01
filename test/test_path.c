@@ -161,6 +161,43 @@ static void TestLimitsEndTheSearch(void)
     path = Search(query, navmesh, a, b);
     CHECK(path.end == mnav_pathTooLong && path.polygonCount >= 1, "past the length");
     mnavDestroyQuery(query);
+    // The limit bounds the whole way through a node, not the way so far:
+    // with the end 84 m off no node opens, so a few nodes are enough.
+    query = MakeQuery(2, 40.0f);
+    path = Search(query, navmesh, a, b);
+    CHECK(path.end == mnav_pathTooLong && path.polygonCount == 1, "nothing opened");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
+// The fewest nodes with which a search reaches its end.
+static int32_t FewestNodes(const mnavNavmesh* navmesh, mnavNearest a, mnavNearest b)
+{
+    for (int32_t nodes = 1; nodes <= 8192; ++nodes)
+    {
+        mnavQuery* query = MakeQuery(nodes, 1000.0f);
+        mnavPath path = Search(query, navmesh, a, b);
+        mnavDestroyQuery(query);
+        if (path.end == mnav_pathFound)
+        {
+            return nodes;
+        }
+    }
+    return -1;
+}
+
+static void TestSearchWorkIsPinned(void)
+{
+    // The nodes a search needs follow from its rules: the way just come
+    // through is never opened again, and ties go to the node nearer the
+    // end.
+    mnavNavmesh* navmesh = LoadAll();
+    int32_t across = FewestNodes(navmesh, On(navmesh, 2.0, 0.0, 2.0), On(navmesh, 62.0, 0.0, 62.0));
+    int32_t around =
+        FewestNodes(navmesh, On(navmesh, 18.0, 0.0, 22.0), On(navmesh, 26.0, 0.0, 22.0));
+    int32_t sides = FewestNodes(navmesh, On(navmesh, 30.0, 0.0, 2.0), On(navmesh, 34.0, 0.0, 62.0));
+    printf("FEWEST across=%d around=%d sides=%d\n", across, around, sides);
+    CHECK(across == 27 && around == 10 && sides == 29, "the pinned node counts");
     mnavDestroyNavmesh(navmesh);
 }
 
@@ -334,6 +371,7 @@ int main(void)
     BakeWorld();
     TestAcrossTheWorld();
     TestLimitsEndTheSearch();
+    TestSearchWorkIsPinned();
     TestUnloadedPlacesAreNamed();
     TestUnreachableIsNone();
     TestIdsAreChecked();
