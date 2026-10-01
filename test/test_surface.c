@@ -89,6 +89,11 @@ static void TestAlongARow(void)
     move = Move(query, navmesh, nullptr, 28.0, 7.5, 33.0, 8.0);
     CHECK(move.end == mnav_moveWall && At(&move, 30.0, 8.0) && move.polygon.polygon == 4,
           "at the row's end");
+    // Straight above the corner the fourth and fifth squares share, both
+    // their walls offer (25, 10): the first met, the fourth's, wins.
+    move = Move(query, navmesh, nullptr, 6.0, 7.5, 25.0, 12.0);
+    CHECK(move.end == mnav_moveWall && At(&move, 25.0, 10.0) && move.polygon.polygon == 3,
+          "a tie to the wall met first");
     move = Move(query, navmesh, nullptr, 28.0, 7.5, 28.0, 7.5);
     CHECK(move.end == mnav_moveReached && At(&move, 28.0, 7.5), "no move at all");
     // The middle square left out is a wall.

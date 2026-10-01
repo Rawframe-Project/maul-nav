@@ -132,7 +132,6 @@ static bool OnWall(const Mover* m, const mnavTile* tile, int32_t polygon, int32_
 {
     bool below = u <= (e->au < e->bu ? e->au : e->bu);
     bool above = u >= (e->au < e->bu ? e->bu : e->au);
-    bool inside = false;
     for (int32_t l = tile->firstLink[polygon]; l < tile->firstLink[polygon + 1]; ++l)
     {
         const mnavLink* link = &tile->links[l];
@@ -140,10 +139,10 @@ static bool OnWall(const Mover* m, const mnavTile* tile, int32_t polygon, int32_
         {
             below = below || (link->low < u && u <= link->high);
             above = above || (link->low <= u && u < link->high);
-            inside = inside || (link->low < u && u < link->high);
         }
     }
-    return !inside && !(below && above);
+    // Covered on both sides, u is open; a point inside a link is.
+    return !(below && above);
 }
 
 // A tile-side edge: its open links are visited; the rest of it is wall,
