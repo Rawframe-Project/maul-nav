@@ -114,6 +114,14 @@ static void TestNearestAndTies(void)
     CHECK(mnavNearObstacles(&agent, vertices, Grid(vertices, count, 3.0), 2.0, near, 1) == 1 &&
               vertices[near[0].vertex].id == 9,
           "the nearer");
+    // A great circle's edge near the agent, its center far beyond the
+    // agent's reach: found through the circle's bounds.
+    const mnavPos2 far = {25.0, 0.0};
+    const mnavObstacle big = {&far, 1, 20.0, {0, 0}, 5};
+    agent.position = (mnavPos2){4.6, 0.0};
+    CHECK(mnavBuildObstacles(&big, 1, vertices, 2, &count) == mnav_success &&
+              mnavNearObstacles(&agent, vertices, Grid(vertices, count, 3.0), 2.0, near, 1) == 1,
+          "a great circle's near edge");
     // A segment of one point twice is no segment.
     const mnavPos2 same[2] = {{1.0, 1.0}, {1.0, 1.0}};
     const mnavObstacle bad = {same, 2, 0.0, {0, 0}, 1};
