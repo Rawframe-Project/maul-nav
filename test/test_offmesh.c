@@ -80,6 +80,14 @@ static void TestLinksAttachAtTheCommit(void)
     state = Get(navmesh, near);
     CHECK(state.attached && state.end.x == 15.0 && state.end.z == 7.5, "snapped to the edge");
     CHECK(!Get(navmesh, far).attached, "too far to snap");
+    // Off the square's corner (15, 5) by 0.4 m on both axes: within the
+    // search box, but 0.57 m away, past the 0.5 m radius.
+    mnavLinkId corner = Stage(navmesh, Link(7.5, 7.5, 14.6, 4.6, 0.5f));
+    CHECK(mnavCommit(navmesh) == mnav_success && !Get(navmesh, corner).attached,
+          "the radius is round");
+    CHECK(mnavStageLinkRemoval(navmesh, corner) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "removed again");
     // The two-way link starts on the second square: it leaves the second
     // forward and the first in reverse, after the first's two links.
     CHECK(Get(navmesh, both).attached && mnavAttachmentsFrom(navmesh, 0, 1, &first) == 1 &&
@@ -141,6 +149,10 @@ static void TestRemovalAndIds(void)
           "no such slot");
     bad = (mnavLinkId){next.slot, next.generation + 1};
     CHECK(mnavGetLink(navmesh, bad, &state) == mnav_errorInvalid, "a generation not yet given");
+    // A slot at its last generation is never reused.
+    navmesh->links[next.slot - 1].generation = UINT32_MAX;
+    mnavLinkId fresh = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
+    CHECK(fresh.slot != next.slot && fresh.generation == 1, "a new slot past a worn one");
     mnavDestroyNavmesh(navmesh);
 }
 
