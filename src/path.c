@@ -577,3 +577,28 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnav
     }
     return result == mnav_success ? mnavFinishPath(query, navmesh, pathOut) : result;
 }
+
+mnavResult mnavCheckReachable(mnavQuery* query, const mnavNavmesh* navmesh,
+                              const mnavQueryFilter* filter, mnavPolygonId startPolygon,
+                              mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
+                              mnavPathEnd* endOut)
+{
+    if (endOut == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    mnavResult result = mnavBeginPath(query, navmesh, filter, startPolygon, start, endPolygon, end);
+    bool ended = false;
+    while (result == mnav_success && !ended)
+    {
+        result = mnavContinuePath(query, navmesh, INT32_MAX, &ended);
+    }
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    mnavSearch* s = &query->search;
+    *endOut = s->found != MNAV_NO_NODE ? mnav_pathFound : EndOf(s);
+    s->active = false;
+    return mnav_success;
+}

@@ -213,3 +213,6 @@ format.
   tiles with pillars and walls and finds three long paths: about 13 ms
   each plainly with 131,072 nodes, 1.4 ms through the hierarchy with
   8,192, at the same lengths; the build takes about 84 ms.
+- Spatial queries: mnavGetHeight, mnavFindWallDistance,
+  mnavFindRandomPoint and mnavFindRandomPointAround (from a 64-bit seed,
+  uniform by area, the latter within its circle), mnavCheckReachable.

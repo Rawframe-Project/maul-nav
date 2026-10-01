@@ -645,6 +645,139 @@ extern "C"
                                                         mnavCell start, mnavCell end,
                                                         mnavGridPath* pathOut);
 
+    /// Reads the height of a polygon's detail surface at a point on the
+    /// ground.
+    ///
+    /// @param navmesh   The navmesh.
+    /// @param polygon   The polygon.
+    /// @param x         The point's X.
+    /// @param z         The point's Z.
+    /// @param heightOut Receives the height.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// coordinate not finite, or a polygon id never handed out;
+    /// `mnav_errorStale` for a polygon whose tile has gone;
+    /// `mnav_errorRange` for a point outside the polygon on the ground.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read the navmesh
+    /// at once while no commit runs on it.
+    MNAV_NODISCARD MNAV_API mnavResult mnavGetHeight(const mnavNavmesh* navmesh,
+                                                     mnavPolygonId polygon, double x, double z,
+                                                     double* heightOut);
+
+    // The nearest wall a search within a radius found.
+    typedef struct mnavWall
+    {
+        // Whether a wall lies within the radius; when not, the distance is
+        // the radius and the point the center.
+        bool found;
+        // Whether the context's node limit cut the search short, so that a
+        // nearer wall may lie unseen.
+        bool limited;
+        // The distance on the ground from the center to the wall point.
+        double distance;
+        // The wall's nearest point, and the unit direction on the ground
+        // from it to the center.
+        mnavPos3 point;
+        mnavPos3 normal;
+    } mnavWall;
+
+    /// Finds the nearest wall to a point within a radius on the ground,
+    /// searching from its polygon across the edges that come within the
+    /// radius, off-mesh links aside. An edge is a wall when no polygon the
+    /// filter includes lies across it, a tile side with no tile loaded
+    /// beyond included.
+    ///
+    /// @param query   The context; its last search ends.
+    /// @param navmesh The navmesh.
+    /// @param filter  The areas usable, or NULL.
+    /// @param polygon The polygon the center lies in.
+    /// @param center  The point.
+    /// @param radius  How far to look, in meters, at least 0 and finite.
+    /// @param wallOut Receives the wall.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// point or radius not finite, a negative radius, a polygon id never
+    /// handed out, or a filter not built from mnavDefaultQueryFilter;
+    /// `mnav_errorStale` for a polygon whose tile has gone;
+    /// `mnav_errorRange` for a filter cost out of its range.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindWallDistance(mnavQuery* query,
+                                                            const mnavNavmesh* navmesh,
+                                                            const mnavQueryFilter* filter,
+                                                            mnavPolygonId polygon, mnavPos3 center,
+                                                            double radius, mnavWall* wallOut);
+
+    // A random point and the polygon it lies on; slot 0 when there was no
+    // polygon to pick.
+    typedef struct mnavRandomPoint
+    {
+        mnavPolygonId polygon;
+        mnavPos3 point;
+    } mnavRandomPoint;
+
+    /// Picks a point uniformly over the ground area of every polygon the
+    /// filter includes, from a seed: the same seed and navmesh give the
+    /// same point on every platform. The point lies on the polygon's detail
+    /// surface. The call reads every polygon twice.
+    ///
+    /// @param navmesh  The navmesh.
+    /// @param filter   The areas usable, or NULL.
+    /// @param seed     Any value.
+    /// @param pointOut Receives the point.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// filter not built from mnavDefaultQueryFilter; `mnav_errorRange` for
+    /// a filter cost out of its range.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read the navmesh
+    /// at once while no commit runs on it.
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindRandomPoint(const mnavNavmesh* navmesh,
+                                                           const mnavQueryFilter* filter,
+                                                           uint64_t seed,
+                                                           mnavRandomPoint* pointOut);
+
+    /// Picks a point reachable from a center: a polygon the walls search
+    /// reaches within the radius, by ground area, then a point uniformly
+    /// on it, which may lie beyond the radius by up to the polygon's size.
+    ///
+    /// @param query    The context; its last search ends.
+    /// @param navmesh  The navmesh.
+    /// @param filter   The areas usable, or NULL.
+    /// @param polygon  The polygon the center lies in.
+    /// @param center   The center.
+    /// @param radius   How far to search, in meters, at least 0 and finite.
+    /// @param seed     Any value.
+    /// @param pointOut Receives the point.
+    /// @return As mnavFindWallDistance.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavFindRandomPointAround(mnavQuery* query, const mnavNavmesh* navmesh,
+                              const mnavQueryFilter* filter, mnavPolygonId polygon, mnavPos3 center,
+                              double radius, uint64_t seed, mnavRandomPoint* pointOut);
+
+    /// Tells whether the end can be reached from the start: the path search
+    /// with its limits, without a path made. mnav_pathFound when it can,
+    /// mnav_pathNone when it cannot, or the limit that stopped the search
+    /// before it could tell.
+    ///
+    /// @param query        The context; its last search ends.
+    /// @param navmesh      The navmesh.
+    /// @param filter       The areas usable and their costs, or NULL.
+    /// @param startPolygon The polygon the start lies in.
+    /// @param start        The start point.
+    /// @param endPolygon   The polygon the end lies in.
+    /// @param end          The end point.
+    /// @param endOut       Receives how the search ended.
+    /// @return As mnavFindPath.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCheckReachable(mnavQuery* query,
+                                                          const mnavNavmesh* navmesh,
+                                                          const mnavQueryFilter* filter,
+                                                          mnavPolygonId startPolygon,
+                                                          mnavPos3 start, mnavPolygonId endPolygon,
+                                                          mnavPos3 end, mnavPathEnd* endOut);
+
     // How a raycast ended.
     typedef uint8_t mnavRayEnd;
 

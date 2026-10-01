@@ -128,6 +128,24 @@ that are not loaded must say so rather than treat them as walls.
   search's ends, closed nodes final, and the turning cells as the
   path.
 
+- **Heights:** `mnavGetHeight` reads a polygon's detail surface at a
+  ground point inside its footprint, `mnav_errorRange` outside it.
+- **Walls:** `mnavFindWallDistance` searches from the center's polygon
+  through the edges within a radius, as Detour's findDistanceToWall
+  does, and returns the nearest wall point, its ground distance and the
+  unit direction from it to the center; an edge with nothing the filter
+  includes across it is a wall, an unloaded tile side included; off-mesh
+  links are left aside; the node limit's cut is reported.
+- **Random points:** `mnavFindRandomPoint` picks uniformly over the
+  ground area of every included polygon from a 64-bit seed through
+  SplitMix64, where Detour picks a tile first; `mnavFindRandomPointAround`
+  samples the polygons the walls search reaches by the area each shares
+  with the circle, an inscribed 32-gon written out as constants, so the
+  point lies in the circle, where Detour's may lie a polygon away.
+- **Reachability:** `mnavCheckReachable` runs the path search without
+  string pulling and returns its end: found, none, or the limit or
+  unloaded tile that kept it from telling.
+
 ## Consequences
 
 - Queries scan the polygons of each loaded tile in their box; a search
