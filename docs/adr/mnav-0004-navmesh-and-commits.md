@@ -36,6 +36,17 @@ is gone (record 0016).
 - **Not loaded:** a place with no committed tile is
   `mnav_errorNotLoaded`, not a wall.
 
+- **Off-mesh links:** points joined where the ground does not join
+  them (jump, drop, climb, ladder, door, teleport, and host kinds up to
+  64), one-way or two-way, with a cost. They are runtime data, never
+  baked: `mnavStageLink` returns an id at once and the link is added at
+  the next commit, `mnavStageLinkRemoval` removes it there, and both
+  ride the same all-or-nothing commit as tiles. At every commit each
+  link's ends snap again to the nearest polygon within its radius on
+  the ground and the agent's step in height, so a link attaches when
+  both ends' tiles are loaded and detaches when one leaves;
+  `mnavGetLink` reads which. A navmesh holds at most `limits.links`.
+
 ## Consequences
 
 - A commit costs work proportional to the tiles next to its changes,

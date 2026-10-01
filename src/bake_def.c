@@ -44,6 +44,7 @@ mnavBakeDef mnavDefaultBakeDef(void)
     def.limits.tileVertices = 16384;
     def.limits.tileLinks = 32768;
     def.limits.tiles = 65536;
+    def.limits.links = 4096;
     def.limits.memoryBytes = 268435456;
     return def;
 }
@@ -79,6 +80,7 @@ static mnavBakeSetting CheckLimits(const mnavBakeLimits* limits)
         {limits->tileVertices, MNAV_MAX_TILE_VERTICES, mnav_settingTileVertices},
         {limits->tileLinks, MNAV_MAX_TILE_LINKS, mnav_settingTileLinks},
         {limits->tiles, MNAV_MAX_TILES, mnav_settingTiles},
+        {limits->links, MNAV_MAX_LINKS, mnav_settingLinks},
     };
     for (size_t i = 0; i < sizeof(counts) / sizeof(counts[0]); ++i)
     {

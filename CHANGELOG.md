@@ -137,3 +137,8 @@ format.
   mnavFindNearest, mnavFindPath and mnavRaycast take a filter after the
   navmesh (NULL for the default); mnavPath gains the length in meters
   beside its cost, and the path length limit counts meters.
+- Off-mesh links (mnav-0004): mnavLinkDef, mnavLinkId, mnavLinkState
+  and mnavLinkKind; mnavStageLink, mnavStageLinkRemoval and
+  mnavGetLink. Links are staged and committed with tiles and snapped
+  again at every commit. The bake def gains limits.links
+  (mnav_settingLinks). mnavCommit moves to its own module.

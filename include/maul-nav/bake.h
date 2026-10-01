@@ -40,6 +40,7 @@ extern "C"
 #define MNAV_MAX_TILE_VERTICES   65535
 #define MNAV_MAX_TILE_LINKS      1048576
 #define MNAV_MAX_TILES           1048576
+#define MNAV_MAX_LINKS           1048576
 
     // An area type, 0 to MNAV_AREA_TYPES - 1.
     typedef uint8_t mnavAreaType;
@@ -91,6 +92,8 @@ extern "C"
         int32_t tileLinks;
         // Tiles in one navmesh.
         int32_t tiles;
+        // Off-mesh links in one navmesh, staged or committed (N29).
+        int32_t links;
         // Bytes the bake may hold allocated at once.
         uint64_t memoryBytes;
     } mnavBakeLimits;
@@ -162,6 +165,7 @@ extern "C"
         mnav_settingMaxEdgeLength = 21,
         mnav_settingDetailSampleDistance = 22,
         mnav_settingDetailMaxError = 23,
+        mnav_settingLinks = 24,
     };
 
     // A def check's outcome: the status, and the first setting it refused.

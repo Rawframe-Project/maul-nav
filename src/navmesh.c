@@ -86,6 +86,10 @@ void mnavDestroyNavmesh(mnavNavmesh* navmesh)
     }
     mnavRelease(memory, navmesh->staged, (size_t)navmesh->stagedCapacity, sizeof(mnavStaged),
                 alignof(mnavStaged));
+    mnavRelease(memory, navmesh->links, (size_t)navmesh->linkCapacity, sizeof(mnavOffLink),
+                alignof(mnavOffLink));
+    mnavRelease(memory, navmesh->attachments, (size_t)navmesh->attachmentCapacity, sizeof(uint64_t),
+                alignof(uint64_t));
     mnavRelease(memory, navmesh->places, (size_t)navmesh->placeCapacity, sizeof(mnavPlace),
                 alignof(mnavPlace));
     mnavRelease(memory, navmesh->slots, (size_t)navmesh->slotCapacity, sizeof(mnavSlot),
@@ -251,30 +255,6 @@ mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX, int32_t til
     return Stage(navmesh, tileX, tileZ, nullptr);
 }
 
-// New links for one tile, applied when the commit succeeds.
-typedef struct Relink
-{
-    int32_t slot;
-    mnavLink* links;
-    int32_t linkCount;
-    int32_t* firstLink;
-} Relink;
-
-// The navmesh after the commit, built beside it: slots, places, and the
-// links of every tile next to a change.
-typedef struct Plan
-{
-    mnavSlot* slots;
-    int32_t slotCount;
-    int32_t slotCapacity;
-    mnavPlace* places;
-    int32_t placeCount;
-    int32_t placeCapacity;
-    Relink* relinks;
-    int32_t relinkCount;
-    int32_t relinkCapacity;
-} Plan;
-
 void mnavAcross(int32_t side, int32_t* x, int32_t* z, int32_t* facing)
 {
     *x += side == 1 ? -1 : (side == 3 ? 1 : 0);
@@ -334,7 +314,7 @@ static bool Overlap(const Span* a, const Span* b, int64_t step, int32_t* low, in
 }
 
 // The slot of the tile at a place after the commit, or -1.
-static int32_t PlannedSlot(const Plan* plan, int32_t x, int32_t z)
+static int32_t PlannedSlot(const mnavTilePlan* plan, int32_t x, int32_t z)
 {
     int32_t at = FindPlace(plan->places, plan->placeCount, x, z);
     return at >= 0 ? plan->places[at].slot : -1;
@@ -353,7 +333,7 @@ typedef struct Edge
 
 // Visits the links from one edge to the polygons across its side: counts
 // them into first, or with links writes each at its polygon's cursor.
-static void VisitAcross(const mnavNavmesh* navmesh, const Plan* plan, const Edge* from,
+static void VisitAcross(const mnavNavmesh* navmesh, const mnavTilePlan* plan, const Edge* from,
                         int32_t* first, mnavLink* links)
 {
     const mnavPolyMesh* across = &plan->slots[from->other].tile->mesh;
@@ -391,8 +371,8 @@ static void VisitAcross(const mnavNavmesh* navmesh, const Plan* plan, const Edge
 // Visits every link of polygon edges on slot's tile sides: with links
 // NULL counts them per polygon into first; otherwise writes each at its
 // polygon's cursor in first.
-static void VisitLinks(const mnavNavmesh* navmesh, const Plan* plan, int32_t slot, int32_t* first,
-                       mnavLink* links)
+static void VisitLinks(const mnavNavmesh* navmesh, const mnavTilePlan* plan, int32_t slot,
+                       int32_t* first, mnavLink* links)
 {
     const mnavSlot* own = &plan->slots[slot];
     const mnavPolyMesh* mesh = &own->tile->mesh;
@@ -420,14 +400,14 @@ static void VisitLinks(const mnavNavmesh* navmesh, const Plan* plan, int32_t slo
 }
 
 // Builds the links of slot's tile after the commit, counting first.
-static mnavResult BuildLinks(mnavNavmesh* navmesh, Plan* plan, int32_t slot)
+static mnavResult BuildLinks(mnavNavmesh* navmesh, mnavTilePlan* plan, int32_t slot)
 {
     mnavMemory* memory = &navmesh->memory;
     int32_t polygons = plan->slots[slot].tile->mesh.polygonCount;
-    Relink relink = {slot, nullptr, 0, nullptr};
+    mnavRelink relink = {slot, nullptr, 0, nullptr};
     mnavResult result =
         mnavReserve(memory, (void**)&plan->relinks, &plan->relinkCapacity, plan->relinkCount,
-                    plan->relinkCount + 1, sizeof(Relink), alignof(Relink));
+                    plan->relinkCount + 1, sizeof(mnavRelink), alignof(mnavRelink));
     if (result == mnav_success)
     {
         result = mnavAllocate(memory, (size_t)polygons + 1, sizeof(int32_t), alignof(int32_t),
@@ -483,7 +463,7 @@ static void InsertionSortStaged(mnavStaged* staged, int32_t count)
 }
 
 // A free slot for a new tile: the lowest free one, or a new one.
-static int32_t TakeSlot(Plan* plan)
+static int32_t TakeSlot(mnavTilePlan* plan)
 {
     for (int32_t s = 0; s < plan->slotCount; ++s)
     {
@@ -499,7 +479,7 @@ static int32_t TakeSlot(Plan* plan)
 // Puts a staged change into the planned slots: a replacement keeps its
 // slot with the next generation, unless that would wrap, which retires
 // the slot; a removal empties its slot with the next generation.
-static void PlanChange(Plan* plan, int32_t existing, const mnavStaged* staged)
+static void PlanChange(mnavTilePlan* plan, int32_t existing, const mnavStaged* staged)
 {
     if (existing >= 0)
     {
@@ -525,7 +505,7 @@ static void PlanChange(Plan* plan, int32_t existing, const mnavStaged* staged)
 
 // Merges the committed places with the staged changes, both sorted, into
 // the planned places.
-static void PlanPlaces(const mnavNavmesh* navmesh, Plan* plan)
+static void PlanPlaces(const mnavNavmesh* navmesh, mnavTilePlan* plan)
 {
     int32_t a = 0;
     int32_t b = 0;
@@ -558,24 +538,24 @@ static void PlanPlaces(const mnavNavmesh* navmesh, Plan* plan)
     }
 }
 
-static void ReleasePlan(mnavMemory* memory, Plan* plan)
+static void ReleasePlan(mnavMemory* memory, mnavTilePlan* plan)
 {
     for (int32_t r = 0; r < plan->relinkCount; ++r)
     {
-        Relink* relink = &plan->relinks[r];
+        mnavRelink* relink = &plan->relinks[r];
         int32_t polygons = plan->slots[relink->slot].tile->mesh.polygonCount;
         mnavRelease(memory, relink->links, (size_t)relink->linkCount, sizeof(mnavLink),
                     alignof(mnavLink));
         mnavRelease(memory, relink->firstLink, (size_t)polygons + 1, sizeof(int32_t),
                     alignof(int32_t));
     }
-    mnavRelease(memory, plan->relinks, (size_t)plan->relinkCapacity, sizeof(Relink),
-                alignof(Relink));
+    mnavRelease(memory, plan->relinks, (size_t)plan->relinkCapacity, sizeof(mnavRelink),
+                alignof(mnavRelink));
     mnavRelease(memory, plan->places, (size_t)plan->placeCapacity, sizeof(mnavPlace),
                 alignof(mnavPlace));
     mnavRelease(memory, plan->slots, (size_t)plan->slotCapacity, sizeof(mnavSlot),
                 alignof(mnavSlot));
-    *plan = (Plan){0};
+    *plan = (mnavTilePlan){0};
 }
 
 // Whether slot's tile lies next to, or at, a staged place.
@@ -595,7 +575,7 @@ static bool NearChange(const mnavNavmesh* navmesh, const mnavSlot* slot)
 }
 
 // Builds the navmesh after the commit beside the one queries read.
-static mnavResult MakePlan(mnavNavmesh* navmesh, Plan* plan)
+static mnavResult MakePlan(mnavNavmesh* navmesh, mnavTilePlan* plan)
 {
     mnavMemory* memory = &navmesh->memory;
     plan->slotCapacity = navmesh->slotCount + navmesh->stagedCount;
@@ -639,7 +619,7 @@ static mnavResult MakePlan(mnavNavmesh* navmesh, Plan* plan)
 
 // Swaps the plan in: frees the tiles it replaced or removed and the links
 // it rebuilt, and takes its slots, places and links.
-static void Apply(mnavNavmesh* navmesh, Plan* plan)
+static void Apply(mnavNavmesh* navmesh, mnavTilePlan* plan)
 {
     mnavMemory* memory = &navmesh->memory;
     for (int32_t s = 0; s < navmesh->slotCount; ++s)
@@ -651,15 +631,15 @@ static void Apply(mnavNavmesh* navmesh, Plan* plan)
     }
     for (int32_t r = 0; r < plan->relinkCount; ++r)
     {
-        Relink* relink = &plan->relinks[r];
+        mnavRelink* relink = &plan->relinks[r];
         mnavTile* tile = plan->slots[relink->slot].tile;
         ReleaseLinks(memory, tile);
         tile->links = relink->links;
         tile->linkCount = relink->linkCount;
         tile->firstLink = relink->firstLink;
     }
-    mnavRelease(memory, plan->relinks, (size_t)plan->relinkCapacity, sizeof(Relink),
-                alignof(Relink));
+    mnavRelease(memory, plan->relinks, (size_t)plan->relinkCapacity, sizeof(mnavRelink),
+                alignof(mnavRelink));
     mnavRelease(memory, navmesh->slots, (size_t)navmesh->slotCapacity, sizeof(mnavSlot),
                 alignof(mnavSlot));
     mnavRelease(memory, navmesh->places, (size_t)navmesh->placeCapacity, sizeof(mnavPlace),
@@ -671,31 +651,36 @@ static void Apply(mnavNavmesh* navmesh, Plan* plan)
     navmesh->placeCount = plan->placeCount;
     navmesh->placeCapacity = plan->placeCapacity;
     navmesh->stagedCount = 0;
-    *plan = (Plan){0};
+    *plan = (mnavTilePlan){0};
 }
 
-mnavResult mnavCommit(mnavNavmesh* navmesh)
+mnavResult mnavPlanTiles(mnavNavmesh* navmesh, mnavTilePlan* plan)
 {
-    if (navmesh == nullptr)
-    {
-        return mnav_errorInvalid;
-    }
+    *plan = (mnavTilePlan){0};
     if (navmesh->stagedCount == 0)
     {
         return mnav_success;
     }
     InsertionSortStaged(navmesh->staged, navmesh->stagedCount);
-    Plan plan = {0};
-    mnavResult result = MakePlan(navmesh, &plan);
-    if (result == mnav_success)
+    mnavResult result = MakePlan(navmesh, plan);
+    if (result != mnav_success)
     {
-        Apply(navmesh, &plan);
-    }
-    else
-    {
-        ReleasePlan(&navmesh->memory, &plan);
+        ReleasePlan(&navmesh->memory, plan);
     }
     return result;
+}
+
+void mnavDropTilePlan(mnavNavmesh* navmesh, mnavTilePlan* plan)
+{
+    ReleasePlan(&navmesh->memory, plan);
+}
+
+void mnavApplyTiles(mnavNavmesh* navmesh, mnavTilePlan* plan)
+{
+    if (navmesh->stagedCount > 0)
+    {
+        Apply(navmesh, plan);
+    }
 }
 
 mnavFrame mnavFrameOf(const mnavNavmesh* navmesh, int32_t x, int32_t z)

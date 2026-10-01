@@ -11,6 +11,7 @@
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -119,9 +120,10 @@ extern "C"
 
     /// Applies everything staged at once: installs and removes the tiles
     /// and links every polygon on a changed tile's sides to the polygons
-    /// across them. Either all of it applies or, on failure, nothing does
-    /// and the staged changes stay. A replaced or removed tile's ids
-    /// become stale.
+    /// across them, adds and removes off-mesh links, and snaps every
+    /// off-mesh link's ends again. Either all of it applies or, on
+    /// failure, nothing does and the staged changes stay. A replaced or
+    /// removed tile's ids become stale, and so do removed links' ids.
     ///
     /// @param navmesh  The navmesh.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
@@ -147,6 +149,113 @@ extern "C"
     /// call runs.
     MNAV_NODISCARD MNAV_API mnavResult mnavGetTile(const mnavNavmesh* navmesh, int32_t tileX,
                                                    int32_t tileZ, mnavTileId* tileOut);
+
+// The number of off-mesh link kinds.
+#define MNAV_LINK_KINDS 64
+// The farthest an off-mesh link's end may snap, in meters.
+#define MNAV_MAX_LINK_RADIUS 100.0f
+// The dearest off-mesh link, in the filter's cost units.
+#define MNAV_MAX_LINK_COST 1.0e9f
+
+    // How an agent traverses an off-mesh link (N29): kinds 0 to 5 are the
+    // library's, 6 to MNAV_LINK_KINDS - 1 the host's to name.
+    typedef uint8_t mnavLinkKind;
+
+    enum
+    {
+        mnav_linkJump = 0,
+        mnav_linkDrop = 1,
+        mnav_linkClimb = 2,
+        mnav_linkLadder = 3,
+        mnav_linkDoor = 4,
+        mnav_linkTeleport = 5,
+        // The first kind the host names.
+        mnav_linkHostKinds = 6,
+    };
+
+    // An off-mesh link: a way from one point to another that the ground
+    // does not make.
+    typedef struct mnavLinkDef
+    {
+        mnavPos3 start;
+        mnavPos3 end;
+        // How far on the ground each end may lie from the polygon it
+        // snaps to, in meters, 0 to MNAV_MAX_LINK_RADIUS.
+        float radius;
+        // What crossing it costs, in the filter's cost units, 0 to
+        // MNAV_MAX_LINK_COST.
+        float cost;
+        mnavLinkKind kind;
+        // Whether agents may cross it from its end to its start too.
+        bool twoWay;
+    } mnavLinkDef;
+
+    // An off-mesh link in a navmesh: its 1-based slot and the slot's
+    // generation.
+    typedef struct mnavLinkId
+    {
+        uint32_t slot;
+        uint32_t generation;
+    } mnavLinkId;
+
+    // An off-mesh link as committed.
+    typedef struct mnavLinkState
+    {
+        // Whether both ends snapped to polygons at the last commit; a
+        // detached link is not crossed.
+        bool attached;
+        // The polygons the ends snapped to and the points on them; zeroed
+        // when detached.
+        mnavPolygonId startPolygon;
+        mnavPolygonId endPolygon;
+        mnavPos3 start;
+        mnavPos3 end;
+    } mnavLinkState;
+
+    /// Stages an off-mesh link; it is added at the next commit. Its ends
+    /// snap, at every commit, to the nearest polygon within its radius on
+    /// the ground and the agent's step in height.
+    ///
+    /// @param navmesh  The navmesh.
+    /// @param def      The link.
+    /// @param linkOut  Receives its id, usable once it is committed.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// point that is not finite; `mnav_errorRange` for a radius, cost or
+    /// kind out of its range; `mnav_errorLimit` when the links, staged and
+    /// committed, would pass the links limit, or memory its limit;
+    /// `mnav_errorCapacity` when the allocator fails.
+    /// @par Thread safety
+    /// Safe from any thread; the navmesh is used by one thread at a time,
+    /// so no query may run while a link is staged.
+    MNAV_NODISCARD MNAV_API mnavResult mnavStageLink(mnavNavmesh* navmesh, const mnavLinkDef* def,
+                                                     mnavLinkId* linkOut);
+
+    /// Stages an off-mesh link's removal; it goes at the next commit. A link
+    /// staged and not yet committed goes at once.
+    ///
+    /// @param navmesh  The navmesh.
+    /// @param link     The link.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh or an
+    /// id never handed out; `mnav_errorStale` for a link already removed.
+    /// @par Thread safety
+    /// Safe from any thread; the navmesh is used by one thread at a time,
+    /// so no query may run while a removal is staged.
+    MNAV_NODISCARD MNAV_API mnavResult mnavStageLinkRemoval(mnavNavmesh* navmesh, mnavLinkId link);
+
+    /// Reads an off-mesh link as committed.
+    ///
+    /// @param navmesh  The navmesh.
+    /// @param link     The link.
+    /// @param stateOut Receives its state.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or an
+    /// id never handed out; `mnav_errorNotLoaded` for a link staged and not
+    /// yet committed; `mnav_errorStale` for a link removed.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read links and
+    /// query at once between commits; none may while a stage or commit
+    /// call runs.
+    MNAV_NODISCARD MNAV_API mnavResult mnavGetLink(const mnavNavmesh* navmesh, mnavLinkId link,
+                                                   mnavLinkState* stateOut);
 
 #ifdef __cplusplus
 }

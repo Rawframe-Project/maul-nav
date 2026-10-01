@@ -68,6 +68,28 @@ typedef struct mnavStaged
     mnavTile* tile;
 } mnavStaged;
 
+// Where an off-mesh link stands: a free slot, added at the next commit,
+// committed, or removed at the next commit.
+typedef uint8_t mnavLinkPhase;
+
+enum
+{
+    MNAV_LINK_FREE = 0,
+    MNAV_LINK_ADDING = 1,
+    MNAV_LINK_LIVE = 2,
+    MNAV_LINK_REMOVING = 3,
+};
+
+// An off-mesh link's slot: the link, its generation (0 before first use)
+// and, once committed, where its ends snapped.
+typedef struct mnavOffLink
+{
+    mnavLinkDef def;
+    uint32_t generation;
+    mnavLinkPhase phase;
+    mnavLinkState state;
+} mnavOffLink;
+
 struct mnavNavmesh
 {
     mnavBakeDef def;
@@ -83,6 +105,18 @@ struct mnavNavmesh
     mnavStaged* staged;
     int32_t stagedCount;
     int32_t stagedCapacity;
+    // Off-mesh links by slot, the slots not free, and the links staged
+    // to be added or removed.
+    mnavOffLink* links;
+    int32_t linkSlots;
+    int32_t linkCapacity;
+    int32_t linksHeld;
+    int32_t linksPending;
+    // Every attached link from each polygon it leaves, as keys sorted by
+    // slot, polygon, link and direction (offmesh.h).
+    uint64_t* attachments;
+    int32_t attachmentCount;
+    int32_t attachmentCapacity;
 };
 
 // The committed tile at a place, or NULL; slotOut receives its 0-based
@@ -118,5 +152,39 @@ mnavResult mnavCheckPolygon(const mnavNavmesh* navmesh, mnavPolygonId id);
 
 // A mesh vertex's world position in a tile's frame.
 mnavPos3 mnavVertexWorld(const mnavFrame* f, const mnavMeshVertex* v);
+
+// New links for one tile, applied when the commit succeeds.
+typedef struct mnavRelink
+{
+    int32_t slot;
+    mnavLink* links;
+    int32_t linkCount;
+    int32_t* firstLink;
+} mnavRelink;
+
+// The navmesh after the commit, built beside it: slots, places, and the
+// links of every tile next to a change.
+typedef struct mnavTilePlan
+{
+    mnavSlot* slots;
+    int32_t slotCount;
+    int32_t slotCapacity;
+    mnavPlace* places;
+    int32_t placeCount;
+    int32_t placeCapacity;
+    mnavRelink* relinks;
+    int32_t relinkCount;
+    int32_t relinkCapacity;
+} mnavTilePlan;
+
+// Works out the commit of the staged tiles beside the navmesh; nothing
+// changes. On failure the plan holds nothing.
+mnavResult mnavPlanTiles(mnavNavmesh* navmesh, mnavTilePlan* plan);
+
+// Swaps a plan in; nothing can fail.
+void mnavApplyTiles(mnavNavmesh* navmesh, mnavTilePlan* plan);
+
+// Releases a plan not applied.
+void mnavDropTilePlan(mnavNavmesh* navmesh, mnavTilePlan* plan);
 
 #endif // MAUL_NAV_SRC_NAVMESH_H
