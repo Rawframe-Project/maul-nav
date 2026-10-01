@@ -7,7 +7,10 @@
 // tiles that enter and leave and committing each step, for ten laps;
 // then finds paths
 // on the whole terrain; then steers 1,000 agents through a doorway 4 m wide
-// with avoidance; then builds flow fields over a grid of 512 by 512 cells.
+// with avoidance; then builds flow fields over a grid of 512 by 512 cells;
+// then, on a flat world of 24 by 24 tiles with pillars and walls baked
+// from outlines, builds a hierarchy and finds long paths with and without
+// it.
 // Prints the best of five runs in microseconds,
 // with counts and bytes, which do not depend on the machine.
 
@@ -15,6 +18,7 @@
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/hierarchy.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
@@ -474,6 +478,156 @@ static void Flow(void)
     mnavDestroyFlowField(field);
 }
 
+enum
+{
+    WORLD_TILES = 24,
+    WORLD_OUTLINES = 9300
+};
+
+static mnavVec2 s_worldPoints[WORLD_OUTLINES][4];
+static mnavOutline s_worldOutlines[WORLD_OUTLINES];
+
+static int32_t WorldBox(int32_t n, float x0, float z0, float x1, float z1, mnavAreaType area)
+{
+    mnavVec2* p = s_worldPoints[n];
+    p[0] = (mnavVec2){x0, z0};
+    p[1] = (mnavVec2){x1, z0};
+    p[2] = (mnavVec2){x1, z1};
+    p[3] = (mnavVec2){x0, z1};
+    s_worldOutlines[n] = (mnavOutline){p, 4, area};
+    return n + 1;
+}
+
+// The flat world: a floor, a pillar of 2 m every 8 m and, every 64 m, a
+// wall across with one gap of 6 m.
+static mnavNavmesh* FlatWorld(float* sideOut)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.limits.tiles = WORLD_TILES * WORLD_TILES;
+    def.allocator = (mnavAllocator){Alloc, Free, NULL};
+    float side = def.cellSize * (float)def.tileCells * (float)WORLD_TILES;
+    int32_t n = WorldBox(0, 0.0f, 0.0f, side, side, mnav_areaWalkable);
+    for (float z = 4.0f; z < side; z += 8.0f)
+    {
+        for (float x = 4.0f; x < side; x += 8.0f)
+        {
+            n = WorldBox(n, x, z, x + 2.0f, z + 2.0f, mnav_areaNone);
+        }
+    }
+    int32_t k = 0;
+    for (float z = 60.0f; z < side - 10.0f; z += 64.0f)
+    {
+        float gap = (float)((k++ * 37) % ((int32_t)side - 40) + 10);
+        n = WorldBox(n, 1.0f, z, gap, z + 1.0f, mnav_areaNone);
+        n = WorldBox(n, gap + 6.0f, z, side - 1.0f, z + 1.0f, mnav_areaNone);
+    }
+    mnavBaker* baker = NULL;
+    mnavNavmesh* navmesh = NULL;
+    Check(mnavCreateBaker(&def, &baker).result, "baker");
+    Check(mnavCreateNavmesh(&def, &navmesh).result, "navmesh");
+    size_t capacity = (size_t)1 << 20;
+    uint8_t* buffer = malloc(capacity);
+    for (int32_t z = 0; z < WORLD_TILES; ++z)
+    {
+        for (int32_t x = 0; x < WORLD_TILES; ++x)
+        {
+            size_t size = 0;
+            Check(mnavBakeTile2D(baker, s_worldOutlines, n, x, z, NULL), "bake 2D");
+            Check(mnavCopyBakedTile(baker, buffer, capacity, &size), "copy");
+            Check(mnavStageTile(navmesh, buffer, size).result, "stage");
+        }
+    }
+    Check(mnavCommit(navmesh), "commit");
+    free(buffer);
+    mnavDestroyBaker(baker);
+    *sideOut = side;
+    return navmesh;
+}
+
+static double Best(mnavResult (*find)(void*), void* context)
+{
+    double best = 1e30;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        double start = Seconds();
+        Check(find(context), "find");
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+    }
+    return best;
+}
+
+typedef struct LongPath
+{
+    mnavQuery* query;
+    mnavHierarchy* hierarchy;
+    const mnavNavmesh* navmesh;
+    mnavNearest a;
+    mnavNearest b;
+    mnavPath path;
+} LongPath;
+
+static mnavResult FindPlain(void* context)
+{
+    LongPath* p = context;
+    return mnavFindPath(p->query, p->navmesh, NULL, p->a.polygon, p->a.point, p->b.polygon,
+                        p->b.point, &p->path);
+}
+
+static mnavResult FindThrough(void* context)
+{
+    LongPath* p = context;
+    return mnavFindHierarchicalPath(p->query, p->hierarchy, p->navmesh, p->a.polygon, p->a.point,
+                                    p->b.polygon, p->b.point, &p->path);
+}
+
+// Long paths on the flat world, plainly with 131,072 nodes and through a
+// hierarchy of 4 by 4 tiles with the default 8,192.
+static void Hierarchy(void)
+{
+    float side = 0.0f;
+    mnavNavmesh* navmesh = FlatWorld(&side);
+    mnavQueryDef def = mnavDefaultQueryDef();
+    def.allocator = (mnavAllocator){Alloc, Free, NULL};
+    def.limits.pathLength = 1.0e5f;
+    mnavQuery* small = NULL;
+    Check(mnavCreateQuery(&def, &small), "query");
+    def.limits.nodes = 131072;
+    mnavQuery* big = NULL;
+    Check(mnavCreateQuery(&def, &big), "query");
+    mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
+    hierarchyDef.allocator = (mnavAllocator){Alloc, Free, NULL};
+    mnavHierarchy* hierarchy = NULL;
+    Check(mnavCreateHierarchy(&hierarchyDef, &hierarchy), "hierarchy");
+    mnavHierarchyReport report;
+    double start = Seconds();
+    Check(mnavBuildHierarchy(hierarchy, small, navmesh, NULL, &report), "build");
+    printf("hierarchy: %d clusters, %d transitions, %d edges, built in %.0f us\n", report.clusters,
+           report.transitions, report.edges, (Seconds() - start) * 1e6);
+    double w = (double)side;
+    const double ends[3][4] = {
+        {2, 2, w - 2, w - 2}, {2, w - 2, w - 2, 2}, {w / 2, 2, w / 2, w - 2}};
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        LongPath p = {.query = big, .hierarchy = hierarchy, .navmesh = navmesh};
+        mnavVec3 box = {3.0f, 2.0f, 3.0f};
+        Check(mnavFindNearest(navmesh, NULL, (mnavPos3){ends[i][0], 0.0, ends[i][1]}, box, &p.a),
+              "nearest");
+        Check(mnavFindNearest(navmesh, NULL, (mnavPos3){ends[i][2], 0.0, ends[i][3]}, box, &p.b),
+              "nearest");
+        double plain = Best(FindPlain, &p);
+        double plainLength = p.path.length;
+        p.query = small;
+        double through = Best(FindThrough, &p);
+        printf("long path %d: plain %.0f m in %.0f us, hierarchical %.0f m in %.0f us\n", i,
+               plainLength, plain * 1e6, p.path.length, through * 1e6);
+    }
+    mnavDestroyHierarchy(hierarchy);
+    mnavDestroyQuery(big);
+    mnavDestroyQuery(small);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     Bake();
@@ -482,6 +636,7 @@ int main(void)
     Paths();
     Doorway();
     Flow();
+    Hierarchy();
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
         free(s_tiles[t]);

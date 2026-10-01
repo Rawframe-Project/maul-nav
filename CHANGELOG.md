@@ -209,3 +209,7 @@ format.
 - mnavUpdateHierarchy: after a commit that changed only polygon areas,
   only the clusters it touched are searched again; the report counts
   the searches.
+- bench/bench_main.c builds a hierarchy on a flat world of 24 by 24
+  tiles with pillars and walls and finds three long paths: about 13 ms
+  each plainly with 131,072 nodes, 1.4 ms through the hierarchy with
+  8,192, at the same lengths; the build takes about 84 ms.
