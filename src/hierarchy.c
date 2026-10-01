@@ -42,13 +42,14 @@ typedef struct Transition
     int32_t polygon;
     int32_t tag;
     int32_t low;
-    // The clusters entered and left, the slot left, its side and the run's
-    // start along it.
+    // The clusters entered and left, the slot left, its side and the
+    // lowest and highest start of the run's links along it.
     int32_t cluster;
     int32_t from;
     int32_t fromSlot;
     int32_t side;
     int32_t runLow;
+    int32_t runHigh;
     // The transition crossing the same portal the other way, or -1.
     int32_t reverse;
 } Transition;
@@ -312,7 +313,7 @@ static mnavPos3 AlongSide(mnavPos3 a, mnavPos3 b, double au, double bu, double u
 // The transition at tile link l of the tile in slot, which leaves its
 // cluster, as the search crosses it.
 static Transition Cross(const mnavHierarchy* h, const mnavNavmesh* navmesh, int32_t slot, int32_t l,
-                        int32_t runLow)
+                        int32_t runLow, int32_t runHigh)
 {
     const mnavSlot* s = &navmesh->slots[slot];
     const mnavTile* tile = s->tile;
@@ -346,6 +347,7 @@ static Transition Cross(const mnavHierarchy* h, const mnavNavmesh* navmesh, int3
         slot,
         side,
         runLow,
+        runHigh,
         -1};
 }
 
@@ -356,7 +358,7 @@ static bool Leaves(const mnavHierarchy* h, const mnavTile* tile, int32_t slot, i
     const mnavLink* link = &tile->links[l];
     int32_t target = (int32_t)link->target.slot - 1;
     return tile->mesh.polygons[link->polygon].sides[link->edge] == side &&
-           h->clusterOf[target] != h->clusterOf[slot] && h->clusterOf[target] >= 0;
+           h->clusterOf[target] != h->clusterOf[slot];
 }
 
 // Adds the transitions of one side of the tile in slot: the middle link of
@@ -391,7 +393,8 @@ static mnavResult AddSide(mnavHierarchy* h, const mnavNavmesh* navmesh, int32_t 
         }
         int32_t middle = (int32_t)(uint32_t)sorted[start + (end - start) / 2];
         int32_t runLow = tile->links[(uint32_t)sorted[start]].low;
-        h->transitions[h->transitionCount++] = Cross(h, navmesh, slot, middle, runLow);
+        int32_t runHigh = tile->links[(uint32_t)sorted[end - 1]].low;
+        h->transitions[h->transitionCount++] = Cross(h, navmesh, slot, middle, runLow, runHigh);
         start = end;
     }
     return mnav_success;
@@ -705,10 +708,8 @@ static bool SearchGraph(mnavHierarchy* h, mnavPos3 end)
         {
             Relax(h, h->edges[e].to, h->costs[u] + h->edges[e].cost, u, end);
         }
-        if (isfinite(h->joins[u]))
-        {
-            Relax(h, goal, h->costs[u] + h->joins[u], u, end);
-        }
+        // An infinite join leaves the end as it is.
+        Relax(h, goal, h->costs[u] + h->joins[u], u, end);
     }
     return false;
 }
@@ -783,13 +784,14 @@ static mnavResult Run(mnavQuery* query, const mnavNavmesh* navmesh, bool* foundO
 }
 
 // One step of the abstract path: from the node the search stands on, the
-// way within cluster from to the transition's crossing.
+// way within cluster from across any link of the transition's run, aimed
+// at the transition.
 static mnavResult Step(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh, int32_t from,
                        const Transition* t, bool* foundOut)
 {
     Mark(h, from, 1);
     mnavConfineSearch(query, h->inside, true, false);
-    const int32_t goal[4] = {t->slot, t->polygon, t->tag, t->low};
+    const int32_t goal[4] = {t->slot, t->tag, t->runLow, t->runHigh};
     mnavAimSearch(query, t->at, -1, -1, goal);
     mnavResult result = Run(query, navmesh, foundOut);
     Mark(h, from, 0);
@@ -859,6 +861,17 @@ static mnavResult CheckQuery(const mnavQuery* query, const mnavHierarchy* h,
     return result == mnav_success ? mnavCheckPolygon(navmesh, endPolygon) : result;
 }
 
+// Whether two points lie within a cluster's side of each other on the
+// ground.
+static bool Near(const mnavHierarchy* h, const mnavNavmesh* navmesh, mnavPos3 a, mnavPos3 b)
+{
+    double side = (double)h->def.clusterTiles * (double)navmesh->def.cellSize *
+                  (double)navmesh->def.tileCells;
+    double dx = a.x - b.x;
+    double dz = a.z - b.z;
+    return dx * dx + dz * dz <= side * side;
+}
+
 mnavResult mnavFindHierarchicalPath(mnavQuery* query, mnavHierarchy* hierarchy,
                                     const mnavNavmesh* navmesh, mnavPolygonId startPolygon,
                                     mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
@@ -879,6 +892,17 @@ mnavResult mnavFindHierarchicalPath(mnavQuery* query, mnavHierarchy* hierarchy,
     {
         return mnavFindPath(query, navmesh, &h->filter, startPolygon, start, endPolygon, end,
                             pathOut);
+    }
+    // Ends within a cluster's side of each other try the plain search
+    // first, which finds the cheapest way where it has the nodes.
+    if (Near(h, navmesh, start, end))
+    {
+        result =
+            mnavFindPath(query, navmesh, &h->filter, startPolygon, start, endPolygon, end, pathOut);
+        if (result != mnav_success || pathOut->end != mnav_pathOutOfNodes)
+        {
+            return result;
+        }
     }
     result = Join(h, query, navmesh, startPolygon, start, endPolygon, end);
     if (result != mnav_success)

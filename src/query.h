@@ -104,8 +104,8 @@ typedef struct mnavSearch
     // beyond set, nodes outside are opened but never expanded.
     const uint8_t* inside;
     bool beyond;
-    // A node whose closing ends the search, its tag -1 for none: slot,
-    // polygon, tag and low, as a node's (mnav-0008).
+    // The nodes whose closing ends the search, its tag -1 for none: a
+    // slot, a tag and a range of lows, as nodes' (mnav-0008).
     int32_t goal[4];
 } mnavSearch;
 
@@ -155,8 +155,9 @@ uint32_t mnavFindNode(const mnavQuery* query, int32_t slot, int32_t polygon, int
 void mnavConfineSearch(mnavQuery* query, const uint8_t* inside, bool beyond, bool noEnd);
 
 // Aims the search at another point: the end point, and the end polygon's
-// slot and index, or -1 for an end never reached; and at the node whose
-// closing ends it, goal's tag -1 for none (mnav-0008).
+// slot and index, or -1 for an end never reached; and at the nodes whose
+// closing ends it, goal's slot, tag and lowest and highest low, its tag
+// -1 for none (mnav-0008).
 void mnavAimSearch(mnavQuery* query, mnavPos3 end, int32_t endSlot, int32_t endPolygon,
                    const int32_t goal[4]);
 

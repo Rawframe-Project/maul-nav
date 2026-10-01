@@ -33,16 +33,21 @@ local search.
   cluster; A* over the transitions, with the straight distance times
   the search's heuristic scale, ties to the lower index, picks them;
   then the navmesh search refines step by step, each step confined to
-  one cluster and aimed at the next transition's node, starting over
-  from the node the last step reached and keeping only the way so far.
+  one cluster, aimed at the next transition and ending on crossing any
+  link of its run, starting over from the node the last step reached
+  and keeping only the way so far.
   The result is an ordinary `mnavPath`, with its corridor and links.
+- **Near ends:** ends within a cluster's side of each other try the
+  plain search first and take the hierarchy only when it runs out of
+  nodes, since a short way forced through entrances can be much longer.
 - **Fallbacks:** a start and end in one cluster, an end the graph does
   not reach, or a step that finds no way take the plain search.
 
 ## Consequences
 
-- Paths cost near the cheapest, not always the cheapest; on the
-  measured world they matched the plain paths' lengths.
+- Paths cost near the cheapest, not always the cheapest: on a test
+  world of 64 tiles, forty random pairs came out at most 4.8% longer
+  than the plain paths, most within 2%.
 - Each query's searches hold one cluster's nodes and the way so far.
 - Off-mesh links between clusters are not transitions yet, so ways
   that need one fall back to the plain search; rebuilding only the

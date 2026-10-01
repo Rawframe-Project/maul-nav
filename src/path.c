@@ -517,8 +517,8 @@ mnavResult mnavContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, int32_
             continue;
         }
         const mnavSearchNode* node = &query->nodes[n];
-        if (node->tag == s->goal[2] && node->slot == s->goal[0] && node->polygon == s->goal[1] &&
-            node->low == s->goal[3])
+        if (node->tag == s->goal[1] && node->slot == s->goal[0] && node->low >= s->goal[2] &&
+            node->low <= s->goal[3])
         {
             s->found = n;
             continue;

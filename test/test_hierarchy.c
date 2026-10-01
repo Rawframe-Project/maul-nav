@@ -18,14 +18,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+// The hash of the random pairs' lengths.
+#define RANDOM_HASH 0xaeda7ea61a27779eull
+
 // The hash of the graph's counts and the paths' points.
-#define PATHS_HASH 0x3f78af37cca771bdull
+#define PATHS_HASH 0xa1605027880a9e63ull
 
 enum
 {
     TILES = 8,
     CAPACITY = 1 << 18,
-    OUTLINES = 1100
+    OUTLINES = 1300
 };
 
 static mnavVec2 s_points[OUTLINES][4];
@@ -44,37 +47,50 @@ static void Box(float x0, float z0, float x1, float z1, mnavAreaType area)
     s_outlines[s_outlineCount++] = (mnavOutline){p, 4, area};
 }
 
-// A floor of 8 by 8 tiles, a pillar of 2 m every 8 m and, every 64 m, a
-// wall across with one gap of 6 m, the gaps zigzagging; baked once.
-static float BakeWorld(void)
+// A floor of 8 by 8 tiles from (shift, shift), a pillar of 2 m every 8 m
+// and, every 64 m, a wall across with one gap of 6 m, the gaps
+// zigzagging; rugs of another area, as cheap, across tile sides, so that
+// runs of touching links cross them; baked into s_bytes.
+static float BakeWorld(float shift)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     float side = def.cellSize * (float)def.tileCells * (float)TILES;
-    Box(0.0f, 0.0f, side, side, mnav_areaWalkable);
+    s_outlineCount = 0;
+    Box(shift, shift, shift + side, shift + side, mnav_areaWalkable);
+    for (float z = 9.0f; z < side; z += 32.0f)
+    {
+        for (float x = 26.0f; x < side; x += 32.0f)
+        {
+            Box(shift + x, shift + z, shift + x + 12.0f, shift + z + 3.0f, 2);
+            Box(shift + z, shift + x, shift + z + 3.0f, shift + x + 12.0f, 2);
+        }
+    }
     for (float z = 4.0f; z < side; z += 8.0f)
     {
         for (float x = 4.0f; x < side; x += 8.0f)
         {
-            Box(x, z, x + 2.0f, z + 2.0f, mnav_areaNone);
+            Box(shift + x, shift + z, shift + x + 2.0f, shift + z + 2.0f, mnav_areaNone);
         }
     }
     int32_t k = 0;
     for (float z = 60.0f; z < side - 10.0f; z += 64.0f)
     {
         float gap = (k++ % 2 == 0) ? side - 30.0f : 20.0f;
-        Box(1.0f, z, gap, z + 1.0f, mnav_areaNone);
-        Box(gap + 6.0f, z, side - 1.0f, z + 1.0f, mnav_areaNone);
+        Box(shift + 1.0f, shift + z, shift + gap, shift + z + 1.0f, mnav_areaNone);
+        Box(shift + gap + 6.0f, shift + z, shift + side - 1.0f, shift + z + 1.0f, mnav_areaNone);
     }
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     uint8_t* buffer = malloc(CAPACITY);
+    int32_t first = (int32_t)floorf(shift / (def.cellSize * (float)def.tileCells));
     for (int32_t z = 0; z < TILES; ++z)
     {
         for (int32_t x = 0; x < TILES; ++x)
         {
             int32_t t = z * TILES + x;
-            CHECK(mnavBakeTile2D(baker, s_outlines, s_outlineCount, x, z, nullptr) ==
-                          mnav_success &&
+            free(s_bytes[t]);
+            CHECK(mnavBakeTile2D(baker, s_outlines, s_outlineCount, first + x, first + z,
+                                 nullptr) == mnav_success &&
                       mnavCopyBakedTile(baker, buffer, CAPACITY, &s_sizes[t]) == mnav_success,
                   "baked");
             s_bytes[t] = malloc(s_sizes[t]);
@@ -173,8 +189,8 @@ static void TestAgainstPlainPaths(float side)
                   through.end == mnav_pathFound,
               "through the hierarchy, with 1,024 nodes");
         printf("pair %d: plain %.3f m, hierarchical %.3f m\n", p, plain.length, through.length);
-        CHECK(through.length <= plain.length * 1.1 && through.length >= plain.length - 1e-9,
-              "within 10% of the plain path");
+        CHECK(through.length <= plain.length * 1.06 && through.length >= plain.length - 1e-9,
+              "within 6% of the plain path");
         hash = mnavHash64(hash, through.points,
                           (int32_t)((size_t)through.pointCount * sizeof(mnavPos3)));
         mnavPath alone;
@@ -189,6 +205,82 @@ static void TestAgainstPlainPaths(float side)
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(small);
     mnavDestroyQuery(big);
+    mnavDestroyNavmesh(navmesh);
+}
+
+static void TestRandomPairs(void)
+{
+    // Forty pairs of ends from a fixed seed: wherever the plain search
+    // finds a way, the hierarchy finds one with 1,024 nodes, within 6%.
+    mnavNavmesh* navmesh = Load(false);
+    mnavQuery* big = Query(32768);
+    mnavQuery* small = Query(1024);
+    mnavHierarchy* hierarchy = Hierarchy(2);
+    CHECK(mnavBuildHierarchy(hierarchy, small, navmesh, nullptr, nullptr) == mnav_success, "built");
+    uint32_t seed = 99u;
+    int32_t found = 0;
+    int32_t worse = 0;
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t p = 0; p < 40; ++p)
+    {
+        double v[4];
+        for (int32_t k = 0; k < 4; ++k)
+        {
+            seed = seed * 1664525u + 1013904223u;
+            v[k] = 1.0 + 254.0 * (double)(seed >> 8 & 0xFFFFu) / 65536.0;
+        }
+        mnavNearest a;
+        mnavNearest b;
+        if (mnavFindNearest(navmesh, nullptr, (mnavPos3){v[0], 0.0, v[1]},
+                            (mnavVec3){3.0f, 2.0f, 3.0f}, &a) != mnav_success ||
+            mnavFindNearest(navmesh, nullptr, (mnavPos3){v[2], 0.0, v[3]},
+                            (mnavVec3){3.0f, 2.0f, 3.0f}, &b) != mnav_success ||
+            a.polygon.slot == 0 || b.polygon.slot == 0)
+        {
+            continue;
+        }
+        mnavPath plain;
+        mnavPath through;
+        CHECK(mnavFindPath(big, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &plain) ==
+                      mnav_success &&
+                  mnavFindHierarchicalPath(small, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                           b.point, &through) == mnav_success,
+              "searched");
+        if (plain.end != mnav_pathFound)
+        {
+            continue;
+        }
+        found += through.end == mnav_pathFound ? 1 : 0;
+        worse += through.length <= plain.length * 1.06 ? 0 : 1;
+        hash = mnavHash64(hash, &through.length, (int32_t)sizeof(double));
+    }
+    printf("RANDOM_HASH=%016llx found=%d\n", (unsigned long long)hash, found);
+    CHECK(found >= 30 && worse == 0, "every way found, none more than 6% longer");
+    CHECK(hash == RANDOM_HASH, "the pinned hash");
+    mnavDestroyHierarchy(hierarchy);
+    mnavDestroyQuery(small);
+    mnavDestroyQuery(big);
+    mnavDestroyNavmesh(navmesh);
+}
+
+static void TestNegativePlaces(void)
+{
+    // The same world 4 tiles back on both axes, at negative places: the
+    // clusters fall on the same tiles, so the graph is the same.
+    mnavNavmesh* navmesh = Load(false);
+    mnavQuery* query = Query(2048);
+    mnavHierarchy* hierarchy = Hierarchy(2);
+    mnavHierarchyReport here;
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &here) == mnav_success, "built");
+    mnavDestroyNavmesh(navmesh);
+    BakeWorld(-128.0f);
+    navmesh = Load(false);
+    mnavHierarchyReport back;
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &back) == mnav_success &&
+              memcmp(&here, &back, sizeof(here)) == 0,
+          "the same graph at negative places");
+    mnavDestroyHierarchy(hierarchy);
+    mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
 
@@ -358,11 +450,13 @@ static void TestLimitsAndChecks(void)
 
 int main(void)
 {
-    float side = BakeWorld();
+    float side = BakeWorld(0.0f);
     TestAgainstPlainPaths(side);
+    TestRandomPairs();
     TestLoadOrder();
     TestStaleAndFallbacks();
     TestLimitsAndChecks();
+    TestNegativePlaces();
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
         free(s_bytes[t]);
