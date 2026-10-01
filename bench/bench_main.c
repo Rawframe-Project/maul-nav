@@ -6,14 +6,17 @@
 // of 5 by 5 tiles as a camera crosses the terrain and back, staging the
 // tiles that enter and leave and committing each step, for ten laps;
 // then finds paths
-// on the whole terrain. Prints the best of five runs in microseconds,
+// on the whole terrain; then steers 1,000 agents through a doorway 4 m wide
+// with avoidance. Prints the best of five runs in microseconds,
 // with counts and bytes, which do not depend on the machine.
 
+#include "maul-nav/avoidance.h"
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -356,12 +359,81 @@ static void Paths(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// 1,000 agents in a block 40 m by 25 m cross a wall through a doorway 4 m
+// wide to a block on the other side, in steps of 0.1 s.
+static void Doorway(void)
+{
+    enum
+    {
+        AGENTS = 1000,
+        STEPS = 600
+    };
+    static mnavAgent agents[AGENTS];
+    static mnavPos2 goals[AGENTS];
+    static mnavPos2 velocities[AGENTS];
+    const mnavPos2 below[4] = {{-1.0, -60.0}, {1.0, -60.0}, {1.0, -2.0}, {-1.0, -2.0}};
+    const mnavPos2 above[4] = {{-1.0, 2.0}, {1.0, 2.0}, {1.0, 60.0}, {-1.0, 60.0}};
+    const mnavObstacle wall[2] = {{below, 4, 0.0, {0.0, 0.0}, 1}, {above, 4, 0.0, {0.0, 0.0}, 2}};
+    mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
+    def.allocator = (mnavAllocator){Alloc, Free, NULL};
+    def.limits.agents = AGENTS;
+    def.neighborDistance = 3.0;
+    def.timeHorizon = 2.0;
+    def.obstacleTimeHorizon = 1.0;
+    mnavAvoidance* avoidance = NULL;
+    Check(mnavCreateAvoidance(&def, &avoidance), "avoidance");
+    double best = 1e30;
+    int32_t arrived = 0;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        for (int32_t i = 0; i < AGENTS; ++i)
+        {
+            double x = -45.0 + (double)(i % 25) * 1.6;
+            double y = -20.0 + (double)(i / 25) * 1.0 + (double)(i % 3) * 0.1;
+            agents[i] = (mnavAgent){{x, y}, {0.0, 0.0}, {0.0, 0.0}, 0.3, 1.5, 1.0, (uint64_t)i};
+            goals[i] = (mnavPos2){-x, y};
+        }
+        double start = Seconds();
+        for (int32_t s = 0; s < STEPS; ++s)
+        {
+            for (int32_t i = 0; i < AGENTS; ++i)
+            {
+                // Through the doorway's middle while still before the wall.
+                mnavPos2 aim = agents[i].position.x < -1.5 ? (mnavPos2){0.0, 0.0} : goals[i];
+                double dx = aim.x - agents[i].position.x;
+                double dy = aim.y - agents[i].position.y;
+                double length = sqrt(dx * dx + dy * dy);
+                double scale = length > 1.0 ? 1.0 / length : 1.0;
+                agents[i].preferred = (mnavPos2){dx * scale, dy * scale};
+            }
+            Check(mnavAvoid(avoidance, agents, AGENTS, wall, 2, 0.1, velocities), "avoid");
+            for (int32_t i = 0; i < AGENTS; ++i)
+            {
+                agents[i].velocity = velocities[i];
+                agents[i].position.x += velocities[i].x * 0.1;
+                agents[i].position.y += velocities[i].y * 0.1;
+            }
+        }
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+        arrived = 0;
+        for (int32_t i = 0; i < AGENTS; ++i)
+        {
+            arrived += agents[i].position.x > 1.5 ? 1 : 0;
+        }
+    }
+    printf("doorway: %d agents, %d through after %d steps, %.0f us per step, %.0f agents per ms\n",
+           AGENTS, arrived, STEPS, best * 1e6 / STEPS, AGENTS * STEPS / (best * 1e3));
+    mnavDestroyAvoidance(avoidance);
+}
+
 int main(void)
 {
     Bake();
     Stream(0);
     Stream(LINKS);
     Paths();
+    Doorway();
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
         free(s_tiles[t]);

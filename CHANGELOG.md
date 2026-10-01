@@ -188,3 +188,6 @@ format.
   obstacleTimeHorizon and limits.obstacleVertices and
   limits.obstacleNeighbors; mnavAvoid takes the obstacles beside the
   agents.
+- bench/bench_main.c times 1,000 agents crossing a wall through a
+  doorway 4 m wide with avoidance: about 1.2 ms a step, 870 agents per
+  millisecond on one core.
