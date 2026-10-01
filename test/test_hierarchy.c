@@ -22,7 +22,7 @@
 #define RANDOM_HASH 0xaeda7ea61a27779eull
 
 // The hash of the graph's counts and the paths' points.
-#define PATHS_HASH 0xa1605027880a9e63ull
+#define PATHS_HASH 0xa356f433fa7507e2ull
 
 enum
 {
@@ -303,6 +303,90 @@ static void TestLinksBetweenClusters(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// The hash of the hierarchical paths between the random pairs.
+static uint64_t PairsHash(const mnavNavmesh* navmesh, mnavQuery* query, mnavHierarchy* hierarchy)
+{
+    uint64_t hash = MNAV_HASH_INIT;
+    uint32_t seed = 5u;
+    for (int32_t p = 0; p < 24; ++p)
+    {
+        double v[4];
+        for (int32_t k = 0; k < 4; ++k)
+        {
+            seed = seed * 1664525u + 1013904223u;
+            v[k] = 1.0 + 254.0 * (double)(seed >> 8 & 0xFFFFu) / 65536.0;
+        }
+        mnavNearest a;
+        mnavNearest b;
+        mnavPath path;
+        if (mnavFindNearest(navmesh, nullptr, (mnavPos3){v[0], 0.0, v[1]},
+                            (mnavVec3){3.0f, 2.0f, 3.0f}, &a) == mnav_success &&
+            mnavFindNearest(navmesh, nullptr, (mnavPos3){v[2], 0.0, v[3]},
+                            (mnavVec3){3.0f, 2.0f, 3.0f}, &b) == mnav_success &&
+            a.polygon.slot != 0 && b.polygon.slot != 0 &&
+            mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                     b.point, &path) == mnav_success)
+        {
+            hash = mnavHash64(hash, path.points,
+                              (int32_t)((size_t)path.pointCount * sizeof(mnavPos3)));
+        }
+    }
+    return hash;
+}
+
+static void TestUpdates(void)
+{
+    // Area 3 costs 5 under this filter. Changing areas in one tile
+    // searches its cluster's entries again only, and gives the graph and
+    // paths a build gives; new links build it all again.
+    mnavNavmesh* navmesh = Load(false);
+    mnavQuery* query = Query(1024);
+    mnavHierarchy* updated = Hierarchy(2);
+    mnavHierarchy* fresh = Hierarchy(2);
+    mnavQueryFilter filter = mnavDefaultQueryFilter();
+    filter.costs[3] = 5.0f;
+    mnavHierarchyReport built;
+    mnavHierarchyReport report;
+    CHECK(mnavBuildHierarchy(updated, query, navmesh, &filter, &built) == mnav_success &&
+              built.searches == built.transitions,
+          "built, a search per transition");
+    CHECK(mnavUpdateHierarchy(updated, query, navmesh, &report) == mnav_success &&
+              report.searches == 0,
+          "nothing to update");
+    for (double x = 70.0; x < 90.0; x += 2.0)
+    {
+        mnavNearest n = On(navmesh, x, 100.0);
+        CHECK(mnavStageArea(navmesh, n.polygon, 3) == mnav_success, "staged");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    mnavHierarchyReport again;
+    CHECK(mnavUpdateHierarchy(updated, query, navmesh, &report) == mnav_success &&
+              mnavBuildHierarchy(fresh, query, navmesh, &filter, &again) == mnav_success,
+          "updated and built");
+    printf("update searched %d of %d\n", report.searches, again.searches);
+    CHECK(report.searches > 0 && report.searches * 4 < again.searches &&
+              report.edges == again.edges && report.transitions == again.transitions,
+          "a few searches, the same graph");
+    CHECK(PairsHash(navmesh, query, updated) == PairsHash(navmesh, query, fresh), "the same paths");
+    // A link: built again.
+    mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, true};
+    mnavLinkId id;
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+          "linked");
+    CHECK(mnavUpdateHierarchy(updated, query, navmesh, &report) == mnav_success &&
+              report.searches == report.transitions && report.transitions == again.transitions + 2,
+          "built again for a link");
+    mnavNavmesh* other = Load(false);
+    CHECK(mnavUpdateHierarchy(updated, query, other, &report) == mnav_errorInvalid &&
+              mnavUpdateHierarchy(nullptr, query, navmesh, &report) == mnav_errorInvalid,
+          "another navmesh, or none");
+    mnavDestroyNavmesh(other);
+    mnavDestroyHierarchy(fresh);
+    mnavDestroyHierarchy(updated);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestNegativePlaces(void)
 {
     // The same world 4 tiles back on both axes, at negative places: the
@@ -497,6 +581,7 @@ int main(void)
     TestStaleAndFallbacks();
     TestLimitsAndChecks();
     TestLinksBetweenClusters();
+    TestUpdates();
     TestNegativePlaces();
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {

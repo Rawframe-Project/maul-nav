@@ -45,6 +45,8 @@ local search.
 - **Near ends:** ends within a cluster's side of each other try the
   plain search first and take the hierarchy only when it runs out of
   nodes, since a short way forced through entrances can be much longer.
+- **Updates:** a commit that changes only polygon areas redoes only
+  the edges from transitions entering the clusters it touched.
 - **Fallbacks:** a start and end in one cluster, an end the graph does
   not reach, or a step that finds no way take the plain search.
 
@@ -54,4 +56,11 @@ local search.
   world of 64 tiles, forty random pairs came out at most 4.8% longer
   than the plain paths, most within 2%.
 - Each query's searches hold one cluster's nodes and the way so far.
-- Rebuilding only the clusters a commit changes is later work.
+- `mnavUpdateHierarchy` brings a hierarchy up to the navmesh's last
+  commit. The build keeps each tile slot's generation and a hash of its
+  polygon areas, and a hash of the off-mesh links' attachments and what
+  the search reads of them; when only areas changed, and no link lands
+  in a changed cluster, only the transitions entering the clusters
+  whose tiles changed are searched again and the other edges are kept;
+  otherwise the hierarchy is built again. The graph is the one a build
+  would make; the report counts the searches run.

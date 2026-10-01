@@ -52,12 +52,14 @@ extern "C"
     // A hierarchy: the abstract graph for one navmesh and filter.
     typedef struct mnavHierarchy mnavHierarchy;
 
-    // What a build made.
+    // What a build or an update made, and the searches within clusters it
+    // ran.
     typedef struct mnavHierarchyReport
     {
         int32_t clusters;
         int32_t transitions;
         int32_t edges;
+        int32_t searches;
     } mnavHierarchyReport;
 
     /// Returns the default hierarchy def: clusters of 4 by 4 tiles, up to
@@ -120,6 +122,30 @@ extern "C"
                                                           const mnavNavmesh* navmesh,
                                                           const mnavQueryFilter* filter,
                                                           mnavHierarchyReport* reportOut);
+
+    /// Brings the hierarchy up to the navmesh's last commit. When only
+    /// polygon areas changed, only the edges of transitions entering the
+    /// clusters whose tiles changed are searched again; when tiles or
+    /// off-mesh links changed, the hierarchy is built again. The graph is
+    /// the one a build would make.
+    ///
+    /// @param hierarchy The hierarchy, built for this navmesh.
+    /// @param query     A context for the searches within clusters; its
+    ///                  last search ends.
+    /// @param navmesh   The navmesh.
+    /// @param reportOut Receives what the graph holds and the searches run.
+    ///                  May be NULL.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// hierarchy with no graph, or one built for another navmesh;
+    /// `mnav_errorLimit` as mnavBuildHierarchy. On an error the hierarchy
+    /// holds no graph.
+    /// @par Thread safety
+    /// Safe from any thread; the hierarchy and the context are used by one
+    /// thread at a time, and no commit runs on the navmesh.
+    MNAV_NODISCARD MNAV_API mnavResult mnavUpdateHierarchy(mnavHierarchy* hierarchy,
+                                                           mnavQuery* query,
+                                                           const mnavNavmesh* navmesh,
+                                                           mnavHierarchyReport* reportOut);
 
     /// Finds a path as mnavFindPath does, with the hierarchy's filter,
     /// through the hierarchy: the start and the end join their clusters'

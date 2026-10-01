@@ -206,3 +206,6 @@ format.
   mnavFindHierarchicalPath (A* over the transitions, refined step by
   step within one cluster at a time into an ordinary path).
 - Hierarchies take off-mesh links between clusters as transitions.
+- mnavUpdateHierarchy: after a commit that changed only polygon areas,
+  only the clusters it touched are searched again; the report counts
+  the searches.
