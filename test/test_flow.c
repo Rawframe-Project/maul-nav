@@ -8,6 +8,7 @@
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/draw.h"
 #include "maul-nav/flow.h"
 #include "maul-nav/query.h"
 
@@ -291,6 +292,149 @@ static void TestChecks(void)
     mnavDestroyFlowField(nullptr);
 }
 
+// The hash of every cell's way in a region.
+static uint64_t RegionHash(const mnavFlowField* field, mnavFlowRegion r)
+{
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t y = r.y; y < r.y + r.height; ++y)
+    {
+        for (int32_t x = r.x; x < r.x + r.width; ++x)
+        {
+            mnavFlow flow = At(field, x, y);
+            hash = mnavHash64(hash, &flow, (int32_t)sizeof(flow));
+        }
+    }
+    return hash;
+}
+
+static mnavAreaType s_window[WIDTH * HEIGHT];
+
+// A field over a region of the grid is the field of the region's cells
+// as a grid of their own.
+static void TestRegion(void)
+{
+    RandomAreas(41u);
+    mnavGrid grid = Grid();
+    mnavQueryFilter filter = Costs();
+    const mnavFlowRegion r = {9, 5, 30, 22};
+    for (int32_t y = 0; y < r.height; ++y)
+    {
+        memcpy(&s_window[y * r.width], &s_areas[(r.y + y) * WIDTH + r.x], (size_t)r.width);
+    }
+    const mnavGrid window = {s_window, r.width, r.height, grid.cellSize};
+    // One goal outside the region, left out.
+    const mnavCell goals[3] = {{12, 7}, {30, 20}, {2, 2}};
+    const mnavCell local[2] = {{3, 2}, {21, 15}};
+    s_areas[7 * WIDTH + 12] = 1;
+    s_areas[20 * WIDTH + 30] = 1;
+    s_window[2 * r.width + 3] = 1;
+    s_window[15 * r.width + 21] = 1;
+    mnavFlowField* field = Make(r.width * r.height);
+    mnavFlowField* alone = Make(r.width * r.height);
+    CHECK(mnavBuildFlowField(field, &grid, &filter, goals, 3) == mnav_errorLimit,
+          "the whole grid is past the limit");
+    bool ended = false;
+    CHECK(mnavBeginFlowField(field, &grid, &filter, &r, goals, 3) == mnav_success &&
+              mnavContinueFlowField(field, &grid, INT32_MAX, &ended) == mnav_success && ended &&
+              mnavBuildFlowField(alone, &window, &filter, local, 2) == mnav_success,
+          "a region within the limit");
+    int32_t same = 0;
+    for (int32_t y = 0; y < r.height; ++y)
+    {
+        for (int32_t x = 0; x < r.width; ++x)
+        {
+            mnavFlow a = At(field, r.x + x, r.y + y);
+            mnavFlow b = At(alone, x, y);
+            same += a.cost == b.cost && a.next.x == b.next.x + r.x && a.next.y == b.next.y + r.y;
+        }
+    }
+    CHECK(same == r.width * r.height, "the region's own field");
+    mnavFlow flow;
+    CHECK(mnavFlowAt(field, (mnavCell){r.x - 1, r.y}, &flow) == mnav_errorInvalid &&
+              mnavFlowAt(field, (mnavCell){r.x, r.y + r.height}, &flow) == mnav_errorInvalid,
+          "cells outside the region");
+    static mnavDebugVertex vertices[WIDTH * HEIGHT * 6];
+    static uint32_t lines[WIDTH * HEIGHT * 6];
+    mnavDebugBuffer buffer = {{0, 0, 0}, vertices, WIDTH * HEIGHT * 6, 0, nullptr, 0,
+                              0,         lines,    WIDTH * HEIGHT * 6, 0};
+    float least = 1e9f;
+    CHECK(mnavDebugFlowField(field, 0.0, &buffer) == mnav_success, "drawn");
+    for (int32_t i = 0; i < buffer.vertexCount; ++i)
+    {
+        least = vertices[i].x < least ? vertices[i].x : least;
+    }
+    CHECK(least >= (float)r.x * grid.cellSize && least < (float)(r.x + 1) * grid.cellSize,
+          "arrows at their grid places");
+    mnavFlowRegion bad = {40, 0, 9, 1};
+    CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid &&
+              mnavFlowAt(field, goals[0], &flow) == mnav_errorInvalid,
+          "a region past the grid's side; the field holds nothing after");
+    bad = (mnavFlowRegion){0, 0, 0, 5};
+    CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid,
+          "an empty region");
+    bad = (mnavFlowRegion){-1, 0, 5, 5};
+    CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid,
+          "a region before the grid");
+    bad = (mnavFlowRegion){0, 0, 31, 22};
+    CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorLimit,
+          "a region past the limit");
+    mnavDestroyFlowField(field);
+    mnavDestroyFlowField(alone);
+}
+
+// Any budget gives the field a build gives; reads wait for the end.
+static void TestSteps(void)
+{
+    RandomAreas(23u);
+    mnavGrid grid = Grid();
+    mnavQueryFilter filter = Costs();
+    const mnavCell goals[3] = {{0, 0}, {47, 35}, {20, 18}};
+    mnavFlowField* field = Make(WIDTH * HEIGHT);
+    const mnavFlowRegion whole = {0, 0, WIDTH, HEIGHT};
+    const int32_t budgets[3] = {1, 7, 500};
+    for (int32_t b = 0; b < 3; ++b)
+    {
+        CHECK(mnavBeginFlowField(field, &grid, &filter, nullptr, goals, 3) == mnav_success,
+              "begun");
+        mnavFlow flow;
+        CHECK(mnavFlowAt(field, goals[0], &flow) == mnav_errorStale, "no reads while working");
+        bool ended = false;
+        int32_t steps = 0;
+        while (!ended)
+        {
+            CHECK(mnavContinueFlowField(field, &grid, budgets[b], &ended) == mnav_success, "step");
+            steps += 1;
+        }
+        CHECK(RegionHash(field, whole) == FIELD_HASH, "the build's field");
+        CHECK(steps >= (WIDTH * HEIGHT * 4 / 5) / budgets[b], "steps of the budget");
+    }
+    bool ended = false;
+    CHECK(mnavContinueFlowField(field, &grid, 1, &ended) == mnav_success && ended,
+          "continuing an ended field");
+    // The grid may move in memory between steps.
+    CHECK(mnavBeginFlowField(field, &grid, &filter, nullptr, goals, 3) == mnav_success &&
+              mnavContinueFlowField(field, &grid, 100, nullptr) == mnav_success,
+          "a first step");
+    memcpy(s_window, s_areas, sizeof(s_areas));
+    mnavGrid moved = {s_window, WIDTH, HEIGHT, grid.cellSize};
+    CHECK(mnavContinueFlowField(field, &moved, INT32_MAX, &ended) == mnav_success && ended &&
+              RegionHash(field, whole) == FIELD_HASH,
+          "the grid moved");
+    mnavGrid other = grid;
+    other.height = HEIGHT - 1;
+    CHECK(mnavContinueFlowField(field, &other, 1, &ended) == mnav_errorInvalid, "another size");
+    other = grid;
+    other.cellSize = 1.0f;
+    CHECK(mnavContinueFlowField(field, &other, 1, &ended) == mnav_errorInvalid &&
+              mnavContinueFlowField(field, &grid, 0, &ended) == mnav_errorInvalid &&
+              mnavContinueFlowField(field, nullptr, 1, &ended) == mnav_errorInvalid,
+          "another cell size; no cells; no grid");
+    mnavFlowField* fresh = Make(10);
+    CHECK(mnavContinueFlowField(fresh, &grid, 1, &ended) == mnav_errorInvalid, "nothing begun");
+    mnavDestroyFlowField(fresh);
+    mnavDestroyFlowField(field);
+}
+
 int main(void)
 {
     TestAgainstGridPaths();
@@ -298,5 +442,7 @@ int main(void)
     TestCornersAndBlocks();
     TestPinned();
     TestChecks();
+    TestRegion();
+    TestSteps();
     return s_failures == 0 ? 0 : 1;
 }

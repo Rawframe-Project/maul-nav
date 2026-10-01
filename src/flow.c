@@ -32,28 +32,39 @@
 #define NOT_OPEN (-1)
 #define DONE     (-2)
 
+// The work on a field: none begun, under way, or ended.
+enum
+{
+    FLOW_NONE = 0,
+    FLOW_WORKING = 1,
+    FLOW_ENDED = 2
+};
+
 struct mnavFlowField
 {
     mnavMemory memory;
     mnavFlowFieldDef def;
-    // Per cell: the cost to the goals, the next cell's index and the place
-    // in the heap.
+    // Per cell of the region, row by row: the cost to the goals, the next
+    // cell's index and the place in the heap.
     double* costs;
     int32_t* next;
     int32_t* places;
     int32_t* heap;
     int32_t heapCount;
-    // The grid last built, 0 by 0 when none is.
-    int32_t width;
-    int32_t height;
+    // The work's region, its grid's size and cell size, and the filter.
+    mnavFlowRegion region;
+    int32_t gridWidth;
+    int32_t gridHeight;
+    float cellSize;
+    mnavQueryFilter filter;
+    int32_t state;
 };
 
-// A search: the field, the grid and the filter it uses.
+// A step of work: the field and the grid's areas.
 typedef struct Search
 {
     mnavFlowField* field;
-    const mnavGrid* grid;
-    const mnavQueryFilter* filter;
+    const mnavAreaType* areas;
 } Search;
 
 mnavFlowFieldDef mnavDefaultFlowFieldDef(void)
@@ -129,19 +140,25 @@ void mnavDestroyFlowField(mnavFlowField* field)
     mnavRelease(&memory, field, 1, sizeof(mnavFlowField), alignof(mnavFlowField));
 }
 
+// Whether grid cell (x, y) lies in the region and may be walked.
 static bool Open(const Search* s, int32_t x, int32_t y)
 {
-    if (x < 0 || y < 0 || x >= s->grid->width || y >= s->grid->height)
+    const mnavFlowRegion* r = &s->field->region;
+    if (x < r->x || y < r->y || x >= r->x + r->width || y >= r->y + r->height)
     {
         return false;
     }
-    mnavAreaType area = s->grid->areas[(size_t)y * (size_t)s->grid->width + (size_t)x];
-    return area != mnav_areaNone && mnavIncludes(s->filter, area);
+    mnavAreaType area = s->areas[(size_t)y * (size_t)s->field->gridWidth + (size_t)x];
+    return area != mnav_areaNone && mnavIncludes(&s->field->filter, area);
 }
 
+// The area cost of a cell of the region.
 static double AreaCost(const Search* s, int32_t cell)
 {
-    return (double)s->filter->costs[s->grid->areas[cell]];
+    const mnavFlowField* f = s->field;
+    int32_t x = f->region.x + cell % f->region.width;
+    int32_t y = f->region.y + cell / f->region.width;
+    return (double)f->filter.costs[s->areas[(size_t)y * (size_t)f->gridWidth + (size_t)x]];
 }
 
 // The heap, by cost, then by cell index.
@@ -223,9 +240,9 @@ static const mnavCell s_steps[8] = {{1, 0}, {0, 1},  {-1, 0},  {0, -1},
 static void Expand(const Search* s, int32_t cell)
 {
     mnavFlowField* f = s->field;
-    int32_t width = s->grid->width;
-    int32_t x = cell % width;
-    int32_t y = cell / width;
+    int32_t width = f->region.width;
+    int32_t x = f->region.x + cell % width;
+    int32_t y = f->region.y + cell / width;
     double here = AreaCost(s, cell);
     for (int32_t d = 0; d < 8; ++d)
     {
@@ -236,12 +253,12 @@ static void Expand(const Search* s, int32_t cell)
         {
             continue;
         }
-        int32_t other = (y + dy) * width + (x + dx);
+        int32_t other = (y + dy - f->region.y) * width + (x + dx - f->region.x);
         if (f->places[other] == DONE)
         {
             continue;
         }
-        double length = (diagonal ? DIAGONAL : 1.0) * (double)s->grid->cellSize;
+        double length = (diagonal ? DIAGONAL : 1.0) * (double)f->cellSize;
         double cost = f->costs[cell] + length * (AreaCost(s, other) + here) * 0.5;
         if (cost < f->costs[other])
         {
@@ -270,32 +287,35 @@ static bool GoodGoals(const mnavGrid* grid, const mnavCell* goals, int32_t count
     return true;
 }
 
-static mnavResult Check(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
-                        int32_t goalCount)
+static bool GoodRegion(const mnavGrid* grid, const mnavFlowRegion* r)
+{
+    return r->x >= 0 && r->y >= 0 && r->width >= 1 && r->height >= 1 &&
+           r->x <= grid->width - r->width && r->y <= grid->height - r->height;
+}
+
+static mnavResult Check(mnavFlowField* field, const mnavGrid* grid, const mnavFlowRegion* region,
+                        const mnavCell* goals, int32_t goalCount)
 {
     if (field == nullptr || grid == nullptr || goalCount < 0 ||
         (goalCount > 0 && goals == nullptr) || !GoodGrid(grid) ||
-        !GoodGoals(grid, goals, goalCount))
+        (region != nullptr && !GoodRegion(grid, region)) || !GoodGoals(grid, goals, goalCount))
     {
         return mnav_errorInvalid;
     }
-    if ((int64_t)grid->width * (int64_t)grid->height > (int64_t)field->def.cells)
-    {
-        return mnav_errorLimit;
-    }
-    return mnav_success;
+    int64_t cells = region != nullptr ? (int64_t)region->width * (int64_t)region->height
+                                      : (int64_t)grid->width * (int64_t)grid->height;
+    return cells > (int64_t)field->def.cells ? mnav_errorLimit : mnav_success;
 }
 
-mnavResult mnavBuildFlowField(mnavFlowField* field, const mnavGrid* grid,
-                              const mnavQueryFilter* filter, const mnavCell* goals,
-                              int32_t goalCount)
+mnavResult mnavBeginFlowField(mnavFlowField* field, const mnavGrid* grid,
+                              const mnavQueryFilter* filter, const mnavFlowRegion* region,
+                              const mnavCell* goals, int32_t goalCount)
 {
     if (field != nullptr)
     {
-        field->width = 0;
-        field->height = 0;
+        field->state = FLOW_NONE;
     }
-    mnavResult result = Check(field, grid, goals, goalCount);
+    mnavResult result = Check(field, grid, region, goals, goalCount);
     const mnavQueryFilter* usable = nullptr;
     if (result == mnav_success)
     {
@@ -305,8 +325,13 @@ mnavResult mnavBuildFlowField(mnavFlowField* field, const mnavGrid* grid,
     {
         return result;
     }
-    Search s = {field, grid, usable};
-    int32_t cells = grid->width * grid->height;
+    field->region = region != nullptr ? *region : (mnavFlowRegion){0, 0, grid->width, grid->height};
+    field->gridWidth = grid->width;
+    field->gridHeight = grid->height;
+    field->cellSize = grid->cellSize;
+    field->filter = *usable;
+    Search s = {field, grid->areas};
+    int32_t cells = field->region.width * field->region.height;
     for (int32_t c = 0; c < cells; ++c)
     {
         field->costs[c] = (double)INFINITY;
@@ -316,43 +341,85 @@ mnavResult mnavBuildFlowField(mnavFlowField* field, const mnavGrid* grid,
     field->heapCount = 0;
     for (int32_t i = 0; i < goalCount; ++i)
     {
-        int32_t cell = goals[i].y * grid->width + goals[i].x;
-        if (Open(&s, goals[i].x, goals[i].y) && field->costs[cell] != 0.0)
+        if (!Open(&s, goals[i].x, goals[i].y))
+        {
+            continue;
+        }
+        int32_t cell =
+            (goals[i].y - field->region.y) * field->region.width + (goals[i].x - field->region.x);
+        if (field->costs[cell] != 0.0)
         {
             Lower(field, cell, 0.0, cell);
         }
     }
-    while (field->heapCount > 0)
+    field->state = FLOW_WORKING;
+    return mnav_success;
+}
+
+mnavResult mnavContinueFlowField(mnavFlowField* field, const mnavGrid* grid, int32_t cells,
+                                 bool* endedOut)
+{
+    if (field == nullptr || grid == nullptr || field->state == FLOW_NONE || cells < 1 ||
+        grid->areas == nullptr || grid->width != field->gridWidth ||
+        grid->height != field->gridHeight || grid->cellSize != field->cellSize)
+    {
+        return mnav_errorInvalid;
+    }
+    Search s = {field, grid->areas};
+    for (int32_t n = 0; n < cells && field->heapCount > 0; ++n)
     {
         Expand(&s, Pop(field));
     }
-    field->width = grid->width;
-    field->height = grid->height;
+    field->state = field->heapCount > 0 ? FLOW_WORKING : FLOW_ENDED;
+    if (endedOut != nullptr)
+    {
+        *endedOut = field->state == FLOW_ENDED;
+    }
     return mnav_success;
+}
+
+mnavResult mnavBuildFlowField(mnavFlowField* field, const mnavGrid* grid,
+                              const mnavQueryFilter* filter, const mnavCell* goals,
+                              int32_t goalCount)
+{
+    mnavResult result = mnavBeginFlowField(field, grid, filter, nullptr, goals, goalCount);
+    return result == mnav_success ? mnavContinueFlowField(field, grid, INT32_MAX, nullptr) : result;
 }
 
 mnavResult mnavFlowAt(const mnavFlowField* field, mnavCell cell, mnavFlow* flowOut)
 {
-    if (field == nullptr || flowOut == nullptr || cell.x < 0 || cell.y < 0 ||
-        cell.x >= field->width || cell.y >= field->height)
+    if (field == nullptr || flowOut == nullptr || field->state == FLOW_NONE)
     {
         return mnav_errorInvalid;
     }
-    int32_t at = cell.y * field->width + cell.x;
+    const mnavFlowRegion* r = &field->region;
+    if (cell.x < r->x || cell.y < r->y || cell.x >= r->x + r->width || cell.y >= r->y + r->height)
+    {
+        return mnav_errorInvalid;
+    }
+    if (field->state != FLOW_ENDED)
+    {
+        return mnav_errorStale;
+    }
+    int32_t at = (cell.y - r->y) * r->width + (cell.x - r->x);
     int32_t next = field->next[at];
-    *flowOut = (mnavFlow){field->costs[at], {next % field->width, next / field->width}};
+    *flowOut = (mnavFlow){field->costs[at], {r->x + next % r->width, r->y + next / r->width}};
     return mnav_success;
 }
 
-mnavResult mnavDebugFlowField(const mnavFlowField* field, double cellSize, double height,
-                              mnavDebugBuffer* buffer)
+mnavResult mnavDebugFlowField(const mnavFlowField* field, double height, mnavDebugBuffer* buffer)
 {
-    if (field == nullptr || !mnavGoodBuffer(buffer) || !isfinite(cellSize) || cellSize <= 0.0 ||
-        !isfinite(height))
+    if (field == nullptr || !mnavGoodBuffer(buffer) || !isfinite(height))
     {
         return mnav_errorInvalid;
     }
-    int32_t cells = field->width * field->height;
+    if (field->state == FLOW_WORKING)
+    {
+        return mnav_errorStale;
+    }
+    const mnavFlowRegion* r = &field->region;
+    int32_t cells = field->state == FLOW_ENDED ? r->width * r->height : 0;
+    double cellSize = (double)field->cellSize;
     for (int32_t c = 0; c < cells; ++c)
     {
         int32_t next = field->next[c];
@@ -360,12 +427,12 @@ mnavResult mnavDebugFlowField(const mnavFlowField* field, double cellSize, doubl
         {
             continue;
         }
-        int32_t column = c % field->width;
-        int32_t row = c / field->width;
-        int32_t nextColumn = next % field->width;
-        int32_t nextRow = next / field->width;
-        double x = ((double)column + 0.5) * cellSize;
-        double z = ((double)row + 0.5) * cellSize;
+        int32_t column = c % r->width;
+        int32_t row = c / r->width;
+        int32_t nextColumn = next % r->width;
+        int32_t nextRow = next / r->width;
+        double x = ((double)(r->x + column) + 0.5) * cellSize;
+        double z = ((double)(r->y + row) + 0.5) * cellSize;
         double dx = (double)(nextColumn - column);
         double dz = (double)(nextRow - row);
         double scale = 0.4 * cellSize / sqrt(dx * dx + dz * dz);

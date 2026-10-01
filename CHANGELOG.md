@@ -230,3 +230,6 @@ format.
   mnavBakeTileInput bake heightfields in a compact form beside meshes.
 - Bake volumes (mnav-0003): mnavBakeVolume in mnavBakeInput, include,
   exclude and area override, applied around the agent radius's erosion.
+- Flow fields over a region of a grid, built in budgeted steps:
+  mnavFlowRegion, mnavBeginFlowField and mnavContinueFlowField;
+  mnavDebugFlowField takes the grid's cell size from the field.

@@ -222,14 +222,14 @@ static void TestFlowAndAvoidance(void)
               mnavBuildFlowField(field, &grid, nullptr, &goal, 1) == mnav_success,
           "a field");
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugFlowField(field, 2.0, 0.5, &b) == mnav_success && b.lineCount == 11 * 3 * 2 &&
+    CHECK(mnavDebugFlowField(field, 0.5, &b) == mnav_success && b.lineCount == 11 * 3 * 2 &&
               Count(&b, mnav_debugFlow, -1) == b.vertexCount,
           "eleven arrows");
     // The arrow of cell (1, 0) points along -X at its center, height 0.5.
     CHECK(b.vertices[0].x == 3.8f && b.vertices[1].x == 2.2f && b.vertices[0].y == 0.5f &&
               b.vertices[0].z == 1.0f,
           "from (1, 0) toward the goal");
-    CHECK(mnavDebugFlowField(field, 0.0, 0.5, &b) == mnav_errorInvalid, "no cell size");
+    CHECK(mnavDebugFlowField(field, (double)NAN, &b) == mnav_errorInvalid, "no height");
     mnavDestroyFlowField(field);
     // Three agents, two near: the near pair sees each other.
     mnavAvoidanceDef avoidDef = mnavDefaultAvoidanceDef();
