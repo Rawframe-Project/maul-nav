@@ -23,6 +23,7 @@ option(MAUL_NAV_SANITIZE "Instrument with AddressSanitizer and UBSan" OFF)
 option(MAUL_NAV_TSAN "Instrument with ThreadSanitizer" OFF)
 option(MAUL_NAV_COVERAGE "Instrument for gcov coverage" OFF)
 option(MAUL_NAV_FUZZ "Build the libFuzzer targets (Clang)" OFF)
+option(MAUL_NAV_DIFFERENTIAL "Build the differential harness against Recast (test only)" OFF)
 
 # Every executable (tests, benchmarks, tools) lands in the top of the
 # build tree, so scripts and CI find them in one place.
@@ -164,6 +165,10 @@ if(MAUL_NAV_FUZZ)
         target_compile_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
         target_link_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
     endforeach()
+endif()
+
+if(MAUL_NAV_DIFFERENTIAL)
+    add_subdirectory(test/differential)
 endif()
 
 if(MAUL_NAV_BUILD_BENCH AND EXISTS ${PROJECT_SOURCE_DIR}/bench/bench_main.c)

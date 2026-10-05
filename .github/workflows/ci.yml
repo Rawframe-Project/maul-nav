@@ -109,6 +109,20 @@ jobs:
         # 0013).
         run: stat -c '%s bytes' build/libmaul-nav.a
 
+  # The differential harness against Recast and Detour (mnav-0011): path
+  # lengths and reachability on the scenario corpus, test only.
+  differential:
+    name: differential
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_DIFFERENTIAL=ON
+          cmake --build build --target differential -j4
+      - name: Run
+        run: build/differential
+
   # Each fuzz target runs for one minute on every push: the tile loader
   # from its seed, the bake input and the query inputs.
   fuzz:

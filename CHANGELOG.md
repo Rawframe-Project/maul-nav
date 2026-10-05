@@ -238,3 +238,5 @@ format.
   field a rebuild gives, bit for bit.
 - Fuzz targets for the bake input (fuzz_bake) and query inputs
   (fuzz_query).
+- A differential harness against Recast and Detour (mnav-0011), test
+  only, behind MAUL_NAV_DIFFERENTIAL.
