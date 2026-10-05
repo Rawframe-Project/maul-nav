@@ -116,9 +116,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Install compilers
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q gcc-14 g++-14
       - name: Build
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_DIFFERENTIAL=ON
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_DIFFERENTIAL=ON \
+            -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14
           cmake --build build --target differential -j4
       - name: Run
         run: build/differential
