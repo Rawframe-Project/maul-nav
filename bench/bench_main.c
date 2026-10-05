@@ -11,8 +11,10 @@
 // then, on a flat world of 24 by 24 tiles with pillars and walls baked
 // from outlines, builds a hierarchy and finds long paths with and without
 // it.
-// Prints the best of five runs in microseconds,
-// with counts and bytes, which do not depend on the machine.
+// Prints each section's counts and bytes, which do not depend on the
+// machine, as comment lines, then its named results, the best of five
+// runs. Given a baseline file, such as bench/baseline.txt, it prints each
+// result's ratio to the recorded one as well (mnav-0012).
 
 #include "maul-nav/avoidance.h"
 #include "maul-nav/bake.h"
@@ -26,6 +28,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 enum
@@ -40,6 +43,45 @@ enum
     LINKS = 512,
     TILE_BYTES = 1 << 20
 };
+
+// The width of a result's name, as printed and as read back.
+#define NAME_WIDTH 32
+
+// The baseline's lines, read whole.
+static char s_baseline[16384];
+
+// The value the baseline records for a name, or 0.
+static double Recorded(const char* name)
+{
+    for (const char* line = s_baseline; *line != '\0';)
+    {
+        const char* end = strchr(line, '\n');
+        size_t length = end != NULL ? (size_t)(end - line) : strlen(line);
+        size_t named = strlen(name);
+        if (line[0] != '#' && length > NAME_WIDTH && strncmp(line, name, named) == 0 &&
+            line[named] == ' ')
+        {
+            return strtod(line + NAME_WIDTH, NULL);
+        }
+        line += length + (end != NULL ? 1 : 0);
+    }
+    return 0.0;
+}
+
+// Prints a result, and its ratio to the baseline's where it has one.
+static void Report(const char* name, double value, const char* unit)
+{
+    double recorded = Recorded(name);
+    if (recorded > 0.0)
+    {
+        printf("%-*s %12.1f %-6s (%.2fx the baseline)\n", NAME_WIDTH, name, value, unit,
+               value / recorded);
+    }
+    else
+    {
+        printf("%-*s %12.1f %s\n", NAME_WIDTH, name, value, unit);
+    }
+}
 
 static double Seconds(void)
 {
@@ -195,8 +237,9 @@ static void Bake(void)
         best = took < best ? took : best;
         mnavDestroyBaker(baker);
     }
-    printf("bake: %d tiles, %d triangles, %d polygons, %zu bytes, %.0f us per tile\n",
+    printf("# bake: %d tiles, %d triangles, %d polygons, %zu bytes, %.0f us per tile\n",
            TILES * TILES, terrain.triangleCount, polygons, bytes, best * 1e6 / (TILES * TILES));
+    Report("bake, a tile", best * 1e6 / (TILES * TILES), "us");
 }
 
 // Whether tile (x, z) is within the window round the camera's tile.
@@ -300,11 +343,50 @@ static void Stream(int32_t links)
         peak = s_peak - before;
         mnavDestroyNavmesh(navmesh);
     }
-    printf("stream with %d links: %d steps, %d tiles staged, %.0f us per step (best %.0f, worst "
+    printf("# stream with %d links: %d steps, %d tiles staged, %.0f us per step (best %.0f, worst "
            "%.0f), "
            "%zu bytes held after the first lap, %zu after the last, %zu at most\n",
            links, steps, staged, total * 1e6 / steps, bestStep * 1e6, worstStep * 1e6, firstLap,
            lastLap, peak);
+    Report(links == 0 ? "stream step, no links" : "stream step, 512 links", total * 1e6 / steps,
+           "us");
+}
+
+// The same searches in slices of 64 nodes each, as a server spreading
+// many agents' searches over its ticks runs them.
+static void Sliced(mnavQuery* query, const mnavNavmesh* navmesh, mnavNearest (*ends)[2])
+{
+    double best = 1e30;
+    int32_t slices = 0;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        slices = 0;
+        double start = Seconds();
+        for (int32_t i = 0; i < PATHS; ++i)
+        {
+            if (ends[i][0].polygon.slot == 0 || ends[i][1].polygon.slot == 0)
+            {
+                continue;
+            }
+            Check(mnavBeginPath(query, navmesh, NULL, ends[i][0].polygon, ends[i][0].point,
+                                ends[i][1].polygon, ends[i][1].point),
+                  "begin");
+            bool ended = false;
+            while (!ended)
+            {
+                Check(mnavContinuePath(query, navmesh, 64, &ended), "continue");
+                slices += 1;
+            }
+            mnavPath path;
+            Check(mnavFinishPath(query, navmesh, &path), "finish");
+        }
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+    }
+    printf("# sliced paths: %d slices of 64 nodes for %d searches, %.1f us per path\n", slices,
+           PATHS, best * 1e6 / PATHS);
+    Report("sliced path query", best * 1e6 / PATHS, "us");
+    Report("sliced path, a slice", best * 1e6 / slices, "us");
 }
 
 static void Paths(void)
@@ -359,8 +441,11 @@ static void Paths(void)
         double took = Seconds() - start;
         best = took < best ? took : best;
     }
-    printf("paths: %d of %d found, %d points, %.1f us per path\n", found, PATHS, corners,
+    printf("# paths: %d of %d found, %d points, %.1f us per path\n", found, PATHS, corners,
            best * 1e6 / PATHS);
+    Report("path query", best * 1e6 / PATHS, "us");
+    Report("path queries per second", PATHS / best, "/s");
+    Sliced(query, navmesh, ends);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
@@ -428,8 +513,11 @@ static void Doorway(void)
             arrived += agents[i].position.x > 1.5 ? 1 : 0;
         }
     }
-    printf("doorway: %d agents, %d through after %d steps, %.0f us per step, %.0f agents per ms\n",
-           AGENTS, arrived, STEPS, best * 1e6 / STEPS, AGENTS * STEPS / (best * 1e3));
+    printf(
+        "# doorway: %d agents, %d through after %d steps, %.0f us per step, %.0f agents per ms\n",
+        AGENTS, arrived, STEPS, best * 1e6 / STEPS, AGENTS * STEPS / (best * 1e3));
+    Report("avoidance step, 1000 agents", best * 1e6 / STEPS, "us");
+    Report("avoidance, agents per ms", AGENTS * STEPS / (best * 1e3), "/ms");
     mnavDestroyAvoidance(avoidance);
 }
 
@@ -479,9 +567,12 @@ static void FlowRepairs(mnavFlowField* field, const mnavGrid* grid, const mnavCe
             wall = took < wall ? took : wall;
         }
     }
-    printf("flow repairs: a cell %.0f us, a corner goal moved %.0f us, a gap closed or opened "
+    printf("# flow repairs: a cell %.0f us, a corner goal moved %.0f us, a gap closed or opened "
            "%.0f us\n",
            cell * 1e6, goal * 1e6, wall * 1e6);
+    Report("flow repair, a cell", cell * 1e6, "us");
+    Report("flow repair, a goal moved", goal * 1e6, "us");
+    Report("flow repair, a gap", wall * 1e6, "us");
 }
 
 // A flow field over 512 by 512 cells of 0.5 m: a wall in every eighth
@@ -523,8 +614,9 @@ static void Flow(void)
         }
         mnavFlow far;
         Check(mnavFlowAt(field, (mnavCell){256, 256}, &far), "read");
-        printf("flow: %d by %d cells, %d goal(s), %.0f us per build, middle costs %.1f\n", SIDE,
+        printf("# flow: %d by %d cells, %d goal(s), %.0f us per build, middle costs %.1f\n", SIDE,
                SIDE, count, best * 1e6, far.cost);
+        Report(count == 1 ? "flow build, 1 goal" : "flow build, 4 goals", best * 1e6, "us");
     }
     FlowRepairs(field, &grid, goals);
     mnavDestroyFlowField(field);
@@ -654,8 +746,12 @@ static void Hierarchy(void)
     mnavHierarchyReport report;
     double start = Seconds();
     Check(mnavBuildHierarchy(hierarchy, small, navmesh, NULL, &report), "build");
-    printf("hierarchy: %d clusters, %d transitions, %d edges, built in %.0f us\n", report.clusters,
-           report.transitions, report.edges, (Seconds() - start) * 1e6);
+    double built = Seconds() - start;
+    printf("# hierarchy: %d clusters, %d transitions, %d edges, built in %.0f us\n",
+           report.clusters, report.transitions, report.edges, built * 1e6);
+    Report("hierarchy build", built * 1e6, "us");
+    double plainSum = 0.0;
+    double throughSum = 0.0;
     double w = (double)side;
     const double ends[3][4] = {
         {2, 2, w - 2, w - 2}, {2, w - 2, w - 2, 2}, {w / 2, 2, w / 2, w - 2}};
@@ -671,17 +767,31 @@ static void Hierarchy(void)
         double plainLength = p.path.length;
         p.query = small;
         double through = Best(FindThrough, &p);
-        printf("long path %d: plain %.0f m in %.0f us, hierarchical %.0f m in %.0f us\n", i,
+        printf("# long path %d: plain %.0f m in %.0f us, hierarchical %.0f m in %.0f us\n", i,
                plainLength, plain * 1e6, p.path.length, through * 1e6);
+        plainSum += plain;
+        throughSum += through;
     }
+    Report("long path, plain", plainSum * 1e6 / 3.0, "us");
+    Report("long path, hierarchical", throughSum * 1e6 / 3.0, "us");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(big);
     mnavDestroyQuery(small);
     mnavDestroyNavmesh(navmesh);
 }
 
-int main(void)
+int main(int argc, char** argv)
 {
+    if (argc > 1)
+    {
+        FILE* file = fopen(argv[1], "rb");
+        size_t read = file != NULL ? fread(s_baseline, 1, sizeof(s_baseline) - 1, file) : 0;
+        s_baseline[read] = '\0';
+        if (file != NULL)
+        {
+            fclose(file);
+        }
+    }
     Bake();
     Stream(0);
     Stream(LINKS);

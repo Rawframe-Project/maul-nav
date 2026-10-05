@@ -16,3 +16,4 @@ are listed in [README.md](README.md).
 | [mnav-0009](mnav-0009-link-generation.md) | Link generation | Accepted |
 | [mnav-0010](mnav-0010-debug-output.md) | Debug output | Accepted |
 | [mnav-0011](mnav-0011-differential-checks.md) | Differential checks against Recast and Detour | Accepted |
+| [mnav-0012](mnav-0012-benchmark-baseline.md) | Benchmarks against a recorded baseline | Accepted |

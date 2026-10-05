@@ -240,3 +240,5 @@ format.
   (fuzz_query).
 - A differential harness against Recast and Detour (mnav-0011), test
   only, behind MAUL_NAV_DIFFERENTIAL.
+- The benchmark prints named results and their ratios to
+  bench/baseline.txt (mnav-0012); sliced path queries are timed too.
