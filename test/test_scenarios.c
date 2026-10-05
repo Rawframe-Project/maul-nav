@@ -2,22 +2,33 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Scenarios from game shapes (requirements section 5): a building of two
-// floors joined by stairs and a ramp, and a bridge that collapses under a
-// dynamic navmesh while an agent's corridor runs over it.
+// floors joined by stairs and a ramp, a bridge that collapses under a
+// dynamic navmesh while an agent's corridor runs over it, a large
+// terrain streamed in and out around an agent crossing it, and an RTS
+// group led by a flow field through a gap, steered apart by avoidance.
 
 #include "test_harness.h"
 
+#include "maul-nav/avoidance.h"
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/flow.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 // The hash of the building's paths, the same on every platform.
 #define BUILDING_HASH 0x64041a557af8393bull
+
+// The hash of the terrain's sixteen tiles.
+#define TERRAIN_HASH 0x346aef8034f02e1dull
+
+// The hash of the group's final places.
+#define GROUP_HASH 0xb16f4123b3485eedull
 
 enum
 {
@@ -280,6 +291,276 @@ static void TestCollapsingBridge(mnavQuery* query)
     mnavDestroyNavmesh(navmesh);
 }
 
+enum
+{
+    SAMPLES = 129
+};
+
+static float s_heights[SAMPLES * SAMPLES];
+
+// A bowl 4 m deep with ripples of up to 8 cm, sampled every meter over
+// 128 by 128 m: four by four tiles of 32 m.
+static mnavTerrain Terrain(void)
+{
+    for (int32_t r = 0; r < SAMPLES; ++r)
+    {
+        for (int32_t c = 0; c < SAMPLES; ++c)
+        {
+            int32_t dx = c - 64;
+            int32_t dz = r - 64;
+            s_heights[r * SAMPLES + c] =
+                (float)(dx * dx + dz * dz) * 0.0005f + (float)((c * 7 + r * 13) % 5) * 0.02f;
+        }
+    }
+    return (mnavTerrain){{0, 0, 0}, 1.0f, 1.0f, SAMPLES, SAMPLES, s_heights, nullptr};
+}
+
+// The tiles within one of the agent's, of the four by four.
+static bool Wanted(int32_t x, int32_t z, double ax, double az)
+{
+    int32_t tx = (int32_t)(ax / 32.0);
+    int32_t tz = (int32_t)(az / 32.0);
+    return abs(x - tx) <= 1 && abs(z - tz) <= 1;
+}
+
+// Moves the window of loaded tiles to the agent's; returns how many are
+// loaded.
+static int32_t Stream(mnavNavmesh* navmesh, bool loaded[4][4], double ax, double az)
+{
+    int32_t count = 0;
+    for (int32_t z = 0; z < 4; ++z)
+    {
+        for (int32_t x = 0; x < 4; ++x)
+        {
+            bool want = Wanted(x, z, ax, az);
+            if (loaded[z][x] && !want)
+            {
+                CHECK(mnavStageTileRemoval(navmesh, x, z) == mnav_success, "streamed out");
+            }
+            else if (!loaded[z][x] && want)
+            {
+                CHECK(mnavStageTile(navmesh, s_tiles[z * 4 + x], s_sizes[z * 4 + x]).result ==
+                          mnav_success,
+                      "streamed in");
+            }
+            loaded[z][x] = want;
+            count += want ? 1 : 0;
+        }
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    return count;
+}
+
+static mnavNearest Ground(const mnavNavmesh* navmesh, double x, double z)
+{
+    mnavNearest n = {0};
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 2.0, z}, (mnavVec3){0.5f, 6.0f, 0.5f},
+                          &n) == mnav_success,
+          "looked");
+    return n;
+}
+
+static void TestStreamedTerrain(mnavQuery* query)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavTerrain terrain = Terrain();
+    const mnavBakeInput input = {nullptr, 0, &terrain, 1, nullptr, 0};
+    mnavBaker* baker = nullptr;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t t = 0; t < 16; ++t)
+    {
+        CHECK(mnavBakeTileInput(baker, &input, t % 4, t / 4, nullptr) == mnav_success &&
+                  mnavCopyBakedTile(baker, s_tiles[t], TILE_ROOM, &s_sizes[t]) == mnav_success,
+              "baked");
+        hash = mnavHash64(hash, s_tiles[t], (int32_t)s_sizes[t]);
+    }
+    mnavDestroyBaker(baker);
+    printf("TERRAIN_HASH=%016llx\n", (unsigned long long)hash);
+    CHECK(hash == TERRAIN_HASH, "the pinned hash");
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    bool loaded[4][4] = {{false}};
+    int32_t most = 0;
+    int32_t outCount = 0;
+    int32_t ahead = 0;
+    int32_t steps = 0;
+    for (double a = 16.0; a <= 112.0; a += 8.0, ++steps)
+    {
+        int32_t count = Stream(navmesh, loaded, a, a);
+        most = count > most ? count : most;
+        mnavNearest here = Ground(navmesh, a, a);
+        double b = a + 12.0 < 124.0 ? a + 12.0 : 124.0;
+        mnavNearest next = Ground(navmesh, b, b);
+        mnavNearest corner = Ground(navmesh, 124.0, 124.0);
+        mnavPath path = {0};
+        CHECK(here.polygon.slot != 0 && next.polygon.slot != 0, "ground around the agent");
+        CHECK(mnavFindPath(query, navmesh, nullptr, here.polygon, here.point, next.polygon,
+                           next.point, &path) == mnav_success,
+              "searched ahead");
+        ahead += path.end == mnav_pathFound ? 1 : 0;
+        if (corner.polygon.slot == 0)
+        {
+            // The far corner's tile is out: a way toward it ends at the
+            // window's edge, not at a wall.
+            mnavRay ray;
+            mnavPos3 far = {124.0, here.point.y, 124.0};
+            CHECK(mnavRaycast(query, navmesh, nullptr, here.polygon, here.point, far, &ray) ==
+                          mnav_success &&
+                      ray.end == mnav_rayNotLoaded,
+                  "a ray stops where tiles are out");
+            outCount += 1;
+        }
+        else
+        {
+            CHECK(mnavFindPath(query, navmesh, nullptr, here.polygon, here.point, corner.polygon,
+                               corner.point, &path) == mnav_success &&
+                      path.end == mnav_pathFound,
+                  "the corner reached once loaded");
+        }
+    }
+    printf("terrain: %d steps, at most %d tiles loaded, %d with the corner out\n", steps, most,
+           outCount);
+    CHECK(most == 9 && ahead == steps && outCount > 0 && outCount < steps,
+          "a window of nine tiles carried the agent across");
+    // Back at the start, the window streams back with the agent and a way
+    // within it is found again.
+    Stream(navmesh, loaded, 16.0, 16.0);
+    mnavNearest start = Ground(navmesh, 16.0, 16.0);
+    mnavNearest edge = Ground(navmesh, 60.0, 60.0);
+    mnavPath path = {0};
+    CHECK(mnavFindPath(query, navmesh, nullptr, start.polygon, start.point, edge.polygon,
+                       edge.point, &path) == mnav_success &&
+              path.end == mnav_pathFound,
+          "within the window");
+    mnavDestroyNavmesh(navmesh);
+}
+
+enum
+{
+    FIELD = 64,
+    GROUP = 60
+};
+
+static mnavAreaType s_field[FIELD * FIELD];
+
+// Whether a place lies in the wall at x 32 to 33, open from y 28 to 36.
+static bool InWall(mnavPos2 p)
+{
+    return p.x >= 32.0 && p.x < 33.0 && (p.y < 28.0 || p.y >= 36.0);
+}
+
+// The velocity an agent prefers: toward the center of the next cell the
+// field gives its cell, at its speed; slowing into the goal's center.
+static mnavPos2 Preferred(const mnavFlowField* field, const mnavAgent* a)
+{
+    mnavCell cell = {(int32_t)floor(a->position.x), (int32_t)floor(a->position.y)};
+    mnavFlow flow = {0};
+    if (mnavFlowAt(field, cell, &flow) != mnav_success || !isfinite(flow.cost))
+    {
+        return (mnavPos2){0, 0};
+    }
+    mnavPos2 to = {flow.next.x + 0.5, flow.next.y + 0.5};
+    if (flow.cost == 0.0)
+    {
+        to = (mnavPos2){56.5, 32.5};
+    }
+    double dx = to.x - a->position.x;
+    double dy = to.y - a->position.y;
+    double length = sqrt(dx * dx + dy * dy);
+    double speed = length < a->maxSpeed ? length : a->maxSpeed;
+    return length > 1e-9 ? (mnavPos2){dx / length * speed, dy / length * speed} : (mnavPos2){0, 0};
+}
+
+static void TestGroup(void)
+{
+    for (int32_t y = 0; y < FIELD; ++y)
+    {
+        for (int32_t x = 0; x < FIELD; ++x)
+        {
+            s_field[y * FIELD + x] = InWall((mnavPos2){x + 0.5, y + 0.5}) ? 0 : 1;
+        }
+    }
+    mnavGrid grid = {s_field, FIELD, FIELD, 1.0f};
+    mnavCell goals[25];
+    for (int32_t i = 0; i < 25; ++i)
+    {
+        goals[i] = (mnavCell){54 + i % 5, 30 + i / 5};
+    }
+    mnavFlowFieldDef fieldDef = mnavDefaultFlowFieldDef();
+    fieldDef.cells = FIELD * FIELD;
+    mnavFlowField* field = nullptr;
+    CHECK(mnavCreateFlowField(&fieldDef, &field) == mnav_success &&
+              mnavBuildFlowField(field, &grid, nullptr, goals, 25) == mnav_success,
+          "a field to the goal");
+    static const mnavPos2 lower[4] = {{32, 0}, {33, 0}, {33, 28}, {32, 28}};
+    static const mnavPos2 upper[4] = {{32, 36}, {33, 36}, {33, 64}, {32, 64}};
+    const mnavObstacle walls[2] = {{lower, 4, 0.0, {0, 0}, 1}, {upper, 4, 0.0, {0, 0}, 2}};
+    mnavAvoidanceDef avoidDef = mnavDefaultAvoidanceDef();
+    avoidDef.limits.agents = GROUP;
+    avoidDef.neighborDistance = 3.0;
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateAvoidance(&avoidDef, &avoidance) == mnav_success, "avoidance");
+    static mnavAgent agents[GROUP];
+    for (int32_t i = 0; i < GROUP; ++i)
+    {
+        agents[i] = (mnavAgent){{6.0 + 1.6 * (i % 6), 24.0 + 1.6 * (i / 6)},
+                                {0, 0},
+                                {0, 0},
+                                0.4,
+                                1.5,
+                                1.0,
+                                (uint64_t)i + 1};
+    }
+    static mnavPos2 velocities[GROUP];
+    double closest = 1e9;
+    int32_t walled = 0;
+    const double step = 0.1;
+    for (int32_t tick = 0; tick < 900; ++tick)
+    {
+        for (int32_t i = 0; i < GROUP; ++i)
+        {
+            agents[i].preferred = Preferred(field, &agents[i]);
+        }
+        CHECK(mnavAvoid(avoidance, agents, GROUP, walls, 2, step, velocities) == mnav_success,
+              "avoided");
+        for (int32_t i = 0; i < GROUP; ++i)
+        {
+            agents[i].velocity = velocities[i];
+            agents[i].position.x += velocities[i].x * step;
+            agents[i].position.y += velocities[i].y * step;
+            walled += InWall(agents[i].position) ? 1 : 0;
+        }
+        for (int32_t i = 0; i < GROUP; ++i)
+        {
+            for (int32_t j = i + 1; j < GROUP; ++j)
+            {
+                double dx = agents[i].position.x - agents[j].position.x;
+                double dy = agents[i].position.y - agents[j].position.y;
+                double d = sqrt(dx * dx + dy * dy);
+                closest = d < closest ? d : closest;
+            }
+        }
+    }
+    int32_t arrived = 0;
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t i = 0; i < GROUP; ++i)
+    {
+        double dx = agents[i].position.x - 56.5;
+        double dy = agents[i].position.y - 32.5;
+        arrived += dx * dx + dy * dy < 8.0 * 8.0 ? 1 : 0;
+        hash = mnavHash64(hash, &agents[i].position, (int32_t)sizeof(mnavPos2));
+    }
+    printf("group: %d of %d arrived, closest pair %.3f m apart, %d places in the wall; "
+           "GROUP_HASH=%016llx\n",
+           arrived, GROUP, closest, walled, (unsigned long long)hash);
+    CHECK(arrived >= GROUP * 9 / 10, "the group through the gap to the goal");
+    CHECK(closest > 0.8 * 0.95 && walled == 0, "no agents overlapping or in the wall");
+    CHECK(hash == GROUP_HASH, "the pinned hash");
+    mnavDestroyAvoidance(avoidance);
+    mnavDestroyFlowField(field);
+}
+
 int main(void)
 {
     mnavQueryDef def = mnavDefaultQueryDef();
@@ -287,6 +568,8 @@ int main(void)
     CHECK(mnavCreateQuery(&def, &query) == mnav_success, "query");
     TestBuilding(query);
     TestCollapsingBridge(query);
+    TestStreamedTerrain(query);
+    TestGroup();
     mnavDestroyQuery(query);
     return s_failures == 0 ? 0 : 1;
 }
