@@ -16,6 +16,10 @@
 // runs. Given a baseline file, such as bench/baseline.txt, it prints each
 // result's ratio to the recorded one as well (mnav-0012).
 
+#ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "maul-nav/avoidance.h"
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
