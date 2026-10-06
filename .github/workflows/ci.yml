@@ -90,6 +90,11 @@ jobs:
         run: cmake --build build --config Release -j 4
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: Headers under MSVC
+        # The public headers alone under cl's /W4 /WX, in C++17 (F26).
+        run: |
+          cmake -S cmake/HeaderCheck -B build-headers
+          cmake --build build-headers --config Release
 
   web:
     name: web-emscripten
