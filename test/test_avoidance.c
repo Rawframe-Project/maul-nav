@@ -607,6 +607,46 @@ static void TestSpeedKept(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+static void TestNeighbourThreeCellsOut(void)
+{
+    // Cells are half the range wide; dividing a position by the width
+    // rounds 0x1.479e0b42c2747p+7 up into cell 65, three cells from the
+    // other agent's 62, though the two stand a hair within range. The
+    // search must still reach that ring: closing at 6 m/s, they would
+    // meet within the time horizon, and each turns from its way.
+    mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
+    def.neighborDistance = 0x1.4293bc517c827p+2;
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
+    mnavAgent agents[2] = {
+        {{0x1.3d896d6036906p+7, 0.0}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 1},
+        {{0x1.479e0b42c2747p+7, 0.0}, {-3.0, 0.0}, {-3.0, 0.0}, 0.5, 4.0, 1.0, 2}};
+    mnavPos2 velocities[2];
+    CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_success &&
+              (velocities[0].x != 3.0 || velocities[0].y != 0.0) &&
+              (velocities[1].x != -3.0 || velocities[1].y != 0.0),
+          "a neighbour three cells out is seen");
+    mnavDestroyAvoidance(avoidance);
+}
+
+static void TestFarNeighbourPastANearOne(void)
+{
+    // Cells 5 m wide for the default 10 m range. B, a step beside A,
+    // walks with it; C, two cells on, comes head on. A list not yet full
+    // must not stop the search at B's distance: C turns A from its way.
+    mnavAvoidance* avoidance = Make(16, 10, 2.0);
+    mnavAgent agents[3] = {{{4.9, 0.1}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 1},
+                           {{4.9, 1.6}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 2},
+                           {{10.5, 0.1}, {-3.0, 0.0}, {-3.0, 0.0}, 0.5, 4.0, 1.0, 3}};
+    mnavPos2 with[3];
+    mnavPos2 without[2];
+    CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.1, with) == mnav_success &&
+              mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.1, without) == mnav_success &&
+              (with[0].x != without[0].x || with[0].y != without[0].y),
+          "a far neighbour past a near one is seen");
+    mnavDestroyAvoidance(avoidance);
+}
+
 int main(void)
 {
     TestHeadOn();
@@ -622,5 +662,7 @@ int main(void)
     TestObstacleChecks();
     TestSpeedKept();
     TestOnACorner();
+    TestNeighbourThreeCellsOut();
+    TestFarNeighbourPastANearOne();
     return s_failures == 0 ? 0 : 1;
 }
