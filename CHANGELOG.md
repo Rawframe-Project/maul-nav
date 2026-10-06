@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+### Fixed
+
+- `mnavAvoid` walked an agent that overlapped a circle obstacle on into
+  it, at its preferred velocity, whenever leaving within the step
+  needed more than the agent's maximum speed. It now leaves at the
+  most it can.
+
 ## [0.2.2] - 2026-10-06
 
 Faster avoidance and outline bakes, the same results.

@@ -42,6 +42,10 @@ symmetry face to face.
 - **Obstacles:** `mnavObstacle` is a circle (one point and a radius),
   a segment (two points) or a counterclockwise polygon, with a velocity
   and an id. A circle gives the line of an agent that never gives way;
+  an agent already overlapping one must leave it within the step, but
+  no faster than its maximum speed, so that the 3D program, which keeps
+  obstacle lines, always can (asked to leave faster, it once kept the
+  agent's preferred velocity and walked it further in);
   edges give RVO2's obstacle lines, seen from outside only, the nearest
   first by distance, then id and vertex, at most
   `limits.obstacleNeighbors`. A moving obstacle's lines are its static

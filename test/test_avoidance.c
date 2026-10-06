@@ -17,7 +17,7 @@
 #define CIRCLE_HASH 0x533db80b7f73782cull
 
 // The hash of the mixed scene's velocities.
-#define SCENE_HASH 0xefaa93993d05e5daull
+#define SCENE_HASH 0xcb53ba76cc38d780ull
 
 enum
 {
@@ -647,6 +647,40 @@ static void TestFarNeighbourPastANearOne(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+static void TestOverlappedObstacleFirst(void)
+{
+    // Room for one obstacle. The agent stands inside circle A, which is
+    // nearest at no distance at all; circle B is 0.6 m off. A must be the
+    // one kept, as if B were not there, however deep the overlap.
+    mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
+    def.limits.obstacleNeighbors = 1;
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
+    const mnavAgent agent = {{0.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, 0.5, 1.5, 1.0, 1};
+    const mnavPos2 a = {0.3, 0.0};
+    const mnavPos2 b = {0.0, 2.0};
+    const mnavObstacle both[2] = {{&a, 1, 1.0, {0.0, 0.0}, 1}, {&b, 1, 1.4, {0.0, 0.0}, 2}};
+    mnavPos2 withBoth;
+    mnavPos2 withA;
+    mnavPos2 withB;
+    CHECK(mnavAvoid(avoidance, &agent, 1, both, 2, 0.1, &withBoth) == mnav_success &&
+              mnavAvoid(avoidance, &agent, 1, both, 1, 0.1, &withA) == mnav_success &&
+              mnavAvoid(avoidance, &agent, 1, both + 1, 1, 0.1, &withB) == mnav_success,
+          "stepped");
+    CHECK((withA.x != withB.x || withA.y != withB.y) && withBoth.x == withA.x &&
+              withBoth.y == withA.y,
+          "an obstacle overlapped is kept before one apart");
+    CHECK(withA.x < 0.0, "out of a circle it stands in, not on into it");
+    // A circle coming on at 4 m/s, faster than the agent can leave: away
+    // at its full speed, the most the agent can do.
+    const mnavObstacle fast = {&a, 1, 1.0, {-4.0, 0.0}, 3};
+    mnavPos2 fleeing;
+    CHECK(mnavAvoid(avoidance, &agent, 1, &fast, 1, 0.1, &fleeing) == mnav_success &&
+              fleeing.x == -1.5 && fleeing.y == 0.0,
+          "away from an oncoming circle at full speed");
+    mnavDestroyAvoidance(avoidance);
+}
+
 int main(void)
 {
     TestHeadOn();
@@ -664,5 +698,6 @@ int main(void)
     TestOnACorner();
     TestNeighbourThreeCellsOut();
     TestFarNeighbourPastANearOne();
+    TestOverlappedObstacleFirst();
     return s_failures == 0 ? 0 : 1;
 }

@@ -561,6 +561,30 @@ static bool EdgeLine(const View* w, int32_t o1, mnavLine* line)
     return FindLegs(w, s, distSqLine, &legs) && Project(w, &legs, line);
 }
 
+// The line of a circle: an agent that never gives way while apart. An
+// agent already overlapping it is asked to leave it within the step, as
+// overlapping agents are, but never faster than its maximum speed: the
+// 3D program keeps obstacle lines, and one it could not keep would let
+// the agent walk on in.
+static mnavLine CircleLine(const mnavAgent* agent, const mnavObstacleVertex* o, double horizon,
+                           double step)
+{
+    double combined = agent->radius + o->radius;
+    mnavPos2 rel = mnavSub2(o->point, agent->position);
+    double distanceSq = mnavDot2(rel, rel);
+    if (distanceSq > combined * combined)
+    {
+        return mnavPairLine(agent->position, agent->velocity, o->point, o->velocity, combined, 1.0,
+                            horizon, step, agent->id < o->id);
+    }
+    // On the center itself no way is out; a fixed one keeps it
+    // deterministic.
+    mnavPos2 away = UnitOr(mnavScale2(rel, -1.0), (mnavPos2){0.0, -1.0});
+    double leave = mnavDot2(o->velocity, away) + (combined - sqrt(distanceSq)) / step;
+    double offset = leave < agent->maxSpeed ? leave : agent->maxSpeed;
+    return (mnavLine){mnavScale2(away, offset), (mnavPos2){away.y, -away.x}};
+}
+
 int32_t mnavObstacleLines(const mnavAgent* agent, const mnavObstacleVertex* vertices,
                           const mnavObstacleNear* near, int32_t nearCount, double horizon,
                           double step, mnavLine* lines)
@@ -571,9 +595,7 @@ int32_t mnavObstacleLines(const mnavAgent* agent, const mnavObstacleVertex* vert
         const mnavObstacleVertex* o = &vertices[near[k].vertex];
         if (o->radius > 0.0)
         {
-            lines[count++] =
-                mnavPairLine(agent->position, agent->velocity, o->point, o->velocity,
-                             agent->radius + o->radius, 1.0, horizon, step, agent->id < o->id);
+            lines[count++] = CircleLine(agent, o, horizon, step);
             continue;
         }
         View w = {vertices, agent->position, mnavSub2(agent->velocity, o->velocity), agent->radius,
