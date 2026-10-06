@@ -820,7 +820,9 @@ extern "C"
     /// (an edge into a polygon the filter excludes is a wall too) or a tile
     /// side with no tile loaded, or crosses as many polygons as the
     /// context's node limit. Where it leaves through a corner, it goes
-    /// on through an edge that leads on, the lowest-numbered first.
+    /// on through an edge that leads on, the lowest-numbered first; at a
+    /// corner where two walls meet, the normal is one of theirs, the same
+    /// on every platform, but which one is not promised.
     ///
     /// @param query        The context; its memory holds the polygons.
     /// @param navmesh      The navmesh.

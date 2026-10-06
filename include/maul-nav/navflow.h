@@ -166,8 +166,10 @@ extern "C"
     /// the walk between them times the next polygon's area cost, with an
     /// off-mesh link's cost where the way crosses one. Ties go to the lower
     /// cost, then the polygon of the lower slot and index; the same navmesh
-    /// and goals give the same field on every platform. Goals on polygons
-    /// the filter leaves out are left out.
+    /// and goals give the same field on every platform. A polygon with two
+    /// ways on of equal cost keeps one of them, the same on every platform,
+    /// but which one is not promised. Goals on polygons the filter leaves
+    /// out are left out.
     ///
     /// @param field     The field; its last field is replaced.
     /// @param navmesh   The navmesh; reads need it unchanged since.
