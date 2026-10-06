@@ -48,12 +48,17 @@ mnavBakeDefResult made = mnavCreateBaker(&def, &baker);
 
 mnavTriangleMesh mesh = {vertices, vertexCount, indices, triangleCount, NULL};
 mnavBakeReport report;
-if (mnavBakeTile(baker, &mesh, 1, tileX, tileZ, &report) == mnav_success)
+size_t size = 0;
+mnavResult baked = mnavBakeTile(baker, &mesh, 1, tileX, tileZ, &report);
+if (baked == mnav_success)
 {
-    size_t size = 0;
-    mnavCopyBakedTile(baker, bytes, capacity, &size);   // the tile's bytes
+    baked = mnavCopyBakedTile(baker, bytes, capacity, &size);   // the tile's bytes
 }
 ```
+
+Every call returns a status, `mnavResult` or a result naming what was
+refused; the snippets here keep each one, and the library's tests run
+them as they are written.
 
 - **Input.** `mnavBakeTile` takes triangle meshes, each triangle with an
   optional area type. `mnavBakeTileInput` also takes terrains (heights
@@ -81,9 +86,10 @@ then committed at a point you choose; queries see one committed state.
 
 ```c
 mnavNavmesh* navmesh = NULL;
-mnavCreateNavmesh(&def, &navmesh);            // the bake def
-mnavStageTile(navmesh, bytes, size);          // copied; refused bytes say where
-mnavCommit(navmesh);
+mnavBakeDefResult created = mnavCreateNavmesh(&def, &navmesh);   // the bake def
+mnavTileResult staged = mnavStageTile(navmesh, bytes, size);     // copied
+// staged.result; refused bytes are named by section and element
+mnavResult committed = mnavCommit(navmesh);
 ```
 
 - **Loading** checks every byte: a tile from another def, a damaged
@@ -115,15 +121,17 @@ and path length). Use one per thread.
 ```c
 mnavQueryDef queryDef = mnavDefaultQueryDef();
 mnavQuery* query = NULL;
-mnavCreateQuery(&queryDef, &query);
+mnavResult opened = mnavCreateQuery(&queryDef, &query);
 
 mnavNearest a, b;
 const mnavVec3 box = {1.0f, 2.0f, 1.0f};      // half extents of the search
-mnavFindNearest(navmesh, NULL, (mnavPos3){8.0, 0.0, 8.0}, box, &a);
-mnavFindNearest(navmesh, NULL, (mnavPos3){8.0, 0.0, 56.0}, box, &b);
+mnavResult nearA = mnavFindNearest(navmesh, NULL, (mnavPos3){8.0, 0.0, 8.0}, box, &a);
+mnavResult nearB = mnavFindNearest(navmesh, NULL, (mnavPos3){8.0, 0.0, 56.0}, box, &b);
+// a.polygon.slot is 0 when no polygon lies in the box
 
 mnavPath path;
-mnavFindPath(query, navmesh, NULL, a.polygon, a.point, b.polygon, b.point, &path);
+mnavResult searched =
+    mnavFindPath(query, navmesh, NULL, a.polygon, a.point, b.polygon, b.point, &path);
 // path.end: found, partial (out of nodes or too long), no path, not loaded
 // path.points: the straight path; path.polygons: the corridor; path.links
 ```
@@ -154,13 +162,14 @@ A path corridor keeps an agent's path valid as it and its target move.
 ```c
 mnavPolygonId buffer[256];
 mnavCorridor corridor;
-mnavResetCorridor(&corridor, buffer, 256, a.polygon, a.point);
-mnavSetCorridor(&corridor, &path);
+mnavResult reset = mnavResetCorridor(&corridor, buffer, 256, a.polygon, a.point);
+mnavResult set = mnavSetCorridor(&corridor, &path);   // mnav_errorCapacity past 256
 
 // Each tick:
 mnavCorners corners;
-mnavCorridorCorners(query, navmesh, &corridor, &corners);  // head for corners.points[1]
-mnavMoveCorridor(query, navmesh, NULL, &corridor, wanted, NULL);
+mnavResult cornered = mnavCorridorCorners(query, navmesh, &corridor, &corners);
+// head for corners.points[1]
+mnavResult moved = mnavMoveCorridor(query, navmesh, NULL, &corridor, wanted, NULL);
 ```
 
 - `mnavMoveCorridorTarget` moves the target; `mnavShortcutCorridor`
@@ -199,11 +208,12 @@ by velocity obstacles (ORCA).
 ```c
 mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
 mnavAvoidance* avoidance = NULL;
-mnavCreateAvoidance(&def, &avoidance);
+mnavResult made = mnavCreateAvoidance(&def, &avoidance);
 
 // Each step: positions, velocities and preferred velocities in, new
 // velocities out.
-mnavAvoid(avoidance, agents, agentCount, obstacles, obstacleCount, 0.1, velocities);
+mnavResult stepped =
+    mnavAvoid(avoidance, agents, agentCount, obstacles, obstacleCount, 0.1, velocities);
 ```
 
 The set keeps no state between steps: you pass every agent each time,
