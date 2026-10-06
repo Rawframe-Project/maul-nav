@@ -8,31 +8,39 @@ avoidance as a separate component. Written in C23 with public headers
 any C17 or C++17 program can include, with no dependencies and an MIT
 license.
 
-It will own:
+It has:
 
-- navmesh generation in 3D and 2D, tiled, run in parallel through the
-  host's task system, with the same bytes at any worker count;
-- the navmesh data format and its loader;
-- nearest-point, path, raycast and other spatial queries, with named
-  limits on every search and typed results when one is hit;
+- navmesh generation in 3D from triangle meshes and terrains, and in
+  2D from polygons, shaped by bake volumes, tile by tile: each tile is
+  an independent call the host may run on its own workers, giving the
+  same bytes at any worker count;
+- the navmesh data format, versioned and fingerprinted, and a loader
+  that refuses malformed bytes with a typed error;
+- nearest-point, path, raycast, height, wall-distance, surface-move,
+  shape, random-point and reachability queries, with named limits on
+  every search and typed results when one is hit;
 - path corridors, sliced and hierarchical searches, grid pathfinding
-  and flow fields;
+  (A* and jump point search), and flow fields over grids and navmeshes;
+- off-mesh links point to point or edge to edge, one or two way, of
+  host-declared kinds, toggled at runtime and generated automatically;
 - runtime changes by declared tier (static, modifiers only, dynamic),
   committed at a point the host chooses;
-- velocity-space avoidance, in its own library target, usable without
-  a navmesh.
+- velocity-space avoidance (ORCA), a component that needs no navmesh;
+- debug geometry as plain vertices and indices, and bake reports.
 
 It owns no world, entities, physics or animation: it takes geometry
 the host extracts, and returns paths, corners and desired velocities
 the host applies. Results are bit-identical on every platform,
-compiler and worker count. It starts no threads and calls no
-application code.
+compiler and worker count. It starts no threads. It calls host code
+only when asked to, synchronously, on the calling thread and within
+the call: an allocator, the clearance test link generation takes and
+the clock a bake may read for its report.
 
 ## Status
 
-Not released. The first decisions are made and the skeleton builds;
-the input surface, tiled 3D generation, the format and its loader come
-first, then the queries.
+Not released yet; the first release, 0.1.0, is being prepared.
+Everything listed above is built and tested on every CI platform, and
+`samples/` shows a first program.
 
 ## Building
 
