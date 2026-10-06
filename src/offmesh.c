@@ -332,6 +332,11 @@ mnavResult mnavPlanAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
     if (result == mnav_success)
     {
         plan->capacity = capacity;
+        result = mnavAllocate(&navmesh->memory, (size_t)capacity, sizeof(uint64_t),
+                              alignof(uint64_t), (void**)&plan->arrivals);
+    }
+    if (result == mnav_success)
+    {
         result = mnavAllocate(&navmesh->memory, (size_t)navmesh->linkSlots, sizeof(bool),
                               alignof(bool), (void**)&plan->resnap);
     }
@@ -354,8 +359,9 @@ mnavResult mnavPlanAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
 
 void mnavDropAttachmentPlan(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
 {
-    mnavRelease(&navmesh->memory, plan->keys, (size_t)plan->capacity, sizeof(uint64_t),
-                alignof(uint64_t));
+    size_t capacity = (size_t)plan->capacity;
+    mnavRelease(&navmesh->memory, plan->keys, capacity, sizeof(uint64_t), alignof(uint64_t));
+    mnavRelease(&navmesh->memory, plan->arrivals, capacity, sizeof(uint64_t), alignof(uint64_t));
     mnavRelease(&navmesh->memory, plan->resnap, (size_t)plan->resnapCount, sizeof(bool),
                 alignof(bool));
     *plan = (mnavAttachmentPlan){0};
@@ -412,6 +418,25 @@ static int32_t Attach(mnavNavmesh* navmesh, int32_t s, uint64_t* keys, int32_t c
     return count;
 }
 
+// Writes each attachment again, by the polygon it lands on, and sorts
+// them with the scratch from half on.
+static void Arrive(mnavNavmesh* navmesh, int32_t half)
+{
+    for (int32_t i = 0; i < navmesh->attachmentCount; ++i)
+    {
+        mnavAttachment a = mnavAttachmentOf(navmesh->attachments[i]);
+        const mnavLinkState* state = &navmesh->links[a.link].state;
+        mnavPolygonId landing = a.reverse ? state->startPolygon : state->endPolygon;
+        navmesh->arrivals[i] = mnavAttachmentKey((mnavAttachment){
+            (int32_t)landing.slot - 1, (int32_t)landing.polygon, a.link, a.reverse});
+    }
+    navmesh->arrivalCount =
+        navmesh->attachmentCount > 0
+            ? (int32_t)mnavSortUnique(navmesh->arrivals, navmesh->arrivals + half,
+                                      (size_t)navmesh->attachmentCount)
+            : 0;
+}
+
 void mnavApplyAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
 {
     int32_t held = 0;
@@ -430,9 +455,14 @@ void mnavApplyAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
     navmesh->linksPending = 0;
     mnavRelease(&navmesh->memory, navmesh->attachments, (size_t)navmesh->attachmentCapacity,
                 sizeof(uint64_t), alignof(uint64_t));
+    mnavRelease(&navmesh->memory, navmesh->arrivals, (size_t)navmesh->arrivalCapacity,
+                sizeof(uint64_t), alignof(uint64_t));
     navmesh->attachments = plan->keys;
     navmesh->attachmentCapacity = plan->capacity;
+    navmesh->arrivals = plan->arrivals;
+    navmesh->arrivalCapacity = plan->capacity;
     plan->keys = nullptr;
+    plan->arrivals = nullptr;
     plan->capacity = 0;
     int32_t count = 0;
     for (int32_t s = 0; s < navmesh->linkSlots; ++s)
@@ -472,18 +502,21 @@ void mnavApplyAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
         count > 0 ? (int32_t)mnavSortUnique(navmesh->attachments, navmesh->attachments + half,
                                             (size_t)count)
                   : 0;
+    Arrive(navmesh, half);
 }
 
-int32_t mnavAttachmentsFrom(const mnavNavmesh* navmesh, int32_t slot, int32_t polygon,
-                            int32_t* first)
+// The keys of one polygon in a sorted key array: first receives the index
+// of the first; returns how many.
+static int32_t KeysOf(const uint64_t* keys, int32_t count, int32_t slot, int32_t polygon,
+                      int32_t* first)
 {
     uint64_t low = mnavAttachmentKey((mnavAttachment){slot, polygon, 0, false});
     int32_t lo = 0;
-    int32_t hi = navmesh->attachmentCount;
+    int32_t hi = count;
     while (lo < hi)
     {
         int32_t middle = lo + (hi - lo) / 2;
-        if (navmesh->attachments[middle] < low)
+        if (keys[middle] < low)
         {
             lo = middle + 1;
         }
@@ -493,9 +526,9 @@ int32_t mnavAttachmentsFrom(const mnavNavmesh* navmesh, int32_t slot, int32_t po
         }
     }
     int32_t end = lo;
-    while (end < navmesh->attachmentCount)
+    while (end < count)
     {
-        mnavAttachment a = mnavAttachmentOf(navmesh->attachments[end]);
+        mnavAttachment a = mnavAttachmentOf(keys[end]);
         if (a.slot != slot || a.polygon != polygon)
         {
             break;
@@ -504,4 +537,15 @@ int32_t mnavAttachmentsFrom(const mnavNavmesh* navmesh, int32_t slot, int32_t po
     }
     *first = lo;
     return end - lo;
+}
+
+int32_t mnavAttachmentsFrom(const mnavNavmesh* navmesh, int32_t slot, int32_t polygon,
+                            int32_t* first)
+{
+    return KeysOf(navmesh->attachments, navmesh->attachmentCount, slot, polygon, first);
+}
+
+int32_t mnavAttachmentsTo(const mnavNavmesh* navmesh, int32_t slot, int32_t polygon, int32_t* first)
+{
+    return KeysOf(navmesh->arrivals, navmesh->arrivalCount, slot, polygon, first);
 }

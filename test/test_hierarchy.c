@@ -303,6 +303,46 @@ static void TestLinksBetweenClusters(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestOneWayLinkInTheEndCluster(void)
+{
+    // A one-way link over the wall at z = 60, both ends in the cluster of
+    // tiles (0, 0) to (1, 1): the end, south of the wall, is reached from
+    // the north by it, or round by the wall's gap 190 m east.
+    mnavNavmesh* navmesh = Load(false);
+    mnavQuery* query = Query(4096);
+    mnavHierarchy* hierarchy = Hierarchy(2);
+    mnavLinkDef def = {{40.0, 0.0, 63.0}, {40.0, 0.0, 57.0}, 1.0f, 2.0f, 0, false, 0.0f};
+    mnavLinkId id;
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+          "linked");
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success, "built");
+    // The start two clusters north, too far for the plain search first.
+    mnavNearest a = On(navmesh, 40.0, 170.0);
+    mnavNearest b = On(navmesh, 40.0, 50.0);
+    mnavPath plain;
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &plain) ==
+                  mnav_success &&
+              plain.end == mnav_pathFound && plain.linkCount == 1,
+          "the plain path takes the link");
+    double plainLength = plain.length;
+    mnavPath path;
+    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                   b.point, &path) == mnav_success,
+          "searched");
+    printf("one-way link in the end cluster: plain %.1f m, hierarchical %.1f m, %d links\n",
+           plainLength, path.length, path.linkCount);
+    CHECK(path.end == mnav_pathFound && path.linkCount == 1 && path.length < plainLength * 1.1,
+          "the hierarchical path takes it too");
+    // From the end northward the link does not go.
+    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, b.polygon, b.point, a.polygon,
+                                   a.point, &path) == mnav_success &&
+              path.end == mnav_pathFound && path.linkCount == 0 && path.length > 300.0,
+          "never against it");
+    mnavDestroyHierarchy(hierarchy);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 // The hash of the hierarchical paths between the random pairs.
 static uint64_t PairsHash(const mnavNavmesh* navmesh, mnavQuery* query, mnavHierarchy* hierarchy)
 {
@@ -644,6 +684,7 @@ int main(void)
     TestStaleAndFallbacks();
     TestLimitsAndChecks();
     TestLinksBetweenClusters();
+    TestOneWayLinkInTheEndCluster();
     TestUpdates();
     TestNegativePlaces();
     for (int32_t t = 0; t < TILES * TILES; ++t)

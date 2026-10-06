@@ -32,9 +32,12 @@ local search.
   gives the cost to each transition leaving that cluster.
 - **Queries:** `mnavFindHierarchicalPath` joins the end to the
   transitions entering its cluster by a confined search from the end,
-  the walk's cost being symmetric: a portal through the cost found to
-  cross it the other way, a link's landing through the cheapest node
-  reached in its polygon and then straight on; and the start to those
+  run backward: walks cost the same either way, and off-mesh links are
+  followed from where they land to where they take off (the navmesh
+  keeps its attachments sorted by landing polygon too), so a one-way
+  link inside the cluster serves only the ways it goes; a portal joins
+  through the cost found to cross it the other way, a link's landing
+  through the cheapest node reached in its polygon and then straight on; and the start to those
   leaving its cluster; A* over the transitions, with the straight distance times
   the search's heuristic scale, ties to the lower index, picks them;
   then the navmesh search refines step by step, each step confined to

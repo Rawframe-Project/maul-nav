@@ -235,10 +235,47 @@ static void ExpandSide(mnavSearch* s, int32_t n, const mnavTile* tile, int32_t j
     }
 }
 
+// Opens the polygons the off-mesh links landing on node n's polygon take
+// off from, as if crossed backward: from the landing point to the takeoff
+// point, at the link's cost.
+static void ExpandArrivals(mnavSearch* s, int32_t n)
+{
+    const mnavNavmesh* navmesh = s->navmesh;
+    const mnavSearchNode* node = &s->query->nodes[n];
+    int32_t first = 0;
+    int32_t count = mnavAttachmentsTo(navmesh, node->slot, node->polygon, &first);
+    for (int32_t i = first; i < first + count; ++i)
+    {
+        mnavAttachment arrival = mnavAttachmentOf(navmesh->arrivals[i]);
+        const mnavOffLink* link = &navmesh->links[arrival.link];
+        const mnavLinkState* state = &link->state;
+        mnavPolygonId takeoff = arrival.reverse ? state->endPolygon : state->startPolygon;
+        const mnavTile* tile = navmesh->slots[takeoff.slot - 1].tile;
+        if (!mnavCrosses(s->filter, link->def.kind) ||
+            !mnavIncludes(s->filter, tile->mesh.polygons[takeoff.polygon].area))
+        {
+            continue;
+        }
+        mnavSearchNode key = {.slot = (int32_t)takeoff.slot - 1,
+                              .polygon = (int32_t)takeoff.polygon,
+                              .tag = MNAV_TAG_OFFMESH,
+                              .low = arrival.link * 2 + (arrival.reverse ? 1 : 0)};
+        mnavPos3 landing = arrival.reverse ? state->start : state->end;
+        mnavPos3 from = arrival.reverse ? state->end : state->start;
+        Open(s, n, &key, landing, from, (double)link->def.cost);
+    }
+}
+
 // Opens the polygons the off-mesh links leaving node n's polygon land on,
-// for the kinds and areas the filter includes.
+// for the kinds and areas the filter includes; a backward search takes
+// those landing on it instead.
 static void ExpandOffMesh(mnavSearch* s, int32_t n)
 {
+    if (s->backward)
+    {
+        ExpandArrivals(s, n);
+        return;
+    }
     const mnavNavmesh* navmesh = s->navmesh;
     const mnavSearchNode* node = &s->query->nodes[n];
     int32_t first = 0;
@@ -373,6 +410,7 @@ mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
                       MNAV_NO_NODE,
                       nullptr,
                       false,
+                      false,
                       {-1, -1, -1, -1}};
     query->nodes[0] = (mnavSearchNode){start,
                                        start,
@@ -405,6 +443,11 @@ void mnavConfineSearch(mnavQuery* query, const uint8_t* inside, bool beyond, boo
         s->cheapest = 0.0;
         query->nodes[0].remaining = 0.0;
     }
+}
+
+void mnavTurnSearchBackward(mnavQuery* query)
+{
+    query->search.backward = true;
 }
 
 void mnavAimSearch(mnavQuery* query, mnavPos3 end, int32_t endSlot, int32_t endPolygon,

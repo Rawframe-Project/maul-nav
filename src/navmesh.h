@@ -133,6 +133,12 @@ struct mnavNavmesh
     uint64_t* attachments;
     int32_t attachmentCount;
     int32_t attachmentCapacity;
+    // The same attachments seen from the polygon each lands on: keys of
+    // the landing polygon's slot and index, the link and the direction,
+    // sorted, for searches run backward.
+    uint64_t* arrivals;
+    int32_t arrivalCount;
+    int32_t arrivalCapacity;
     // The areas staged to change, in staging order.
     mnavAreaChange* areaChanges;
     int32_t areaChangeCount;

@@ -464,7 +464,7 @@ static mnavPolygonId IdOf(const mnavNavmesh* navmesh, int32_t slot, int32_t poly
 }
 
 mnavResult mnavSearchCluster(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh,
-                             int32_t cluster, mnavPolygonId polygon, mnavPos3 point)
+                             bool backward, int32_t cluster, mnavPolygonId polygon, mnavPos3 point)
 {
     mnavResult result = mnavBeginPath(query, navmesh, &h->filter, polygon, point, polygon, point);
     if (result != mnav_success)
@@ -473,6 +473,10 @@ mnavResult mnavSearchCluster(mnavHierarchy* h, mnavQuery* query, const mnavNavme
     }
     mnavMarkCluster(h, cluster, 1);
     mnavConfineSearch(query, h->inside, true, true);
+    if (backward)
+    {
+        mnavTurnSearchBackward(query);
+    }
     bool ended = false;
     while (result == mnav_success && !ended)
     {
@@ -497,8 +501,8 @@ static mnavResult AddEdges(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh
 {
     const mnavTransition* t = &h->transitions[u];
     h->searches += 1;
-    mnavResult result =
-        mnavSearchCluster(h, query, navmesh, t->cluster, IdOf(navmesh, t->slot, t->polygon), t->at);
+    mnavResult result = mnavSearchCluster(h, query, navmesh, false, t->cluster,
+                                          IdOf(navmesh, t->slot, t->polygon), t->at);
     if (result != mnav_success)
     {
         return result;

@@ -104,6 +104,10 @@ typedef struct mnavSearch
     // beyond set, nodes outside are opened but never expanded.
     const uint8_t* inside;
     bool beyond;
+    // Whether off-mesh links are followed from where they land back to
+    // where they take off, so that the costs found are those of walking to
+    // the start rather than from it (mnav-0008).
+    bool backward;
     // The nodes whose closing ends the search, its tag -1 for none: a
     // slot, a tag and a range of lows, as nodes' (mnav-0008).
     int32_t goal[4];
@@ -153,6 +157,11 @@ uint32_t mnavFindNode(const mnavQuery* query, int32_t slot, int32_t polygon, int
 // search is Dijkstra's and never reaches the end, so that it runs until
 // its open list empties (mnav-0008).
 void mnavConfineSearch(mnavQuery* query, const uint8_t* inside, bool beyond, bool noEnd);
+
+// Turns the search just begun backward: off-mesh links are followed from
+// where they land to where they take off. Walks cost the same either way,
+// so its costs are those of the way from each node to the start.
+void mnavTurnSearchBackward(mnavQuery* query);
 
 // Aims the search at another point: the end point, and the end polygon's
 // slot and index, or -1 for an end never reached; and at the nodes whose

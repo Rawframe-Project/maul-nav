@@ -95,6 +95,8 @@ void mnavDestroyNavmesh(mnavNavmesh* navmesh)
                 alignof(mnavOffLink));
     mnavRelease(memory, navmesh->areaChanges, (size_t)navmesh->areaChangeCapacity,
                 sizeof(mnavAreaChange), alignof(mnavAreaChange));
+    mnavRelease(memory, navmesh->arrivals, (size_t)navmesh->arrivalCapacity, sizeof(uint64_t),
+                alignof(uint64_t));
     mnavRelease(memory, navmesh->attachments, (size_t)navmesh->attachmentCapacity, sizeof(uint64_t),
                 alignof(uint64_t));
     mnavRelease(memory, navmesh->places, (size_t)navmesh->placeCapacity, sizeof(mnavPlace),
