@@ -64,11 +64,35 @@ static void TestNearestOnALine(void)
           "too fast: on the circle");
 }
 
+static void TestOnePointLeft(void)
+{
+    // x at most 0, x at least 0, then y at least 0: on the third line the
+    // first two leave the single point t = 0, which is feasible: (0, 0).
+    const mnavLine lines[3] = {
+        {{0.0, 0.0}, {0.0, 1.0}}, {{0.0, 0.0}, {0.0, -1.0}}, {{0.0, 0.0}, {1.0, 0.0}}};
+    mnavPos2 result = {0.0, 0.0};
+    CHECK(mnavLinearProgram2(lines, 3, 5.0, (mnavPos2){0.0, -1.0}, false, &result) == 3 &&
+              result.x == 0.0 && result.y == 0.0,
+          "an interval of one point is kept");
+}
+
+static void TestTouchingTheSpeed(void)
+{
+    // y at least 5 within speed 5 leaves one velocity, (0, 5).
+    const mnavLine line = {{0.0, 5.0}, {1.0, 0.0}};
+    mnavPos2 result = {0.0, 0.0};
+    CHECK(mnavLinearProgram2(&line, 1, 5.0, (mnavPos2){0.0, 0.0}, false, &result) == 1 &&
+              result.x == 0.0 && result.y == 5.0,
+          "a line touching the speed circle is kept");
+}
+
 int main(void)
 {
     TestFacingParallels();
     TestFacingParallelsBalanced();
     TestSameWayParallels();
     TestNearestOnALine();
+    TestOnePointLeft();
+    TestTouchingTheSpeed();
     return s_failures == 0 ? 0 : 1;
 }
