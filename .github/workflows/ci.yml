@@ -74,7 +74,12 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Package
         if: matrix.name == 'linux-shared'
-        run: cmake --install build --prefix "$PWD/package"
+        run: |
+          cmake --install build --prefix "$PWD/package"
+          cmake -S samples/minimal -B build-minimal -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_PREFIX_PATH="$PWD/package"
+          cmake --build build-minimal
+          LD_LIBRARY_PATH="$PWD/package/lib" ./build-minimal/minimal
 
   windows-clang-cl:
     name: windows-clang-cl

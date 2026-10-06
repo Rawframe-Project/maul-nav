@@ -16,6 +16,7 @@ project(maul-nav
 
 option(MAUL_NAV_BUILD_TESTS "Build the test suites" ${PROJECT_IS_TOP_LEVEL})
 option(MAUL_NAV_BUILD_BENCH "Build the benchmarks" ${PROJECT_IS_TOP_LEVEL})
+option(MAUL_NAV_BUILD_SAMPLES "Build the samples" ${PROJECT_IS_TOP_LEVEL})
 option(MAUL_NAV_BUILD_SHARED "Build a shared library instead of a static one" OFF)
 option(MAUL_NAV_INSTALL "Generate install rules" ${PROJECT_IS_TOP_LEVEL})
 option(MAUL_NAV_WERROR "Treat compiler warnings as errors" OFF)
@@ -180,6 +181,10 @@ endif()
 
 if(MAUL_NAV_BUILD_BENCH AND EXISTS ${PROJECT_SOURCE_DIR}/bench/bench_main.c)
     add_subdirectory(bench)
+endif()
+
+if(MAUL_NAV_BUILD_SAMPLES)
+    add_subdirectory(samples)
 endif()
 
 if(MAUL_NAV_INSTALL)

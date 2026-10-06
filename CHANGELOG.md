@@ -253,3 +253,5 @@ format.
 - Navmesh flow fields take their memory when made, for named limits of
   polygons, tile slots and links (mnavNavFlowLimits; the def's polygons
   field moves into it), and draw their arrows (mnavDebugNavFlow).
+- Samples: walk (bake to a walking agent), crowd (avoidance alone) and
+  minimal (a consumer of the installed package, built in CI).
