@@ -42,6 +42,9 @@ format.
   agent a velocity far past its maximum speed (3.7e210 m/s for a
   limit of 0.3), and a huge circle radius overflowed a conversion to a
   grid cell; now refused (see Changed), and grid cells saturate.
+- `mnavAvoid` gave a NaN velocity to an agent a hair from an obstacle's
+  corner (2.8e-312 m in the fuzz case): the corner gave no direction.
+  Such an agent now keeps out of the edge.
 - `mnavAvoid` could give a velocity a little faster than the agent's
   maximum speed (1.2e-8 of it, with deeply overlapping agents) when
   constraints met at a narrow angle; the speed is now kept exactly.

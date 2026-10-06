@@ -365,6 +365,15 @@ static bool Covered(const View* w, int32_t o1, int32_t o2, const mnavLine* lines
     return false;
 }
 
+// The unit vector along a, or the fallback when a has no length: an
+// agent standing on a vertex, or a velocity on a cut-off point, gives no
+// direction of its own.
+static mnavPos2 UnitOr(mnavPos2 a, mnavPos2 fallback)
+{
+    mnavPos2 unit = mnavNormalize2(a);
+    return unit.x == 0.0 && unit.y == 0.0 ? fallback : unit;
+}
+
 // The leg from a convex vertex at relative position rel, on the left
 // (left true) or right of the agent's view.
 static mnavPos2 Leg(mnavPos2 rel, double radius, bool left)
@@ -462,16 +471,19 @@ static bool Project(const View* w, const Legs* legs, mnavLine* line)
     double t = one ? 0.5 : mnavDot2(mnavSub2(v, leftCutoff), cutoff) / mnavDot2(cutoff, cutoff);
     double tLeft = mnavDot2(mnavSub2(v, leftCutoff), legs->left);
     double tRight = mnavDot2(mnavSub2(v, rightCutoff), legs->right);
+    // With no direction from the cut-off point, the edge's outward normal
+    // stands in.
+    mnavPos2 outward = {vs[legs->o1].direction.y, -vs[legs->o1].direction.x};
     if ((t < 0.0 && tLeft < 0.0) || (one && tLeft < 0.0 && tRight < 0.0))
     {
-        mnavPos2 unit = mnavNormalize2(mnavSub2(v, leftCutoff));
+        mnavPos2 unit = UnitOr(mnavSub2(v, leftCutoff), outward);
         *line = (mnavLine){mnavAdd2(leftCutoff, mnavScale2(unit, w->radius * w->inverse)),
                            (mnavPos2){unit.y, -unit.x}};
         return true;
     }
     if (t > 1.0 && tRight < 0.0)
     {
-        mnavPos2 unit = mnavNormalize2(mnavSub2(v, rightCutoff));
+        mnavPos2 unit = UnitOr(mnavSub2(v, rightCutoff), outward);
         *line = (mnavLine){mnavAdd2(rightCutoff, mnavScale2(unit, w->radius * w->inverse)),
                            (mnavPos2){unit.y, -unit.x}};
         return true;
@@ -505,15 +517,18 @@ static bool Touching(const View* w, int32_t o1, int32_t o2, double s, double dis
     mnavPos2 rel1 = mnavSub2(vs[o1].point, w->position);
     mnavPos2 rel2 = mnavSub2(vs[o2].point, w->position);
     double radiusSq = w->radius * w->radius;
+    // An agent on the vertex itself keeps out of the edge, as one touching
+    // its middle does.
+    mnavPos2 away = mnavScale2(vs[o1].direction, -1.0);
     *handled = true;
     if (s < 0.0 && mnavDot2(rel1, rel1) <= radiusSq)
     {
-        *line = (mnavLine){{0.0, 0.0}, mnavNormalize2((mnavPos2){-rel1.y, rel1.x})};
+        *line = (mnavLine){{0.0, 0.0}, UnitOr((mnavPos2){-rel1.y, rel1.x}, away)};
         return vs[o1].convex;
     }
     if (s > 1.0 && mnavDot2(rel2, rel2) <= radiusSq)
     {
-        *line = (mnavLine){{0.0, 0.0}, mnavNormalize2((mnavPos2){-rel2.y, rel2.x})};
+        *line = (mnavLine){{0.0, 0.0}, UnitOr((mnavPos2){-rel2.y, rel2.x}, away)};
         return vs[o2].convex && mnavDet2(rel2, vs[o2].direction) >= 0.0;
     }
     if (s >= 0.0 && s <= 1.0 && distSqLine <= radiusSq)

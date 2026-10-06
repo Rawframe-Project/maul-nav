@@ -529,6 +529,59 @@ static void TestObstacleChecks(void)
           "an obstacle horizon under the shortest");
 }
 
+// An agent a hair from an obstacle's corner, from the avoidance fuzz
+// target: the corner gave no direction to keep out by, and the agent's
+// velocity came out NaN. It keeps out of the edge, as one touching its
+// middle does.
+static void TestOnACorner(void)
+{
+    mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
+    def.limits.agents = 20;
+    def.limits.neighbors = 11;
+    def.limits.obstacleVertices = 32;
+    def.neighborDistance = 16.0;
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
+    const mnavAgent agents[3] = {{{0x1.2p+0, -0x1.4p-1},
+                                  {-0x1.4949494940ap-694, 0x1.4p+1},
+                                  {0x1.ep+0, -0x1.d4p+3},
+                                  0x1.4p+1,
+                                  0x1.ccccccccccccdp-1,
+                                  0x1.ccccccccccccdp-1,
+                                  1},
+                                 {{0x0.0000000e2p-1022, 0.0},
+                                  {0.0, 0x0.00000000001p-1022},
+                                  {-0x1.4949494949494p-694, 0x1.fcp+3},
+                                  0x1.ccccccccccccdp-1,
+                                  0x1.ccccccccccccdp-1,
+                                  0x1.ccccccccccccdp-1,
+                                  0},
+                                 {{0x1.c8p+3, -0x1p+4},
+                                  {-0x1.494949494940ap-694, 0x1.4p+1},
+                                  {0x1.4p+1, -0x1p+4},
+                                  0x1.ccccccccccccdp-1,
+                                  0x1.ccccccccccccdp-1,
+                                  0x1.ccccccccccccdp-1,
+                                  1}};
+    const mnavPos2 corners[3] = {
+        {-0x1p+4, 0x0.000000000e2p-1022}, {0.0, 0x0.001p-1022}, {-0x1.49494p-694, 0x1.4p+1}};
+    const mnavObstacle block = {corners, 3, 0.0, {0x1.fcp+3, -0x1.fcp+3}, 1};
+    mnavPos2 velocities[3];
+    CHECK(mnavAvoid(avoidance, agents, 3, &block, 1, 0x1.ccccccccccccdp-2, velocities) ==
+              mnav_success,
+          "stepped");
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        // Squared, as the library keeps it: hypot rounds differently by
+        // platform.
+        double speedSq = velocities[i].x * velocities[i].x + velocities[i].y * velocities[i].y;
+        CHECK(isfinite(velocities[i].x) && isfinite(velocities[i].y) &&
+                  speedSq <= agents[i].maxSpeed * agents[i].maxSpeed,
+              "finite and within the speed");
+    }
+    mnavDestroyAvoidance(avoidance);
+}
+
 // Three deeply overlapping agents, from the avoidance fuzz target: the
 // third's lines meet at a narrow angle, and the programs' result came out
 // 1.2e-8 of its maximum speed too fast before the speed was kept.
@@ -568,5 +621,6 @@ int main(void)
     TestMixedScene();
     TestObstacleChecks();
     TestSpeedKept();
+    TestOnACorner();
     return s_failures == 0 ? 0 : 1;
 }
