@@ -45,8 +45,11 @@ that are not loaded must say so rather than treat them as walls.
   result names how the search ended (found, out of nodes, too long,
   stopped at places with no tile loaded, no path, checked in that
   order), its cost, and the corridor of polygons, which short of the
-  end runs to the node nearest it. A stale polygon id is
-  `mnav_errorStale`.
+  end runs to the node nearest it. The corridor lists each visit to a
+  polygon once: a polygon an off-mesh link leaves and lands back on is
+  listed before the link and after it, so that a corridor set from the
+  path still crosses the link (in 0.2.0 such visits merged, which a
+  fuzz target found). A stale polygon id is `mnav_errorStale`.
 - **Straight path:** the corridor is pulled tight with the funnel
   algorithm over its portals, in binary64 world coordinates with exact
   side tests and no tolerance: a portal end on a funnel side narrows
