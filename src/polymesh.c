@@ -307,6 +307,17 @@ static mnavResult Store(Builder* builder, const mnavPolygon* polygon)
     return result;
 }
 
+// Twice the signed area of triangle abc on the ground; negative for the
+// winding of the rings.
+static int64_t TwiceArea(const mnavMeshVertex* v, int32_t a, int32_t b, int32_t c)
+{
+    int64_t abx = (int64_t)v[b].x - v[a].x;
+    int64_t abz = (int64_t)v[b].z - v[a].z;
+    int64_t acx = (int64_t)v[c].x - v[a].x;
+    int64_t acz = (int64_t)v[c].z - v[a].z;
+    return abx * acz - abz * acx;
+}
+
 // Triangulates one ring, welds its vertices, merges its triangles and
 // stores the polygons.
 static mnavResult AddRing(Builder* builder, const mnavContourSet* set, const mnavContour* contour)
@@ -320,7 +331,6 @@ static mnavResult AddRing(Builder* builder, const mnavContourSet* set, const mna
     bool complete = true;
     int32_t triangleCount =
         mnavTriangulate(ring, contour->count, builder->ears, builder->triangles, &complete);
-    builder->mesh->failedRings += complete ? 0 : 1;
     for (int32_t k = 0; k < contour->count && result == mnav_success; ++k)
     {
         result = Weld(builder, &ring[k], &builder->welded[k]);
@@ -336,8 +346,13 @@ static mnavResult AddRing(Builder* builder, const mnavContourSet* set, const mna
         int32_t a = builder->welded[corner[0]];
         int32_t b = builder->welded[corner[1]];
         int32_t c = builder->welded[corner[2]];
-        if (a == b || a == c || b == c)
+        // A triangle with no area, as the last of a ring whose points lie
+        // in a line, covers nothing and could never load; one turned the
+        // wrong way means the ring was cut short.
+        int64_t area = a == b || a == c || b == c ? 0 : TwiceArea(builder->mesh->vertices, a, b, c);
+        if (area >= 0)
         {
+            complete = complete && area == 0;
             continue;
         }
         mnavPolygon* polygon = &builder->polygons[count++];
@@ -350,6 +365,7 @@ static mnavResult AddRing(Builder* builder, const mnavContourSet* set, const mna
         polygon->area = contour->area;
         polygon->region = contour->region;
     }
+    builder->mesh->failedRings += complete ? 0 : 1;
     if (result == mnav_success)
     {
         count = mnavMergePolygons(builder->mesh->vertices, builder->polygons, count);

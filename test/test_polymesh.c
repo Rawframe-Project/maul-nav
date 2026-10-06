@@ -113,6 +113,24 @@ static void TestTangledRingIsCounted(void)
     mnavReleaseContours(&memory, &set);
 }
 
+static void TestFlatTrianglesAreDropped(void)
+{
+    // A square, and a ring of three points in a line along its top side,
+    // as a sliver region simplified to nothing leaves one: its only
+    // triangle has no area, and a loader refuses such a polygon.
+    const int32_t points[14] = {0, 0, 0, 10, 10, 10, 10, 0, 2, 10, 4, 10, 6, 10};
+    const int32_t counts[2] = {4, 3};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = Rings(&memory, points, counts, 2);
+    mnavPolyMesh mesh;
+    CHECK(BuildLinked(&memory, &set, 10, 100, 100, &mesh) == mnav_success, "built");
+    CHECK(mesh.polygonCount == 1 && Valid(&mesh) && TwiceArea(&mesh) == 200,
+          "the square alone, valid");
+    CHECK(mesh.failedRings == 0, "nothing of area lost");
+    mnavReleasePolyMesh(&memory, &mesh);
+    mnavReleaseContours(&memory, &set);
+}
+
 static void TestBridgedRingWithAHiddenVertex(void)
 {
     // A square of 20 with three holes bridged in, found by searching
@@ -221,6 +239,7 @@ int main(void)
     TestRingsWeldAndLinkAcrossRegions();
     TestLimitsAreTyped();
     TestTangledRingIsCounted();
+    TestFlatTrianglesAreDropped();
     TestBridgedRingWithAHiddenVertex();
     TestPinchedRingNeedsTheLooseTest();
     TestLevelMeshIsPinned();
