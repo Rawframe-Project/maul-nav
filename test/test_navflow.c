@@ -430,6 +430,13 @@ static void TestStepsAndRegions(mnavNavFlow* field)
 static mnavDebugVertex s_vertices3[8192];
 static uint32_t s_lines[8192];
 
+// A debug vertex's position.
+static mnavPos3 At(const mnavDebugBuffer* b, uint32_t i)
+{
+    const mnavDebugVertex* v = &b->vertices[i];
+    return (mnavPos3){(double)v->x, (double)v->y, (double)v->z};
+}
+
 // The arrows over the 8 m tiles: one for each polygon with a way on, its
 // head at that polygon's portal midpoint.
 static void TestDebug(mnavNavFlow* field)
@@ -468,6 +475,20 @@ static void TestDebug(mnavNavFlow* field)
                            : 0;
         }
     }
+    // Barbs a quarter of their arrow, at most half a meter.
+    int32_t capped = 0;
+    bool barbs = true;
+    for (int32_t a = 0; a < b.lineCount / 6; ++a)
+    {
+        const uint32_t* l = &b.lines[6 * a];
+        double arrow = Distance(At(&b, l[0]), At(&b, l[1]));
+        double barb = Distance(At(&b, l[2]), At(&b, l[3]));
+        double expected = 0.25 * arrow < 0.5 ? 0.25 * arrow : 0.5;
+        // Each barb is the quarter-length step back plus as much across.
+        barbs = barbs && fabs(barb - expected * sqrt(2.0)) < 1e-3;
+        capped += 0.25 * arrow > 0.5 ? 1 : 0;
+    }
+    CHECK(barbs && capped > 0, "barbs a quarter of their arrow, capped at half a meter");
     printf("navflow debug: %d ways, %d lines\n", ways, b.lineCount / 2);
     CHECK(ways > 100 && b.lineCount == 6 * ways && matched >= ways,
           "an arrow of three lines for each way, heads at the portals");
