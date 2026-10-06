@@ -13,6 +13,9 @@ format.
 - Avoidance finds neighbours through a table of grid cells half the
   neighbour range wide, ring by ring from each agent's cell: a quarter
   fewer instructions on a doorway of 1000 agents, the same velocities.
+- Polygon merging in the bake pairs only polygons that share an edge,
+  into the same bytes: the benchmark's outline world, with many holes,
+  bakes and builds its hierarchy with a fifth fewer instructions.
 
 ## [0.2.1] - 2026-10-06
 
