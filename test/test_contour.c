@@ -163,6 +163,39 @@ static void TestErrorDecidesASmallNotch(void)
     }
 }
 
+// A hole touching the outside at a corner: cells (1, 1) and (2, 2) are
+// left out, so the outline walks in at corner (2, 2), round the hole and
+// out at the same corner. Simplified hard, the loop round the hole goes
+// and the corner is left twice running; the repeat is dropped, and the
+// contour still bounds the region.
+static void TestCornerHoleLeavesNoRepeat(void)
+{
+    for (int32_t pass = 0; pass < 3; ++pass)
+    {
+        static Field field;
+        InsideFloor(&field);
+        field.counts[1 + 1 * WIDTH] = 0;
+        field.counts[2 + 2 * WIDTH] = 0;
+        Built built;
+        Build(&field, pass == 0 ? 0.5f : (pass == 1 ? 1.5f : 2.0f), 0, &built);
+        bool repeats = false;
+        int32_t fewest = INT32_MAX;
+        for (int32_t c = 0; c < built.set.count; ++c)
+        {
+            int32_t count = built.set.contours[c].count;
+            fewest = count < fewest ? count : fewest;
+            for (int32_t k = 0; k < count; ++k)
+            {
+                const mnavContourVertex* a = Vertex(&built, c, k);
+                const mnavContourVertex* b = Vertex(&built, c, k + 1);
+                repeats = repeats || (a->x == b->x && a->z == b->z);
+            }
+        }
+        CHECK(built.set.count == 1 && !repeats && fewest >= 3, "one contour, no repeats");
+        Release(&built);
+    }
+}
+
 static void TestLongWallsAreSplit(void)
 {
     static Field field;
@@ -278,6 +311,7 @@ int main(void)
     TestRegionsAgreeOnTheirSharedEdge();
     TestErrorDecidesASmallNotch();
     TestLongWallsAreSplit();
+    TestCornerHoleLeavesNoRepeat();
     TestTileBorderCornerRule();
     TestLevelContoursArePinned();
     return s_failures == 0 ? 0 : 1;

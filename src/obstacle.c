@@ -365,9 +365,10 @@ static bool Covered(const View* w, int32_t o1, int32_t o2, const mnavLine* lines
     return false;
 }
 
-// The unit vector along a, or the fallback when a has no length: an
-// agent standing on a vertex, or a velocity on a cut-off point, gives no
-// direction of its own.
+// The unit vector along a, or the fallback when a has no length. The
+// callers keep exact zeros away (an agent on a corner is taken as
+// touching the edge, and a velocity on a cut-off point is not projected
+// on it), so the fallback only guards their rounding.
 static mnavPos2 UnitOr(mnavPos2 a, mnavPos2 fallback)
 {
     mnavPos2 unit = mnavNormalize2(a);

@@ -7,6 +7,7 @@
 #include "border_vertices.h"
 #include "compact.h"
 #include "contour.h"
+#include "counting_allocator.h"
 #include "erode.h"
 #include "filter.h"
 #include "heightfield.h"
@@ -144,6 +145,60 @@ static void TestVertexInsideTheMeshIsRemoved(void)
               PolygonIs(&mesh, 1, left, 3) && PolygonIs(&mesh, 2, right, 3),
           "the hole's polygons");
     Finish(&memory, &set, &mesh);
+}
+
+// An allocator that refuses once a count of allocations is spent, -1
+// for never.
+static int32_t s_left = -1;
+
+static void* Refusing(size_t size, size_t alignment, void* context)
+{
+    if (s_left == 0)
+    {
+        return nullptr;
+    }
+    s_left -= s_left > 0 ? 1 : 0;
+    return CountingAlloc(size, alignment, context);
+}
+
+static void TestAllocationFailuresAreTyped(void)
+{
+    // Three squares in a row, (5, 0) and (10, 0) on the tile's side: two
+    // vertices removed in one call, the second reusing the scratch the
+    // first grew. Every allocation of the removal refused in turn: a
+    // capacity error, and nothing held.
+    const int32_t points[24] = {0,  0, 0,  5, 5,  5, 5,  0, 5,  0, 5,  5,
+                                10, 5, 10, 0, 10, 0, 10, 5, 15, 5, 15, 0};
+    const int32_t counts[3] = {4, 4, 4};
+    int32_t refused = 0;
+    bool clean = true;
+    for (int32_t k = 0;; ++k)
+    {
+        s_left = -1;
+        mnavMemory memory =
+            mnavMakeMemory((mnavAllocator){Refusing, CountingFree, nullptr}, UINT64_MAX);
+        mnavContourSet set = Rings(&memory, points, counts, 3);
+        Flag(&set, 5, 0);
+        Flag(&set, 10, 0);
+        mnavPolyMesh mesh;
+        CHECK(mnavBuildPolyMesh(&memory, &set, 10, 100, 100, &mesh) == mnav_success, "built");
+        s_left = k;
+        mnavResult result = mnavRemoveBorderVertices(&memory, &mesh, 100);
+        s_left = -1;
+        if (result == mnav_success)
+        {
+            CHECK(!HasVertex(&mesh, 5, 0) && !HasVertex(&mesh, 10, 0) && Valid(&mesh) &&
+                      TwiceArea(&mesh) == 150,
+                  "both removed once every allocation is granted");
+            Finish(&memory, &set, &mesh);
+            break;
+        }
+        refused += 1;
+        clean = clean && result == mnav_errorCapacity;
+        Finish(&memory, &set, &mesh);
+    }
+    printf("border vertices: %d allocation failures refused\n", refused);
+    CHECK(refused > 0 && clean, "each a capacity error");
 }
 
 static void TestTipOfALonePolygonStays(void)
@@ -335,6 +390,7 @@ int main(void)
     TestVertexBetweenTwoRegionsIsRemoved();
     TestNewPolygonsCountAgainstTheLimit();
     TestVertexInsideTheMeshIsRemoved();
+    TestAllocationFailuresAreTyped();
     TestTipOfALonePolygonStays();
     TestDifferentAreasStay();
     TestPolygonsTouchingOnlyAtTheVertexStay();

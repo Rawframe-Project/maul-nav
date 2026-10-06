@@ -267,6 +267,60 @@ static void TestSecondBridgeTakesTheCopyFacingIt(void)
     mnavReleaseContours(&memory, &set);
 }
 
+// A 20 m square with two holes touching at their least corner, (4, 4),
+// as two blocked areas meeting diagonally do: a 2 m square above it and a
+// triangle below. Holes merge in order of that corner, then of their
+// contour: the result is the same whichever order the set lists them in.
+static mnavContourSet TiedHoles(mnavMemory* memory, bool swapped)
+{
+    const int32_t square[8] = {4, 4, 6, 4, 6, 6, 4, 6};
+    const int32_t triangle[6] = {4, 4, 6, 1, 8, 2};
+    const int32_t* holes[2] = {swapped ? triangle : square, swapped ? square : triangle};
+    const int32_t sizes[2] = {swapped ? 3 : 4, swapped ? 4 : 3};
+    mnavContourSet set = {0};
+    CHECK(mnavReserve(memory, (void**)&set.vertices, &set.vertexCapacity, 0, 11,
+                      sizeof(mnavContourVertex), alignof(mnavContourVertex)) == mnav_success &&
+              mnavReserve(memory, (void**)&set.contours, &set.capacity, 0, 3, sizeof(mnavContour),
+                          alignof(mnavContour)) == mnav_success,
+          "room");
+    const int32_t outline[8] = {0, 0, 0, 20, 20, 20, 20, 0};
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        set.vertices[k] = (mnavContourVertex){outline[2 * k], 0, outline[2 * k + 1], 0, 0};
+    }
+    set.contours[set.count++] = (mnavContour){0, 4, 1, 1, false};
+    int32_t first = 4;
+    for (int32_t h = 0; h < 2; ++h)
+    {
+        for (int32_t k = 0; k < sizes[h]; ++k)
+        {
+            set.vertices[first + k] =
+                (mnavContourVertex){holes[h][2 * k], 0, holes[h][2 * k + 1], 0, 0};
+        }
+        set.contours[set.count++] = (mnavContour){first, sizes[h], 1, 1, true};
+        first += sizes[h];
+    }
+    set.vertexCount = first;
+    return set;
+}
+
+static void TestHolesTiedOnTheirCornerMerge(void)
+{
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    int64_t areas[2] = {0, 0};
+    for (int32_t pass = 0; pass < 2; ++pass)
+    {
+        mnavContourSet set = TiedHoles(&memory, pass == 1);
+        CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
+        CHECK(set.count == 1 && set.droppedHoles == 0 && ProperCrossings(&set, 0) == 0,
+              "both bridged, nothing crossing");
+        areas[pass] = TwiceArea(&set, 0);
+        mnavReleaseContours(&memory, &set);
+    }
+    // 800 for the square, less 8 for each hole.
+    CHECK(areas[0] == 784 && areas[1] == 784, "the square less both holes, either order");
+}
+
 static void TestHoleWithoutOutlineIsDropped(void)
 {
     mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
@@ -332,6 +386,7 @@ int main(void)
 {
     TestHolesMergeIntoOneContour();
     TestTiedBridgesTakeTheLowestOutlineVertex();
+    TestHolesTiedOnTheirCornerMerge();
     TestHoleWithoutOutlineIsDropped();
     TestBridgeAvoidsAWaitingHole();
     TestSecondBridgeTakesTheCopyFacingIt();

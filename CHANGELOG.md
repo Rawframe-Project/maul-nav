@@ -52,8 +52,9 @@ calls accept: a minor release.
   limit of 0.3), and a huge circle radius overflowed a conversion to a
   grid cell; now refused (see Changed), and grid cells saturate.
 - `mnavAvoid` gave a NaN velocity to an agent a hair from an obstacle's
-  corner (2.8e-312 m in the fuzz case): the corner gave no direction.
-  Such an agent now keeps out of the edge.
+  corner (2.8e-312 m in the fuzz case): the vector to the corner was
+  too short to square, and its unit vector came out infinite. Such
+  vectors are now scaled up exactly before they are normalized.
 - `mnavAvoid` could give a velocity a little faster than the agent's
   maximum speed (1.2e-8 of it, with deeply overlapping agents) when
   constraints met at a narrow angle; the speed is now kept exactly.

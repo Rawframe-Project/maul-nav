@@ -83,6 +83,11 @@ static int32_t Crossings(const mnavVec2* points, int32_t pointCount, double at, 
 // after v, or width.
 static int32_t FirstAtOrAfter(const mnavTileFrame* frame, float min, double v)
 {
+    // The guess is exact for points in binary32, as outline points are;
+    // a slanted edge's crossing is binary64 and may lie a unit in the last
+    // place past a center, which the second loop corrects. The first
+    // guards the opposite rounding, which a search over two million
+    // values never met.
     double guess = ceil((v - (double)min) / (double)frame->cellSize - 0.5);
     int32_t i = guess < 0.0 ? 0 : (guess > (double)frame->width ? frame->width : (int32_t)guess);
     while (i > 0 && Center(min, frame->cellSize, i - 1) >= v)

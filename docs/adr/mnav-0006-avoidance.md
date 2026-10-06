@@ -57,12 +57,13 @@ symmetry face to face.
   which rounding does when lines meet at a narrow angle (1.2e-8 of it
   in a fuzz case), is scaled back onto the speed circle, so no agent
   is ever given more than its maximum speed.
-- **Vectors of no direction:** a unit vector is taken of vectors so
-  short that their squared length is subnormal by first scaling them
-  by 2^600, exactly; an agent a hair from an obstacle corner, or a
-  velocity on a cut-off point, has no direction at all, and the edge's
-  own constraint stands in, as for an agent touching its middle. The
-  fuzz target found such an agent given a NaN velocity.
+- **Short vectors:** a unit vector is taken of vectors so short that
+  their squared length is subnormal by first scaling them by 2^600,
+  exactly. The fuzz target found an agent a hair from an obstacle
+  corner given a NaN velocity: the vector to the corner squared to 0.
+  A vector of no length at all gives {0, 0}, and the obstacle lines
+  then fall back on the edge's own constraint; the callers' conditions
+  keep exact zeros away, so that only guards rounding.
 
 ## Consequences
 

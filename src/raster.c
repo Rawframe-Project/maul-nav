@@ -172,6 +172,10 @@ static mnavResult Grow(mnavMemory* memory, mnavFragmentList* list)
 static mnavResult Emit(mnavMemory* memory, const Poly* cell, int32_t x, int32_t z,
                        mnavAreaType area, mnavFragmentList* list)
 {
+    // The loops cut only strictly inside a polygon's range, and a cut
+    // gives both sides its crossing points, so each piece keeps three
+    // corners or more; this and the row's check guard against that ever
+    // failing, and no input has reached them.
     if (cell->count < 3)
     {
         return mnav_success;

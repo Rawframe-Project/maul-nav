@@ -23,6 +23,19 @@ static void TestFacingParallels(void)
           "facing parallels leave nothing");
 }
 
+static void TestFacingParallelsBalanced(void)
+{
+    // The same two lines through the 3D program: their bisector is the
+    // line halfway between them, and the velocity breaking both least
+    // lies on it, y = 0.5.
+    const mnavLine lines[2] = {{{0.0, 1.0}, {1.0, 0.0}}, {{0.0, 0.0}, {-1.0, 0.0}}};
+    mnavLine scratch[2];
+    mnavPos2 result = {0.0, 0.0};
+    int32_t failed = mnavLinearProgram2(lines, 2, 5.0, (mnavPos2){0.0, 0.5}, false, &result);
+    mnavLinearProgram3(lines, 2, 0, failed, 5.0, scratch, &result);
+    CHECK(failed == 1 && result.y == 0.5 && fabs(result.x) <= 5.0, "halfway between them");
+}
+
 static void TestSameWayParallels(void)
 {
     // y at least 3 and y at least 4 within speed 1: the 3D program finds
@@ -54,6 +67,7 @@ static void TestNearestOnALine(void)
 int main(void)
 {
     TestFacingParallels();
+    TestFacingParallelsBalanced();
     TestSameWayParallels();
     TestNearestOnALine();
     return s_failures == 0 ? 0 : 1;
