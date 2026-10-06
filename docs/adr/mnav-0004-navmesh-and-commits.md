@@ -46,6 +46,11 @@ is gone (record 0016).
   the ground and the agent's step in height, so a link attaches when
   both ends' tiles are loaded and detaches when one leaves;
   `mnavGetLink` reads which. A navmesh holds at most `limits.links`.
+  A link's ends lie within the extent bake input may have round the
+  def's origin (`MNAV_MAX_EXTENT_CELLS` cells on the ground,
+  `MNAV_MAX_HEIGHT_CELLS` cell heights up or down), so that the
+  arithmetic on them stays finite; merely finite ends let an edge
+  link's direction overflow to NaN, which a fuzz target found.
 
 - **Runtime tiers:** the def's `tier` declares what may change once
   loaded; tiles and off-mesh links stream in and out in every tier.
@@ -70,7 +75,9 @@ is gone (record 0016).
   snapped, attached and searched as a point link is; the id names the
   first, removal and toggles reach all, `mnavGetLink` reports the first
   attached crossing and how many are, and paths name the link. A
-  crossing lies within half a spacing of the best place.
+  crossing lies within half a spacing of the best place. An edge link
+  whose ends are so near that the square of their distance rounds to 0
+  has no direction and is refused.
 
 ## Consequences
 

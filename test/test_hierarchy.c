@@ -596,6 +596,37 @@ static void TestLoadOrder(void)
     mnavDestroyNavmesh(backward);
 }
 
+// Ground left out just past a cluster's side, where transitions out of
+// the cluster next to it cross: that cluster's edges change too, and the
+// update gives the graph a build makes.
+static void TestChangeAcrossASide(void)
+{
+    mnavQueryFilter filter = mnavDefaultQueryFilter();
+    filter.areas &= ~((uint64_t)1 << 4);
+    int32_t agreed = 0;
+    int32_t tried = 0;
+    for (double z = 6.0; z < 250.0; z += 12.0)
+    {
+        mnavNavmesh* navmesh = Load(false);
+        mnavQuery* query = Query(1024);
+        mnavHierarchy* updated = Hierarchy(2);
+        mnavHierarchy* fresh = Hierarchy(2);
+        CHECK(mnavBuildHierarchy(updated, query, navmesh, &filter, nullptr) == mnav_success,
+              "built");
+        // Clusters of 2 tiles are 64 m wide: x = 64 is a side.
+        Paint(navmesh, 64.5, 66.5, z, 4);
+        mnavHierarchyReport report;
+        tried += 1;
+        agreed += Agree(updated, fresh, query, navmesh, &filter, &report) ? 1 : 0;
+        mnavDestroyHierarchy(fresh);
+        mnavDestroyHierarchy(updated);
+        mnavDestroyQuery(query);
+        mnavDestroyNavmesh(navmesh);
+    }
+    printf("across a side: %d of %d agree\n", agreed, tried);
+    CHECK(agreed == tried, "the graph a build makes, every time");
+}
+
 // An area change that opens a way adds edges; an update past the edge
 // limit is refused, as a build is.
 static void TestUpdatePastTheEdgeLimit(void)
@@ -790,6 +821,7 @@ int main(void)
     TestLinksBetweenClusters();
     TestOneWayLinkInTheEndCluster();
     TestSplitWorld();
+    TestChangeAcrossASide();
     TestUpdatePastTheEdgeLimit();
     TestUpdates();
     TestNegativePlaces();

@@ -289,8 +289,11 @@ extern "C"
     /// @param linkOut  Receives its id, usable once it is committed.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// point that is not finite, or an edge link whose ends lie at one
-    /// place on the ground; `mnav_errorRange` for a radius, cost, kind or
-    /// width out of its range; `mnav_errorLimit` when the links' crossings,
+    /// place on the ground or so near that the square of their distance
+    /// rounds to 0; `mnav_errorRange` for a point farther from the
+    /// def's origin than bake input may lie (MNAV_MAX_EXTENT_CELLS cells
+    /// on the ground, MNAV_MAX_HEIGHT_CELLS cell heights up or down), or a
+    /// radius, cost, kind or width out of its range; `mnav_errorLimit` when the links' crossings,
     /// staged and committed, would pass the links limit, or memory its
     /// limit: the link is refused whole, none of its crossings taken;
     /// `mnav_errorCapacity` when the allocator fails.

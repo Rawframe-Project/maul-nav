@@ -76,11 +76,13 @@ struct mnavHierarchy
     mnavEdge* edges;
     int32_t edgeCount;
     // What the graph was built from: per slot, the tile's generation, 0
-    // for none, and its areas' hash; the off-mesh links' hash; and per
-    // cluster, whether an update searches it again.
+    // for none, and its areas' hash; the off-mesh links' hash; per slot,
+    // whether an update found its areas changed; and per cluster, whether
+    // an update searches it again.
     uint32_t* generations;
     uint64_t* areaHashes;
     uint64_t linkHash;
+    uint8_t* changed;
     uint8_t* dirty;
     int32_t searches;
     // The abstract search: per transition, and one more for the end.

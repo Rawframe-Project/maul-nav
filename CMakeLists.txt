@@ -164,16 +164,19 @@ endif()
 # <file> writes fuzz_tile's seed.
 if(MAUL_NAV_FUZZ)
     # The library is instrumented too: its coverage guides libFuzzer, and
-    # the sanitizers watch its code, not only the targets'.
-    target_compile_options(maul-nav PRIVATE -fsanitize=fuzzer-no-link,address,undefined)
+    # the sanitizers watch its code, not only the targets'. Undefined
+    # behaviour stops the run, as a failed check does.
+    target_compile_options(maul-nav PRIVATE -fsanitize=fuzzer-no-link,address,undefined
+                                            -fno-sanitize-recover=all)
     target_link_options(maul-nav PUBLIC -fsanitize=address,undefined)
-    foreach(area tile bake query avoid)
+    foreach(area tile bake query avoid graph)
         add_executable(fuzz_${area} test/fuzz_${area}.c)
         target_link_libraries(fuzz_${area} PRIVATE maul-nav)
         # The targets reach the library's own functions.
         target_include_directories(fuzz_${area} PRIVATE ${PROJECT_SOURCE_DIR}/src)
         maul_apply_flags(fuzz_${area})
-        target_compile_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
+        target_compile_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined
+                                                     -fno-sanitize-recover=all)
         target_link_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
     endforeach()
 endif()

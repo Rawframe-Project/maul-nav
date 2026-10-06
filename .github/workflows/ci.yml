@@ -146,7 +146,8 @@ jobs:
         run: build/differential
 
   # Each fuzz target runs for one minute on every push: the tile loader
-  # from its seed, the bake input, the query inputs and avoidance input.
+  # from its seed, the bake input, the query inputs, avoidance input and
+  # the searches over the whole navmesh.
   fuzz:
     name: fuzz
     runs-on: ubuntu-24.04

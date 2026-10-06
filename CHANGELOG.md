@@ -13,9 +13,21 @@ format.
 - `MNAV_MAX_AVOIDANCE_COORDINATE`, `MNAV_MAX_AVOIDANCE_SPEED`,
   `MNAV_MAX_AVOIDANCE_RADIUS` and `MNAV_MIN_AVOIDANCE_TIME`: the ranges
   of avoidance input.
-- `fuzz_avoid`, a fuzz target for avoidance agents and obstacles.
+- `fuzz_avoid`, a fuzz target for avoidance agents and obstacles, and
+  `fuzz_graph`, one for hierarchies, navmesh flow fields, edge links and
+  link generation.
 
 ### Changed
+
+- `mnavStageLink` refuses with `mnav_errorRange` a link end farther
+  from the def's origin than bake input may lie, and with
+  `mnav_errorInvalid` an edge link whose ends are so near that the
+  square of their distance rounds to 0. Such ends made an edge link's
+  direction NaN and converted it to a tile index, undefined behaviour.
+- `mnavUpdateHierarchy` searches more after an area change (on the
+  test world 27 of 114 transitions for one tile, against 10); see
+  Fixed.
+- Fuzz builds stop on undefined behaviour.
 
 - `mnavAvoid` refuses with `mnav_errorInvalid` a velocity, preferred
   velocity, obstacle velocity or maximum speed past 1e6 m/s, a radius
@@ -35,6 +47,11 @@ format.
   constraints met at a narrow angle; the speed is now kept exactly.
 - The obstacle search walked every grid column an agent's reach spans;
   it now skips columns with no obstacles.
+- `mnavUpdateHierarchy` after an area change kept the edges of the
+  clusters next to the change, though their searches end on crossings
+  inside it: the graph could differ from a build's, an edge kept to a
+  crossing the filter now leaves out. Those clusters are searched
+  again too.
 
 - `mnavFindRandomPointAround` with a radius of 0, or one too small to
   tell its corners apart at the center's place, returned a point

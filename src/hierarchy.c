@@ -96,6 +96,7 @@ static mnavResult Allocate(mnavHierarchy* h)
     Take(h, &r, n.edges, sizeof(mnavEdge), alignof(mnavEdge), (void**)&h->edges);
     Take(h, &r, n.tiles, sizeof(uint32_t), alignof(uint32_t), (void**)&h->generations);
     Take(h, &r, n.tiles, sizeof(uint64_t), alignof(uint64_t), (void**)&h->areaHashes);
+    Take(h, &r, n.tiles, sizeof(uint8_t), alignof(uint8_t), (void**)&h->changed);
     Take(h, &r, n.tiles, sizeof(uint8_t), alignof(uint8_t), (void**)&h->dirty);
     Take(h, &r, n.transitions + 1, sizeof(double), alignof(double), (void**)&h->costs);
     Take(h, &r, n.transitions, sizeof(double), alignof(double), (void**)&h->joins);
@@ -165,6 +166,7 @@ void mnavDestroyHierarchy(mnavHierarchy* hierarchy)
     Give(h, h->edges, n.edges, sizeof(mnavEdge), alignof(mnavEdge));
     Give(h, h->generations, n.tiles, sizeof(uint32_t), alignof(uint32_t));
     Give(h, h->areaHashes, n.tiles, sizeof(uint64_t), alignof(uint64_t));
+    Give(h, h->changed, n.tiles, sizeof(uint8_t), alignof(uint8_t));
     Give(h, h->dirty, n.tiles, sizeof(uint8_t), alignof(uint8_t));
     Give(h, h->costs, n.transitions + 1, sizeof(double), alignof(double));
     Give(h, h->joins, n.transitions, sizeof(double), alignof(double));
@@ -644,16 +646,20 @@ static bool SameShape(const mnavHierarchy* h, const mnavNavmesh* navmesh)
 }
 
 // Marks the clusters holding a tile whose areas changed; whether a link
-// lands in one, which may change the transitions.
+// lands in one, which may change the transitions. A transition's
+// crossing lies in the tile it enters, and the searches of the cluster it
+// leaves end there: when that tile changed, that cluster is marked too.
 static bool MarkDirty(mnavHierarchy* h, const mnavNavmesh* navmesh)
 {
     memset(h->dirty, 0, (size_t)h->clusterCount);
+    memset(h->changed, 0, (size_t)navmesh->slotCount);
     for (int32_t i = 0; i < navmesh->placeCount; ++i)
     {
         int32_t slot = navmesh->places[i].slot;
         uint64_t hash = AreaHash(navmesh->slots[slot].tile);
         if (hash != h->areaHashes[slot])
         {
+            h->changed[slot] = 1;
             h->dirty[h->clusterOf[slot]] = 1;
             h->areaHashes[slot] = hash;
         }
@@ -667,6 +673,11 @@ static bool MarkDirty(mnavHierarchy* h, const mnavNavmesh* navmesh)
         {
             return true;
         }
+    }
+    for (int32_t u = 0; u < h->transitionCount; ++u)
+    {
+        const mnavTransition* tr = &h->transitions[u];
+        h->dirty[tr->from] = h->changed[tr->slot] != 0 ? 1 : h->dirty[tr->from];
     }
     return false;
 }

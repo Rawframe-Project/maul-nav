@@ -224,7 +224,9 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
     else if (op == 4)
     {
         mnavRandomPoint point;
-        uint64_t seed = (uint64_t)Raw(r);
+        double bits = Raw(r);
+        uint64_t seed;
+        memcpy(&seed, &bits, sizeof(seed));
         result = Byte(r) % 2 == 0 ? mnavFindRandomPoint(s_navmesh, filter, seed, &point)
                                   : mnavFindRandomPointAround(s_query, s_navmesh, filter, id, a,
                                                               Length(r), seed, &point);

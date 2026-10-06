@@ -63,11 +63,26 @@ static mnavResult Find(const mnavNavmesh* navmesh, mnavLinkId id, int32_t* slotO
     return link->parent == *slotOut ? mnav_success : mnav_errorInvalid;
 }
 
-static mnavResult CheckDef(const mnavLinkDef* def)
+// Whether a point lies within the extent bake input may have round the
+// navmesh's origin, so that the arithmetic on links stays finite.
+static bool InExtent(const mnavNavmesh* navmesh, mnavPos3 p)
+{
+    const mnavBakeDef* def = &navmesh->def;
+    double ground = (double)def->cellSize * (double)MNAV_MAX_EXTENT_CELLS;
+    double vertical = (double)def->cellHeight * (double)MNAV_MAX_HEIGHT_CELLS;
+    return fabs(p.x - def->origin.x) <= ground && fabs(p.z - def->origin.z) <= ground &&
+           fabs(p.y - def->origin.y) <= vertical;
+}
+
+static mnavResult CheckDef(const mnavNavmesh* navmesh, const mnavLinkDef* def)
 {
     if (!FinitePoint(def->start) || !FinitePoint(def->end))
     {
         return mnav_errorInvalid;
+    }
+    if (!InExtent(navmesh, def->start) || !InExtent(navmesh, def->end))
+    {
+        return mnav_errorRange;
     }
     bool radius = def->radius >= 0.0f && def->radius <= MNAV_MAX_LINK_RADIUS;
     bool cost = def->cost >= 0.0f && def->cost <= MNAV_MAX_LINK_COST;
@@ -76,7 +91,11 @@ static mnavResult CheckDef(const mnavLinkDef* def)
     {
         return mnav_errorRange;
     }
-    bool flat = def->start.x == def->end.x && def->start.z == def->end.z;
+    // An edge link needs a direction on the ground: ends so near that the
+    // square of their distance rounds to 0 give none.
+    double gx = def->end.x - def->start.x;
+    double gz = def->end.z - def->start.z;
+    bool flat = gx * gx + gz * gz == 0.0;
     return def->width > 0.0f && flat ? mnav_errorInvalid : mnav_success;
 }
 
@@ -138,7 +157,7 @@ mnavResult mnavStageLink(mnavNavmesh* navmesh, const mnavLinkDef* def, mnavLinkI
     {
         return mnav_errorInvalid;
     }
-    mnavResult result = CheckDef(def);
+    mnavResult result = CheckDef(navmesh, def);
     if (result != mnav_success)
     {
         return result;

@@ -176,6 +176,28 @@ static void TestDefsAndLimits(void)
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
     link.kind = MNAV_LINK_KINDS;
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "no such kind");
+    // Ends farther than bake input may lie: past the extent on the ground
+    // or in height, and an edge link whose ends are far enough apart that
+    // their difference overflows.
+    double ground = (double)def.cellSize * (double)MNAV_MAX_EXTENT_CELLS;
+    double height = (double)def.cellHeight * (double)MNAV_MAX_HEIGHT_CELLS;
+    link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
+    link.end.x = def.origin.x + ground;
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_success &&
+              mnavStageLinkRemoval(navmesh, id) == mnav_success,
+          "at the extent");
+    link.end.x = def.origin.x + ground * 1.001;
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "past the extent");
+    link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
+    link.start.y = def.origin.y - height * 1.001;
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "below the extent");
+    link = Link(-1.0e308, 7.5, 1.0e308, 7.5, 0.5f);
+    link.width = 2.0f;
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "an overflowing edge link");
+    link = Link(7.5, 7.5, 7.5 + 1.0e-200, 7.5, 0.5f);
+    link.width = 2.0f;
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid,
+          "an edge link of ends too near for a direction");
     link = Link(7.5, 7.5, (double)INFINITY, 7.5, 0.5f);
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "an end not finite");
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);

@@ -49,7 +49,9 @@ local search.
   plain search first and take the hierarchy only when it runs out of
   nodes, since a short way forced through entrances can be much longer.
 - **Updates:** a commit that changes only polygon areas redoes only
-  the edges from transitions entering the clusters it touched.
+  the edges from transitions entering the clusters it touched, and
+  those entering the clusters with transitions out into the tiles it
+  touched.
 - **Fallbacks:** a start and end in one cluster, an end the graph does
   not reach, or a step that finds no way take the plain search.
 
@@ -67,3 +69,10 @@ local search.
   whose tiles changed are searched again and the other edges are kept;
   otherwise the hierarchy is built again. The graph is the one a build
   would make; the report counts the searches run.
+- A transition's crossing is a polygon in the tile it enters, so the
+  searches of the cluster it leaves end one polygon past its side: a
+  change there changes that cluster's edges too. In 0.1.0 the update
+  kept them, and a fuzz target found the graph it gave differing from a
+  build's (an edge kept to a crossing left out by the filter); such
+  clusters are now searched again too. On the test world an area change
+  in one tile searches 27 of 114 transitions again, against 10 before.
