@@ -655,6 +655,8 @@ static mnavNavmesh* FlatWorld(float* sideOut)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.limits.tiles = WORLD_TILES * WORLD_TILES;
     def.allocator = (mnavAllocator){Alloc, Free, NULL};
+    // Areas may change, for the hierarchy update.
+    def.tier = mnav_tierModifiers;
     float side = def.cellSize * (float)def.tileCells * (float)WORLD_TILES;
     int32_t n = WorldBox(0, 0.0f, 0.0f, side, side, mnav_areaWalkable);
     for (float z = 4.0f; z < side; z += 8.0f)
@@ -824,6 +826,25 @@ static void Hierarchy(void)
     }
     Report("long path, plain", plainSum * 1e6 / 3.0, "us");
     Report("long path, hierarchical", throughSum * 1e6 / 3.0, "us");
+    // One polygon's area changed in a tile in the middle, back and forth:
+    // the update searches the clusters the change reaches, not all.
+    mnavNearest middle;
+    Check(mnavFindNearest(navmesh, NULL, (mnavPos3){w / 2 + 3, 0.0, w / 2 + 3},
+                          (mnavVec3){3.0f, 2.0f, 3.0f}, &middle),
+          "nearest");
+    double update = 1e30;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        Check(mnavStageArea(navmesh, middle.polygon, run % 2 == 0 ? 3 : mnav_areaWalkable), "area");
+        Check(mnavCommit(navmesh), "commit");
+        double begin = Seconds();
+        Check(mnavUpdateHierarchy(hierarchy, small, navmesh, &report), "update");
+        double took = Seconds() - begin;
+        update = took < update ? took : update;
+    }
+    printf("# hierarchy update: %d of %d transitions searched\n", report.searches,
+           report.transitions);
+    Report("hierarchy update, one tile", update * 1e6, "us");
     NavFlow(navmesh, side);
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(big);

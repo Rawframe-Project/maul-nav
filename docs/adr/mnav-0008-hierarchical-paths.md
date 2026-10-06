@@ -75,4 +75,8 @@ local search.
   kept them, and a fuzz target found the graph it gave differing from a
   build's (an edge kept to a crossing left out by the filter); such
   clusters are now searched again too. On the test world an area change
-  in one tile searches 27 of 114 transitions again, against 10 before.
+  in one tile searches 27 of 114 transitions again, against 10 before;
+  on the benchmark's flat world, 60 of 588 against 20, at 59.9 million
+  instructions an update against 18.0 million, still a tenth of a
+  build. Searching fewer would mean repairing single edge costs, which
+  that tenth does not call for.
