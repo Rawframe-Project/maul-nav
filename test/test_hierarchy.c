@@ -338,6 +338,35 @@ static void TestOneWayLinkInTheEndCluster(void)
                                    a.point, &path) == mnav_success &&
               path.end == mnav_pathFound && path.linkCount == 0 && path.length > 300.0,
           "never against it");
+    // The same link two-way, defined from the south: the way south crosses
+    // it from its end to its start.
+    CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success, "removed");
+    def = (mnavLinkDef){{40.0, 0.0, 57.0}, {40.0, 0.0, 63.0}, 1.0f, 2.0f, 0, true, 0.0f};
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success &&
+              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
+              mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                       b.point, &path) == mnav_success &&
+              path.end == mnav_pathFound && path.linkCount == 1 && path.length < plainLength * 1.1,
+          "a two-way link crossed from its end");
+    // A link dearer than the way round: the join prices it, and the path
+    // goes round as the plain one does.
+    mnavQuery* wide = Query(16384);
+    CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success, "removed");
+    def = (mnavLinkDef){{40.0, 0.0, 63.0}, {40.0, 0.0, 57.0}, 1.0f, 900.0f, 0, false, 0.0f};
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success &&
+              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
+              mnavFindPath(wide, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
+                           &plain) == mnav_success &&
+              plain.end == mnav_pathFound && plain.linkCount == 0,
+          "the plain path, with the nodes to search round, goes round");
+    double roundCost = plain.cost;
+    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                   b.point, &path) == mnav_success &&
+              path.end == mnav_pathFound && path.linkCount == 0 && path.cost < roundCost * 1.1,
+          "so does the hierarchical one");
+    mnavDestroyQuery(wide);
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
