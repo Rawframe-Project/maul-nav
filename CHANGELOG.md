@@ -8,12 +8,25 @@ format.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-07
+
+Avoidance keeps agents out of circle obstacles they overlap.
+
 ### Fixed
 
 - `mnavAvoid` walked an agent that overlapped a circle obstacle on into
   it, at its preferred velocity, whenever leaving within the step
   needed more than the agent's maximum speed. It now leaves at the
   most it can.
+
+### Changed
+
+- The raycast and navmesh flow field documentation says which tie
+  choices are the same everywhere but not promised: the normal at a
+  corner of two walls, and which of two equal-cost ways a polygon
+  keeps.
+- The guide's code snippets keep every result they get, and the tests
+  run each one as written.
 
 ## [0.2.2] - 2026-10-06
 
