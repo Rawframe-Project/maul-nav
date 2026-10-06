@@ -242,8 +242,11 @@ extern "C"
         // and end are the centers of two edges this wide, in meters, across
         // the link's direction on the ground, up to MNAV_MAX_LINK_WIDTH.
         // Agents cross it at points spaced along the width, no farther
-        // apart than the agent's radius, at most MNAV_MAX_LINK_CROSSINGS;
-        // each counts toward the navmesh's link limit.
+        // apart than the agent's radius (the cell size when the radius is
+        // 0): 1 + ceil(width / spacing) crossings, at most
+        // MNAV_MAX_LINK_CROSSINGS. Each crossing takes one of the navmesh's
+        // links (mnavBakeLimits.links), so a link 16 m wide for agents of
+        // 0.5 m takes 33; size the limit by crossings, not by links.
         float width;
     } mnavLinkDef;
 
@@ -289,7 +292,7 @@ extern "C"
     /// place on the ground; `mnav_errorRange` for a radius, cost, kind or
     /// width out of its range; `mnav_errorLimit` when the links' crossings,
     /// staged and committed, would pass the links limit, or memory its
-    /// limit;
+    /// limit: the link is refused whole, none of its crossings taken;
     /// `mnav_errorCapacity` when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,

@@ -92,7 +92,10 @@ extern "C"
         int32_t tileLinks;
         // Tiles in one navmesh.
         int32_t tiles;
-        // Off-mesh links in one navmesh, staged or committed (mnav-0004).
+        // Off-mesh links in one navmesh, staged or committed (mnav-0004),
+        // counted by crossings: a point link takes 1, an edge link 1 +
+        // ceil(width / spacing) up to MNAV_MAX_LINK_CROSSINGS (see
+        // mnavLinkDef.width).
         int32_t links;
         // Bytes the bake may hold allocated at once.
         uint64_t memoryBytes;

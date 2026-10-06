@@ -183,9 +183,22 @@ static void TestLimitsAndToggles(mnavQuery* query)
     CHECK(mnavStageLink(navmesh, &def, &edge) == mnav_success &&
               mnavStageLink(navmesh, &def, &more) == mnav_errorLimit,
           "crossings count toward the limit");
+    // Refused whole: the 6 slots left still take 6 point links, not 7.
+    mnavLinkId points[7];
+    mnavLinkDef small = Ledge(10.0, 0.0f);
+    int32_t taken = 0;
+    for (int32_t i = 0; i < 7; ++i)
+    {
+        taken += mnavStageLink(navmesh, &small, &points[i]) == mnav_success ? 1 : 0;
+    }
+    CHECK(taken == 6, "a link past the limit refused whole, no crossing kept");
+    for (int32_t i = 0; i < 6; ++i)
+    {
+        CHECK(mnavStageLinkRemoval(navmesh, points[i]) == mnav_success, "removed");
+    }
     CHECK(mnavStageLinkRemoval(navmesh, point) == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
-          "committed without the point link");
+          "committed without the point links");
     // Toggled off and on again, as a door.
     mnavLinkState state;
     CHECK(mnavStageLinkEnabled(navmesh, edge, false) == mnav_success &&
