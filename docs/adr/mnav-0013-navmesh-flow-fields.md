@@ -34,5 +34,12 @@ polygon's way to the goals from one search.
   toward the limit; `mnavContinueNavFlow` settles a budget of polygons,
   and the field is the same for any budgets. Reads wait for the end; a
   commit during the work makes it stale.
-- Repairs after goals move are a later slice; a change to the navmesh
-  calls for a new build.
+- **No repairs:** a polygon's place depends on the way it takes (the
+  midpoint of its own portal), so the cost of a step into it depends on
+  its choice, not on the graph alone. Ramalingam and Reps' repairs,
+  which mnav-0007 gives grids, need fixed step costs; here a repair
+  could not promise the build's field. A build is cheap instead: the
+  whole 768 m flat world of the benchmark in about 14 ms on a loaded
+  machine, a region less, and in steps of any size. A host whose goals
+  move keeps two fields, building the next in steps while agents read
+  the last.

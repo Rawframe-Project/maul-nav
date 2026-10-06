@@ -25,6 +25,7 @@
 #include "maul-nav/base.h"
 #include "maul-nav/flow.h"
 #include "maul-nav/hierarchy.h"
+#include "maul-nav/navflow.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
@@ -730,6 +731,50 @@ static mnavResult FindThrough(void* context)
                                     p->b.polygon, p->b.point, &p->path);
 }
 
+// A navmesh flow field over the whole flat world toward one goal in a
+// corner, whole and in steps of 1,024 polygons.
+static void NavFlow(const mnavNavmesh* navmesh, float side)
+{
+    mnavNavFlowDef def = mnavDefaultNavFlowDef();
+    def.allocator = (mnavAllocator){Alloc, Free, NULL};
+    def.polygons = 1 << 20;
+    mnavNavFlow* field = NULL;
+    Check(mnavCreateNavFlow(&def, &field), "navmesh flow field");
+    mnavNearest goal;
+    mnavNearest far;
+    mnavVec3 box = {3.0f, 2.0f, 3.0f};
+    Check(mnavFindNearest(navmesh, NULL, (mnavPos3){2.0, 0.0, 2.0}, box, &goal), "nearest");
+    Check(mnavFindNearest(navmesh, NULL, (mnavPos3){(double)side - 2.0, 0.0, (double)side - 2.0},
+                          box, &far),
+          "nearest");
+    const mnavNavFlowGoal goals[1] = {{goal.polygon, goal.point}};
+    double best = 1e30;
+    double stepped = 1e30;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        double start = Seconds();
+        Check(mnavBuildNavFlow(field, navmesh, NULL, goals, 1), "build");
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+        start = Seconds();
+        Check(mnavBeginNavFlow(field, navmesh, NULL, NULL, goals, 1), "begin");
+        bool ended = false;
+        while (!ended)
+        {
+            Check(mnavContinueNavFlow(field, navmesh, 1024, &ended), "continue");
+        }
+        took = Seconds() - start;
+        stepped = took < stepped ? took : stepped;
+    }
+    mnavPolygonFlow way;
+    Check(mnavNavFlowAt(field, navmesh, far.polygon, &way), "read");
+    printf("# navmesh flow field: far corner at cost %.0f, built in %.0f us, %.0f us in steps\n",
+           way.cost, best * 1e6, stepped * 1e6);
+    Report("navmesh flow field", best * 1e6, "us");
+    Report("navmesh flow field, stepped", stepped * 1e6, "us");
+    mnavDestroyNavFlow(field);
+}
+
 // Long paths on the flat world, plainly with 131,072 nodes and through a
 // hierarchy of 4 by 4 tiles with the default 8,192.
 static void Hierarchy(void)
@@ -779,6 +824,7 @@ static void Hierarchy(void)
     }
     Report("long path, plain", plainSum * 1e6 / 3.0, "us");
     Report("long path, hierarchical", throughSum * 1e6 / 3.0, "us");
+    NavFlow(navmesh, side);
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(big);
     mnavDestroyQuery(small);
