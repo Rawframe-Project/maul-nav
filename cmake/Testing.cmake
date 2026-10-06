@@ -36,7 +36,7 @@ endfunction()
 #
 # Compiles every public header on its own as C17, C23 and C++17, with
 # pedantic warnings as errors, so the headers stay in the common subset
-# the family requires (F5, F26). ROOT and NAME default to the project's
+# the family requires (family record 0008). ROOT and NAME default to the project's
 # source directory and name; cmake/HeaderCheck passes them to check a
 # library's headers alone. MSVC's cl has no C23 mode (its /std:clatest is
 # a draft mode), so the C23 check is skipped there. In C++17 the
