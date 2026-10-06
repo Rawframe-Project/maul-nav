@@ -117,6 +117,15 @@ extern "C"
         mnav_tierDynamic = 2,
     };
 
+    // A clock the host passes in: now returns ticks in a unit of the
+    // host's choosing, never going back, and is called from the thread
+    // that bakes.
+    typedef struct mnavClock
+    {
+        uint64_t (*now)(void* context);
+        void* context;
+    } mnavClock;
+
     typedef struct mnavBakeDef
     {
         uint32_t cookie;
@@ -155,6 +164,9 @@ extern "C"
         // The runtime tier of a navmesh made with this def,
         // mnav_tierStatic by default; the bake ignores it.
         mnavTier tier;
+        // The clock the bake reads between stages for its report; zeroed
+        // for none. It never shapes the tile.
+        mnavClock clock;
     } mnavBakeDef;
 
     // The setting a def check refused.
@@ -453,6 +465,9 @@ extern "C"
         mnav_stageDone = 12,
     };
 
+// The stages a report times, mnav_stageInput to mnav_stageEncode.
+#define MNAV_BAKE_STAGES 12
+
     // What a bake did: its result and the stage it ended in, the first
     // input refused, what the tile holds, and every piece of work it gave
     // up on rather than fail.
@@ -479,6 +494,11 @@ extern "C"
         // The tile's bytes, and the most memory the bake held at once.
         uint64_t tileBytes;
         uint64_t memoryPeak;
+        // For each stage, by mnavBakeStage: the clock's ticks it took, 0
+        // without a clock or for a stage not reached, and the most memory
+        // held at once while it ran.
+        uint64_t stageTicks[MNAV_BAKE_STAGES];
+        uint64_t stageMemory[MNAV_BAKE_STAGES];
         // Holes that no bridge could join to their outline, polygon rings
         // and detail outlines whose triangulation stopped short, detail
         // samples that found no height and took the polygon's, and

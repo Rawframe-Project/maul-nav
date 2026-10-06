@@ -248,3 +248,5 @@ format.
   mnavBuildNavFlow and mnavNavFlowAt.
 - Navmesh flow fields over a region of tiles, in budgeted steps:
   mnavNavFlowRegion, mnavBeginNavFlow and mnavContinueNavFlow.
+- Bake reports give each stage's time and memory peak: mnavClock in the
+  bake def, stageTicks and stageMemory in mnavBakeReport.

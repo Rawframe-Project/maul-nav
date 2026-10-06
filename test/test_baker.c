@@ -240,6 +240,71 @@ static void TestLimitsEndInAStage(void)
     mnavDestroyBaker(baker);
 }
 
+// A clock that moves 10 ticks at each read, counting its reads.
+static uint64_t TenTicks(void* context)
+{
+    uint64_t* reads = context;
+    *reads += 1;
+    return *reads * 10;
+}
+
+static uint8_t s_timed[TILE_CAPACITY];
+static uint8_t s_untimed[TILE_CAPACITY];
+
+static void TestStagesAreTimedAndMeasured(void)
+{
+    mnavTriangleMesh level = Level();
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBaker* plain = nullptr;
+    CHECK(mnavCreateBaker(&def, &plain).result == mnav_success, "created");
+    uint64_t reads = 0;
+    def.clock = (mnavClock){TenTicks, &reads};
+    mnavBaker* timed = nullptr;
+    CHECK(mnavCreateBaker(&def, &timed).result == mnav_success, "created with a clock");
+    mnavBakeReport a;
+    mnavBakeReport b;
+    size_t sizeA = 0;
+    size_t sizeB = 0;
+    CHECK(BakeCopy(plain, &level, 1, 0, 0, s_untimed, &sizeA, &a) == mnav_success &&
+              BakeCopy(timed, &level, 1, 0, 0, s_timed, &sizeB, &b) == mnav_success,
+          "baked both ways");
+    CHECK(sizeA == sizeB && memcmp(s_untimed, s_timed, sizeA) == 0 &&
+              a.fingerprint == b.fingerprint,
+          "the clock never shapes the tile");
+    // Read once at the start and once as each of the 12 stages ends.
+    uint64_t largest = 0;
+    bool timedRight = reads == 13;
+    bool untimed = true;
+    for (int32_t s = 0; s < MNAV_BAKE_STAGES; ++s)
+    {
+        timedRight = timedRight && b.stageTicks[s] == 10;
+        untimed = untimed && a.stageTicks[s] == 0;
+        largest = b.stageMemory[s] > largest ? b.stageMemory[s] : largest;
+        CHECK(a.stageMemory[s] == b.stageMemory[s], "the same memory either way");
+    }
+    CHECK(timedRight && untimed, "every stage 10 ticks with the clock, 0 without");
+    CHECK(largest == b.memoryPeak && b.stageMemory[mnav_stageRasterize] > 0 &&
+              b.stageMemory[mnav_stageDetail] > 0,
+          "the peak is the largest stage's");
+    // A bake ending in the polygon stage times the stages up to it only.
+    mnavDestroyBaker(timed);
+    def.limits.tilePolygons = 10;
+    CHECK(mnavCreateBaker(&def, &timed).result == mnav_success, "created");
+    reads = 0;
+    CHECK(mnavBakeTile(timed, &level, 1, 0, 0, &b) == mnav_errorLimit &&
+              b.stage == mnav_stagePolygons,
+          "ended in the polygon stage");
+    bool upTo = true;
+    for (int32_t s = 0; s < MNAV_BAKE_STAGES; ++s)
+    {
+        bool ran = s <= mnav_stagePolygons;
+        upTo = upTo && b.stageTicks[s] == (ran ? 10u : 0u) && (b.stageMemory[s] > 0) == ran;
+    }
+    CHECK(upTo && reads == (uint64_t)mnav_stagePolygons + 2, "only the stages that ran");
+    mnavDestroyBaker(timed);
+    mnavDestroyBaker(plain);
+}
+
 int main(void)
 {
     TestCreateChecksTheDef();
@@ -249,5 +314,6 @@ int main(void)
     TestDetailSearchesAsFarAsWallsStray();
     TestBadInputIsNamed();
     TestLimitsEndInAStage();
+    TestStagesAreTimedAndMeasured();
     return s_failures == 0 ? 0 : 1;
 }

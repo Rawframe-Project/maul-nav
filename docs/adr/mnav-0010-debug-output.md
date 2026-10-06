@@ -32,7 +32,11 @@ and picks colours itself.
   still uses no navmesh module; circles are drawn from corners written
   out as constants, the same on every platform.
 - **Bake reports** keep counts, the memory peak and the work given up
-  on; the library keeps no clock, so hosts time the stages.
+  on, and for each stage the most memory held while it ran and its
+  time. The library keeps no clock: a host that wants times passes one
+  in the bake def (`mnavClock`), read between stages; neither the clock
+  nor the times reach the tile or its fingerprint. A host timing the
+  call alone could not see the stages inside it.
 
 ## Consequences
 

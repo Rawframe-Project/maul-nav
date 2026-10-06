@@ -37,6 +37,8 @@ struct mnavBaker
     mnavMemory memory;
     uint8_t* tile;
     size_t tileSize;
+    // The clock's ticks when the stage being run began.
+    uint64_t stageStart;
 };
 
 // The stages' results for one tile, released together.
@@ -81,7 +83,7 @@ mnavBakeDefResult mnavCreateBaker(const mnavBakeDef* def, mnavBaker** bakerOut)
     {
         return (mnavBakeDefResult){result, mnav_settingNone};
     }
-    *baker = (mnavBaker){*def, cells, memory, nullptr, 0};
+    *baker = (mnavBaker){*def, cells, memory, nullptr, 0, 0};
     *bakerOut = baker;
     return (mnavBakeDefResult){mnav_success, mnav_settingNone};
 }
@@ -383,14 +385,40 @@ static int32_t SearchRadius(float edgeError)
     return radius < 1 ? 1 : radius;
 }
 
-// Runs the stages in order, recording each in the report before it runs.
+// The clock's ticks now, or 0 without a clock.
+static uint64_t Now(const mnavBaker* baker)
+{
+    const mnavClock* clock = &baker->def.clock;
+    return clock->now != nullptr ? clock->now(clock->context) : 0;
+}
+
+// Ends the stage being run: its ticks and the most memory held while it
+// ran go into the report; then the bake enters stage next.
+static void Enter(mnavBaker* baker, mnavBakeReport* report, mnavBakeStage next)
+{
+    uint64_t now = Now(baker);
+    uint64_t peak = baker->memory.peak;
+    mnavBakeStage stage = report->stage;
+    if (stage < MNAV_BAKE_STAGES)
+    {
+        report->stageTicks[stage] += now - baker->stageStart;
+        report->stageMemory[stage] =
+            peak > report->stageMemory[stage] ? peak : report->stageMemory[stage];
+    }
+    report->memoryPeak = peak > report->memoryPeak ? peak : report->memoryPeak;
+    baker->memory.peak = baker->memory.used;
+    baker->stageStart = now;
+    report->stage = next;
+}
+
+// Runs the stages in order, entering each in the report before it runs.
 static mnavResult RunStages(mnavBaker* baker, const Input* in, int32_t tileX, int32_t tileZ,
                             Stages* s, mnavBakeReport* report)
 {
     mnavMemory* memory = &baker->memory;
     const mnavBakeDef* def = &baker->def;
     const mnavBakeCells* cells = &baker->cells;
-    report->stage = mnav_stageRasterize;
+    Enter(baker, report, mnav_stageRasterize);
     bool flat = in->flat;
     mnavResult result =
         flat ? mnavBuildHeightfield2D(memory, def, cells, in->outlines, in->outlineCount, tileX,
@@ -407,7 +435,7 @@ static mnavResult RunStages(mnavBaker* baker, const Input* in, int32_t tileX, in
     {
         mnavFilterWalkable(&s->heightfield, cells->agentHeight, cells->agentStep);
     }
-    report->stage = mnav_stageCompact;
+    Enter(baker, report, mnav_stageCompact);
     result = mnavBuildCompactField(memory, &s->heightfield, cells->agentHeight, cells->agentStep,
                                    &s->compact);
     if (result == mnav_success)
@@ -416,7 +444,7 @@ static mnavResult RunStages(mnavBaker* baker, const Input* in, int32_t tileX, in
     }
     if (result == mnav_success)
     {
-        report->stage = mnav_stageErode;
+        Enter(baker, report, mnav_stageErode);
         result = mnavErode(memory, &s->compact, cells->agentRadius);
     }
     if (result == mnav_success)
@@ -425,40 +453,40 @@ static mnavResult RunStages(mnavBaker* baker, const Input* in, int32_t tileX, in
     }
     if (result == mnav_success)
     {
-        report->stage = mnav_stageRegions;
+        Enter(baker, report, mnav_stageRegions);
         result =
             mnavBuildRegions(memory, &s->compact, cells->border, cells->minRegion, &s->regions);
     }
     if (result == mnav_success)
     {
-        report->stage = mnav_stageContours;
+        Enter(baker, report, mnav_stageContours);
         result = mnavBuildContours(memory, &s->compact, &s->regions, cells->border,
                                    cells->edgeError, cells->edgeLength, &s->set);
     }
     if (result == mnav_success)
     {
-        report->stage = mnav_stageHoles;
+        Enter(baker, report, mnav_stageHoles);
         result = mnavMergeHoles(memory, &s->set, s->regions.count);
     }
     if (result == mnav_success)
     {
-        report->stage = mnav_stagePolygons;
+        Enter(baker, report, mnav_stagePolygons);
         result = mnavBuildPolyMesh(memory, &s->set, def->tileCells, def->limits.tileVertices,
                                    def->limits.tilePolygons, &s->mesh);
     }
     if (result == mnav_success)
     {
-        report->stage = mnav_stageBorderVertices;
+        Enter(baker, report, mnav_stageBorderVertices);
         result = mnavRemoveBorderVertices(memory, &s->mesh, def->limits.tilePolygons);
     }
     if (result == mnav_success)
     {
-        report->stage = mnav_stageLinks;
+        Enter(baker, report, mnav_stageLinks);
         result = mnavLinkPolyMesh(memory, &s->mesh);
     }
     if (result == mnav_success)
     {
-        report->stage = mnav_stageDetail;
+        Enter(baker, report, mnav_stageDetail);
         mnavDetailSettings settings = {cells->detailSample, cells->detailError,
                                        SearchRadius(cells->edgeError), cells->border};
         result =
@@ -523,6 +551,7 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
     }
     DropTile(baker);
     baker->memory.peak = baker->memory.used;
+    baker->stageStart = Now(baker);
     report.stage = mnav_stageInput;
     mnavResult result = CheckInput(baker, in, &report);
     mnavTileFrame frame = {0};
@@ -544,17 +573,17 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
     if (result == mnav_success)
     {
         Count(&stages, &report);
-        report.stage = mnav_stageEncode;
+        Enter(baker, &report, mnav_stageEncode);
         result = Encode(baker, tileX, tileZ, &stages, report.fingerprint);
     }
+    // The last stage run ends here, where the bake ended or failed.
+    Enter(baker, &report, result == mnav_success ? mnav_stageDone : report.stage);
     ReleaseStages(&baker->memory, &stages);
     if (result == mnav_success)
     {
-        report.stage = mnav_stageDone;
         report.tileBytes = baker->tileSize;
     }
     report.result = result;
-    report.memoryPeak = baker->memory.peak;
     if (reportOut != nullptr)
     {
         *reportOut = report;
