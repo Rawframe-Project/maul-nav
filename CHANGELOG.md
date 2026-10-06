@@ -8,12 +8,11 @@ format.
 
 ## [Unreleased]
 
-### Fixed
+## [0.2.1] - 2026-10-06
 
-- A path across an off-mesh link whose ends lie on one polygon listed
-  that polygon once, so the corridor set from it lost the link: its
-  corners walked straight past. Each visit is now listed, before the
-  link and after it.
+A path fault turned up by fuzzing, fixed; the fuzz targets now cover
+the runtime navmesh's changes and debug output, and CI's fuzzing starts
+from seed corpora.
 
 ### Added
 
@@ -21,6 +20,13 @@ format.
   (tiles added, removed and replaced, links added, removed and toggled,
   areas changed) with commits, queries and a corridor between; and
   seed corpora for every fuzz target in `test/corpus`.
+
+### Fixed
+
+- A path across an off-mesh link whose ends lie on one polygon listed
+  that polygon once, so the corridor set from it lost the link: its
+  corners walked straight past. Each visit is now listed, before the
+  link and after it.
 
 ## [0.2.0] - 2026-10-06
 
