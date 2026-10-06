@@ -128,6 +128,16 @@ static void TestFlatTrianglesAreDropped(void)
           "the square alone, valid");
     CHECK(mesh.failedRings == 0, "nothing of area lost");
     mnavReleasePolyMesh(&memory, &mesh);
+    mnavReleaseContours(
+        &memory, &set); // A triangle wound the wrong way is dropped too, and its ring counted
+    // as cut short.
+    const int32_t wrong[6] = {0, 0, 10, 0, 0, 10};
+    const int32_t three[1] = {3};
+    set = Rings(&memory, wrong, three, 1);
+    CHECK(BuildLinked(&memory, &set, 10, 100, 100, &mesh) == mnav_success &&
+              mesh.polygonCount == 0 && mesh.failedRings == 1,
+          "a ring wound the wrong way, counted");
+    mnavReleasePolyMesh(&memory, &mesh);
     mnavReleaseContours(&memory, &set);
 }
 
