@@ -342,7 +342,14 @@ static void TestStepsAndRegions(mnavNavFlow* field)
               mnavContinueNavFlow(field, navmesh, 0, &ended) == mnav_errorInvalid &&
               mnavContinueNavFlow(field, nullptr, 1, &ended) == mnav_errorInvalid,
           "continuing an ended field; the checks");
-    // A region's field is the field of a navmesh holding its tiles alone.
+    // A region's field is the field of a navmesh holding its tiles alone,
+    // also with a link from inside it to a tile outside of a lower slot,
+    // which a region must not take for one of its own polygons.
+    const mnavLinkDef out = {{38, 0, 46}, {20, 0, 4}, 1.0f, 0.0f, mnav_linkDrop, false, 0.0f};
+    mnavLinkId outLink;
+    CHECK(mnavStageLink(navmesh, &out, &outLink) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "a link out of the region");
     const mnavNavFlowRegion region = {1, 2, 4, 5};
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tileCells = 32;
@@ -361,14 +368,15 @@ static void TestStepsAndRegions(mnavNavFlow* field)
     mnavNavFlowDef small = mnavDefaultNavFlowDef();
     small.polygons = 40;
     mnavNavFlow* alone = nullptr;
-    const mnavNavFlowGoal partGoal = Goal(part, 18, 30);
+    const mnavNavFlowGoal partGoal = Goal(part, 10, 18);
+    const mnavNavFlowGoal near[2] = {Goal(navmesh, 10, 18), goals[1]};
     CHECK(mnavCreateNavFlow(&small, &alone) == mnav_success &&
               mnavBuildNavFlow(alone, part, nullptr, &partGoal, 1) == mnav_success,
           "the part's field");
     mnavNavFlow* regional = nullptr;
     CHECK(mnavCreateNavFlow(&small, &regional) == mnav_success &&
               mnavBuildNavFlow(regional, navmesh, nullptr, goals, 2) == mnav_errorLimit &&
-              mnavBeginNavFlow(regional, navmesh, nullptr, &region, goals, 2) == mnav_success &&
+              mnavBeginNavFlow(regional, navmesh, nullptr, &region, near, 2) == mnav_success &&
               mnavContinueNavFlow(regional, navmesh, INT32_MAX, &ended) == mnav_success && ended,
           "a region within the limit the whole navmesh passes, the far goal left out");
     CHECK(TilesHash(regional, navmesh, region.x0, region.z0, region.x1, region.z1) ==
