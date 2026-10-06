@@ -23,7 +23,7 @@ extern "C"
 // The library version. CMake reads it from here.
 #define MNAV_VERSION_MAJOR 0
 #define MNAV_VERSION_MINOR 2
-#define MNAV_VERSION_PATCH 1
+#define MNAV_VERSION_PATCH 2
 
 // MNAV_API marks the public functions: dllexport or dllimport in a
 // shared Windows build (maul_nav_EXPORTS is defined while building

@@ -8,6 +8,10 @@ format.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-06
+
+Faster avoidance and outline bakes, the same results.
+
 ### Changed
 
 - Avoidance finds neighbours through a table of grid cells half the
