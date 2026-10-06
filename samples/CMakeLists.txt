@@ -6,4 +6,9 @@ foreach(sample walk crowd)
     add_executable(sample_${sample} ${sample}.c)
     target_link_libraries(sample_${sample} PRIVATE maul-nav)
     maul_apply_flags(sample_${sample})
+    # Each sample returns 0 when its agents arrive: run as a test, so a
+    # sample that stops working fails the suite.
+    if(MAUL_NAV_BUILD_TESTS)
+        add_test(NAME sample_${sample} COMMAND sample_${sample})
+    endif()
 endforeach()
