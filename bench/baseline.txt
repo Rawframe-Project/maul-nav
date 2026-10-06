@@ -1,24 +1,27 @@
 # The reference numbers for bench/bench_main.c, written by the benchmark
 # itself: GCC 14, Release, AMD Ryzen 9 5900X pinned to one core
-# (taskset -c 0), Linux 6.8, 2026-10-06, with other work on the machine
-# (load averages 110.54 53.88 38.13), so runs differ by up to 15%; to be
-# recorded again on a quiet machine. Compare runs on one core of one
-# machine. Compare with:
+# (taskset -c 0), Linux 6.8, 2026-10-06, on a quiet machine (load
+# averages 4.10 7.77 20.43 at the start), the better of two runs. Wall
+# time differs between runs by a few percent even so: compare runs on
+# one core of one machine, as information, never as a gate. Compare
+# with:
 # taskset -c 0 maul-nav_bench bench/baseline.txt
-bake, a tile                           6430.2 us
-stream step, no links                    30.0 us
-stream step, 512 links                  200.9 us
-path query                               39.5 us
-path queries per second               25291.7 /s
-sliced path query                        40.4 us
-sliced path, a slice                     15.4 us
-avoidance step, 1000 agents            1684.0 us
-avoidance, agents per ms                593.8 /ms
-flow build, 1 goal                    45166.7 us
-flow build, 4 goals                   47809.6 us
-flow repair, a cell                      10.7 us
-flow repair, a goal moved              4470.1 us
-flow repair, a gap                     5695.6 us
-hierarchy build                      130267.9 us
-long path, plain                      20808.5 us
-long path, hierarchical                2308.4 us
+bake, a tile                           6338.9 us
+stream step, no links                    28.4 us
+stream step, 512 links                  178.9 us
+path query                               32.8 us
+path queries per second               30478.3 /s
+sliced path query                        32.9 us
+sliced path, a slice                     12.5 us
+avoidance step, 1000 agents            1520.0 us
+avoidance, agents per ms                657.9 /ms
+flow build, 1 goal                    36977.5 us
+flow build, 4 goals                   43649.0 us
+flow repair, a cell                       7.6 us
+flow repair, a goal moved              3343.8 us
+flow repair, a gap                     3779.2 us
+hierarchy build                      117250.2 us
+long path, plain                      14555.1 us
+long path, hierarchical                1930.2 us
+navmesh flow field                     4531.4 us
+navmesh flow field, stepped            4819.6 us

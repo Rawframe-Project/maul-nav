@@ -29,5 +29,6 @@ benchmark printed its timings only.
 
 ## Consequences
 
-- The first baseline was recorded with other work on the machine, and
-  its comments say so; it is to be recorded again on a quiet machine.
+- The first baseline was recorded with other work on the machine; it
+  was recorded again on a quiet machine (load average about 4), the
+  better of two runs, with the navmesh flow fields (mnav-0013) added.
