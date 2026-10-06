@@ -197,6 +197,24 @@ static void TestLimitsAndToggles(mnavQuery* query)
               mnavCommit(navmesh) == mnav_success &&
               fabs(Across(query, navmesh, edge, 6.0) - 6.0) < 1e-9,
           "enabled again");
+    // A corridor across it: its corners carry the link.
+    mnavNearest from;
+    mnavNearest to;
+    mnavPath path;
+    static mnavPolygonId buffer[64];
+    mnavCorridor corridor;
+    mnavCorners corners;
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){5, 3, 6}, (mnavVec3){0.5f, 1, 0.5f},
+                          &from) == mnav_success &&
+              mnavFindNearest(navmesh, nullptr, (mnavPos3){17, 0, 14}, (mnavVec3){0.5f, 1, 0.5f},
+                              &to) == mnav_success &&
+              mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon, to.point,
+                           &path) == mnav_success &&
+              mnavResetCorridor(&corridor, buffer, 64, from.polygon, from.point) == mnav_success &&
+              mnavSetCorridor(&corridor, &path) == mnav_success &&
+              mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+              corners.linkCount == 1 && corners.links[0].link.slot == edge.slot,
+          "a corridor across the edge link");
     mnavDestroyNavmesh(navmesh);
 }
 
