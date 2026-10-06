@@ -735,6 +735,8 @@ extern "C"
                                                            uint64_t seed,
                                                            mnavRandomPoint* pointOut);
 
+    // clang-format off: the API reference reads a declaration from the
+    // line that names the function, so its result type stays on it.
     /// Picks a point reachable from a center: a polygon the walls search
     /// reaches within the radius, by ground area, then a point uniformly
     /// on it, which may lie beyond the radius by up to the polygon's size.
@@ -750,10 +752,11 @@ extern "C"
     /// @return As mnavFindWallDistance.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult
-    mnavFindRandomPointAround(mnavQuery* query, const mnavNavmesh* navmesh,
-                              const mnavQueryFilter* filter, mnavPolygonId polygon, mnavPos3 center,
-                              double radius, uint64_t seed, mnavRandomPoint* pointOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindRandomPointAround(
+        mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+        mnavPolygonId polygon, mnavPos3 center, double radius, uint64_t seed,
+        mnavRandomPoint* pointOut);
+    // clang-format on
 
     /// Tells whether the end can be reached from the start: the path search
     /// with its limits, without a path made. mnav_pathFound when it can,

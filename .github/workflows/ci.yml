@@ -33,6 +33,13 @@ jobs:
           python3 tools/check_modules.py
           python3 tools/check_docs.py
           python3 tools/check_lengths.py
+      - name: API reference
+        # docs/api.md is what the generator makes from the headers, and
+        # the README gives its function count.
+        run: |
+          COUNT=$(python3 tools/gen_api.py | grep -oE '\([0-9]+ functions\)' | grep -oE '[0-9]+')
+          git diff --exit-code docs/api.md || { echo "docs/api.md is stale: run tools/gen_api.py"; exit 1; }
+          grep -q "$COUNT public functions" README.md || { echo "README says the wrong function count ($COUNT)"; exit 1; }
       - name: clang-tidy
         run: |
           cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \

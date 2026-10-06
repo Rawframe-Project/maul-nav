@@ -8,6 +8,17 @@ format.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-06
+
+The first release: navmesh generation in 3D and 2D, the navmesh format
+and its hostile-input loader, path and spatial queries, corridors,
+off-mesh links, runtime tiers and streaming, hierarchical and sliced
+searches, grid paths, flow fields over grids and navmeshes, avoidance,
+and debug output; deterministic on every platform, compiler and worker
+count, with named limits on every search and bake. A guide
+(`docs/guide.md`), the API reference (`docs/api.md`) and samples come
+with it.
+
 ### Added
 
 - The library skeleton: the build, the family rules and tools, the

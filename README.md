@@ -38,9 +38,18 @@ the clock a bake may read for its report.
 
 ## Status
 
-Not released yet; the first release, 0.1.0, is being prepared.
-Everything listed above is built and tested on every CI platform, and
-`samples/` shows a first program.
+Version 0.1.0, the first release. Everything listed above is built and
+tested on every CI platform. Before 1.0.0 a minor release may change
+the API, the ABI and the tile format.
+
+## Documentation
+
+- [The guide](docs/guide.md) walks through baking, the navmesh,
+  queries, corridors, flow fields, avoidance and debug output.
+- [The API reference](docs/api.md) lists all 86 public functions,
+  generated from the headers.
+- [The samples](docs/samples.md) are small complete programs.
+- [The changelog](CHANGELOG.md) records every change.
 
 ## Building
 
