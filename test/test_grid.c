@@ -228,6 +228,25 @@ static void TestLimitsAndEnds(void)
     mnavDestroyQuery(query);
 }
 
+static void TestPathAsLongAsTheLimit(void)
+{
+    // Four cells of 0.5 m along a row: 2 m, exactly the length allowed.
+    memset(s_areas, mnav_areaWalkable, sizeof(s_areas));
+    mnavGrid grid = Grid(SIDE, SIDE);
+    mnavGridPath path;
+    mnavQueryFilter weighted = Weighted();
+    mnavQuery* query = MakeQuery(4096, 2.0f);
+    CHECK(mnavFindGridPath(query, &grid, nullptr, (mnavCell){0, 0}, (mnavCell){4, 0}, &path) ==
+                  mnav_success &&
+              path.end == mnav_pathFound && path.length == 2.0,
+          "a path as long as the limit is found");
+    CHECK(mnavFindGridPath(query, &grid, &weighted, (mnavCell){0, 0}, (mnavCell){4, 0}, &path) ==
+                  mnav_success &&
+              path.end == mnav_pathFound && path.length == 2.0,
+          "and under A*");
+    mnavDestroyQuery(query);
+}
+
 static void TestJumpsMatchAStar(void)
 {
     // On random grids, a fifth to a third blocked, jump point search and A*
@@ -314,6 +333,7 @@ int main(void)
     TestCornersAndBlocks();
     TestCostsSteerA();
     TestLimitsAndEnds();
+    TestPathAsLongAsTheLimit();
     TestJumpsMatchAStar();
     TestEndsASlicedSearch();
     return s_failures == 0 ? 0 : 1;

@@ -37,6 +37,7 @@ enum
     CELL_SIZE_AT = 48,
     ORIGIN_AT = 64,
     VERTICES_AT = 88,
+    DETAIL_TRIANGLES_AT = 96,
     // The offset cell height of a hand tile's floor.
     BASE = 32768
 };
@@ -555,6 +556,32 @@ static void TestHandTilesRefuseOneFlawEach(void)
     CHECK(Names(HandLoad(&h), mnav_tileDetailVertices, 0), "a detail vertex past the tile");
 }
 
+static void TestBoundaryRefusals(void)
+{
+    // Each value one past what a check allows, refused by that check and
+    // so named where it stands: a vertex a cell past the tile, a polygon
+    // with no detail parts, fewer detail triangles than polygons in the
+    // header, an edge side past the four, a polygon of two vertices.
+    static Fixture f;
+    Bake(&f);
+    const mnavPolyMesh* mesh = &f.baked.mesh;
+    CHECK(Names(Changed(&f, MNAV_TILE_HEADER_BYTES, (uint64_t)mesh->tileCells + 1, 2, true),
+                mnav_tileVertices, 0),
+          "a vertex past the tile");
+    size_t parts = PolygonAt(&f, mesh->polygonCount);
+    CHECK(Names(Changed(&f, parts + 1, 0, 1, true), mnav_tileDetailParts, 0),
+          "a polygon with no detail parts");
+    mnavTileResult few =
+        Changed(&f, DETAIL_TRIANGLES_AT, (uint64_t)mesh->polygonCount - 1, 4, true);
+    CHECK(few.result == mnav_errorInvalid && few.section == mnav_tilePayload,
+          "fewer detail triangles than polygons");
+    CHECK(Names(Changed(&f, PolygonAt(&f, 0) + 2 + 4, 5, 1, true), mnav_tilePolygons, 0),
+          "a side past the four");
+    CHECK(Names(Changed(&f, PolygonAt(&f, 0), 2, 1, true), mnav_tilePolygons, 0),
+          "a polygon of two vertices");
+    Unbake(&f);
+}
+
 static void TestHeaderSettingsAreChecked(void)
 {
     const int32_t points[8] = {4, 4, 4, 8, 8, 8, 8, 4};
@@ -617,5 +644,6 @@ int main(int argc, char** argv)
     TestHandTilesRefuseOneFlawEach();
     TestHeaderSettingsAreChecked();
     TestMemoryLimitIsTyped();
+    TestBoundaryRefusals();
     return s_failures == 0 ? 0 : 1;
 }
