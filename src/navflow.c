@@ -66,6 +66,9 @@ struct mnavNavFlow
     uint64_t commits;
     int32_t polygonCount;
     mnavQueryFilter filter;
+    // The tiles searched, and whether the work has ended.
+    mnavNavFlowRegion region;
+    bool ended;
 };
 
 mnavNavFlowDef mnavDefaultNavFlowDef(void)
@@ -256,9 +259,19 @@ static void Polygon(const mnavNavFlow* f, int32_t number, int32_t* slot, int32_t
     *polygon = number - f->firsts[lo];
 }
 
-static bool Usable(const mnavNavFlow* f, const mnavTile* tile, int32_t polygon)
+// Whether a slot's tile lies in the region.
+static bool InRegion(const mnavNavFlow* f, const mnavNavmesh* navmesh, int32_t slot)
 {
-    return mnavIncludes(&f->filter, tile->mesh.polygons[polygon].area);
+    const mnavSlot* s = &navmesh->slots[slot];
+    const mnavNavFlowRegion* r = &f->region;
+    return s->tile != nullptr && s->x >= r->x0 && s->x <= r->x1 && s->z >= r->z0 && s->z <= r->z1;
+}
+
+// Whether a polygon may be walked: in the region, of an area included.
+static bool Usable(const mnavNavFlow* f, int32_t slot, int32_t polygon)
+{
+    return InRegion(f, f->navmesh, slot) &&
+           mnavIncludes(&f->filter, f->navmesh->slots[slot].tile->mesh.polygons[polygon].area);
 }
 
 // Steps back from polygon q over its inner edges and tile links.
@@ -278,7 +291,7 @@ static void ExpandEdges(mnavNavFlow* f, int32_t q, int32_t slot, int32_t polygon
     for (int32_t j = 0; j < poly->count; ++j)
     {
         int32_t next = poly->neighbors[j];
-        if (next == MNAV_NO_INDEX || !Usable(f, tile, next))
+        if (next == MNAV_NO_INDEX || !Usable(f, slot, next))
         {
             continue;
         }
@@ -291,8 +304,7 @@ static void ExpandEdges(mnavNavFlow* f, int32_t q, int32_t slot, int32_t polygon
     for (int32_t l = tile->firstLink[polygon]; l < tile->firstLink[polygon + 1]; ++l)
     {
         const mnavLink* link = &tile->links[l];
-        const mnavTile* beyond = navmesh->slots[link->target.slot - 1].tile;
-        if (!Usable(f, beyond, (int32_t)link->target.polygon))
+        if (!Usable(f, (int32_t)link->target.slot - 1, (int32_t)link->target.polygon))
         {
             continue;
         }
@@ -342,8 +354,8 @@ static void ExpandLinks(mnavNavFlow* f, int32_t q, double areaCost)
         mnavAttachment a = mnavAttachmentOf(navmesh->attachments[index]);
         const mnavOffLink* link = &navmesh->links[a.link];
         int32_t p = f->firsts[a.slot] + a.polygon;
-        if (!mnavCrosses(&f->filter, link->def.kind) ||
-            !Usable(f, navmesh->slots[a.slot].tile, a.polygon) || f->places[p] == DONE)
+        if (!mnavCrosses(&f->filter, link->def.kind) || !Usable(f, a.slot, a.polygon) ||
+            f->places[p] == DONE)
         {
             continue;
         }
@@ -369,8 +381,7 @@ static mnavResult Index(mnavNavFlow* f, const mnavNavmesh* navmesh)
     for (int32_t s = 0; result == mnav_success && s < navmesh->slotCount; ++s)
     {
         f->firsts[s] = (int32_t)total;
-        const mnavTile* tile = navmesh->slots[s].tile;
-        total += tile != nullptr ? tile->mesh.polygonCount : 0;
+        total += InRegion(f, navmesh, s) ? navmesh->slots[s].tile->mesh.polygonCount : 0;
         if (total > f->def.polygons)
         {
             result = mnav_errorLimit;
@@ -389,16 +400,21 @@ static mnavResult Index(mnavNavFlow* f, const mnavNavmesh* navmesh)
     {
         return result;
     }
+    // Only links landing in the region.
+    int32_t kept = 0;
     for (int32_t i = 0; i < count; ++i)
     {
         mnavAttachment a = mnavAttachmentOf(navmesh->attachments[i]);
         const mnavLinkState* state = &navmesh->links[a.link].state;
         mnavPolygonId landing = a.reverse ? state->startPolygon : state->endPolygon;
-        uint32_t p = (uint32_t)(f->firsts[landing.slot - 1] + (int32_t)landing.polygon);
-        f->landings[i] = (uint64_t)p << 32 | (uint32_t)i;
+        if (InRegion(f, navmesh, (int32_t)landing.slot - 1))
+        {
+            uint32_t p = (uint32_t)(f->firsts[landing.slot - 1] + (int32_t)landing.polygon);
+            f->landings[kept++] = (uint64_t)p << 32 | (uint32_t)i;
+        }
     }
     f->landingCount =
-        count > 0 ? (int32_t)mnavSortUnique(f->landings, f->landings + count, (size_t)count) : 0;
+        kept > 0 ? (int32_t)mnavSortUnique(f->landings, f->landings + count, (size_t)kept) : 0;
     return mnav_success;
 }
 
@@ -420,7 +436,7 @@ static mnavResult Seed(mnavNavFlow* f, const mnavNavFlowGoal* goals, int32_t goa
         int32_t slot = (int32_t)goals[i].polygon.slot - 1;
         int32_t polygon = (int32_t)goals[i].polygon.polygon;
         int32_t number = f->firsts[slot] + polygon;
-        if (Usable(f, f->navmesh->slots[slot].tile, polygon) && f->ways[number].cost != 0.0)
+        if (Usable(f, slot, polygon) && f->ways[number].cost != 0.0)
         {
             Way way = {0.0, p, p, p, -1, -1};
             Lower(f, number, 0.0, &way);
@@ -429,9 +445,9 @@ static mnavResult Seed(mnavNavFlow* f, const mnavNavFlowGoal* goals, int32_t goa
     return mnav_success;
 }
 
-mnavResult mnavBuildNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
-                            const mnavQueryFilter* filter, const mnavNavFlowGoal* goals,
-                            int32_t goalCount)
+mnavResult mnavBeginNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
+                            const mnavQueryFilter* filter, const mnavNavFlowRegion* region,
+                            const mnavNavFlowGoal* goals, int32_t goalCount)
 {
     if (field == nullptr)
     {
@@ -439,10 +455,14 @@ mnavResult mnavBuildNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
     }
     field->navmesh = nullptr;
     const mnavQueryFilter* usable = nullptr;
-    if (navmesh == nullptr || goalCount < 0 || (goalCount > 0 && goals == nullptr))
+    if (navmesh == nullptr || goalCount < 0 || (goalCount > 0 && goals == nullptr) ||
+        (region != nullptr && (region->x0 > region->x1 || region->z0 > region->z1)))
     {
         return mnav_errorInvalid;
     }
+    field->region = region != nullptr
+                        ? *region
+                        : (mnavNavFlowRegion){INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX};
     mnavResult result = mnavCheckFilter(filter, &usable);
     result = result == mnav_success ? Index(field, navmesh) : result;
     if (result != mnav_success)
@@ -451,14 +471,31 @@ mnavResult mnavBuildNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
     }
     field->filter = *usable;
     field->navmesh = navmesh;
+    field->commits = navmesh->commits;
     for (int32_t p = 0; p < field->polygonCount; ++p)
     {
         field->ways[p] = (Way){(double)INFINITY, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, -1, -1};
         field->places[p] = NOT_OPEN;
     }
     field->heapCount = 0;
+    field->ended = false;
     result = Seed(field, goals, goalCount);
-    while (result == mnav_success && field->heapCount > 0)
+    field->navmesh = result == mnav_success ? navmesh : nullptr;
+    return result;
+}
+
+mnavResult mnavContinueNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh, int32_t polygons,
+                               bool* endedOut)
+{
+    if (field == nullptr || navmesh == nullptr || field->navmesh == nullptr || polygons < 1)
+    {
+        return mnav_errorInvalid;
+    }
+    if (navmesh != field->navmesh || navmesh->commits != field->commits)
+    {
+        return mnav_errorStale;
+    }
+    for (int32_t n = 0; n < polygons && field->heapCount > 0; ++n)
     {
         int32_t q = Pop(field);
         int32_t slot = 0;
@@ -468,9 +505,21 @@ mnavResult mnavBuildNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
         ExpandEdges(field, q, slot, polygon);
         ExpandLinks(field, q, (double)field->filter.costs[tile->mesh.polygons[polygon].area]);
     }
-    field->navmesh = result == mnav_success ? navmesh : nullptr;
-    field->commits = navmesh->commits;
-    return result;
+    field->ended = field->heapCount == 0;
+    if (endedOut != nullptr)
+    {
+        *endedOut = field->ended;
+    }
+    return mnav_success;
+}
+
+mnavResult mnavBuildNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
+                            const mnavQueryFilter* filter, const mnavNavFlowGoal* goals,
+                            int32_t goalCount)
+{
+    mnavResult result = mnavBeginNavFlow(field, navmesh, filter, nullptr, goals, goalCount);
+    return result == mnav_success ? mnavContinueNavFlow(field, navmesh, INT32_MAX, nullptr)
+                                  : result;
 }
 
 mnavResult mnavNavFlowAt(const mnavNavFlow* field, const mnavNavmesh* navmesh,
@@ -488,6 +537,14 @@ mnavResult mnavNavFlowAt(const mnavNavFlow* field, const mnavNavmesh* navmesh,
     if (result != mnav_success)
     {
         return result;
+    }
+    if (!InRegion(field, navmesh, (int32_t)polygon.slot - 1))
+    {
+        return mnav_errorInvalid;
+    }
+    if (!field->ended)
+    {
+        return mnav_errorStale;
     }
     const Way* way = &field->ways[field->firsts[polygon.slot - 1] + (int32_t)polygon.polygon];
     *flowOut = (mnavPolygonFlow){way->cost, {0, 0, 0}, way->left, way->right, {0, 0}};

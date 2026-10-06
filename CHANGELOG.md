@@ -246,3 +246,5 @@ format.
   it; mnavLinkState.crossings.
 - Flow fields over the navmesh (mnav-0013): navflow.h, mnavNavFlow,
   mnavBuildNavFlow and mnavNavFlowAt.
+- Navmesh flow fields over a region of tiles, in budgeted steps:
+  mnavNavFlowRegion, mnavBeginNavFlow and mnavContinueNavFlow.

@@ -30,6 +30,7 @@ enum
 };
 
 static uint8_t s_small[100][SMALL_ROOM];
+static size_t s_smallSizes[100];
 
 static mnavNavmesh* Load(void)
 {
@@ -59,10 +60,10 @@ static mnavNavmesh* LoadSmall(void)
     mnavTriangleMesh world = World();
     for (int32_t t = 0; t < 100; ++t)
     {
-        size_t size = 0;
+        size_t* size = &s_smallSizes[t];
         CHECK(mnavBakeTile(baker, &world, 1, t % 10 - 1, t / 10 - 1, nullptr) == mnav_success &&
-                  mnavCopyBakedTile(baker, s_small[t], SMALL_ROOM, &size) == mnav_success &&
-                  mnavStageTile(navmesh, s_small[t], size).result == mnav_success,
+                  mnavCopyBakedTile(baker, s_small[t], SMALL_ROOM, size) == mnav_success &&
+                  mnavStageTile(navmesh, s_small[t], *size).result == mnav_success,
               "a small tile");
     }
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
@@ -283,6 +284,116 @@ static void TestAreas(mnavNavFlow* field)
     mnavDestroyNavmesh(navmesh);
 }
 
+// Every way over the tiles of a box of places, field by field, polygon by
+// polygon: the next polygon by its index alone, so that two navmeshes
+// holding the same tiles in other slots compare.
+static uint64_t TilesHash(const mnavNavFlow* field, const mnavNavmesh* navmesh, int32_t x0,
+                          int32_t z0, int32_t x1, int32_t z1)
+{
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t z = z0; z <= z1; ++z)
+    {
+        for (int32_t x = x0; x <= x1; ++x)
+        {
+            mnavTileId tile;
+            CHECK(mnavGetTile(navmesh, x, z, &tile) == mnav_success, "a tile");
+            for (uint32_t i = 0;; ++i)
+            {
+                mnavPolygonId id = {tile.slot, tile.generation, i};
+                mnavAreaType area = 0;
+                mnavPolygonFlow f;
+                if (mnavGetArea(navmesh, id, &area) != mnav_success)
+                {
+                    break;
+                }
+                CHECK(mnavNavFlowAt(field, navmesh, id, &f) == mnav_success, "read");
+                hash = mnavHash64(hash, &f.cost, (int32_t)sizeof(f.cost));
+                hash = mnavHash64(hash, &f.next.polygon, (int32_t)sizeof(f.next.polygon));
+                hash = mnavHash64(hash, &f.left, (int32_t)sizeof(f.left));
+                hash = mnavHash64(hash, &f.right, (int32_t)sizeof(f.right));
+            }
+        }
+    }
+    return hash;
+}
+
+static void TestStepsAndRegions(mnavNavFlow* field)
+{
+    mnavNavmesh* navmesh = LoadSmall();
+    const mnavNavFlowGoal goals[2] = {Goal(navmesh, 18, 30), Goal(navmesh, 60, 6)};
+    CHECK(mnavBuildNavFlow(field, navmesh, nullptr, goals, 2) == mnav_success, "built");
+    uint64_t whole = TilesHash(field, navmesh, -1, -1, 8, 8);
+    const int32_t budgets[3] = {1, 7, 64};
+    for (int32_t b = 0; b < 3; ++b)
+    {
+        mnavPolygonFlow f;
+        bool ended = false;
+        CHECK(mnavBeginNavFlow(field, navmesh, nullptr, nullptr, goals, 2) == mnav_success &&
+                  mnavNavFlowAt(field, navmesh, goals[0].polygon, &f) == mnav_errorStale,
+              "no reads while working");
+        while (!ended)
+        {
+            CHECK(mnavContinueNavFlow(field, navmesh, budgets[b], &ended) == mnav_success, "step");
+        }
+        CHECK(TilesHash(field, navmesh, -1, -1, 8, 8) == whole, "the build's field");
+    }
+    bool ended = false;
+    CHECK(mnavContinueNavFlow(field, navmesh, 1, &ended) == mnav_success && ended &&
+              mnavContinueNavFlow(field, navmesh, 0, &ended) == mnav_errorInvalid &&
+              mnavContinueNavFlow(field, nullptr, 1, &ended) == mnav_errorInvalid,
+          "continuing an ended field; the checks");
+    // A region's field is the field of a navmesh holding its tiles alone.
+    const mnavNavFlowRegion region = {1, 2, 4, 5};
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.tileCells = 32;
+    mnavNavmesh* part = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &part).result == mnav_success, "a part");
+    for (int32_t z = region.z0; z <= region.z1; ++z)
+    {
+        for (int32_t x = region.x0; x <= region.x1; ++x)
+        {
+            int32_t t = (z + 1) * 10 + (x + 1);
+            CHECK(mnavStageTile(part, s_small[t], s_smallSizes[t]).result == mnav_success,
+                  "staged");
+        }
+    }
+    CHECK(mnavCommit(part) == mnav_success, "committed");
+    mnavNavFlowDef small = mnavDefaultNavFlowDef();
+    small.polygons = 40;
+    mnavNavFlow* alone = nullptr;
+    const mnavNavFlowGoal partGoal = Goal(part, 18, 30);
+    CHECK(mnavCreateNavFlow(&small, &alone) == mnav_success &&
+              mnavBuildNavFlow(alone, part, nullptr, &partGoal, 1) == mnav_success,
+          "the part's field");
+    mnavNavFlow* regional = nullptr;
+    CHECK(mnavCreateNavFlow(&small, &regional) == mnav_success &&
+              mnavBuildNavFlow(regional, navmesh, nullptr, goals, 2) == mnav_errorLimit &&
+              mnavBeginNavFlow(regional, navmesh, nullptr, &region, goals, 2) == mnav_success &&
+              mnavContinueNavFlow(regional, navmesh, INT32_MAX, &ended) == mnav_success && ended,
+          "a region within the limit the whole navmesh passes, the far goal left out");
+    CHECK(TilesHash(regional, navmesh, region.x0, region.z0, region.x1, region.z1) ==
+              TilesHash(alone, part, region.x0, region.z0, region.x1, region.z1),
+          "the region's own field");
+    mnavPolygonFlow f;
+    CHECK(mnavNavFlowAt(regional, navmesh, goals[1].polygon, &f) == mnav_errorInvalid,
+          "a polygon outside the region");
+    const mnavNavFlowRegion backward = {4, 2, 1, 5};
+    CHECK(mnavBeginNavFlow(regional, navmesh, nullptr, &backward, goals, 2) == mnav_errorInvalid,
+          "a region backward");
+    // A commit while working: the work is stale.
+    const mnavLinkDef jump = {{5, 0, 5}, {9, 0, 5}, 1.0f, 1.0f, mnav_linkJump, false, 0.0f};
+    mnavLinkId link;
+    CHECK(mnavBeginNavFlow(field, navmesh, nullptr, nullptr, goals, 2) == mnav_success &&
+              mnavStageLink(navmesh, &jump, &link) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success &&
+              mnavContinueNavFlow(field, navmesh, 1, &ended) == mnav_errorStale,
+          "a commit while working");
+    mnavDestroyNavFlow(regional);
+    mnavDestroyNavFlow(alone);
+    mnavDestroyNavmesh(part);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestChecks(mnavNavFlow* field, const mnavNavmesh* navmesh)
 {
     mnavPolygonFlow f;
@@ -346,6 +457,7 @@ int main(void)
     TestChecks(field, navmesh);
     TestLinks(field, navmesh);
     TestAreas(field);
+    TestStepsAndRegions(field);
     mnavDestroyNavFlow(field);
     mnavDestroyNavmesh(navmesh);
     return s_failures == 0 ? 0 : 1;

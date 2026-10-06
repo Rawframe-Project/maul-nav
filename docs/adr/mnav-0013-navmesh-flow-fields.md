@@ -29,5 +29,10 @@ polygon's way to the goals from one search.
 
 - An agent heads for its polygon's portal and the next polygon's after
   it; within a polygon the host steers, as with a corridor's corners.
-- Regions of tiles, budgeted steps and repairs, as grid fields have
-  them, are a later slice.
+- **Regions and steps:** `mnavBeginNavFlow` takes a box of tile places
+  (all by default): polygons outside are as left out and count nothing
+  toward the limit; `mnavContinueNavFlow` settles a budget of polygons,
+  and the field is the same for any budgets. Reads wait for the end; a
+  commit during the work makes it stale.
+- Repairs after goals move are a later slice; a change to the navmesh
+  calls for a new build.
