@@ -123,6 +123,25 @@ static void TestCrossings(mnavQuery* query)
     CHECK(mnavGetLink(navmesh, child, &state) == mnav_errorInvalid &&
               mnavStageLinkRemoval(navmesh, child) == mnav_errorInvalid,
           "a crossing's own slot is no link");
+    // A width that is no whole number of spacings gets one crossing more.
+    mnavLinkId odd;
+    def = Ledge(10.0, 16.2f);
+    CHECK(mnavStageLink(navmesh, &def, &odd) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success &&
+              mnavGetLink(navmesh, odd, &state) == mnav_success && state.crossings == 34,
+          "a spacing under the agent's radius");
+    // Along z on the ledge itself: the crossings spread along x, the first
+    // on the right of the link's direction.
+    mnavLinkId along;
+    def = (mnavLinkDef){{5, 3, 4}, {5, 3, 16}, 0.5f, 1.0f, mnav_linkJump, false, 4.0f};
+    CHECK(mnavStageLink(navmesh, &def, &along) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success &&
+              mnavGetLink(navmesh, along, &state) == mnav_success && state.crossings == 9 &&
+              fabs(state.start.x - 7.0) < 1e-9 && fabs(state.start.z - 4.0) < 1e-9,
+          "a link along z");
+    CHECK(mnavStageLinkRemoval(navmesh, odd) == mnav_success &&
+              mnavStageLinkRemoval(navmesh, along) == mnav_success,
+          "those two removed");
     // The widest link is crossed at 64 points.
     def = Ledge(10.0, MNAV_MAX_LINK_WIDTH);
     mnavLinkId widest;
