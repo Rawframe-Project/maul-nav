@@ -16,6 +16,7 @@
 #include "region.h"
 #include "soup.h"
 #include "test_harness.h"
+#include "triangulate.h"
 
 #include "maul-nav/bake.h"
 
@@ -177,6 +178,57 @@ static void TestPinchedRingNeedsTheLooseTest(void)
     mnavReleaseContours(&memory, &set);
 }
 
+static int64_t Cross(const mnavContourVertex* o, const mnavContourVertex* a,
+                     const mnavContourVertex* b)
+{
+    return (int64_t)(a->x - o->x) * (b->z - o->z) - (int64_t)(a->z - o->z) * (b->x - o->x);
+}
+
+// Whether p lies on the segment from a to b, between its ends.
+static bool Inside(const mnavContourVertex* p, const mnavContourVertex* a,
+                   const mnavContourVertex* b)
+{
+    bool end = (p->x == a->x && p->z == a->z) || (p->x == b->x && p->z == b->z);
+    return !end && Cross(a, b, p) == 0 && p->x >= (a->x < b->x ? a->x : b->x) &&
+           p->x <= (a->x > b->x ? a->x : b->x) && p->z >= (a->z < b->z ? a->z : b->z) &&
+           p->z <= (a->z > b->z ? a->z : b->z);
+}
+
+static void TestEarDiagonalThroughAVertex(void)
+{
+    // Three of the ring's points lie in a row, (9, 11), (10, 11) and
+    // (11, 11). A diagonal that touches another vertex is no strict ear:
+    // cut, one gives a flat triangle and a vertex inside another
+    // triangle's edge. Every triangle must have area and no vertex may lie
+    // inside an edge. (Found by triangulating 200,000 random rings with
+    // points in a row; the touching test changed 1,763 of them.)
+    mnavContourVertex ring[5] = {{9, 0, 11, 0, 0},
+                                 {10, 0, 11, 0, 0},
+                                 {11, 0, 12, 0, 0},
+                                 {11, 0, 11, 0, 0},
+                                 {12, 0, 10, 0, 0}};
+    int32_t indices[5];
+    uint8_t ears[5];
+    int32_t triangles[9];
+    bool complete = false;
+    int32_t count = mnavTriangulate(ring, 5, (mnavEarScratch){indices, ears}, triangles, &complete);
+    bool clean = complete && count == 3;
+    for (int32_t k = 0; clean && k < count; ++k)
+    {
+        const mnavContourVertex* c[3] = {&ring[triangles[3 * k]], &ring[triangles[3 * k + 1]],
+                                         &ring[triangles[3 * k + 2]]};
+        clean = Cross(c[0], c[1], c[2]) != 0;
+        for (int32_t e = 0; clean && e < 3; ++e)
+        {
+            for (int32_t v = 0; v < 5; ++v)
+            {
+                clean = clean && !Inside(&ring[v], c[e], c[(e + 1) % 3]);
+            }
+        }
+    }
+    CHECK(clean, "no flat triangle and no vertex inside an edge");
+}
+
 static void TestLevelMeshIsPinned(void)
 {
     static mnavVec3 vertices[LEVEL_VERTICES];
@@ -252,6 +304,7 @@ int main(void)
     TestFlatTrianglesAreDropped();
     TestBridgedRingWithAHiddenVertex();
     TestPinchedRingNeedsTheLooseTest();
+    TestEarDiagonalThroughAVertex();
     TestLevelMeshIsPinned();
     return s_failures == 0 ? 0 : 1;
 }
