@@ -190,6 +190,17 @@ static void TestLinks(mnavNavFlow* field, mnavNavmesh* navmesh)
               f.link.slot == link.slot && f.link.generation == link.generation &&
               f.left.x == f.right.x && f.cost < 20.0,
           "the far corner's way takes the link");
+    // Its cost: the landing polygon's, the walk from the landing point to
+    // that polygon's place, and the link's cost of 1.
+    mnavLinkState state;
+    mnavPolygonFlow landing;
+    CHECK(mnavGetLink(navmesh, link, &state) == mnav_success &&
+              mnavNavFlowAt(field, navmesh, f.next, &landing) == mnav_success &&
+              f.cost ==
+                  landing.cost +
+                      Distance(state.end, landing.cost == 0.0 ? landing.left : Middle(&landing)) +
+                      1.0,
+          "the link's cost added");
     // Toward the far corner, the link is never taken backward: the way is
     // the one a filter barring it gives.
     mnavQueryFilter barred = mnavDefaultQueryFilter();
@@ -212,6 +223,64 @@ static void TestLinks(mnavNavFlow* field, mnavNavmesh* navmesh)
               mnavCommit(navmesh) == mnav_success &&
               mnavNavFlowAt(field, navmesh, far.polygon, &f) == mnav_errorStale,
           "stale after a commit");
+}
+
+// A strip of area 5 across the world, from x 16 to 24, two tile sides,
+// marked by a volume, in 8 m tiles; a link taking off inside it.
+static void TestAreas(mnavNavFlow* field)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.tileCells = 32;
+    mnavBaker* baker = nullptr;
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavCreateNavmesh(&def, &navmesh).result == mnav_success,
+          "baker and navmesh");
+    mnavTriangleMesh world = World();
+    const mnavVec2 strip[4] = {{16, -2}, {24, -2}, {24, 70}, {16, 70}};
+    const mnavBakeVolume volume = {strip, 4, -1.0f, 1.0f, mnav_volumeArea, 5};
+    const mnavBakeInput input = {&world, 1, nullptr, 0, &volume, 1};
+    for (int32_t t = 0; t < 100; ++t)
+    {
+        size_t size = 0;
+        CHECK(mnavBakeTileInput(baker, &input, t % 10 - 1, t / 10 - 1, nullptr) == mnav_success &&
+                  mnavCopyBakedTile(baker, s_small[t], SMALL_ROOM, &size) == mnav_success &&
+                  mnavStageTile(navmesh, s_small[t], size).result == mnav_success,
+              "a small tile");
+    }
+    const mnavLinkDef jump = {{20, 0, 40}, {5, 0, 40}, 1.0f, 1.0f, mnav_linkJump, false, 0.0f};
+    mnavLinkId link;
+    CHECK(mnavStageLink(navmesh, &jump, &link) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "committed");
+    mnavDestroyBaker(baker);
+    const mnavNavFlowGoal goal = Goal(navmesh, 4, 40);
+    mnavQueryFilter filter = mnavDefaultQueryFilter();
+    filter.areas &= ~((uint64_t)1 << 5);
+    CHECK(mnavBuildNavFlow(field, navmesh, &filter, &goal, 1) == mnav_success, "built");
+    static mnavPolygonId ids[4096];
+    int32_t count = Polygons(navmesh, ids, 4096);
+    int32_t stripped = 0;
+    int32_t beyond = 0;
+    int32_t wrong = 0;
+    for (int32_t i = 0; i < count; ++i)
+    {
+        mnavAreaType area = 0;
+        mnavPolygonFlow f;
+        CHECK(mnavGetArea(navmesh, ids[i], &area) == mnav_success &&
+                  mnavNavFlowAt(field, navmesh, ids[i], &f) == mnav_success,
+              "read");
+        mnavPos3 m = Middle(&f);
+        stripped += area == 5 ? 1 : 0;
+        // Left out, the strip is reached by nothing and cuts the far side
+        // off, the link out of it with it.
+        wrong += area == 5 && isfinite(f.cost) ? 1 : 0;
+        wrong += area != 5 && isfinite(f.cost) && m.x > 24.0 ? 1 : 0;
+        beyond += area != 5 && !isfinite(f.cost) ? 1 : 0;
+    }
+    printf("navflow areas: %d polygons, %d in the strip, %d cut off\n", count, stripped, beyond);
+    CHECK(stripped > 0 && beyond > 0 && wrong == 0, "an area left out is crossed by nothing");
+    mnavDestroyNavmesh(navmesh);
 }
 
 static void TestChecks(mnavNavFlow* field, const mnavNavmesh* navmesh)
@@ -276,6 +345,7 @@ int main(void)
     mnavDestroyNavmesh(small);
     TestChecks(field, navmesh);
     TestLinks(field, navmesh);
+    TestAreas(field);
     mnavDestroyNavFlow(field);
     mnavDestroyNavmesh(navmesh);
     return s_failures == 0 ? 0 : 1;
