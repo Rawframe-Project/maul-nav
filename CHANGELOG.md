@@ -244,3 +244,5 @@ format.
   bench/baseline.txt (mnav-0012); sliced path queries are timed too.
 - Edge-to-edge links: mnavLinkDef.width, crossed at points spaced along
   it; mnavLinkState.crossings.
+- Flow fields over the navmesh (mnav-0013): navflow.h, mnavNavFlow,
+  mnavBuildNavFlow and mnavNavFlowAt.

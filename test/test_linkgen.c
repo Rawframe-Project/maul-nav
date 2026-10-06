@@ -18,7 +18,7 @@
 #include <string.h>
 
 // The hash of the links generated, the same on every platform.
-#define LINKS_HASH 0x80a7236cbc019e3dull
+#define LINKS_HASH 0x768644e0f96be61bull
 
 enum
 {
@@ -150,8 +150,19 @@ static void TestKinds(const mnavNavmesh* navmesh)
     printf("links %d: drops %d, jumps across %d and back %d\n", count, drops, across, back);
     CHECK(drops > 20 && across > 10 && back > 10 && wrong == 0,
           "drops off the platform and jumps both ways across the gap, nothing else");
-    uint64_t hash =
-        mnavHash64(MNAV_HASH_INIT, s_links, (int32_t)((size_t)count * sizeof(mnavLinkDef)));
+    // Field by field: the def has padding.
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t i = 0; i < count; ++i)
+    {
+        const mnavLinkDef* l = &s_links[i];
+        const uint8_t small[2] = {l->kind, l->twoWay ? 1u : 0u};
+        hash = mnavHash64(hash, &l->start, (int32_t)sizeof(l->start));
+        hash = mnavHash64(hash, &l->end, (int32_t)sizeof(l->end));
+        hash = mnavHash64(hash, &l->radius, (int32_t)sizeof(l->radius));
+        hash = mnavHash64(hash, &l->cost, (int32_t)sizeof(l->cost));
+        hash = mnavHash64(hash, small, 2);
+        hash = mnavHash64(hash, &l->width, (int32_t)sizeof(l->width));
+    }
     printf("LINKS_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == LINKS_HASH, "the pinned hash");
     // Without the walking rule, links past the pillar appear.

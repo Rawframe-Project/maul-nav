@@ -71,6 +71,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/linkgen.c
     src/holes.c
     src/input.c
+    src/navflow.c
     src/navmesh.c
     src/nearest.c
     src/obstacle.c
@@ -135,6 +136,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(spatial)
     maul_add_test(linkgen)
     maul_add_test(debug)
+    maul_add_test(navflow)
     maul_add_test(edge_links)
     maul_add_test(scenarios)
     maul_add_test(terrain)
