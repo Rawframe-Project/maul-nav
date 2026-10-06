@@ -44,6 +44,19 @@ symmetry face to face.
 - **Memory and limits:** an `mnavAvoidance` owns the memory for
   `limits.agents` and `limits.neighbors`; more agents is
   `mnav_errorLimit`.
+- **Input ranges:** coordinates within `MNAV_MAX_AVOIDANCE_COORDINATE`
+  (1e12 m), velocity components and maximum speeds within
+  `MNAV_MAX_AVOIDANCE_SPEED` (1e6 m/s), radii up to
+  `MNAV_MAX_AVOIDANCE_RADIUS` (1e6 m), the step and horizons at least
+  `MNAV_MIN_AVOIDANCE_TIME` (1e-6 s); other input is refused. Values
+  merely finite let an ORCA line lie so far out that its program
+  cancelled catastrophically (a velocity of 3.7e210 m/s for a limit of
+  0.3, found by the fuzz target), and the step and horizons scale the
+  lines by their inverses. Grid cells saturate at 2^52.
+- **Speed:** a velocity the programs leave past the maximum speed,
+  which rounding does when lines meet at a narrow angle (1.2e-8 of it
+  in a fuzz case), is scaled back onto the speed circle, so no agent
+  is ever given more than its maximum speed.
 
 ## Consequences
 
