@@ -8,6 +8,15 @@ format.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-06
+
+Faults found by measuring test coverage and by fuzzing the inputs no
+target reached, and fixed: a random point in a circle of no radius,
+avoidance given values of any size, vectors of no direction, hierarchy
+updates next to a change, and link ends past the bake extent. Input
+that made them is now refused or handled, which changes what some
+calls accept: a minor release.
+
 ### Added
 
 - `MNAV_MAX_AVOIDANCE_COORDINATE`, `MNAV_MAX_AVOIDANCE_SPEED`,
