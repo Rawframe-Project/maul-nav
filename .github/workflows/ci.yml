@@ -145,7 +145,8 @@ jobs:
       - name: Run
         run: build/differential
 
-  # Each fuzz target runs for one minute on every push: the tile loader
+  # Each fuzz target runs for one minute on every push, from the seed
+  # corpus in test/corpus (minimized from local campaigns): the tile loader
   # from its seed, the bake input, the query inputs, avoidance input and
   # the searches over the whole navmesh.
   fuzz:
@@ -167,6 +168,8 @@ jobs:
           mkdir -p corpus-fuzz_tile
           build/test_tile --seed corpus-fuzz_tile/level.tile
           for target in build/fuzz_*; do
-            mkdir -p "corpus-$(basename $target)"
-            "$target" -max_total_time=60 "corpus-$(basename $target)"
+            name=$(basename $target)
+            mkdir -p "corpus-$name"
+            tar -xzf "test/corpus/$name.tar.gz" -C "corpus-$name"
+            "$target" -max_total_time=60 "corpus-$name"
           done

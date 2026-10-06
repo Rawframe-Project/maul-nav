@@ -160,8 +160,9 @@ if(MAUL_NAV_BUILD_TESTS)
 endif()
 
 # The fuzz targets: test/fuzz_<area>.c, run as fuzz_<area> <corpus dir>,
-# over the bytes programs load and hand the library. test_tile --seed
-# <file> writes fuzz_tile's seed.
+# over the bytes programs load and hand the library. test/corpus holds a
+# minimized seed corpus for each (fuzz_<area>.tar.gz); test_tile --seed
+# <file> writes fuzz_tile's first seed.
 if(MAUL_NAV_FUZZ)
     # The library is instrumented too: its coverage guides libFuzzer, and
     # the sanitizers watch its code, not only the targets'. Undefined
