@@ -8,7 +8,33 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- `MNAV_MAX_AVOIDANCE_COORDINATE`, `MNAV_MAX_AVOIDANCE_SPEED`,
+  `MNAV_MAX_AVOIDANCE_RADIUS` and `MNAV_MIN_AVOIDANCE_TIME`: the ranges
+  of avoidance input.
+- `fuzz_avoid`, a fuzz target for avoidance agents and obstacles.
+
+### Changed
+
+- `mnavAvoid` refuses with `mnav_errorInvalid` a velocity, preferred
+  velocity, obstacle velocity or maximum speed past 1e6 m/s, a radius
+  past 1e6 m, and a step shorter than 1e-6 s; `mnavCreateAvoidance`
+  refuses horizons shorter than 1e-6 s with `mnav_errorRange`.
+  Velocities came out the same except where rounding had put them past
+  the maximum speed.
+
 ### Fixed
+
+- `mnavAvoid` with a huge velocity, only checked to be finite, gave an
+  agent a velocity far past its maximum speed (3.7e210 m/s for a
+  limit of 0.3), and a huge circle radius overflowed a conversion to a
+  grid cell; now refused (see Changed), and grid cells saturate.
+- `mnavAvoid` could give a velocity a little faster than the agent's
+  maximum speed (1.2e-8 of it, with deeply overlapping agents) when
+  constraints met at a narrow angle; the speed is now kept exactly.
+- The obstacle search walked every grid column an agent's reach spans;
+  it now skips columns with no obstacles.
 
 - `mnavFindRandomPointAround` with a radius of 0, or one too small to
   tell its corners apart at the center's place, returned a point

@@ -19,9 +19,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// The largest coordinate an obstacle point may have, in meters, as for
-// agents.
-#define MAX_COORDINATE 1.0e12
+// The largest cell index, as for agents.
+#define CELL_LIMIT 0x1p52
 
 // How far inside a line an obstacle's cut-off points may lie and still
 // count as covered by it.
@@ -34,7 +33,8 @@ static bool Finite(mnavPos2 p)
 
 static bool GoodPoint(mnavPos2 p)
 {
-    return Finite(p) && fabs(p.x) <= MAX_COORDINATE && fabs(p.y) <= MAX_COORDINATE;
+    return Finite(p) && fabs(p.x) <= MNAV_MAX_AVOIDANCE_COORDINATE &&
+           fabs(p.y) <= MNAV_MAX_AVOIDANCE_COORDINATE;
 }
 
 // det(a - c, b - a): more than 0 when c lies left of a to b.
@@ -47,8 +47,11 @@ static double LeftOf(mnavPos2 a, mnavPos2 b, mnavPos2 c)
 // point alone, edges of some length, a polygon counterclockwise.
 static bool GoodObstacle(const mnavObstacle* o)
 {
-    if (o->points == nullptr || o->pointCount < 1 || !Finite(o->velocity) || !isfinite(o->radius) ||
-        (o->pointCount == 1) != (o->radius > 0.0) || o->radius < 0.0)
+    if (o->points == nullptr || o->pointCount < 1 || !Finite(o->velocity) ||
+        fabs(o->velocity.x) > MNAV_MAX_AVOIDANCE_SPEED ||
+        fabs(o->velocity.y) > MNAV_MAX_AVOIDANCE_SPEED || !isfinite(o->radius) ||
+        (o->pointCount == 1) != (o->radius > 0.0) || o->radius < 0.0 ||
+        o->radius > MNAV_MAX_AVOIDANCE_RADIUS)
     {
         return false;
     }
@@ -157,22 +160,26 @@ static void Bounds(const mnavObstacleVertex* vertices, int32_t v, mnavPos2* low,
     *high = (mnavPos2){(a.x > b.x ? a.x : b.x) + o->radius, (a.y > b.y ? a.y : b.y) + o->radius};
 }
 
+// The cell holding v, saturated as for agents.
 static int64_t CellOf(double v, double size)
 {
-    return (int64_t)floor(v / size);
+    double cell = floor(v / size);
+    return cell < -CELL_LIMIT ? (int64_t)-CELL_LIMIT
+                              : (cell > CELL_LIMIT ? (int64_t)CELL_LIMIT : (int64_t)cell);
 }
 
-// The entries vertices' bounds take at a cell size.
-static int64_t Entries(const mnavObstacleVertex* vertices, int32_t count, double size)
+// The entries vertices' bounds take at a cell size, counted in binary64
+// since a bound may span more cells than 64 bits count.
+static double Entries(const mnavObstacleVertex* vertices, int32_t count, double size)
 {
-    int64_t total = 0;
+    double total = 0.0;
     for (int32_t v = 0; v < count; ++v)
     {
         mnavPos2 low;
         mnavPos2 high;
         Bounds(vertices, v, &low, &high);
-        total += (CellOf(high.x, size) - CellOf(low.x, size) + 1) *
-                 (CellOf(high.y, size) - CellOf(low.y, size) + 1);
+        total += (double)(CellOf(high.x, size) - CellOf(low.x, size) + 1) *
+                 (double)(CellOf(high.y, size) - CellOf(low.y, size) + 1);
     }
     return total;
 }
@@ -220,7 +227,7 @@ void mnavBuildObstacleGrid(mnavObstacleGrid* grid, const mnavObstacleVertex* ver
 {
     // Long edges on small cells take many entries: the cells double until
     // they fit, which they do once no bound spans more than two cells.
-    while (Entries(vertices, vertexCount, size) > grid->capacity)
+    while (Entries(vertices, vertexCount, size) > (double)grid->capacity)
     {
         size *= 2.0;
     }
@@ -292,10 +299,23 @@ int32_t mnavNearObstacles(const mnavAgent* agent, const mnavObstacleVertex* vert
     int64_t y1 = CellOf(p.y + reach, grid->size);
     int32_t stamp = grid->stamp++;
     int32_t count = 0;
-    for (int64_t x = CellOf(p.x - reach, grid->size); x <= CellOf(p.x + reach, grid->size); ++x)
+    int64_t x1 = CellOf(p.x + reach, grid->size);
+    for (int64_t x = CellOf(p.x - reach, grid->size); x <= x1; ++x)
     {
-        for (int32_t k = FirstAt(grid, x, y0);
-             k < grid->count && grid->cells[k].x == x && grid->cells[k].y <= y1; ++k)
+        // Columns with no entries are skipped, so that a reach of many
+        // cells costs the entries it covers, not its cells.
+        int32_t first = FirstAt(grid, x, y0);
+        if (first == grid->count)
+        {
+            break;
+        }
+        if (grid->cells[first].x > x)
+        {
+            x = grid->cells[first].x - 1;
+            continue;
+        }
+        for (int32_t k = first; k < grid->count && grid->cells[k].x == x && grid->cells[k].y <= y1;
+             ++k)
         {
             int32_t v = grid->cells[k].vertex;
             if (grid->stamps[v] == stamp)

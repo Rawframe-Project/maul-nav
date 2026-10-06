@@ -209,6 +209,10 @@ mnavAvoid(avoidance, agents, agentCount, obstacles, obstacleCount, 0.1, velociti
 The set keeps no state between steps: you pass every agent each time,
 with the step's length. Obstacles are circles, segments or polygons,
 still or moving. The same agents in any order get the same velocities.
+Input has named ranges (`MNAV_MAX_AVOIDANCE_COORDINATE`,
+`MNAV_MAX_AVOIDANCE_SPEED`, `MNAV_MAX_AVOIDANCE_RADIUS`,
+`MNAV_MIN_AVOIDANCE_TIME`), wide enough for any scene, and an agent's
+new velocity is never faster than its maximum speed.
 
 ## Debug output
 

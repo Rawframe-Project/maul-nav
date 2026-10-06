@@ -14,7 +14,7 @@
 #include <string.h>
 
 // The hash of the circle's final positions, the same on every platform.
-#define CIRCLE_HASH 0x303f5c6f58dde75aull
+#define CIRCLE_HASH 0x533db80b7f73782cull
 
 // The hash of the mixed scene's velocities.
 #define SCENE_HASH 0xefaa93993d05e5daull
@@ -241,17 +241,32 @@ static void TestChecks(void)
           "more agents than the limit");
     CHECK(mnavAvoid(avoidance, agents, 0, nullptr, 0, 0.1, nullptr) == mnav_success, "none at all");
     CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.0, velocities) == mnav_errorInvalid &&
+              mnavAvoid(avoidance, agents, 2, nullptr, 0, MNAV_MIN_AVOIDANCE_TIME * 0.5,
+                        velocities) == mnav_errorInvalid &&
               mnavAvoid(avoidance, agents, -1, nullptr, 0, 0.1, velocities) == mnav_errorInvalid &&
               mnavAvoid(avoidance, nullptr, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid &&
               mnavAvoid(nullptr, agents, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid,
           "bad calls");
-    const double bad[5] = {(double)NAN, 0.0, -1.0, 0.0, 1e13};
-    for (int32_t k = 0; k < 5; ++k)
+    // Past each range: a coordinate, a radius, the maximum speed and a
+    // component of either velocity.
+    const double fast = MNAV_MAX_AVOIDANCE_SPEED * 1.5;
+    const double bad[9] = {(double)NAN,
+                           0.0,
+                           -1.0,
+                           0.0,
+                           MNAV_MAX_AVOIDANCE_COORDINATE * 10.0,
+                           MNAV_MAX_AVOIDANCE_RADIUS * 1.5,
+                           fast,
+                           fast,
+                           -fast};
+    for (int32_t k = 0; k < 9; ++k)
     {
         mnavAgent broken[2] = {Agent(0.0, 0.0, 1), Agent(3.0, 0.0, 2)};
         broken[1].position.x = k == 0 || k == 4 ? bad[k] : broken[1].position.x;
-        broken[1].radius = k == 1 ? bad[k] : broken[1].radius;
-        broken[1].maxSpeed = k == 2 ? bad[k] : broken[1].maxSpeed;
+        broken[1].radius = k == 1 || k == 5 ? bad[k] : broken[1].radius;
+        broken[1].maxSpeed = k == 2 || k == 6 ? bad[k] : broken[1].maxSpeed;
+        broken[1].velocity.y = k == 7 ? bad[k] : broken[1].velocity.y;
+        broken[1].preferred.x = k == 8 ? bad[k] : broken[1].preferred.x;
         broken[1].priority = k == 3 ? bad[k] : broken[1].priority;
         CHECK(mnavAvoid(avoidance, broken, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid,
               "a broken agent");
@@ -482,12 +497,14 @@ static void TestObstacleChecks(void)
     const mnavPos2 repeated[3] = {{0.0, 0.0}, {0.0, 0.0}, {1.0, 0.0}};
     const mnavPos2 square[4] = {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}};
     const mnavPos2 point = {0.0, 0.0};
-    const mnavObstacle bad[5] = {{clockwise, 3, 0.0, {0.0, 0.0}, 1},
-                                 {repeated, 3, 0.0, {0.0, 0.0}, 1},
-                                 {&point, 1, 0.0, {0.0, 0.0}, 1},
-                                 {square, 4, 1.0, {0.0, 0.0}, 1},
-                                 {nullptr, 3, 0.0, {0.0, 0.0}, 1}};
-    for (int32_t k = 0; k < 5; ++k)
+    const double fast = MNAV_MAX_AVOIDANCE_SPEED * 1.5;
+    const double wide = MNAV_MAX_AVOIDANCE_RADIUS * 1.5;
+    const mnavObstacle bad[7] = {
+        {clockwise, 3, 0.0, {0.0, 0.0}, 1}, {repeated, 3, 0.0, {0.0, 0.0}, 1},
+        {&point, 1, 0.0, {0.0, 0.0}, 1},    {square, 4, 1.0, {0.0, 0.0}, 1},
+        {nullptr, 3, 0.0, {0.0, 0.0}, 1},   {&point, 1, wide, {0.0, 0.0}, 1},
+        {square, 4, 0.0, {0.0, -fast}, 1}};
+    for (int32_t k = 0; k < 7; ++k)
     {
         CHECK(mnavAvoid(avoidance, &agent, 1, &bad[k], 1, 0.1, &velocity) == mnav_errorInvalid,
               "a bad obstacle");
@@ -506,6 +523,35 @@ static void TestObstacleChecks(void)
     def = mnavDefaultAvoidanceDef();
     def.limits.obstacleNeighbors = 0;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorRange, "no obstacle neighbours");
+    def = mnavDefaultAvoidanceDef();
+    def.obstacleTimeHorizon = MNAV_MIN_AVOIDANCE_TIME * 0.5;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorRange,
+          "an obstacle horizon under the shortest");
+}
+
+// Three deeply overlapping agents, from the avoidance fuzz target: the
+// third's lines meet at a narrow angle, and the programs' result came out
+// 1.2e-8 of its maximum speed too fast before the speed was kept.
+static void TestSpeedKept(void)
+{
+    mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
+    def.limits.agents = 16;
+    def.limits.neighbors = 7;
+    def.neighborDistance = 5.0;
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
+    const mnavAgent agents[3] = {
+        {{12.5, 12.5}, {14.75, 14.75}, {14.75, 14.75}, 12.5, 12.5, 12.5, 0},
+        {{12.5, 14.75}, {14.75, 14.75}, {14.75, 14.75}, 12.5, 12.5, 12.5, 0},
+        {{12.5, 14.5}, {14.5, 14.5}, {12.5, 12.5}, 14.625, 0.6, 1.8000000000000003, 0}};
+    mnavPos2 velocities[3];
+    CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.05, velocities) == mnav_success, "stepped");
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        double speed = sqrt(velocities[i].x * velocities[i].x + velocities[i].y * velocities[i].y);
+        CHECK(speed <= agents[i].maxSpeed * (1.0 + 0x1p-52), "no faster than the maximum");
+    }
+    mnavDestroyAvoidance(avoidance);
 }
 
 int main(void)
@@ -521,5 +567,6 @@ int main(void)
     TestObstaclesInAnyOrder();
     TestMixedScene();
     TestObstacleChecks();
+    TestSpeedKept();
     return s_failures == 0 ? 0 : 1;
 }

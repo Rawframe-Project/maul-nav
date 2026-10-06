@@ -23,9 +23,9 @@
 // Marks a def built by mnavDefaultAvoidanceDef.
 #define AVOIDANCE_DEF_COOKIE 0x4E415641u
 
-// The largest coordinate an agent may have, in meters: grid cells stay
-// well inside 64-bit integers.
-#define MAX_COORDINATE 1.0e12
+// The largest cell index, far inside 64-bit integers so that a cell and
+// its neighbours stay exact.
+#define CELL_LIMIT 0x1p52
 
 // How far right of its preferred velocity a held-back agent aims, as a
 // fraction of its speed.
@@ -76,6 +76,16 @@ static bool Positive(double v)
     return isfinite(v) && v > 0.0;
 }
 
+static bool Time(double v)
+{
+    return isfinite(v) && v >= MNAV_MIN_AVOIDANCE_TIME;
+}
+
+static bool Speed(double v)
+{
+    return isfinite(v) && fabs(v) <= MNAV_MAX_AVOIDANCE_SPEED;
+}
+
 // Whether a def's limits, distance and horizons lie in their ranges.
 static bool GoodLimits(const mnavAvoidanceDef* def)
 {
@@ -86,8 +96,8 @@ static bool GoodLimits(const mnavAvoidanceDef* def)
            limits->obstacleVertices <= MNAV_MAX_AVOIDANCE_VERTICES &&
            limits->obstacleNeighbors >= 1 &&
            limits->obstacleNeighbors <= MNAV_MAX_AVOIDANCE_NEIGHBORS &&
-           Positive(def->neighborDistance) && Positive(def->timeHorizon) &&
-           Positive(def->obstacleTimeHorizon);
+           Positive(def->neighborDistance) && Time(def->timeHorizon) &&
+           Time(def->obstacleTimeHorizon);
 }
 
 // Allocates a set's memory for its limits.
@@ -224,10 +234,11 @@ static bool FinitePos(mnavPos2 p)
 
 static bool GoodAgent(const mnavAgent* agent)
 {
-    return FinitePos(agent->position) && FinitePos(agent->velocity) &&
-           FinitePos(agent->preferred) && fabs(agent->position.x) <= MAX_COORDINATE &&
-           fabs(agent->position.y) <= MAX_COORDINATE && Positive(agent->radius) &&
-           isfinite(agent->maxSpeed) && agent->maxSpeed >= 0.0 && Positive(agent->priority);
+    return FinitePos(agent->position) && fabs(agent->position.x) <= MNAV_MAX_AVOIDANCE_COORDINATE &&
+           fabs(agent->position.y) <= MNAV_MAX_AVOIDANCE_COORDINATE && Speed(agent->velocity.x) &&
+           Speed(agent->velocity.y) && Speed(agent->preferred.x) && Speed(agent->preferred.y) &&
+           Positive(agent->radius) && agent->radius <= MNAV_MAX_AVOIDANCE_RADIUS &&
+           Speed(agent->maxSpeed) && agent->maxSpeed >= 0.0 && Positive(agent->priority);
 }
 
 static bool KeyBefore(const Key* a, const Key* b)
@@ -313,9 +324,14 @@ static int32_t Insert(Neighbor* list, int32_t count, int32_t limit, Neighbor can
     return count;
 }
 
+// The cell holding v; saturated, so that any distance gives a cell.
+// Saturation keeps cells in order and neighbours within one of each
+// other, which is all the search needs.
 static int64_t CellOf(double v, double size)
 {
-    return (int64_t)floor(v / size);
+    double cell = floor(v / size);
+    return cell < -CELL_LIMIT ? (int64_t)-CELL_LIMIT
+                              : (cell > CELL_LIMIT ? (int64_t)CELL_LIMIT : (int64_t)cell);
 }
 
 // The neighbours of agent i, nearest first.
@@ -381,6 +397,14 @@ static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, int32_t agentCo
     {
         mnavLinearProgram3(a->lines, count, fixed, failed, self->maxSpeed, a->projected, &velocity);
     }
+    // The programs stay within the speed circle up to rounding, which
+    // lines meeting at a narrow angle make larger; the maximum speed is
+    // kept exactly.
+    double speedSq = mnavDot2(velocity, velocity);
+    if (speedSq > self->maxSpeed * self->maxSpeed)
+    {
+        velocity = mnavScale2(velocity, self->maxSpeed / sqrt(speedSq));
+    }
     return velocity;
 }
 
@@ -390,7 +414,7 @@ mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t 
 {
     if (avoidance == nullptr || agentCount < 0 || obstacleCount < 0 ||
         (agentCount > 0 && (agents == nullptr || velocitiesOut == nullptr)) ||
-        (obstacleCount > 0 && obstacles == nullptr) || !Positive(step))
+        (obstacleCount > 0 && obstacles == nullptr) || !Time(step))
     {
         return mnav_errorInvalid;
     }
