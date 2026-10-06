@@ -13,6 +13,7 @@
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
+#include "maul-nav/query.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -98,6 +99,47 @@ static void TestLinksAttachAtTheCommit(void)
     mnavAttachment a = mnavAttachmentOf(navmesh->attachments[first + 2]);
     CHECK(a.slot == 0 && a.polygon == 0 && a.link == (int32_t)both.slot - 1 && a.reverse,
           "the two-way link crosses back to the first square");
+    mnavDestroyNavmesh(navmesh);
+}
+
+// A free link whose ends both lie on one square, from the fuzz target:
+// taking it is cheaper than walking, and the path leaves the square and
+// comes back. The corridor keeps the two visits apart, so that its
+// corners still cross the link.
+static void TestLinkBackToItsOwnPolygon(void)
+{
+    mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
+    mnavLinkDef loop = Link(5.5, 5.5, 9.5, 9.5, 0.25f);
+    loop.cost = 0.0f;
+    Stage(navmesh, loop);
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    mnavQueryDef def = mnavDefaultQueryDef();
+    mnavQuery* query = nullptr;
+    CHECK(mnavCreateQuery(&def, &query) == mnav_success, "a query");
+    mnavNearest a;
+    mnavNearest b;
+    const mnavVec3 box = {1.0f, 2.0f, 1.0f};
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){5.5, 0.0, 6.0}, box, &a) == mnav_success &&
+              mnavFindNearest(navmesh, nullptr, (mnavPos3){9.5, 0.0, 9.0}, box, &b) ==
+                  mnav_success &&
+              a.polygon.polygon == b.polygon.polygon,
+          "both ends on the first square");
+    mnavPath path;
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
+                  mnav_success &&
+              path.end == mnav_pathFound && path.linkCount == 1 && path.pointCount == 4,
+          "through the link");
+    CHECK(path.polygonCount == 2 && path.polygons[0].polygon == path.polygons[1].polygon,
+          "the square twice, before the link and after it");
+    mnavPolygonId buffer[8];
+    mnavCorridor corridor;
+    mnavCorners corners;
+    CHECK(mnavResetCorridor(&corridor, buffer, 8, a.polygon, a.point) == mnav_success &&
+              mnavSetCorridor(&corridor, &path) == mnav_success &&
+              mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+              corners.linkCount == 1,
+          "the corridor's corners cross it");
+    mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
 
@@ -254,6 +296,7 @@ int main(void)
     s_sizes[1] = HandTileBytes(s_bytes[1], 1, s_beyond, 1);
     TestLinksAttachAtTheCommit();
     TestLinksFollowTheTiles();
+    TestLinkBackToItsOwnPolygon();
     TestRemovalAndIds();
     TestDefsAndLimits();
     TestFailedCommitKeepsLinksStaged();

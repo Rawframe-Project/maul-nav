@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+### Fixed
+
+- A path across an off-mesh link whose ends lie on one polygon listed
+  that polygon once, so the corridor set from it lost the link: its
+  corners walked straight past. Each visit is now listed, before the
+  link and after it.
+
 ### Added
 
 - `fuzz_stream`, a fuzz target for sequences of runtime changes

@@ -6,7 +6,8 @@
 // added, removed and replaced by a variant baked with another area, links
 // added, removed and toggled, areas changed) with commits between, and
 // queries, paths and a corridor that keep polygon and link ids from
-// earlier commits. Every call must end in a typed status; after each
+// earlier commits, drawn now and then (fuzz_draw.h). Every call must end
+// in a typed status; after each
 // commit the corridor is checked and, where it breaks, replanned; the
 // same sequence on a second navmesh gives the same results; everything
 // is given back.
@@ -16,6 +17,7 @@
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/debug.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
@@ -42,6 +44,8 @@ static void Expect(bool condition)
         abort();
     }
 }
+
+#include "fuzz_draw.h"
 
 typedef struct Reader
 {
@@ -184,9 +188,58 @@ static void AfterCommit(Run* run)
     }
 }
 
+// What a draw call draws: tiles in a range, the links, the corridor or a
+// path.
+typedef struct Drawing
+{
+    const Run* run;
+    const mnavPath* path;
+    int32_t x0;
+    int32_t z0;
+    int32_t x1;
+    int32_t z1;
+} Drawing;
+
+static mnavResult DrawTiles(void* context, mnavDebugBuffer* buffer)
+{
+    const Drawing* d = context;
+    return mnavDebugNavmesh(d->run->navmesh, d->x0, d->z0, d->x1, d->z1, buffer);
+}
+
+static mnavResult DrawLinks(void* context, mnavDebugBuffer* buffer)
+{
+    const Drawing* d = context;
+    return mnavDebugLinks(d->run->navmesh, buffer);
+}
+
+static mnavResult DrawCorridor(void* context, mnavDebugBuffer* buffer)
+{
+    const Drawing* d = context;
+    return mnavDebugCorridor(d->run->navmesh, d->run->corridor.polygons, d->run->corridor.count,
+                             buffer);
+}
+
+static mnavResult DrawPath(void* context, mnavDebugBuffer* buffer)
+{
+    const Drawing* d = context;
+    return mnavDebugPath(d->path, buffer);
+}
+
+static void Drawn(const Run* run, Reader* r)
+{
+    uint8_t what = Byte(r) % 3;
+    Drawing d = {run, nullptr, Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1};
+    DrawFn draw = what == 0 ? DrawTiles : (what == 1 ? DrawLinks : DrawCorridor);
+    if (what == 2 && !run->walking)
+    {
+        return;
+    }
+    Draw(draw, &d, Byte(r), Byte(r), Byte(r));
+}
+
 static void Step(Run* run, Reader* r)
 {
-    uint8_t op = Byte(r) % 12;
+    uint8_t op = Byte(r) % 13;
     uint8_t pick = Byte(r);
     int32_t k = pick % IDS;
     if (op == 0)
@@ -246,6 +299,11 @@ static void Step(Run* run, Reader* r)
         mnavResult found = mnavFindPath(run->query, run->navmesh, nullptr, run->polygons[k],
                                         run->points[k], run->polygons[j], run->points[j], &path);
         NotePath(run, found, &path);
+        if (found == mnav_success && (pick & 16) != 0)
+        {
+            Drawing d = {run, &path, 0, 0, 0, 0};
+            Draw(DrawPath, &d, Byte(r), Byte(r), Byte(r));
+        }
         if (found == mnav_success && path.polygonCount > 0 && path.polygonCount <= CORRIDOR)
         {
             Expect(mnavResetCorridor(&run->corridor, run->buffer, CORRIDOR, path.polygons[0],
@@ -253,6 +311,10 @@ static void Step(Run* run, Reader* r)
             NoteResult(run, mnavSetCorridor(&run->corridor, &path));
             run->walking = true;
         }
+    }
+    else if (op == 12)
+    {
+        Drawn(run, r);
     }
     else if (run->walking)
     {

@@ -198,8 +198,9 @@ extern "C"
         double cost;
         // That way's length in meters; the straight path is never longer.
         double length;
-        // The polygons from the start polygon on, in the context's memory
-        // until its next search.
+        // The polygons from the start polygon on, each visit once: a polygon
+        // an off-mesh link leaves and lands back on appears before the link
+        // and after it. In the context's memory until its next search.
         const mnavPolygonId* polygons;
         int32_t polygonCount;
         // The straight path from the start point, the corridor pulled

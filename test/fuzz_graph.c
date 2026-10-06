@@ -46,6 +46,8 @@ static void Expect(bool condition)
     }
 }
 
+#include "fuzz_draw.h"
+
 typedef struct Reader
 {
     const uint8_t* data;
@@ -288,6 +290,18 @@ static bool SameFlow(const mnavPolygonFlow* a, const mnavPolygonFlow* b)
            a->link.slot == b->link.slot && a->link.generation == b->link.generation;
 }
 
+typedef struct FieldDrawing
+{
+    const mnavNavFlow* field;
+    const mnavNavmesh* navmesh;
+} FieldDrawing;
+
+static mnavResult DrawField(void* context, mnavDebugBuffer* buffer)
+{
+    const FieldDrawing* d = context;
+    return mnavDebugNavFlow(d->field, d->navmesh, buffer);
+}
+
 static void Fields(Reader* r, const mnavNavmesh* navmesh, const mnavQueryFilter* filter)
 {
     mnavNavFlowDef def = mnavDefaultNavFlowDef();
@@ -336,6 +350,8 @@ static void Fields(Reader* r, const mnavNavmesh* navmesh, const mnavQueryFilter*
                    next.cost <= a.cost);
         }
     }
+    FieldDrawing drawing = {whole, navmesh};
+    Draw(DrawField, &drawing, Byte(r), Byte(r), Byte(r));
     // A region from the bytes, perhaps backward or outside the world.
     mnavNavFlowRegion region = {Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1};
     begun = mnavBeginNavFlow(stepped, navmesh, filter, &region, goals, goalCount);
