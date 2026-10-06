@@ -115,45 +115,57 @@ static bool Before(const mnavFragment* a, const mnavFragment* b)
     return a->area < b->area;
 }
 
-// Orders fragments by column with a counting pass, then each column by
-// bottom, top and area. columns receives each column's start in sorted.
-static void Sort(const mnavFragmentList* list, int32_t width, uint32_t* columns,
-                 mnavFragment* sorted)
+// Orders fragments in place: by column, each column's region taking the
+// fragments that belong to it by swaps, as in American flag sort, with a
+// cursor per column in cursors; then each column by bottom, top and area.
+// Fragments equal in all of those are equal in full, so the order is the
+// same whatever the swaps did. columns receives each column's start.
+static void Sort(mnavFragment* items, int32_t count, int32_t width, uint32_t* columns,
+                 uint32_t* cursors)
 {
     int32_t columnCount = width * width;
     memset(columns, 0, ((size_t)columnCount + 1) * sizeof(uint32_t));
-    for (int32_t i = 0; i < list->count; ++i)
+    // No fragments, no array: every column is empty.
+    if (count == 0 || items == nullptr)
     {
-        columns[list->items[i].x + list->items[i].z * width + 1] += 1;
+        return;
+    }
+    for (int32_t i = 0; i < count; ++i)
+    {
+        columns[items[i].x + items[i].z * width + 1] += 1;
     }
     for (int32_t c = 0; c < columnCount; ++c)
     {
         columns[c + 1] += columns[c];
     }
-    for (int32_t i = 0; i < list->count; ++i)
+    memcpy(cursors, columns, (size_t)columnCount * sizeof(uint32_t));
+    for (int32_t c = 0; c < columnCount; ++c)
     {
-        const mnavFragment* fragment = &list->items[i];
-        int32_t column = fragment->x + fragment->z * width;
-        // The column's start serves as its cursor and is restored below.
-        sorted[columns[column]++] = *fragment;
+        while (cursors[c] < columns[c + 1])
+        {
+            mnavFragment fragment = items[cursors[c]];
+            int32_t home = fragment.x + fragment.z * width;
+            if (home == c)
+            {
+                cursors[c] += 1;
+                continue;
+            }
+            items[cursors[c]] = items[cursors[home]];
+            items[cursors[home]++] = fragment;
+        }
     }
-    for (int32_t c = columnCount; c > 0; --c)
-    {
-        columns[c] = columns[c - 1];
-    }
-    columns[0] = 0;
     for (int32_t c = 0; c < columnCount; ++c)
     {
         for (uint32_t i = columns[c] + 1; i < columns[c + 1]; ++i)
         {
-            mnavFragment item = sorted[i];
+            mnavFragment item = items[i];
             uint32_t j = i;
-            while (j > columns[c] && Before(&item, &sorted[j - 1]))
+            while (j > columns[c] && Before(&item, &items[j - 1]))
             {
-                sorted[j] = sorted[j - 1];
+                items[j] = items[j - 1];
                 --j;
             }
-            sorted[j] = item;
+            items[j] = item;
         }
     }
 }
@@ -264,24 +276,26 @@ static mnavResult Finish(mnavMemory* memory, const mnavBakeCells* cells, mnavRes
                          mnavFragmentList* list, mnavHeightfield* heightfield)
 {
     int32_t width = heightfield->frame.width;
-    mnavFragment* sorted = nullptr;
+    size_t columnCount = (size_t)width * (size_t)width;
+    uint32_t* cursors = nullptr;
     if (result == mnav_success)
     {
-        result = mnavAllocate(memory, (size_t)width * (size_t)width + 1, sizeof(uint32_t),
-                              alignof(uint32_t), (void**)&heightfield->columns);
+        result = mnavAllocate(memory, columnCount + 1, sizeof(uint32_t), alignof(uint32_t),
+                              (void**)&heightfield->columns);
     }
     if (result == mnav_success)
     {
-        result = mnavAllocate(memory, (size_t)list->count, sizeof(mnavFragment),
-                              alignof(mnavFragment), (void**)&sorted);
+        result = mnavAllocate(memory, columnCount, sizeof(uint32_t), alignof(uint32_t),
+                              (void**)&cursors);
     }
     if (result == mnav_success)
     {
-        Sort(list, width, heightfield->columns, sorted);
-        mnavReleaseFragments(memory, list);
-        result = Merge(memory, sorted, list->count, cells->agentStep, heightfield);
+        Sort(list->items, list->count, width, heightfield->columns, cursors);
+        mnavRelease(memory, cursors, columnCount, sizeof(uint32_t), alignof(uint32_t));
+        cursors = nullptr;
+        result = Merge(memory, list->items, list->count, cells->agentStep, heightfield);
     }
-    mnavRelease(memory, sorted, (size_t)list->count, sizeof(mnavFragment), alignof(mnavFragment));
+    mnavRelease(memory, cursors, columnCount, sizeof(uint32_t), alignof(uint32_t));
     mnavReleaseFragments(memory, list);
     if (result != mnav_success)
     {
