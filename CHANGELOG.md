@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- `fuzz_stream`, a fuzz target for sequences of runtime changes
+  (tiles added, removed and replaced, links added, removed and toggled,
+  areas changed) with commits, queries and a corridor between; and
+  seed corpora for every fuzz target in `test/corpus`.
+
 ## [0.2.0] - 2026-10-06
 
 Faults found by measuring test coverage and by fuzzing the inputs no

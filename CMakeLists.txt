@@ -170,7 +170,7 @@ if(MAUL_NAV_FUZZ)
     target_compile_options(maul-nav PRIVATE -fsanitize=fuzzer-no-link,address,undefined
                                             -fno-sanitize-recover=all)
     target_link_options(maul-nav PUBLIC -fsanitize=address,undefined)
-    foreach(area tile bake query avoid graph)
+    foreach(area tile bake query avoid graph stream)
         add_executable(fuzz_${area} test/fuzz_${area}.c)
         target_link_libraries(fuzz_${area} PRIVATE maul-nav)
         # The targets reach the library's own functions.
