@@ -510,6 +510,21 @@ static void TestDebug(mnavNavFlow* field)
               mnavDebugNavFlow(field, navmesh, &b) == mnav_errorStale,
           "stale after a commit");
     mnavDestroyNavmesh(navmesh);
+    // A field over a region draws its polygons alone.
+    const mnavNavFlowRegion part = {1, 1, 3, 3};
+    b.lineCount = 0;
+    b.vertexCount = 0;
+    navmesh = LoadSmall();
+    const mnavNavFlowGoal inside = Goal(navmesh, 18, 18);
+    bool ended = false;
+    CHECK(mnavBeginNavFlow(field, navmesh, nullptr, &part, &inside, 1) == mnav_success &&
+              mnavContinueNavFlow(field, navmesh, INT32_MAX, &ended) == mnav_success && ended &&
+              mnavDebugNavFlow(field, navmesh, &b) == mnav_success && b.lineCount > 0 &&
+              b.lineCount < 6 * ways,
+          "a region's arrows alone");
+    mnavDestroyNavmesh(navmesh);
+    b.lineCount = 0;
+    b.vertexCount = 0;
     // Nothing begun: nothing drawn.
     mnavNavFlowDef def = mnavDefaultNavFlowDef();
     mnavNavFlow* fresh = nullptr;

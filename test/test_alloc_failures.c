@@ -60,13 +60,16 @@ static uint8_t s_bytes[TILE_CAPACITY];
 static const float s_heights[9] = {-0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f};
 static const mnavVec2 s_strip[4] = {{10, 10}, {20, 10}, {20, 50}, {10, 50}};
 
+static const mnavVec2 s_all[4] = {{-1, -1}, {65, -1}, {65, 65}, {-1, 65}};
+
 static mnavBakeInput Input(const mnavTriangleMesh* world)
 {
     static mnavTerrain terrain;
-    static mnavBakeVolume volume;
+    static mnavBakeVolume volumes[2];
     terrain = (mnavTerrain){{0.0, 0.0, 0.0}, 32.0f, 32.0f, 3, 3, s_heights, nullptr};
-    volume = (mnavBakeVolume){s_strip, 4, -1.0f, 1.0f, mnav_volumeArea, 5};
-    return (mnavBakeInput){world, 1, &terrain, 1, &volume, 1};
+    volumes[0] = (mnavBakeVolume){s_strip, 4, -1.0f, 1.0f, mnav_volumeArea, 5};
+    volumes[1] = (mnavBakeVolume){s_all, 4, -1.0f, 1.0f, mnav_volumeInclude, 0};
+    return (mnavBakeInput){world, 1, &terrain, 1, volumes, 2};
 }
 
 static void TestBakes(void)
@@ -143,6 +146,40 @@ static void TestBakes(void)
         mnavDestroyBaker(b);
     }
     CHECK(made && s_held == 0, "a baker refused whole");
+}
+
+// A floor over one tile with a pillar in its middle, which leaves a hole
+// in the floor's region that the bake merges into its outline.
+static void TestHoles(void)
+{
+    const mnavVec3 v[12] = {{0, 0, 0},      {0, 0, 32},     {32, 0, 32},    {32, 0, 0},
+                            {14, 0, 14},    {18, 0, 14},    {18, 0, 18},    {14, 0, 18},
+                            {14, 2.5f, 14}, {18, 2.5f, 14}, {18, 2.5f, 18}, {14, 2.5f, 18}};
+    const int32_t i[] = {0, 1, 2,  0, 2,  3, 8, 11, 10, 8, 10, 9, 4, 8,  9, 4, 9, 5,
+                         5, 9, 10, 5, 10, 6, 6, 10, 11, 6, 11, 7, 7, 11, 8, 7, 8, 4};
+    const mnavTriangleMesh mesh = {v, 12, i, (int32_t)(sizeof(i) / sizeof(i[0]) / 3), nullptr};
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.allocator = Allocator();
+    FailAfter(-1);
+    mnavBaker* baker = nullptr;
+    mnavBakeReport report;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTile(baker, &mesh, 1, 0, 0, &report) == mnav_success && report.polygons > 4,
+          "a floor round a pillar");
+    // Counted on a baker that has baked before, as every bake below is.
+    FailAfter(-1);
+    CHECK(mnavBakeTile(baker, &mesh, 1, 0, 0, nullptr) == mnav_success, "again");
+    int32_t calls = s_calls;
+    bool refused = true;
+    for (int32_t k = 0; k < calls; ++k)
+    {
+        FailAfter(k);
+        refused = refused && mnavBakeTile(baker, &mesh, 1, 0, 0, nullptr) == mnav_errorCapacity;
+    }
+    CHECK(refused, "every failure round the hole refused");
+    FailAfter(-1);
+    mnavDestroyBaker(baker);
+    CHECK(s_held == 0, "nothing held");
 }
 
 // Stages the four tiles and a two-way link, and commits; committing
@@ -304,6 +341,7 @@ static void TestObjects(void)
 int main(void)
 {
     TestBakes();
+    TestHoles();
     TestCommits();
     TestObjects();
     return s_failures == 0 ? 0 : 1;

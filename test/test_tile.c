@@ -238,6 +238,28 @@ static void TestEveryTruncationIsRefused(void)
     Unbake(&f);
 }
 
+static void TestTrailingBytesAreRefused(void)
+{
+    // A tile with bytes past its last section, sealed so that its size
+    // and hash agree: the payload is longer than the sections it holds.
+    static Fixture f;
+    Bake(&f);
+    static uint8_t copy[(1 << 16) + 8];
+    CHECK(f.size + 8 <= sizeof(copy), "room");
+    uint64_t held = f.memory.used;
+    for (size_t extra = 1; extra <= 8; ++extra)
+    {
+        memcpy(copy, f.bytes, f.size);
+        memset(copy + f.size, 0, extra);
+        Reseal(copy, f.size + extra);
+        mnavTileResult r = Load(&f.memory, copy, f.size + extra);
+        CHECK(r.result == mnav_errorInvalid && r.section == mnav_tilePayload,
+              "trailing bytes refused as the payload's");
+    }
+    CHECK(f.memory.used == held, "nothing held after a refusal");
+    Unbake(&f);
+}
+
 static void TestEveryByteChangeIsRefusedOrCanonical(void)
 {
     static Fixture f;
@@ -588,6 +610,7 @@ int main(int argc, char** argv)
     }
     TestRoundTrip();
     TestEveryTruncationIsRefused();
+    TestTrailingBytesAreRefused();
     TestEveryByteChangeIsRefusedOrCanonical();
     TestHeaderRefusals();
     TestMeshRefusals();

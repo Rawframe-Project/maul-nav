@@ -280,6 +280,16 @@ static void TestLinksBetweenClusters(void)
     CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &after) == mnav_success &&
               after.transitions == before.transitions + 1,
           "one transition, one way");
+    // A hierarchy with room for the sides' transitions alone refuses the
+    // link's.
+    mnavHierarchyDef tight = Small();
+    tight.clusterTiles = 2;
+    tight.limits.transitions = before.transitions;
+    mnavHierarchy* full = nullptr;
+    CHECK(mnavCreateHierarchy(&tight, &full) == mnav_success &&
+              mnavBuildHierarchy(full, query, navmesh, nullptr, nullptr) == mnav_errorLimit,
+          "no room for the link's transition");
+    mnavDestroyHierarchy(full);
     mnavNearest a = On(navmesh, 40.0, 30.0);
     mnavNearest b = On(navmesh, 40.0, 110.0);
     mnavPath path;
@@ -586,6 +596,71 @@ static void TestLoadOrder(void)
     mnavDestroyNavmesh(backward);
 }
 
+// An area change that opens a way adds edges; an update past the edge
+// limit is refused, as a build is.
+static void TestUpdatePastTheEdgeLimit(void)
+{
+    mnavNavmesh* navmesh = Load(false);
+    mnavQuery* query = Query(4096);
+    // The wall at z = 60 has its gap at x = 226 to 232: closed by an area
+    // the filter leaves out.
+    Paint(navmesh, 226.0, 232.0, 60.5, 3);
+    mnavQueryFilter filter = mnavDefaultQueryFilter();
+    filter.areas &= ~((uint64_t)1 << 3);
+    mnavHierarchy* probe = Hierarchy(2);
+    mnavHierarchyReport closed;
+    CHECK(mnavBuildHierarchy(probe, query, navmesh, &filter, &closed) == mnav_success, "closed");
+    mnavDestroyHierarchy(probe);
+    mnavHierarchyDef def = Small();
+    def.clusterTiles = 2;
+    def.limits.edges = closed.edges;
+    mnavHierarchy* tight = nullptr;
+    CHECK(mnavCreateHierarchy(&def, &tight) == mnav_success &&
+              mnavBuildHierarchy(tight, query, navmesh, &filter, nullptr) == mnav_success,
+          "built at the limit");
+    Paint(navmesh, 226.0, 232.0, 60.5, mnav_areaWalkable);
+    mnavHierarchyReport opened;
+    mnavResult result = mnavUpdateHierarchy(tight, query, navmesh, &opened);
+    printf("edge limit: %d edges closed\n", closed.edges);
+    CHECK(result == mnav_errorLimit, "the opened gap's edges past the limit");
+    mnavDestroyHierarchy(tight);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
+// A row of tiles removed splits the world: the graph has no way across,
+// and the hierarchical search gives the plain search's answer.
+static void TestSplitWorld(void)
+{
+    mnavNavmesh* navmesh = Load(false);
+    for (int32_t x = 0; x < TILES; ++x)
+    {
+        CHECK(mnavStageTileRemoval(navmesh, x, 2) == mnav_success, "staged");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "a row removed");
+    mnavQuery* query = Query(4096);
+    mnavHierarchy* hierarchy = Hierarchy(2);
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success, "built");
+    mnavNearest a = On(navmesh, 40.0, 20.0);
+    mnavNearest b = On(navmesh, 40.0, 200.0);
+    mnavPath plain;
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &plain) ==
+              mnav_success,
+          "plain");
+    mnavPathEnd plainEnd = plain.end;
+    mnavPath path;
+    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                   b.point, &path) == mnav_success &&
+              path.end == plainEnd && path.end != mnav_pathFound,
+          "no way through the graph: the plain search's answer");
+    // Making a hierarchy refuses a NULL out.
+    mnavHierarchyDef def = Small();
+    CHECK(mnavCreateHierarchy(&def, nullptr) == mnav_errorInvalid, "a NULL out");
+    mnavDestroyHierarchy(hierarchy);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestStaleAndFallbacks(void)
 {
     mnavNavmesh* navmesh = Load(false);
@@ -714,6 +789,8 @@ int main(void)
     TestLimitsAndChecks();
     TestLinksBetweenClusters();
     TestOneWayLinkInTheEndCluster();
+    TestSplitWorld();
+    TestUpdatePastTheEdgeLimit();
     TestUpdates();
     TestNegativePlaces();
     for (int32_t t = 0; t < TILES * TILES; ++t)
