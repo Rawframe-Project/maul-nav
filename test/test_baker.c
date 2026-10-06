@@ -286,6 +286,12 @@ static void TestStagesAreTimedAndMeasured(void)
     CHECK(largest == b.memoryPeak && b.stageMemory[mnav_stageRasterize] > 0 &&
               b.stageMemory[mnav_stageDetail] > 0,
           "the peak is the largest stage's");
+    // Each stage's own peak: the rasterizer's fragments are gone before
+    // the compact field is built, and the regions' scratch before the
+    // contours.
+    CHECK(b.stageMemory[mnav_stageCompact] < b.stageMemory[mnav_stageRasterize] &&
+              b.stageMemory[mnav_stageContours] < b.stageMemory[mnav_stageRegions],
+          "a stage's peak is its own, not the bake's so far");
     // A bake ending in the polygon stage times the stages up to it only.
     mnavDestroyBaker(timed);
     def.limits.tilePolygons = 10;
