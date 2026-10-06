@@ -810,6 +810,39 @@ static void TestLimitsAndChecks(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestUpdatePastTheTileLimit(void)
+{
+    // A graph built over eight tiles with room for eight; a ninth tile
+    // committed. The update must refuse it as a build would, reading
+    // nothing past what the hierarchy holds, and leave no graph.
+    mnavBakeDef bake = mnavDefaultBakeDef();
+    bake.tier = mnav_tierDynamic;
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&bake, &navmesh).result == mnav_success, "navmesh");
+    for (int32_t t = 0; t < 8; ++t)
+    {
+        CHECK(mnavStageTile(navmesh, s_bytes[t], s_sizes[t]).result == mnav_success, "staged");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    mnavQuery* query = Query(4096);
+    mnavHierarchyDef def = Small();
+    def.limits.tiles = 8;
+    mnavHierarchy* hierarchy = nullptr;
+    CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_success &&
+              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success,
+          "built over eight tiles");
+    CHECK(mnavStageTile(navmesh, s_bytes[8], s_sizes[8]).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "a ninth tile");
+    CHECK(mnavUpdateHierarchy(hierarchy, query, navmesh, nullptr) == mnav_errorLimit,
+          "an update past the tile limit refused");
+    CHECK(mnavUpdateHierarchy(hierarchy, query, navmesh, nullptr) == mnav_errorInvalid,
+          "no graph after it to bring up to date");
+    mnavDestroyHierarchy(hierarchy);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     float side = BakeWorld(0.0f);
@@ -825,6 +858,7 @@ int main(void)
     TestUpdatePastTheEdgeLimit();
     TestUpdates();
     TestNegativePlaces();
+    TestUpdatePastTheTileLimit();
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
         free(s_bytes[t]);
