@@ -284,7 +284,8 @@ static void Stream(int32_t links)
                                 1.0f,
                                 5.0f,
                                 mnav_linkJump,
-                                true};
+                                true,
+                                0.0f};
             mnavLinkId id;
             Check(mnavStageLink(navmesh, &jump, &id), "link");
         }

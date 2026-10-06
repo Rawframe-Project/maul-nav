@@ -87,8 +87,9 @@ enum
     MNAV_LINK_REMOVING = 3,
 };
 
-// An off-mesh link's slot: the link, its generation (0 before first use)
-// and, once committed, where its ends snapped.
+// An off-mesh link's slot: one crossing of a link, a point link having
+// one; its def, its generation (0 before first use) and, once committed,
+// where its ends snapped.
 typedef struct mnavOffLink
 {
     mnavLinkDef def;
@@ -97,6 +98,12 @@ typedef struct mnavOffLink
     // Whether it is to be enabled at the next commit.
     bool enabled;
     mnavLinkState state;
+    // The slot of the link's first crossing, which its id names, this one
+    // for a point link; the crossing's place along the width, and in the
+    // first, how many there are.
+    int32_t parent;
+    int32_t crossing;
+    int32_t crossings;
 } mnavOffLink;
 
 struct mnavNavmesh

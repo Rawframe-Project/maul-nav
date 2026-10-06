@@ -174,7 +174,8 @@ static void Keep(Gen* g, Spot from, Spot to, bool drop)
                                            d->radius,
                                            drop ? d->dropCost : d->jumpCost,
                                            drop ? d->dropKind : d->jumpKind,
-                                           twoWay};
+                                           twoWay,
+                                           0.0f};
     }
     g->count += 1;
 }

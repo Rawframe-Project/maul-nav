@@ -176,7 +176,7 @@ static void TestFiltersAndLinks(void)
     size_t size = HandTileBytes(bytes, 0, squares, 4);
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false};
+    mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false, 0.0f};
     mnavLinkId id;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
               mnavStageTile(navmesh, bytes, size).result == mnav_success &&

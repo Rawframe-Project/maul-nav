@@ -86,7 +86,7 @@ static void TestStatic(void)
 {
     mnavNavmesh* navmesh = Load(mnav_tierStatic);
     mnavNearest middle = On(navmesh, 12.5, 7.5);
-    mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false};
+    mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false, 0.0f};
     mnavLinkId link;
     CHECK(mnavStageArea(navmesh, middle.polygon, mnav_areaNone) == mnav_errorTier,
           "no area changes");
@@ -191,7 +191,7 @@ static void TestLinkToggles(void)
 {
     mnavNavmesh* navmesh = Load(mnav_tierModifiers);
     mnavQuery* query = MakeQuery();
-    mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false};
+    mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false, 0.0f};
     mnavLinkId link;
     mnavLinkState state;
     CHECK(mnavStageLink(navmesh, &jump, &link) == mnav_success &&

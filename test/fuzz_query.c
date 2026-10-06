@@ -94,8 +94,8 @@ static mnavPolygonId s_ids[8];
 // The bytes the query context holds.
 static size_t s_baseline;
 
-// The world, tile (1, 1) left out, a link joining two of its places; a
-// few polygon ids found on it.
+// The world, tile (1, 1) left out, a point link and an edge link joining
+// places on it; a few polygon ids found on it.
 static void Load(void)
 {
     BakeWorld();
@@ -105,8 +105,10 @@ static void Load(void)
     {
         Expect(mnavStageTile(s_navmesh, s_tiles[t], s_sizes[t]).result == mnav_success);
     }
-    const mnavLinkDef link = {{5, 0, 5}, {40, 0, 5}, 1.0f, 2.0f, mnav_linkJump, true};
+    const mnavLinkDef link = {{5, 0, 5}, {40, 0, 5}, 1.0f, 2.0f, mnav_linkJump, true, 0.0f};
+    const mnavLinkDef edge = {{20, 0, 30}, {20, 0, 50}, 1.0f, 3.0f, mnav_linkClimb, true, 6.0f};
     mnavLinkId id;
+    Expect(mnavStageLink(s_navmesh, &edge, &id) == mnav_success);
     Expect(mnavStageLink(s_navmesh, &link, &id) == mnav_success &&
            mnavCommit(s_navmesh) == mnav_success);
     mnavQueryDef queryDef = mnavDefaultQueryDef();

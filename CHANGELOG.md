@@ -242,3 +242,5 @@ format.
   only, behind MAUL_NAV_DIFFERENTIAL.
 - The benchmark prints named results and their ratios to
   bench/baseline.txt (mnav-0012); sliced path queries are timed too.
+- Edge-to-edge links: mnavLinkDef.width, crossed at points spaced along
+  it; mnavLinkState.crossings.

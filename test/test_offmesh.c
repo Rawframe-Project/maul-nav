@@ -37,7 +37,7 @@ static mnavNavmesh* Make(mnavBakeDef def)
 
 static mnavLinkDef Link(double x0, double z0, double x1, double z1, float radius)
 {
-    return (mnavLinkDef){{x0, 0.0, z0}, {x1, 0.0, z1}, radius, 4.0f, mnav_linkJump, false};
+    return (mnavLinkDef){{x0, 0.0, z0}, {x1, 0.0, z1}, radius, 4.0f, mnav_linkJump, false, 0.0f};
 }
 
 static mnavLinkId Stage(mnavNavmesh* navmesh, mnavLinkDef def)

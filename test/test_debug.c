@@ -137,8 +137,8 @@ static void TestNavmesh(const mnavNavmesh* navmesh)
 static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
 {
     // Its start half a meter above the floor, which it snaps down to.
-    mnavLinkDef both = {{5.0, 0.5, 5.0}, {9.0, 0.0, 5.0}, 1.0f, 1.0f, mnav_linkJump, true};
-    mnavLinkDef away = {{5.0, 0.0, 9.0}, {500.0, 0.0, 9.0}, 1.0f, 1.0f, mnav_linkDrop, false};
+    mnavLinkDef both = {{5.0, 0.5, 5.0}, {9.0, 0.0, 5.0}, 1.0f, 1.0f, mnav_linkJump, true, 0.0f};
+    mnavLinkDef away = {{5.0, 0.0, 9.0}, {500.0, 0.0, 9.0}, 1.0f, 1.0f, mnav_linkDrop, false, 0.0f};
     mnavLinkId a;
     mnavLinkId c;
     CHECK(mnavStageLink(navmesh, &both, &a) == mnav_success &&

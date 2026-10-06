@@ -62,6 +62,16 @@ is gone (record 0016).
   changes (a tile in or out, an area); the result equals snapping
   every link, and the commit's cost follows the places changed.
 
+- **Edge links:** a link def's `width`, 0 for a point link, makes an
+  edge link: its start and end are the centers of two edges that wide
+  across its ground direction. It is staged as crossings evenly spaced
+  along the width, no farther apart than the agent's radius, at most
+  64, each in a link slot of its own that counts toward the link limit,
+  snapped, attached and searched as a point link is; the id names the
+  first, removal and toggles reach all, `mnavGetLink` reports the first
+  attached crossing and how many are, and paths name the link. A
+  crossing lies within half a spacing of the best place.
+
 ## Consequences
 
 - A commit costs work proportional to the tiles next to its changes,

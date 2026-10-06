@@ -71,7 +71,7 @@ static void TestOnlyChangedPlacesResnap(void)
         }
         float radius = 0.25f + (float)(l % 12);
         mnavLinkDef def2 = {{p[0], 0.0, p[1]}, {p[2], 0.0, p[3]}, radius, 2.0f,
-                            mnav_linkJump,     (l & 1) != 0};
+                            mnav_linkJump,     (l & 1) != 0,      0.0f};
         CHECK(mnavStageLink(navmesh, &def2, &ids[l]) == mnav_success, "staged");
     }
     bool loaded[4] = {false, false, false, false};

@@ -272,7 +272,7 @@ static void TestLinksBetweenClusters(void)
     mnavHierarchy* hierarchy = Hierarchy(2);
     mnavHierarchyReport before;
     CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &before) == mnav_success, "built");
-    mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, false};
+    mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, false, 0.0f};
     mnavLinkId id;
     CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
           "linked");
@@ -391,7 +391,7 @@ static void TestUpdates(void)
           "only the new change searched");
     printf("updates searched %d and %d of %d\n", first, report.searches, built.searches);
     // A link: built again.
-    mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, true};
+    mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, true, 0.0f};
     mnavLinkId id;
     CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
           "linked");

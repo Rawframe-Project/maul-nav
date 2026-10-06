@@ -31,7 +31,7 @@ static mnavNavmesh* Make(const HandSquare* squares, int32_t count)
 static mnavLinkId AddLink(mnavNavmesh* navmesh, double x0, double x1, float cost, mnavLinkKind kind,
                           bool twoWay)
 {
-    mnavLinkDef def = {{x0, 0.0, 7.5}, {x1, 0.0, 7.5}, 0.5f, cost, kind, twoWay};
+    mnavLinkDef def = {{x0, 0.0, 7.5}, {x1, 0.0, 7.5}, 0.5f, cost, kind, twoWay, 0.0f};
     mnavLinkId id = {0, 0};
     CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
           "link added");
@@ -206,7 +206,8 @@ static void TestLeftOutKindsDoNotWeakenTheSearch(void)
     int32_t without = FewestNodes(navmesh, &walker, 6.0, 6.0, 24.0, 24.0);
     mnavDestroyNavmesh(navmesh);
     navmesh = Make(grid, 16);
-    mnavLinkDef def = {{24.0, 0.0, 6.0}, {6.0, 0.0, 24.0}, 0.5f, 0.01f, mnav_linkTeleport, false};
+    mnavLinkDef def = {
+        {24.0, 0.0, 6.0}, {6.0, 0.0, 24.0}, 0.5f, 0.01f, mnav_linkTeleport, false, 0.0f};
     mnavLinkId id;
     CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
           "teleport added");
