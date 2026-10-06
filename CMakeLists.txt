@@ -144,6 +144,7 @@ if(MAUL_NAV_BUILD_TESTS)
     # Bakes and queries on several threads; Emscripten builds have none.
     if(NOT EMSCRIPTEN)
         maul_add_test(workers POSIX)
+        maul_add_test(shared_reads POSIX)
     endif()
     maul_add_test(edge_links)
     maul_add_test(scenarios)
