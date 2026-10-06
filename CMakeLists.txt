@@ -139,6 +139,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(debug)
     maul_add_test(navflow)
     maul_add_test(alloc_failures)
+    maul_add_test(rings)
     # Bakes and queries on several threads; Emscripten builds have none.
     if(NOT EMSCRIPTEN)
         maul_add_test(workers POSIX)

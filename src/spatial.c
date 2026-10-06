@@ -530,6 +530,13 @@ static int32_t ClipToCircle(const mnavPos3* corners, int32_t count, mnavPos3 cen
         mnavPos3 p = {center.x + radius * s_ring[e][0], 0.0, center.z + radius * s_ring[e][1]};
         mnavPos3 q = {center.x + radius * s_ring[(e + 1) % 32][0], 0.0,
                       center.z + radius * s_ring[(e + 1) % 32][1]};
+        // A circle too small for its corners to differ at the center's
+        // place, as one of no radius is, holds no area: an edge of one
+        // point would keep every corner.
+        if (p.x == q.x && p.z == q.z)
+        {
+            return 0;
+        }
         // The 32-gon turns counterclockwise in X and Z; flipped to the
         // polygon's way when it turns the other.
         if (sign < 0.0)

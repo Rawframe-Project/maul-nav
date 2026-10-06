@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+### Fixed
+
+- `mnavFindRandomPointAround` with a radius of 0, or one too small to
+  tell its corners apart at the center's place, returned a point
+  anywhere on the polygons it reached instead of the center: a circle
+  of one point clipped nothing away.
+
 ## [0.1.0] - 2026-10-06
 
 The first release: navmesh generation in 3D and 2D, the navmesh format
