@@ -8,6 +8,12 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- Avoidance finds neighbours through a table of grid cells half the
+  neighbour range wide, ring by ring from each agent's cell: a quarter
+  fewer instructions on a doorway of 1000 agents, the same velocities.
+
 ## [0.2.1] - 2026-10-06
 
 A path fault turned up by fuzzing, fixed; the fuzz targets now cover

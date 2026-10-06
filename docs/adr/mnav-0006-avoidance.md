@@ -24,10 +24,17 @@ symmetry face to face.
   priority, the host's id) and a step, and writes each agent's new
   velocity: the 2D linear program over its ORCA lines, the 3D one when
   they leave nothing. Lines count as parallel within 1e-9.
-- **Order:** neighbours come from a grid of cells as wide as the
-  neighbour range, sorted by cell, then id; each agent keeps the
-  nearest by distance, then id, at most `limits.neighbors`. The same
-  agents in any order give the same velocities, bit for bit.
+- **Order:** neighbours come from a grid of cells half the neighbour
+  range wide, sorted by cell, then id, each occupied cell found through
+  a hash table built once a step; an agent searches the rings of cells
+  round its own, nearest first, and stops at a ring that cannot hold a
+  neighbour nearer than the worst it keeps. It keeps the nearest by
+  distance, then id, at most `limits.neighbors`, the same set a search
+  of every cell in range finds. The same agents in any order give the
+  same velocities, bit for bit. (The first grid had cells the whole
+  range wide and found cells by binary search; the doorway benchmark of
+  1000 agents took 26.3 billion instructions with it and 19.7 billion
+  with this, the velocities unchanged.)
 - **Priority:** an agent takes the other's priority over the sum of
   both of each avoidance; equal priorities are plain ORCA.
 - **Symmetry:** an agent held back from its preferred velocity aims 1%
