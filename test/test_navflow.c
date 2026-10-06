@@ -6,6 +6,7 @@
 // plus the walk between their places, links are taken one way, and the
 // checks; the field pinned.
 
+#include "counting_allocator.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -219,6 +220,30 @@ static void TestLinks(mnavNavFlow* field, mnavNavmesh* navmesh)
     CHECK(mnavBuildNavFlow(field, navmesh, &filter, &goal, 1) == mnav_success &&
               mnavNavFlowAt(field, navmesh, far.polygon, &f) == mnav_success && f.link.slot == 0,
           "a kind barred");
+    // A two-way link beside it: 3 ends attached, which a field of 1 link
+    // cannot index and one of 2 can.
+    const mnavLinkDef jump = {{40, 0, 40}, {44, 0, 40}, 1.0f, 1.0f, mnav_linkJump, true, 0.0f};
+    mnavLinkId both;
+    CHECK(mnavStageLink(navmesh, &jump, &both) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "a two-way link");
+    mnavNavFlowDef fewDef = mnavDefaultNavFlowDef();
+    fewDef.limits.links = 1;
+    mnavNavFlow* few = nullptr;
+    CHECK(mnavCreateNavFlow(&fewDef, &few) == mnav_success &&
+              mnavBuildNavFlow(few, navmesh, nullptr, &goal, 1) == mnav_errorLimit,
+          "past the link limit");
+    mnavDestroyNavFlow(few);
+    // Within it, and with every byte taken when the field was made.
+    fewDef.limits.links = 2;
+    fewDef.allocator = CountingAllocator();
+    CHECK(mnavCreateNavFlow(&fewDef, &few) == mnav_success, "made");
+    size_t held = s_held;
+    CHECK(mnavBuildNavFlow(few, navmesh, nullptr, &goal, 1) == mnav_success && s_held == held,
+          "within it, a build allocating nothing");
+    mnavDestroyNavFlow(few);
+    CHECK(s_held == 0, "every byte given back");
+    CHECK(mnavStageLinkRemoval(navmesh, both) == mnav_success, "removed");
     // A commit makes the field stale.
     CHECK(mnavStageLinkRemoval(navmesh, link) == mnav_success &&
               mnavCommit(navmesh) == mnav_success &&
@@ -366,7 +391,7 @@ static void TestStepsAndRegions(mnavNavFlow* field)
     }
     CHECK(mnavCommit(part) == mnav_success, "committed");
     mnavNavFlowDef small = mnavDefaultNavFlowDef();
-    small.polygons = 40;
+    small.limits.polygons = 40;
     mnavNavFlow* alone = nullptr;
     const mnavNavFlowGoal partGoal = Goal(part, 10, 18);
     const mnavNavFlowGoal near[2] = {Goal(navmesh, 10, 18), goals[1]};
@@ -399,6 +424,79 @@ static void TestStepsAndRegions(mnavNavFlow* field)
     mnavDestroyNavFlow(regional);
     mnavDestroyNavFlow(alone);
     mnavDestroyNavmesh(part);
+    mnavDestroyNavmesh(navmesh);
+}
+
+static mnavDebugVertex s_vertices3[8192];
+static uint32_t s_lines[8192];
+
+// The arrows over the 8 m tiles: one for each polygon with a way on, its
+// head at that polygon's portal midpoint.
+static void TestDebug(mnavNavFlow* field)
+{
+    mnavNavmesh* navmesh = LoadSmall();
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_vertices3, 8192, 0, nullptr, 0, 0, s_lines, 8192, 0};
+    CHECK(mnavDebugNavFlow(field, navmesh, &b) == mnav_errorStale && b.lineCount == 0,
+          "a field of another navmesh");
+    const mnavNavFlowGoal goals[2] = {Goal(navmesh, 18, 30), Goal(navmesh, 60, 6)};
+    CHECK(mnavBeginNavFlow(field, navmesh, nullptr, nullptr, goals, 2) == mnav_success &&
+              mnavDebugNavFlow(field, navmesh, &b) == mnav_errorStale,
+          "work not ended");
+    CHECK(mnavBuildNavFlow(field, navmesh, nullptr, goals, 2) == mnav_success &&
+              mnavDebugNavFlow(field, navmesh, &b) == mnav_success,
+          "drawn");
+    static mnavPolygonId ids[4096];
+    int32_t count = Polygons(navmesh, ids, 4096);
+    int32_t ways = 0;
+    int32_t matched = 0;
+    for (int32_t i = 0; i < count; ++i)
+    {
+        mnavPolygonFlow f;
+        CHECK(mnavNavFlowAt(field, navmesh, ids[i], &f) == mnav_success, "read");
+        if (f.next.slot == 0)
+        {
+            continue;
+        }
+        ways += 1;
+        mnavPos3 m = Middle(&f);
+        for (int32_t a = 0; a < b.lineCount / 6; ++a)
+        {
+            const mnavDebugVertex* head = &b.vertices[b.lines[6 * a + 1]];
+            matched += fabs((double)head->x - m.x) < 1e-4 && fabs((double)head->y - m.y) < 1e-4 &&
+                               fabs((double)head->z - m.z) < 1e-4 && head->kind == mnav_debugFlow
+                           ? 1
+                           : 0;
+        }
+    }
+    printf("navflow debug: %d ways, %d lines\n", ways, b.lineCount / 2);
+    CHECK(ways > 100 && b.lineCount == 6 * ways && matched >= ways,
+          "an arrow of three lines for each way, heads at the portals");
+    // Too small a buffer: counted past full (two indices a line).
+    mnavDebugBuffer small = {{0.0, 0.0, 0.0}, s_vertices3, 4, 0, nullptr, 0, 0, s_lines, 4, 0};
+    CHECK(mnavDebugNavFlow(field, navmesh, &small) == mnav_errorCapacity &&
+              small.lineCount == 6 * ways,
+          "counted past full");
+    CHECK(mnavDebugNavFlow(nullptr, navmesh, &b) == mnav_errorInvalid &&
+              mnavDebugNavFlow(field, nullptr, &b) == mnav_errorInvalid &&
+              mnavDebugNavFlow(field, navmesh, nullptr) == mnav_errorInvalid,
+          "bad arguments");
+    const mnavLinkDef jump = {{5, 0, 5}, {9, 0, 5}, 1.0f, 1.0f, mnav_linkJump, false, 0.0f};
+    mnavLinkId link;
+    b.lineCount = 0;
+    b.vertexCount = 0;
+    CHECK(mnavStageLink(navmesh, &jump, &link) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success &&
+              mnavDebugNavFlow(field, navmesh, &b) == mnav_errorStale,
+          "stale after a commit");
+    mnavDestroyNavmesh(navmesh);
+    // Nothing begun: nothing drawn.
+    mnavNavFlowDef def = mnavDefaultNavFlowDef();
+    mnavNavFlow* fresh = nullptr;
+    navmesh = LoadSmall();
+    CHECK(mnavCreateNavFlow(&def, &fresh) == mnav_success &&
+              mnavDebugNavFlow(fresh, navmesh, &b) == mnav_success && b.lineCount == 0,
+          "nothing begun");
+    mnavDestroyNavFlow(fresh);
     mnavDestroyNavmesh(navmesh);
 }
 
@@ -438,14 +536,36 @@ static void TestChecks(mnavNavFlow* field, const mnavNavmesh* navmesh)
           "a goal left out");
     // Too few polygons for the navmesh.
     mnavNavFlowDef def = mnavDefaultNavFlowDef();
-    def.polygons = 4;
+    def.limits.polygons = 4;
     mnavNavFlow* small = nullptr;
     CHECK(mnavCreateNavFlow(&def, &small) == mnav_success &&
               mnavBuildNavFlow(small, navmesh, nullptr, &goal, 1) == mnav_errorLimit,
           "past the polygon limit");
     mnavDestroyNavFlow(small);
-    def.polygons = 0;
-    CHECK(mnavCreateNavFlow(&def, &small) == mnav_errorRange && small == nullptr, "no polygons");
+    // The navmesh's 4 slots: 3 are too few.
+    def = mnavDefaultNavFlowDef();
+    def.limits.tiles = 3;
+    CHECK(mnavCreateNavFlow(&def, &small) == mnav_success &&
+              mnavBuildNavFlow(small, navmesh, nullptr, &goal, 1) == mnav_errorLimit,
+          "past the tile limit");
+    mnavDestroyNavFlow(small);
+    def.limits.tiles = 4;
+    CHECK(mnavCreateNavFlow(&def, &small) == mnav_success &&
+              mnavBuildNavFlow(small, navmesh, nullptr, &goal, 1) == mnav_success,
+          "within it");
+    mnavDestroyNavFlow(small);
+    const mnavNavFlowLimits outOfRange[6] = {{0, 1, 1}, {MNAV_MAX_NAVFLOW_POLYGONS + 1, 1, 1},
+                                             {1, 0, 1}, {1, MNAV_MAX_NAVFLOW_TILES + 1, 1},
+                                             {1, 1, 0}, {1, 1, MNAV_MAX_NAVFLOW_LINKS + 1}};
+    bool refused = true;
+    for (int32_t i = 0; i < 6; ++i)
+    {
+        def.limits = outOfRange[i];
+        refused = refused && mnavCreateNavFlow(&def, &small) == mnav_errorRange && small == nullptr;
+    }
+    def.limits = (mnavNavFlowLimits){1, 1, 1};
+    CHECK(refused && mnavCreateNavFlow(&def, &small) == mnav_success, "every limit's range");
+    mnavDestroyNavFlow(small);
     def = mnavDefaultNavFlowDef();
     def.cookie = 0;
     CHECK(mnavCreateNavFlow(&def, &small) == mnav_errorInvalid, "not a def");
@@ -466,6 +586,7 @@ int main(void)
     TestLinks(field, navmesh);
     TestAreas(field);
     TestStepsAndRegions(field);
+    TestDebug(field);
     mnavDestroyNavFlow(field);
     mnavDestroyNavmesh(navmesh);
     return s_failures == 0 ? 0 : 1;

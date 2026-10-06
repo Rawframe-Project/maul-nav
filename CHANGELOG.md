@@ -250,3 +250,6 @@ format.
   mnavNavFlowRegion, mnavBeginNavFlow and mnavContinueNavFlow.
 - Bake reports give each stage's time and memory peak: mnavClock in the
   bake def, stageTicks and stageMemory in mnavBakeReport.
+- Navmesh flow fields take their memory when made, for named limits of
+  polygons, tile slots and links (mnavNavFlowLimits; the def's polygons
+  field moves into it), and draw their arrows (mnavDebugNavFlow).

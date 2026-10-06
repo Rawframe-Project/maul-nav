@@ -10,6 +10,7 @@
 #define MAUL_NAV_NAVFLOW_H
 
 #include "maul-nav/base.h"
+#include "maul-nav/draw.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
@@ -21,8 +22,24 @@ extern "C"
 {
 #endif
 
-// The most polygons a navmesh flow field may hold.
+// The most polygons, tile slots and off-mesh links a navmesh flow field
+// may hold.
 #define MNAV_MAX_NAVFLOW_POLYGONS 16777216
+#define MNAV_MAX_NAVFLOW_TILES    1048576
+#define MNAV_MAX_NAVFLOW_LINKS    1048576
+
+    // What a navmesh flow field may hold; its memory is taken for them all
+    // when it is made, and a build needs no more.
+    typedef struct mnavNavFlowLimits
+    {
+        // Polygons in the tiles searched, 1 to MNAV_MAX_NAVFLOW_POLYGONS.
+        int32_t polygons;
+        // Tile slots of the navmesh, 1 to MNAV_MAX_NAVFLOW_TILES.
+        int32_t tiles;
+        // Off-mesh links of the navmesh, counted as its links limit counts
+        // them (by crossings), 1 to MNAV_MAX_NAVFLOW_LINKS.
+        int32_t links;
+    } mnavNavFlowLimits;
 
     // How a navmesh flow field is made. Build it with
     // mnavDefaultNavFlowDef.
@@ -31,9 +48,7 @@ extern "C"
         uint32_t cookie;
         // The allocator the field uses; zeroed for the C library's.
         mnavAllocator allocator;
-        // The most polygons the navmesh may hold, 1 to
-        // MNAV_MAX_NAVFLOW_POLYGONS.
-        int32_t polygons;
+        mnavNavFlowLimits limits;
     } mnavNavFlowDef;
 
     // A navmesh flow field: the memory for its polygons, and the field last
@@ -65,20 +80,21 @@ extern "C"
         mnavLinkId link;
     } mnavPolygonFlow;
 
-    /// Returns the default navmesh flow field def: up to 65536 polygons.
+    /// Returns the default navmesh flow field def: up to 65,536 polygons,
+    /// 4,096 tile slots and 4,096 off-mesh links.
     ///
     /// @return The def.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_API mnavNavFlowDef mnavDefaultNavFlowDef(void);
 
-    /// Makes a navmesh flow field with the memory its polygon limit needs.
+    /// Makes a navmesh flow field with the memory its limits need.
     ///
     /// @param def      The def, from mnavDefaultNavFlowDef.
     /// @param fieldOut Receives the field, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
-    /// def not from mnavDefaultNavFlowDef; `mnav_errorRange` for a polygon
-    /// limit out of its range; `mnav_errorCapacity` when the allocator
+    /// def not from mnavDefaultNavFlowDef; `mnav_errorRange` for a limit
+    /// out of its range; `mnav_errorCapacity` when the allocator
     /// fails.
     /// @par Thread safety
     /// Safe from any thread.
@@ -164,9 +180,10 @@ extern "C"
     /// not finite, or a filter not built from mnavDefaultQueryFilter;
     /// `mnav_errorRange` for a filter cost out of its range;
     /// `mnav_errorStale` for a goal polygon whose tile was replaced or
-    /// removed; `mnav_errorLimit` for a navmesh of more polygons than the
-    /// field's limit; `mnav_errorCapacity` when the allocator fails. On an
-    /// error the field holds nothing.
+    /// removed; `mnav_errorLimit` for a navmesh of more polygons (in the
+    /// tiles searched), tile slots or off-mesh links than the field's
+    /// limits. A build allocates nothing. On an error the field holds
+    /// nothing.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh at
     /// once while no commit runs on it; the field is used by one thread at
@@ -195,6 +212,29 @@ extern "C"
                                                      const mnavNavmesh* navmesh,
                                                      mnavPolygonId polygon,
                                                      mnavPolygonFlow* flowOut);
+
+    /// Appends an arrow for each polygon of the field that has a way on
+    /// (mnav_debugFlow): from the mean of the polygon's corners to the
+    /// midpoint of its portal, or to the takeoff point where the way leaves
+    /// by an off-mesh link, with two barbs a quarter of its length (at most
+    /// half a meter) on the ground plane.
+    ///
+    /// @param field   The field.
+    /// @param navmesh The navmesh the field was built on.
+    /// @param buffer  The buffer appended to.
+    /// @return `mnav_success`, appending nothing when nothing was begun;
+    /// `mnav_errorInvalid` for a NULL argument or a buffer with a count out
+    /// of range, an array missing or an origin not finite;
+    /// `mnav_errorStale` for another navmesh, one committed to since the
+    /// work began, or work not yet ended; `mnav_errorCapacity` when the
+    /// buffer filled, its counts saying what the whole needs.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read a field at once
+    /// while no build runs on it; the buffer is used by one thread at a
+    /// time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavDebugNavFlow(const mnavNavFlow* field,
+                                                        const mnavNavmesh* navmesh,
+                                                        mnavDebugBuffer* buffer);
 
 #ifdef __cplusplus
 }

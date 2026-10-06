@@ -737,7 +737,7 @@ static void NavFlow(const mnavNavmesh* navmesh, float side)
 {
     mnavNavFlowDef def = mnavDefaultNavFlowDef();
     def.allocator = (mnavAllocator){Alloc, Free, NULL};
-    def.polygons = 1 << 20;
+    def.limits.polygons = 1 << 20;
     mnavNavFlow* field = NULL;
     Check(mnavCreateNavFlow(&def, &field), "navmesh flow field");
     mnavNearest goal;

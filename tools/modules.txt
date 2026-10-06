@@ -47,7 +47,7 @@ spatial: navmesh nearest query query_filter
 linkgen: navmesh path query query_filter
 flow: allocator draw query_filter
 flow_repair: flow
-navflow: allocator navmesh offmesh query_filter sort
+navflow: allocator draw navmesh offmesh query_filter sort
 hierarchy: allocator navmesh offmesh path query query_filter sort
 hierarchy_path: hierarchy navmesh path query
 # Avoidance (mnav-0006) uses the base alone, never a navmesh module.

@@ -10,9 +10,13 @@ polygon's way to the goals from one search.
 
 ## Decision
 
-- **Owner object:** `mnavNavFlow` holds memory for up to `polygons`
-  polygons; it numbers a navmesh's polygons slot by slot at each build
-  and sorts the off-mesh links by the polygon they land on.
+- **Owner object:** `mnavNavFlow` takes its memory when it is made, for
+  the named limits of its def: polygons in the tiles searched, the
+  navmesh's tile slots, and its off-mesh links (two ends each). A build
+  allocates nothing and refuses a navmesh past a limit with
+  `mnav_errorLimit`, as hierarchies refuse one. It numbers the polygons
+  slot by slot at each build and sorts the off-mesh links by the
+  polygon they land on.
 - **Search:** Dijkstra's search backward from goal points on
   polygons, the path search's pricing reversed: a polygon stands at the
   midpoint of the portal it is left by toward the goals, a goal polygon
@@ -24,6 +28,10 @@ polygon's way to the goals from one search.
 - **Reads:** `mnavNavFlowAt` gives a polygon's cost, next polygon, the
   portal's ends and the link taken; after a later commit the field is
   stale.
+
+- **Debug output:** `mnavDebugNavFlow` draws an arrow for each polygon
+  with a way on, from the mean of its corners to its portal's midpoint
+  (the takeoff point for a link), as grid fields draw theirs.
 
 ## Consequences
 

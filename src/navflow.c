@@ -11,6 +11,7 @@
 #include "maul-nav/navflow.h"
 
 #include "allocator.h"
+#include "draw.h"
 #include "navmesh.h"
 #include "offmesh.h"
 #include "query_filter.h"
@@ -53,14 +54,13 @@ struct mnavNavFlow
     int32_t* places;
     int32_t* heap;
     int32_t heapCount;
-    // Each slot's first polygon number, slotCount + 1 of them.
+    // Each slot's first polygon number, tiles + 1 of them.
     int32_t* firsts;
-    int32_t firstCapacity;
     // The attachments by landing polygon: its number above 32 bits, the
-    // attachment's index below.
+    // attachment's index below; 2 per link, and as many again for the
+    // sort's scratch.
     uint64_t* landings;
     int32_t landingCount;
-    int32_t landingCapacity;
     // The navmesh built on and its commits then; NULL with nothing built.
     const mnavNavmesh* navmesh;
     uint64_t commits;
@@ -73,7 +73,20 @@ struct mnavNavFlow
 
 mnavNavFlowDef mnavDefaultNavFlowDef(void)
 {
-    return (mnavNavFlowDef){NAVFLOW_DEF_COOKIE, {0}, 65536};
+    return (mnavNavFlowDef){NAVFLOW_DEF_COOKIE, {0}, {65536, 4096, 4096}};
+}
+
+static bool GoodLimits(const mnavNavFlowLimits* l)
+{
+    return l->polygons >= 1 && l->polygons <= MNAV_MAX_NAVFLOW_POLYGONS && l->tiles >= 1 &&
+           l->tiles <= MNAV_MAX_NAVFLOW_TILES && l->links >= 1 &&
+           l->links <= MNAV_MAX_NAVFLOW_LINKS;
+}
+
+// The landing array's length: two attachments a link, and scratch.
+static size_t Landings(const mnavNavFlowLimits* l)
+{
+    return 4 * (size_t)l->links;
 }
 
 mnavResult mnavCreateNavFlow(const mnavNavFlowDef* def, mnavNavFlow** fieldOut)
@@ -88,7 +101,7 @@ mnavResult mnavCreateNavFlow(const mnavNavFlowDef* def, mnavNavFlow** fieldOut)
     {
         return mnav_errorInvalid;
     }
-    if (def->polygons < 1 || def->polygons > MNAV_MAX_NAVFLOW_POLYGONS)
+    if (!GoodLimits(&def->limits))
     {
         return mnav_errorRange;
     }
@@ -103,7 +116,7 @@ mnavResult mnavCreateNavFlow(const mnavNavFlowDef* def, mnavNavFlow** fieldOut)
     *f = (mnavNavFlow){0};
     f->memory = memory;
     f->def = *def;
-    size_t n = (size_t)def->polygons;
+    size_t n = (size_t)def->limits.polygons;
     result = mnavAllocate(&f->memory, n, sizeof(Way), alignof(Way), (void**)&f->ways);
     if (result == mnav_success)
     {
@@ -112,6 +125,16 @@ mnavResult mnavCreateNavFlow(const mnavNavFlowDef* def, mnavNavFlow** fieldOut)
     if (result == mnav_success)
     {
         result = mnavAllocate(&f->memory, n, sizeof(int32_t), alignof(int32_t), (void**)&f->heap);
+    }
+    if (result == mnav_success)
+    {
+        result = mnavAllocate(&f->memory, (size_t)def->limits.tiles + 1, sizeof(int32_t),
+                              alignof(int32_t), (void**)&f->firsts);
+    }
+    if (result == mnav_success)
+    {
+        result = mnavAllocate(&f->memory, Landings(&def->limits), sizeof(uint64_t),
+                              alignof(uint64_t), (void**)&f->landings);
     }
     if (result != mnav_success)
     {
@@ -129,13 +152,13 @@ void mnavDestroyNavFlow(mnavNavFlow* field)
         return;
     }
     mnavMemory memory = field->memory;
-    size_t n = (size_t)field->def.polygons;
+    size_t n = (size_t)field->def.limits.polygons;
     mnavRelease(&memory, field->ways, n, sizeof(Way), alignof(Way));
     mnavRelease(&memory, field->places, n, sizeof(int32_t), alignof(int32_t));
     mnavRelease(&memory, field->heap, n, sizeof(int32_t), alignof(int32_t));
-    mnavRelease(&memory, field->firsts, (size_t)field->firstCapacity, sizeof(int32_t),
+    mnavRelease(&memory, field->firsts, (size_t)field->def.limits.tiles + 1, sizeof(int32_t),
                 alignof(int32_t));
-    mnavRelease(&memory, field->landings, (size_t)field->landingCapacity, sizeof(uint64_t),
+    mnavRelease(&memory, field->landings, Landings(&field->def.limits), sizeof(uint64_t),
                 alignof(uint64_t));
     mnavRelease(&memory, field, 1, sizeof(mnavNavFlow), alignof(mnavNavFlow));
 }
@@ -375,31 +398,28 @@ static void ExpandLinks(mnavNavFlow* f, int32_t q, double areaCost)
 // polygon they land on.
 static mnavResult Index(mnavNavFlow* f, const mnavNavmesh* navmesh)
 {
-    mnavResult result = mnavReserve(&f->memory, (void**)&f->firsts, &f->firstCapacity, 0,
-                                    navmesh->slotCount + 1, sizeof(int32_t), alignof(int32_t));
+    // Two attachments a link at most: its two ends when two-way.
+    int32_t count = navmesh->attachmentCount;
+    mnavResult result = navmesh->slotCount > f->def.limits.tiles ||
+                                (int64_t)count > 2 * (int64_t)f->def.limits.links
+                            ? mnav_errorLimit
+                            : mnav_success;
     int64_t total = 0;
     for (int32_t s = 0; result == mnav_success && s < navmesh->slotCount; ++s)
     {
         f->firsts[s] = (int32_t)total;
         total += InRegion(f, navmesh, s) ? navmesh->slots[s].tile->mesh.polygonCount : 0;
-        if (total > f->def.polygons)
+        if (total > f->def.limits.polygons)
         {
             result = mnav_errorLimit;
         }
-    }
-    // Twice the attachments: the second half is the sort's scratch.
-    int32_t count = navmesh->attachmentCount;
-    if (result == mnav_success)
-    {
-        f->firsts[navmesh->slotCount] = (int32_t)total;
-        f->polygonCount = (int32_t)total;
-        result = mnavReserve(&f->memory, (void**)&f->landings, &f->landingCapacity, 0, 2 * count,
-                             sizeof(uint64_t), alignof(uint64_t));
     }
     if (result != mnav_success)
     {
         return result;
     }
+    f->firsts[navmesh->slotCount] = (int32_t)total;
+    f->polygonCount = (int32_t)total;
     // Only links landing in the region.
     int32_t kept = 0;
     for (int32_t i = 0; i < count; ++i)
@@ -562,4 +582,78 @@ mnavResult mnavNavFlowAt(const mnavNavFlow* field, const mnavNavmesh* navmesh,
         flowOut->link = (mnavLinkId){(uint32_t)parent + 1, navmesh->links[parent].generation};
     }
     return mnav_success;
+}
+
+// Appends an arrow from tail to head with two barbs on the ground plane.
+static void Arrow(mnavDebugBuffer* buffer, mnavPos3 tail, mnavPos3 head)
+{
+    double dx = head.x - tail.x;
+    double dz = head.z - tail.z;
+    double ground = sqrt(dx * dx + dz * dz);
+    mnavDrawLine(buffer, tail, head, mnav_debugFlow, 0);
+    if (ground == 0.0)
+    {
+        return;
+    }
+    double barb = 0.25 * Distance(tail, head);
+    barb = barb < 0.5 ? barb : 0.5;
+    double ux = dx / ground * barb;
+    double uz = dz / ground * barb;
+    // Back from the head, an eighth turned either way.
+    mnavDrawLine(buffer, head, (mnavPos3){head.x - ux + uz, head.y, head.z - uz - ux},
+                 mnav_debugFlow, 0);
+    mnavDrawLine(buffer, head, (mnavPos3){head.x - ux - uz, head.y, head.z - uz + ux},
+                 mnav_debugFlow, 0);
+}
+
+// The mean of a polygon's corners.
+static mnavPos3 Center(const mnavFrame* frame, const mnavPolyMesh* mesh, const mnavPolygon* poly)
+{
+    mnavPos3 sum = {0.0, 0.0, 0.0};
+    for (int32_t k = 0; k < poly->count; ++k)
+    {
+        mnavPos3 v = mnavVertexWorld(frame, &mesh->vertices[poly->vertices[k]]);
+        sum = (mnavPos3){sum.x + v.x, sum.y + v.y, sum.z + v.z};
+    }
+    double n = poly->count > 0 ? (double)poly->count : 1.0;
+    return (mnavPos3){sum.x / n, sum.y / n, sum.z / n};
+}
+
+mnavResult mnavDebugNavFlow(const mnavNavFlow* field, const mnavNavmesh* navmesh,
+                            mnavDebugBuffer* buffer)
+{
+    if (field == nullptr || navmesh == nullptr || !mnavGoodBuffer(buffer))
+    {
+        return mnav_errorInvalid;
+    }
+    if (field->navmesh == nullptr)
+    {
+        return mnav_success;
+    }
+    if (navmesh != field->navmesh || navmesh->commits != field->commits || !field->ended)
+    {
+        return mnav_errorStale;
+    }
+    for (int32_t s = 0; s < navmesh->slotCount; ++s)
+    {
+        if (!InRegion(field, navmesh, s))
+        {
+            continue;
+        }
+        const mnavSlot* slot = &navmesh->slots[s];
+        const mnavPolyMesh* mesh = &slot->tile->mesh;
+        mnavFrame frame = mnavFrameOf(navmesh, slot->x, slot->z);
+        for (int32_t p = 0; p < mesh->polygonCount; ++p)
+        {
+            const Way* way = &field->ways[field->firsts[s] + p];
+            if (way->next < 0)
+            {
+                continue;
+            }
+            mnavPos3 head = {(way->left.x + way->right.x) * 0.5, (way->left.y + way->right.y) * 0.5,
+                             (way->left.z + way->right.z) * 0.5};
+            Arrow(buffer, Center(&frame, mesh, &mesh->polygons[p]), head);
+        }
+    }
+    return mnavDrawResult(buffer);
 }
