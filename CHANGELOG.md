@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- The filter's area test is inline, as every search step asks it:
+  building the benchmark's 512 by 512 grid flow field takes 21% fewer
+  instructions and about 19% less time, and the whole benchmark 905 M
+  fewer instructions, every result the same.
+
 ## [0.4.1] - 2026-10-07
 
 Faster nearest queries and path searches, and a sample of a world baked
