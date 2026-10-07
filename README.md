@@ -66,7 +66,7 @@ ctest --test-dir build
 ```
 
 The suite is checked against hand-picked mutants: `tools/mutants.txt`
-lists 231 one-line changes to the library, each of which a test kills
+lists 234 one-line changes to the library, each of which a test kills
 or which was judged equivalent when it was written. To run them, on a
 clean tree (hours; not part of CI):
 

@@ -207,7 +207,7 @@ ti-all-x1 | src/tile_index.c | all.x1 = r.x1 > all.x1 ? r.x1 : all.x1; | all.x1 
 ti-all-z0 | src/tile_index.c | all.z0 = r.z0 < all.z0 ? r.z0 : all.z0; | all.z0 = r.z0 > all.z0 ? r.z0 : all.z0;
 ti-entries-one | src/tile_index.c | entries += (r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1); | entries += (r.x1 - r.x0 + 1) * (r.z1 - r.z0);
 ti-entries-limit | src/tile_index.c | if (entries > INT32_MAX) | if (entries > 1000)
-ti-rows | src/tile_index.c | index->rows = (int32_t)(all.z1 - all.z0 + 1); | index->rows = (int32_t)(all.z1 - all.z0);
+ti-rows | src/tile_index.c | int64_t rows = all.z1 - all.z0 + 1; | int64_t rows = all.z1 - all.z0;
 ti-fill-z-end | src/tile_index.c | for (int64_t z = r.z0; z <= r.z1; ++z) | for (int64_t z = r.z0; z < r.z1; ++z)
 ti-k-rows | src/tile_index.c | int64_t k = (x - index->minX) + (z - index->minZ) * index->columns; | int64_t k = (x - index->minX) + (z - index->minZ) * index->rows;
 ti-count-k | src/tile_index.c | index->first[k + 1] += 1; | index->first[k] += 1;
@@ -282,3 +282,13 @@ run-scan-last | src/avoidance.c | for (int32_t k = run.first; k < run.end; ++k) 
 run-scan-past | src/avoidance.c | for (int32_t k = run.first; k < run.end; ++k) | for (int32_t k = run.first; k <= run.end && k < run.end + 1 && k < a->def.limits.agents; ++k)
 run-probe-stop | src/avoidance.c | for (Run run = a->table[slot]; run.first >= 0; run = a->table[slot]) | for (Run run = a->table[slot]; run.first > 0; run = a->table[slot])
 run-place-over | src/avoidance.c | while (a->table[slot].first >= 0) | while (a->table[slot].first > 0)
+
+# The tile index's grid check (23cce64). ti-grid-none and ti-grid-rows
+# are killed by test_tile_index only in a sanitizer build
+# (-DMAUL_NAV_SANITIZE=ON, as the linux-clang-20-asan job): without it
+# the overflowed count meets the memory limit and is refused alike.
+# ti-grid-bound is equivalent: columns times rows cannot equal 2^31 - 1,
+# a prime, as no side reaches it.
+ti-grid-bound | src/tile_index.c | if (columns * rows >= INT32_MAX) | if (columns * rows > INT32_MAX)
+ti-grid-none | src/tile_index.c | if (columns * rows >= INT32_MAX) | if (columns * rows >= INT64_MAX)
+ti-grid-rows | src/tile_index.c | if (columns * rows >= INT32_MAX) | if (columns >= INT32_MAX)
