@@ -22,7 +22,7 @@
 
 // The hash of a tile baked with every kind of volume, the same on every
 // platform.
-#define VOLUME_HASH 0x07c503ee7837f46bull
+#define VOLUME_HASH 0x942c9e7b2dcb8239ull
 
 enum
 {

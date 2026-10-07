@@ -8,6 +8,10 @@ format.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-07
+
+Tile indexes for bakes from large meshes, and a faster tile test.
+
 ### Added
 
 - Tile indexes (mnav-0014): `mnavCreateTileIndex` lists, once, the
@@ -23,7 +27,6 @@ format.
   positionally gives it `NULL` (compilers warn of the missing field
   under `-Wextra`); zero-initialized and designated initializers need
   no change.
-
 - Baking tests whether a triangle reaches the tile before its slope, and
   rejects triangles a cell or more outside the tile without dividing:
   11.8% fewer instructions in a Release build baking the benchmark's
