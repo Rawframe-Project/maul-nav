@@ -8,6 +8,10 @@ format.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-07
+
+Hierarchy updates after area changes do a third of the work.
+
 ### Changed
 
 - `mnavUpdateHierarchy` searches again the cluster before a changed
