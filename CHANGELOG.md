@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+### Documentation
+
+- The README names the tile index; the guide covers checking a def and
+  input before a bake, removing links, reading a link's state, the tile
+  at a place, a polygon's area and the tier back, and the linked
+  version.
+
 ## [0.4.3] - 2026-10-07
 
 A faster neighbour search for crowds.

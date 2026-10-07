@@ -68,6 +68,11 @@ them as they are written.
   Input is checked as hostile: NaNs, indices out of range and
   overflowing values are refused with the first element named in the
   report.
+- **Checking first.** A tool can check a def or its input without
+  baking, at import time for instance: `mnavValidateBakeDef` names a
+  bad setting and gives the def's settings in cells,
+  `mnavValidateTriangleMesh` and `mnavValidateOutline` name the first
+  bad vertex, triangle or point with the checks a bake makes.
 - **Large meshes.** A bake tests every triangle of its input against
   its tile. When many tiles bake from meshes much larger than a tile,
   make a tile index of the meshes once (`mnavCreateTileIndex`) and pass
@@ -114,12 +119,17 @@ mnavResult committed = mnavCommit(navmesh);
   it as a wall.
 - **Off-mesh links.** `mnavStageLink` adds a jump, drop, climb, ladder,
   door, teleport or host-declared kind, point to point or edge to edge
-  (`width`), one way or two, with a cost. Links snap to the polygons at
-  their ends at each commit. `mnavGenerateLinks` proposes drops and
+  (`width`), one way or two, with a cost, and `mnavStageLinkRemoval`
+  takes one away. Links snap to the polygons at their ends at each
+  commit; `mnavGetLink` tells whether a link is attached and enabled,
+  and where its ends snapped. `mnavGenerateLinks` proposes drops and
   jumps along a range of tiles, with your clearance test if you give
   one.
 - **Ids.** Polygons, tiles and links are named by ids with generations;
   an id of a replaced tile reads as `mnav_errorStale`.
+- **Reading back.** `mnavGetTile` finds the tile loaded at a place,
+  `mnavGetArea` a polygon's committed area and `mnavGetTier` the
+  navmesh's tier.
 
 ## Queries
 
@@ -257,6 +267,8 @@ cmake --install build --prefix "$PWD/package"
 
 A program finds the installed package with
 `find_package(maul-nav REQUIRED CONFIG)` and links `maul-nav::maul-nav`;
-`samples/minimal` is such a program. The headers compile as C17, C23 and
-C++17; the library itself is C23 (GCC 14, Clang 19 or newer; clang-cl
-on Windows).
+`samples/minimal` is such a program. `mnavGetVersion` gives the version
+of the library linked, which a program can compare with the
+`MNAV_VERSION_*` macros it was compiled with. The headers compile as
+C17, C23 and C++17; the library itself is C23 (GCC 14, Clang 19 or
+newer; clang-cl on Windows).
