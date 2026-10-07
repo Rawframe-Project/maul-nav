@@ -10,18 +10,25 @@ ring-stop-partial | src/avoidance.c | if (near >= range || (found == limit && ne
 ring-one-row | src/avoidance.c | for (int64_t y = cy - r; y <= cy + r; y += side || r == 0 ? 1 : 2 * r) | for (int64_t y = cy - r; y <= cy + r; y += side || r == 0 ? 1 : 4 * r)
 merge-tie-last | src/polymesh.c | bool first = value == best->value && (j < best->a || (j == best->a && k < best->b)); | bool first = value == best->value && (j > best->a || (j == best->a && k > best->b));
 merge-overwrite | src/polymesh.c | while (table[slot] >= 0) | while (false && table[slot] >= 0)
+# merge-k-any survives, equivalent: the reversed pair has the same value
+# and loses the tie-break.
 merge-k-any | src/polymesh.c | if (k > j && other->vertices[edge] == to && | if (k != j && other->vertices[edge] == to &&
 
 # The query core: funnel, raycast, A* open list, corridor merges (item 41)
 funnel-right-strict | src/funnel.c | if (Area2(f.apex, f.right, p[i].right) >= 0.0) | if (Area2(f.apex, f.right, p[i].right) > 0.0)
 funnel-left-corner-strict | src/funnel.c | if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) >= 0.0) | if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) > 0.0)
 funnel-no-same-apex | src/funnel.c | if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) >= 0.0) | if (Area2(f.apex, f.left, p[i].right) >= 0.0)
+# funnel-last-point survives, equivalent: every stretch's last portal is
+# a point (the end, the target or a takeoff), so its ends coincide.
 funnel-last-point | src/funnel.c | Push(query, &count, p[last].left); | Push(query, &count, p[last].right);
 portals-no-midpoint | src/funnel.c | if (node->tag != MNAV_TAG_END) | if (node->tag == MNAV_TAG_END)
 link-point-index | src/funnel.c | count - 1}; | count};
 ray-outward-strict | src/raycast.c | if (outward <= 0.0) | if (outward < 0.0)
 ray-link-span | src/raycast.c | if (link->edge == j && u >= link->low && u <= link->high && included) | if (link->edge == j && u > link->low && u < link->high && included)
 ray-leaves-strict | src/raycast.c | if (Leaves(&w, corners[k], corners[(k + 1) % sides]) <= t) | if (Leaves(&w, corners[k], corners[(k + 1) % sides]) < t)
+# ray-last-wall survives, equivalent in effect: a ray leaving exactly
+# through a corner gets the other of two correct normals; query.h does
+# not promise which.
 ray-last-wall | src/raycast.c | wall = wall < 0 ? k : wall; | wall = k;
 ray-node-limit | src/raycast.c | if (count == query->limits.nodes) | if (count > query->limits.nodes)
 shortcut-at | src/corridor.c | if (at >= last) | if (at > last)
@@ -40,12 +47,18 @@ sameshape-held | src/hierarchy.c | return held == navmesh->placeCount; | return 
 research-cluster | src/hierarchy.c | if (h->dirty[h->transitions[u].cluster] != 0) | if (h->dirty[h->transitions[u].from] != 0)
 commits-shortcut | src/hierarchy.c | if (h->commits == navmesh->commits) | if (h->commits <= navmesh->commits)
 hash-not-kept | src/hierarchy.c | h->areaHashes[slot] = hash; | (void)hash;
+# sameshape-limit survives, sanitizer only: TestUpdatePastTheTileLimit
+# reads past the per-tile arrays, which ASan stops.
 sameshape-limit | src/hierarchy.c | if (navmesh->slotCount > h->def.limits.tiles || h->linkHash != LinkHash(navmesh)) | if (h->linkHash != LinkHash(navmesh))
 nf-tie | src/navflow.c | return f->ways[a].cost != f->ways[b].cost ? f->ways[a].cost < f->ways[b].cost : a < b; | return f->ways[a].cost != f->ways[b].cost ? f->ways[a].cost < f->ways[b].cost : a > b;
+# nf-flat-edge survives, unreached: a tile-side edge runs along its
+# side; coverage shows the line never run.
 nf-flat-edge | src/navflow.c | if (bu == au) | if (bu == au && false)
 nf-rising | src/navflow.c | bool rising = bu > au; | bool rising = bu < au;
 nf-link-cost | src/navflow.c | (double)link->def.cost; | 0.0;
 nf-landing-swap | src/navflow.c | double cost = f->ways[q].cost + Distance(landing, f->ways[q].place) * areaCost + | double cost = f->ways[q].cost + Distance(landing, takeoff) * areaCost +
+# nf-done-skip survives, equivalent: costs are not negative, so a done
+# polygon never lowers.
 nf-done-skip | src/navflow.c | f->places[p] == DONE) | false)
 ext-strict | src/offmesh.c | return fabs(p.x - def->origin.x) <= ground && fabs(p.z - def->origin.z) <= ground && | return fabs(p.x - def->origin.x) < ground && fabs(p.z - def->origin.z) <= ground &&
 ext-vertical | src/offmesh.c | fabs(p.y - def->origin.y) <= vertical; | fabs(p.y - def->origin.y) <= vertical * 2.0;
@@ -62,7 +75,11 @@ lp1-tangent | src/orca.c | if (discriminant < 0.0) | if (discriminant <= 0.0)
 lp1-direction | src/orca.c | t = mnavDot2(wanted, line->direction) > 0.0 ? right : left; | t = mnavDot2(wanted, line->direction) > 0.0 ? left : right;
 lp1-no-clamp | src/orca.c | t = t < left ? left : (t > right ? right : t); | t = t > right ? right : t;
 lp2-speed-edge | src/orca.c | else if (mnavDot2(wanted, wanted) > radius * radius) | else if (mnavDot2(wanted, wanted) >= radius * radius)
+# lp2-violated survives, equivalent: re-solving a line the point already
+# lies on, the optimum unique.
 lp2-violated | src/orca.c | if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) > 0.0) | if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) >= 0.0)
+# lp3-distance survives, equivalent: reprocessing lines at the current
+# 3D distance, the same objective; RVO2 compares the same way.
 lp3-distance | src/orca.c | if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) <= distance) | if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) < distance)
 lp3-no-fixed | src/orca.c | for (int32_t k = 0; k < fixed; ++k) | for (int32_t k = 0; k < 0 && k < fixed; ++k)
 bisector-parallel | src/orca.c | if (mnavDot2(i->direction, j->direction) > 0.0) | if (mnavDot2(i->direction, j->direction) < 0.0)
@@ -77,6 +94,8 @@ obs-near-limit | src/obstacle.c | if (count == limit && !NearBefore(vertices, ca
 obs-covered | src/obstacle.c | if (mnavDet2(mnavSub2(c1, lines[j].point), lines[j].direction) - margin >= -COVERED && | if (mnavDet2(mnavSub2(c1, lines[j].point), lines[j].direction) - margin > COVERED &&
 obs-convex1 | src/obstacle.c | if (!vs[legs->o1].convex) | if (vs[legs->o1].convex)
 obs-cut-choice | src/obstacle.c | if (cut <= left && cut <= right) | if (cut < left && cut < right)
+# obs-side-pick survives, equivalent: an exact tie between an edge's two
+# legs.
 obs-side-pick | src/obstacle.c | if (left <= right) | if (left < right)
 obs-inside-seg | src/obstacle.c | if (s >= 0.0 && s <= 1.0 && distSqLine <= radiusSq) | if (distSqLine <= radiusSq)
 
@@ -86,6 +105,8 @@ tile-triangles-least | src/tile.c | return least <= (int64_t)counts->payload && 
 tile-vertex-edge | src/tile.c | if (r->exhausted || vertex->x > mesh->tileCells || vertex->z > mesh->tileCells) | if (r->exhausted || vertex->x > mesh->tileCells + 1 || vertex->z > mesh->tileCells)
 tile-polygon-count | src/tile.c | if (count < 3 || count > MNAV_POLYGON_VERTICES || area == mnav_areaNone || | if (count < 2 || count > MNAV_POLYGON_VERTICES || area == mnav_areaNone ||
 tile-area-none | src/tile.c | if (count < 3 || count > MNAV_POLYGON_VERTICES || area == mnav_areaNone || | if (count < 3 || count > MNAV_POLYGON_VERTICES ||
+# tile-side-range survives, equivalent: a side past the four is refused
+# by a later check in the same place.
 tile-side-range | src/tile.c | if (vertex >= (uint64_t)mesh->vertexCount || !linked || side > 4) | if (vertex >= (uint64_t)mesh->vertexCount || !linked || side > 5)
 tile-degenerate-edge | src/tile.c | if (a->x == b->x && a->z == b->z) | if (a->x == b->x && a->z == b->z && false)
 tile-convex | src/tile.c | if (Area2(a, b, &mesh->vertices[polygon->vertices[j]]) > 0) | if (Area2(a, b, &mesh->vertices[polygon->vertices[j]]) >= 0)
