@@ -67,7 +67,7 @@ static void TestMaking(void)
     def = mnavDefaultBakeDef();
     const mnavVec2 square[4] = {{300, 300}, {330, 300}, {330, 330}, {300, 330}};
     const mnavBakeVolume include = {square, 4, -1.0f, 1.0f, mnav_volumeInclude, 0};
-    const mnavBakeInput input = {&world, 1, nullptr, 0, &include, 1};
+    const mnavBakeInput input = {&world, 1, nullptr, 0, &include, 1, nullptr};
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBakeTileInput(baker, &input, 9, 9, &report) == mnav_success &&

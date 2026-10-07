@@ -342,6 +342,11 @@ extern "C"
         mnavAreaType area;
     } mnavBakeVolume;
 
+    // The triangles of a bake's meshes that may reach each tile of a def's
+    // grid, so that a bake of one tile reads those alone (mnav-0014). Made
+    // by mnavCreateTileIndex.
+    typedef struct mnavTileIndex mnavTileIndex;
+
     // Everything a 3D bake reads: triangle meshes, terrains and volumes.
     typedef struct mnavBakeInput
     {
@@ -351,6 +356,10 @@ extern "C"
         int32_t terrainCount;
         const mnavBakeVolume* volumes;
         int32_t volumeCount;
+        // The meshes' tile index, or NULL to read every triangle: made by
+        // mnavCreateTileIndex from these meshes, unchanged since, with a
+        // def of the same tile grid. Only read during the call.
+        const mnavTileIndex* index;
     } mnavBakeInput;
 
     // The kind of input element a check refused.
@@ -539,7 +548,9 @@ extern "C"
     /// limits and the fingerprint, and a volume's points count as input
     /// triangles too. A refused terrain is reported as the mesh at its
     /// index after the meshes, a refused volume as the one at its index
-    /// after the terrains.
+    /// after the terrains. Given a tile index, the bake checks each mesh's
+    /// counts and pointers and then only the triangles the index lists for
+    /// the tile, with their vertices, before reading them.
     ///
     /// @param baker     The baker; the tile it held before is dropped.
     /// @param input     The meshes and terrains.
@@ -553,12 +564,54 @@ extern "C"
     /// `mnav_errorRange`; a volume with fewer than 3 points, a kind out of
     /// range, an area volume's area not walkable, heights not finite or
     /// backward, or a point not finite (the point) is `mnav_errorInvalid`,
-    /// a point past the extent (the point) `mnav_errorRange`.
+    /// a point past the extent (the point) `mnav_errorRange`; a tile index
+    /// made for another grid, another number of meshes or another number
+    /// of triangles in a mesh is `mnav_errorInvalid`.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBakeTileInput(mnavBaker* baker,
                                                          const mnavBakeInput* input, int32_t tileX,
                                                          int32_t tileZ, mnavBakeReport* reportOut);
+
+    /// Makes a tile index of meshes for a def's tile grid (mnav-0014):
+    /// checks every mesh as a bake does, then lists for each tile the
+    /// triangles whose ground bounds, widened by the tile's border and two
+    /// cells, reach it, in input order. A bake given the index through
+    /// mnavBakeInput reads only the tile's list and makes the same tile,
+    /// to the byte, as a bake that reads every triangle. Changing a mesh's
+    /// vertices or triangles calls for a new index.
+    ///
+    /// @param def       The def; the index fits defs with its cell size,
+    ///                  tile cells and agent radius.
+    /// @param meshes    The meshes, in the def's frame. Only read during
+    ///                  the call.
+    /// @param meshCount The number of meshes, at least 0.
+    /// @param indexOut  Receives the index, or NULL on failure.
+    /// @param reportOut Receives the result, the first mesh refused and
+    ///                  what its check found, and the memory peak; the
+    ///                  other fields are 0. May be NULL.
+    /// @return `mnav_success`; `mnav_errorInvalid` for an invalid def, a
+    /// NULL indexOut, a negative count, NULL meshes with a positive count,
+    /// or a mesh its check refuses; `mnav_errorRange` for a mesh past the
+    /// extent; `mnav_errorLimit` past the def's memory limit or past
+    /// 2^31 - 1 listed triangles; `mnav_errorCapacity` when the allocator
+    /// fails.
+    /// @par Thread safety
+    /// Safe from any thread. An index is never changed after it is made,
+    /// so any number of bakes on any threads may read it at once.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileIndex(const mnavBakeDef* def,
+                                                           const mnavTriangleMesh* meshes,
+                                                           int32_t meshCount,
+                                                           mnavTileIndex** indexOut,
+                                                           mnavBakeReport* reportOut);
+
+    /// Destroys a tile index.
+    ///
+    /// @param index  The index, or NULL.
+    /// @par Thread safety
+    /// Safe from any thread; the index is used by one thread at a time.
+    /// No bake may be reading it.
+    MNAV_API void mnavDestroyTileIndex(mnavTileIndex* index);
 
     /// Bakes tile (tileX, tileZ) of the meshes: checks every mesh, then
     /// rasterizes, filters, partitions, traces and triangulates the tile

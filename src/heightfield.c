@@ -9,6 +9,7 @@
 #include "outline.h"
 #include "raster.h"
 #include "terrain.h"
+#include "tile_index.h"
 
 #include "maul-nav/bake.h"
 
@@ -73,27 +74,67 @@ static mnavResult AddTerrain(mnavMemory* memory, const mnavBakeDef* def, const m
     return mnav_success;
 }
 
-static mnavResult Collect(mnavMemory* memory, const mnavBakeDef* def, const mnavBakeCells* cells,
-                          const mnavBakeInput* input, const mnavTileFrame* frame,
-                          mnavFragmentList* list)
+static mnavResult AddMeshTriangle(mnavMemory* memory, const mnavBakeDef* def,
+                                  const mnavBakeCells* cells, const mnavTileFrame* frame,
+                                  const mnavTriangleMesh* mesh, int32_t t, int32_t* touching,
+                                  mnavFragmentList* list)
 {
-    int32_t touching = 0;
-    for (int32_t m = 0; m < input->meshCount; ++m)
+    const int32_t* index = mesh->indices + (size_t)t * 3;
+    const mnavVec3 corners[3] = {mesh->vertices[index[0]], mesh->vertices[index[1]],
+                                 mesh->vertices[index[2]]};
+    mnavAreaType given = mesh->areas != nullptr ? mesh->areas[t] : mnav_areaWalkable;
+    return AddTriangle(memory, def, cells, frame, corners, given, touching, list);
+}
+
+// Rasterizes the meshes' triangles that reach the tile: with a tile index,
+// those it lists for the tile, which are all of them, in the same order.
+static mnavResult CollectMeshes(mnavMemory* memory, const mnavBakeDef* def,
+                                const mnavBakeCells* cells, const mnavBakeInput* input,
+                                int32_t tileX, int32_t tileZ, const mnavTileFrame* frame,
+                                int32_t* touching, mnavFragmentList* list)
+{
+    if (input->index != nullptr)
     {
-        const mnavTriangleMesh* mesh = &input->meshes[m];
-        for (int32_t t = 0; t < mesh->triangleCount; ++t)
+        const mnavIndexEntry* entries = nullptr;
+        int32_t count = 0;
+        mnavTileIndexList(input->index, tileX, tileZ, &entries, &count);
+        for (int32_t k = 0; k < count; ++k)
         {
-            const int32_t* index = mesh->indices + (size_t)t * 3;
-            const mnavVec3 corners[3] = {mesh->vertices[index[0]], mesh->vertices[index[1]],
-                                         mesh->vertices[index[2]]};
-            mnavAreaType given = mesh->areas != nullptr ? mesh->areas[t] : mnav_areaWalkable;
             mnavResult result =
-                AddTriangle(memory, def, cells, frame, corners, given, &touching, list);
+                AddMeshTriangle(memory, def, cells, frame, &input->meshes[entries[k].mesh],
+                                entries[k].triangle, touching, list);
             if (result != mnav_success)
             {
                 return result;
             }
         }
+        return mnav_success;
+    }
+    for (int32_t m = 0; m < input->meshCount; ++m)
+    {
+        for (int32_t t = 0; t < input->meshes[m].triangleCount; ++t)
+        {
+            mnavResult result =
+                AddMeshTriangle(memory, def, cells, frame, &input->meshes[m], t, touching, list);
+            if (result != mnav_success)
+            {
+                return result;
+            }
+        }
+    }
+    return mnav_success;
+}
+
+static mnavResult Collect(mnavMemory* memory, const mnavBakeDef* def, const mnavBakeCells* cells,
+                          const mnavBakeInput* input, int32_t tileX, int32_t tileZ,
+                          const mnavTileFrame* frame, mnavFragmentList* list)
+{
+    int32_t touching = 0;
+    mnavResult meshes =
+        CollectMeshes(memory, def, cells, input, tileX, tileZ, frame, &touching, list);
+    if (meshes != mnav_success)
+    {
+        return meshes;
     }
     for (int32_t i = 0; i < input->terrainCount; ++i)
     {
@@ -241,7 +282,7 @@ mnavResult mnavBuildHeightfield(mnavMemory* memory, const mnavBakeDef* def,
                                 int32_t meshCount, int32_t tileX, int32_t tileZ,
                                 mnavHeightfield* heightfield)
 {
-    const mnavBakeInput input = {meshes, meshCount, nullptr, 0, nullptr, 0};
+    const mnavBakeInput input = {meshes, meshCount, nullptr, 0, nullptr, 0, nullptr};
     return mnavBuildHeightfieldInput(memory, def, cells, &input, tileX, tileZ, heightfield);
 }
 
@@ -255,7 +296,8 @@ mnavResult mnavBuildHeightfieldInput(mnavMemory* memory, const mnavBakeDef* def,
         return mnav_errorRange;
     }
     mnavFragmentList list = {nullptr, 0, 0, def->limits.tileSpans};
-    mnavResult result = Collect(memory, def, cells, input, &heightfield->frame, &list);
+    mnavResult result =
+        Collect(memory, def, cells, input, tileX, tileZ, &heightfield->frame, &list);
     return Finish(memory, cells, result, &list, heightfield);
 }
 

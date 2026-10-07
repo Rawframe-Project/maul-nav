@@ -8,7 +8,21 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- Tile indexes (mnav-0014): `mnavCreateTileIndex` lists, once, the
+  triangles of a set of meshes that may reach each tile of a def's
+  grid, and a bake given one through `mnavBakeInput.index` reads only
+  its tile's list, making the same tile to the byte. 17% fewer
+  instructions baking the benchmark's 64 tiles from one mesh, more
+  for meshes spanning more tiles. `mnavDestroyTileIndex` frees one.
+
 ### Changed
+
+- `mnavBakeInput` has a last field, `index`. Code that fills the record
+  positionally gives it `NULL` (compilers warn of the missing field
+  under `-Wextra`); zero-initialized and designated initializers need
+  no change.
 
 - Baking tests whether a triangle reaches the tile before its slope, and
   rejects triangles a cell or more outside the tile without dividing:

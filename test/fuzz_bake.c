@@ -217,10 +217,27 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         int32_t count = ReadRing(&r, in.points[o]);
         in.outlines[o] = (mnavOutline){in.points[o], count, Area(&r)};
     }
-    const mnavBakeInput input = {in.meshes,       meshes,     &in.terrain,
-                                 terrain ? 1 : 0, in.volumes, volumes};
+    const mnavBakeInput input = {in.meshes,  meshes,  &in.terrain, terrain ? 1 : 0,
+                                 in.volumes, volumes, nullptr};
     static uint8_t tile[TILE_ROOM];
     size_t tileSize = BakeTwice(baker, &in, flat, outlines, &input, tileX, tileZ, tile);
+    // A tile index of the meshes (mnav-0014), made only when they all
+    // pass their checks, gives the same result and the same bytes.
+    mnavTileIndex* index = nullptr;
+    if (!flat && mnavCreateTileIndex(&def, in.meshes, meshes, &index, nullptr) == mnav_success)
+    {
+        mnavBakeInput indexed = input;
+        indexed.index = index;
+        mnavBakeReport report;
+        mnavResult result = mnavBakeTileInput(baker, &indexed, tileX, tileZ, &report);
+        static uint8_t copy[TILE_ROOM];
+        size_t copySize = 0;
+        Expect((result == mnav_success) == (tileSize > 0));
+        Expect(result != mnav_success ||
+               (mnavCopyBakedTile(baker, copy, TILE_ROOM, &copySize) == mnav_success &&
+                copySize == tileSize && memcmp(copy, tile, tileSize) == 0));
+        mnavDestroyTileIndex(index);
+    }
     mnavDestroyBaker(baker);
     if (tileSize > 0)
     {

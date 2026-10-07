@@ -265,7 +265,7 @@ static void TestAreas(mnavNavFlow* field)
     mnavTriangleMesh world = World();
     const mnavVec2 strip[4] = {{16, -2}, {24, -2}, {24, 70}, {16, 70}};
     const mnavBakeVolume volume = {strip, 4, -1.0f, 1.0f, mnav_volumeArea, 5};
-    const mnavBakeInput input = {&world, 1, nullptr, 0, &volume, 1};
+    const mnavBakeInput input = {&world, 1, nullptr, 0, &volume, 1, nullptr};
     for (int32_t t = 0; t < 100; ++t)
     {
         size_t size = 0;

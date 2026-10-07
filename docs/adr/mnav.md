@@ -18,3 +18,4 @@ are listed in [README.md](README.md).
 | [mnav-0011](mnav-0011-differential-checks.md) | Differential checks against Recast and Detour | Accepted |
 | [mnav-0012](mnav-0012-benchmark-baseline.md) | Benchmarks against a recorded baseline | Accepted |
 | [mnav-0013](mnav-0013-navmesh-flow-fields.md) | Flow fields over the navmesh | Accepted |
+| [mnav-0014](mnav-0014-tile-index.md) | A tile index for bakes from large meshes | Accepted |

@@ -68,6 +68,12 @@ them as they are written.
   Input is checked as hostile: NaNs, indices out of range and
   overflowing values are refused with the first element named in the
   report.
+- **Large meshes.** A bake tests every triangle of its input against
+  its tile. When many tiles bake from meshes much larger than a tile,
+  make a tile index of the meshes once (`mnavCreateTileIndex`) and pass
+  it as `mnavBakeInput.index`: each bake then reads only the triangles
+  near its tile and makes the same bytes. Indexes are read-only, so
+  workers share one. After changing a mesh, make a new index.
 - **The agent.** The def's `agent` (radius, height, step height,
   maximum slope) shapes what is walkable; a navmesh serves one agent
   profile.

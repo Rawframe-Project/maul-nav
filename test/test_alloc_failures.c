@@ -69,7 +69,7 @@ static mnavBakeInput Input(const mnavTriangleMesh* world)
     terrain = (mnavTerrain){{0.0, 0.0, 0.0}, 32.0f, 32.0f, 3, 3, s_heights, nullptr};
     volumes[0] = (mnavBakeVolume){s_strip, 4, -1.0f, 1.0f, mnav_volumeArea, 5};
     volumes[1] = (mnavBakeVolume){s_all, 4, -1.0f, 1.0f, mnav_volumeInclude, 0};
-    return (mnavBakeInput){world, 1, &terrain, 1, volumes, 2};
+    return (mnavBakeInput){world, 1, &terrain, 1, volumes, 2, nullptr};
 }
 
 static void TestBakes(void)
@@ -329,6 +329,19 @@ static void DestroyAvoidance(void* object)
     mnavDestroyAvoidance(object);
 }
 
+static mnavResult MakeTileIndex(void** out)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.allocator = Allocator();
+    mnavTriangleMesh world = World();
+    return mnavCreateTileIndex(&def, &world, 1, (mnavTileIndex**)out, nullptr);
+}
+
+static void DestroyTileIndex(void* object)
+{
+    mnavDestroyTileIndex(object);
+}
+
 static void TestObjects(void)
 {
     CHECK(EachRefused(MakeQuery, DestroyQuery), "query contexts");
@@ -336,6 +349,7 @@ static void TestObjects(void)
     CHECK(EachRefused(MakeNavFlow, DestroyNavFlow), "navmesh flow fields");
     CHECK(EachRefused(MakeFlowField, DestroyFlowField), "flow fields");
     CHECK(EachRefused(MakeAvoidance, DestroyAvoidance), "avoidance sets");
+    CHECK(EachRefused(MakeTileIndex, DestroyTileIndex), "tile indexes");
 }
 
 int main(void)

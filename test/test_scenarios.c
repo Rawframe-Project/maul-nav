@@ -364,7 +364,7 @@ static void TestStreamedTerrain(mnavQuery* query)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavTerrain terrain = Terrain();
-    const mnavBakeInput input = {nullptr, 0, &terrain, 1, nullptr, 0};
+    const mnavBakeInput input = {nullptr, 0, &terrain, 1, nullptr, 0, nullptr};
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     uint64_t hash = MNAV_HASH_INIT;

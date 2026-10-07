@@ -80,7 +80,7 @@ static mnavTriangleMesh Mesh(const mnavTerrain* t)
 static bool Same(mnavBaker* baker, const mnavTerrain* terrain, mnavBakeReport* report)
 {
     mnavTriangleMesh mesh = Mesh(terrain);
-    const mnavBakeInput input = {nullptr, 0, terrain, 1, nullptr, 0};
+    const mnavBakeInput input = {nullptr, 0, terrain, 1, nullptr, 0, nullptr};
     mnavBakeReport other;
     size_t first = 0;
     size_t second = 0;
@@ -129,7 +129,7 @@ static void TestLikeItsMesh(mnavBaker* baker)
     odd.spacingX = 0.7f;
     odd.spacingZ = 0.9f;
     CHECK(Same(baker, &odd, &a), "spacings that round");
-    const mnavBakeInput fromTerrain = {nullptr, 0, &terrain, 1, nullptr, 0};
+    const mnavBakeInput fromTerrain = {nullptr, 0, &terrain, 1, nullptr, 0, nullptr};
     // A hole of 6 by 6 cells.
     memset(s_areas, mnav_areaWalkable, sizeof(s_areas));
     for (int32_t r = 10; r < 16; ++r)
@@ -159,7 +159,7 @@ static int32_t Refused(mnavBaker* baker, const mnavTerrain* terrain, mnavResult 
                        mnavInputElement element)
 {
     const mnavTriangleMesh none = {nullptr, 0, nullptr, 0, nullptr};
-    const mnavBakeInput input = {&none, 1, terrain, 1, nullptr, 0};
+    const mnavBakeInput input = {&none, 1, terrain, 1, nullptr, 0, nullptr};
     mnavBakeReport report;
     bool refused = mnavBakeTileInput(baker, &input, 0, 0, &report) == result &&
                    report.stage == mnav_stageInput && report.mesh == 1 &&
@@ -202,7 +202,7 @@ static void TestChecks(mnavBaker* baker)
     t = good;
     t.areas = s_areas;
     CHECK(Refused(baker, &t, mnav_errorInvalid, mnav_elementCell) == 5, "an area out of range");
-    const mnavBakeInput missing = {nullptr, 0, nullptr, 1, nullptr, 0};
+    const mnavBakeInput missing = {nullptr, 0, nullptr, 1, nullptr, 0, nullptr};
     CHECK(mnavBakeTileInput(baker, &missing, 0, 0, nullptr) == mnav_errorInvalid &&
               mnavBakeTileInput(baker, nullptr, 0, 0, nullptr) == mnav_errorInvalid,
           "terrains missing; no input");
@@ -215,14 +215,14 @@ static void TestLimits(void)
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     mnavTerrain terrain = Terrain();
-    const mnavBakeInput input = {nullptr, 0, &terrain, 1, nullptr, 0};
+    const mnavBakeInput input = {nullptr, 0, &terrain, 1, nullptr, 0, nullptr};
     mnavBakeReport report;
     CHECK(mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_errorLimit && report.mesh == 0,
           "one triangle over the input limit");
     // A mesh's triangles and a terrain's count together.
     mnavTriangleMesh mesh = Mesh(&terrain);
     mesh.triangleCount = 1;
-    const mnavBakeInput both = {&mesh, 1, &terrain, 1, nullptr, 0};
+    const mnavBakeInput both = {&mesh, 1, &terrain, 1, nullptr, 0, nullptr};
     def.limits.inputTriangles = CELLS * 2;
     mnavDestroyBaker(baker);
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
