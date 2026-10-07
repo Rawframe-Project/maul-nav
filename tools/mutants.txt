@@ -223,3 +223,13 @@ bk-indexed-check | src/baker.c | mnavCheckMeshTriangle(&baker->def, &solid->mesh
 bk-hash-both | src/baker.c | for (int32_t m = 0; m < input->meshCount && input->index == nullptr; ++m) | for (int32_t m = 0; m < input->meshCount && input->index == (void*)1; ++m)
 in-triangle-vertices | src/input.c | for (int k = 0; k < 3 && result.result == mnav_success; ++k) | for (int k = 0; k < 2 && result.result == mnav_success; ++k)
 in-shape-limit | src/input.c | if (mesh->triangleCount > def->limits.inputTriangles) | if (mesh->triangleCount > def->limits.inputTriangles + 1000000)
+
+# Tile indexes of outlines (0.4.0): their reach, fit and kind, the 2D
+# bake's checks of listed outlines, and the outline set.
+ti2-reach-zx | src/tile_index.c | TileRange(index, low.y, high.y, &reach.z0, &reach.z1); | TileRange(index, low.x, high.x, &reach.z0, &reach.z1);
+ti2-reach-last | src/tile_index.c | for (int32_t i = 1; i < outline->pointCount; ++i) | for (int32_t i = 1; i < outline->pointCount - 1; ++i)
+ti2-fits-points | src/tile_index.c | if (index->counts[o] != outlines[o].pointCount) | if (index->counts[o] < outlines[o].pointCount)
+ti2-fits-kind | src/tile_index.c | index->border == cells->border && index->outlines == outlines && | index->border == cells->border && index->outlines >= outlines &&
+bk2-check-listed | src/baker.c | mnavInputResult input = mnavCheckOutline(&baker->def, outline); | mnavInputResult input = {mnav_success, mnav_elementNone, -1};
+ol-at-index | src/outline.h | return &set->outlines[set->indexed ? set->listed[k].mesh : k]; | return &set->outlines[k];
+ol-set-count | src/outline.c | mnavTileIndexList(index, tileX, tileZ, &set.listed, &set.count); | mnavTileIndexList(index, tileX, tileZ, &set.listed, &set.count); set.count -= set.count > 0;

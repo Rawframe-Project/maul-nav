@@ -229,8 +229,11 @@ static void MakeOutlines(const mnavBakeDef* def, Place place)
             count = RING;
             for (int32_t i = 0; i < RING; ++i)
             {
+                // Every other ring a star whose last point reaches
+                // furthest, so no bound may skip a point.
                 double a = 6.283185307179586 * (double)i / (double)RING;
-                p[i] = (mnavVec2){cx + r * (float)cos(a), cz + r * (float)sin(a)};
+                float reach = o % 6 == 3 && i == RING - 1 ? 2.0f * r : r;
+                p[i] = (mnavVec2){cx + reach * (float)cos(a), cz + reach * (float)sin(a)};
             }
         }
         else
@@ -325,6 +328,17 @@ static void TestRefusals2D(void)
     const mnavBakeInput solid = {meshes, MESHES, nullptr, 0, nullptr, 0, outlines};
     CHECK(mnavBakeTileInput(baker, &solid, 1, 1, &report) == mnav_errorInvalid,
           "an index of outlines refused by a 3D bake");
+    // The kind is checked even where the counts agree: one outline of 4
+    // points, one mesh of 4 triangles.
+    mnavTileIndex* square = nullptr;
+    CHECK(mnavCreateTileIndex2D(&def, s_outlines + 1, 1, &square, &report) == mnav_success, "made");
+    mnavTriangleMesh four = meshes[0];
+    four.triangleCount = 4;
+    const mnavBakeInput alike = {&four, 1, nullptr, 0, nullptr, 0, square};
+    CHECK(s_outlines[1].pointCount == 4 &&
+              mnavBakeTileInput(baker, &alike, 0, 0, &report) == mnav_errorInvalid,
+          "an index of outlines refused where the counts agree");
+    mnavDestroyTileIndex(square);
     flat.index = outlines;
     flat.outlineCount = OUTLINES - 1;
     CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
