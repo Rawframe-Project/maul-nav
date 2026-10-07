@@ -355,13 +355,18 @@ static void TestRefusals2D(void)
     s_points[0][1].x = NAN;
     CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid && report.mesh == 0,
           "a point not finite, refused as read");
+    mnavTileIndex* none = nullptr;
     mnavBakeDef tight = def;
     tight.limits.memoryBytes = 256;
-    mnavTileIndex* none = nullptr;
     CHECK(mnavCreateTileIndex2D(&tight, s_outlines, OUTLINES, &none, &report) ==
                   mnav_errorInvalid &&
               report.mesh == 0 && none == nullptr,
           "an outline its check refuses, named");
+    MakeOutlines(&def, (Place){0, 0, 3, 3});
+    s_points[2][1].x = -1e30f;
+    CHECK(mnavCreateTileIndex2D(&def, s_outlines, OUTLINES, &none, &report) == mnav_errorRange &&
+              report.mesh == 2 && none == nullptr,
+          "a point past the extent, named");
     MakeOutlines(&def, (Place){0, 0, 3, 3});
     CHECK(mnavCreateTileIndex2D(&tight, s_outlines, OUTLINES, &none, &report) == mnav_errorLimit &&
               none == nullptr,
@@ -391,6 +396,12 @@ static void TestRefusals(void)
     CHECK(mnavCreateTileIndex(&def, bad, MESHES, &index, &report) == mnav_errorInvalid &&
               report.mesh == 2 && report.input.element == mnav_elementTriangle && index == nullptr,
           "a mesh its check refuses, named");
+    mnavVec3 corner = s_vertices[2][5];
+    s_vertices[2][5].z = 1e30f;
+    CHECK(mnavCreateTileIndex(&def, meshes, MESHES, &index, &report) == mnav_errorRange &&
+              report.mesh == 2 && report.input.element == mnav_elementVertex && index == nullptr,
+          "a vertex past the extent, named");
+    s_vertices[2][5] = corner;
     mnavBakeDef tight = def;
     tight.limits.memoryBytes = 256;
     CHECK(mnavCreateTileIndex(&tight, meshes, MESHES, &index, &report) == mnav_errorLimit &&

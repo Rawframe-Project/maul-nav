@@ -13,7 +13,9 @@ It has:
 - navmesh generation in 3D from triangle meshes and terrains, and in
   2D from polygons, shaped by bake volumes, tile by tile: each tile is
   an independent call the host may run on its own workers, giving the
-  same bytes at any worker count;
+  same bytes at any worker count, and a tile index of a large mesh or
+  outline set that the workers share, so each tile reads only what
+  reaches it;
 - the navmesh data format, versioned and fingerprinted, and a loader
   that refuses malformed bytes with a typed error;
 - nearest-point, path, raycast, height, wall-distance, surface-move,
