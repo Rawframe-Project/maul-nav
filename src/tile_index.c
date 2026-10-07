@@ -117,15 +117,19 @@ static mnavResult Measure(mnavTileIndex* index, Source s, int64_t* entriesOut)
     }
     if (entries > 0)
     {
-        // Inputs lie within the extent, so the grid's sides fit in 32 bits.
-        index->minX = (int32_t)all.x0;
-        index->minZ = (int32_t)all.z0;
-        index->columns = (int32_t)(all.x1 - all.x0 + 1);
-        index->rows = (int32_t)(all.z1 - all.z0 + 1);
-        if ((int64_t)index->columns * index->rows >= INT32_MAX)
+        // Inputs lie within the extent, so the grid's sides fit in 32 bits;
+        // its tiles may not, and the grid is kept only when they do, so a
+        // refused index stays 0 by 0 tiles.
+        int64_t columns = all.x1 - all.x0 + 1;
+        int64_t rows = all.z1 - all.z0 + 1;
+        if (columns * rows >= INT32_MAX)
         {
             return mnav_errorLimit;
         }
+        index->minX = (int32_t)all.x0;
+        index->minZ = (int32_t)all.z0;
+        index->columns = (int32_t)columns;
+        index->rows = (int32_t)rows;
     }
     *entriesOut = entries;
     return mnav_success;

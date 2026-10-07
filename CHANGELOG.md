@@ -8,6 +8,14 @@ format.
 
 ## [Unreleased]
 
+### Fixed
+
+- `mnavCreateTileIndex` and `mnavCreateTileIndex2D` refused input
+  spread over more than 2^31 - 1 tiles with `mnav_errorLimit` as
+  documented, but counted the grid's tiles in 32 bits on the way out,
+  an overflow undefined in C. The grid is now kept only when its tiles
+  fit. Found by fuzz_bake.
+
 ### Documentation
 
 - The README names the tile index; the guide covers checking a def and

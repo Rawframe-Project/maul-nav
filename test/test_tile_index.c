@@ -407,6 +407,19 @@ static void TestRefusals(void)
     CHECK(mnavCreateTileIndex(&tight, meshes, MESHES, &index, &report) == mnav_errorLimit &&
               index == nullptr,
           "past the memory limit");
+    // Two triangles near opposite corners of the extent, in tiles of 16
+    // cells of 0.25 m: about 500,000 tiles a side, more than 2^31 - 1 in
+    // all, though each triangle reaches only a few.
+    mnavBakeDef small = def;
+    small.tileCells = 16;
+    const mnavVec3 far[6] = {{-1.0e6f, 0.0f, -1.0e6f},    {-1.0e6f, 0.0f, -999999.0f},
+                             {-999999.0f, 0.0f, -1.0e6f}, {1.0e6f, 0.0f, 1.0e6f},
+                             {999999.0f, 0.0f, 1.0e6f},   {1.0e6f, 0.0f, 999999.0f}};
+    const int32_t corners[6] = {0, 1, 2, 3, 4, 5};
+    const mnavTriangleMesh apart = {far, 6, corners, 2, nullptr};
+    CHECK(mnavCreateTileIndex(&small, &apart, 1, &index, &report) == mnav_errorLimit &&
+              index == nullptr,
+          "a grid of more tiles than 2^31 - 1 refused");
     CHECK(mnavCreateTileIndex(&def, meshes, 0, &index, &report) == mnav_success, "no meshes");
     mnavDestroyTileIndex(index);
     mnavDestroyTileIndex(nullptr);
