@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- A fuzz target for grid flow fields, `fuzz_flow`, with its seed
+  corpus: a field built in steps must be the one built at once, each
+  cell's cost its next cell's plus the step, and a repair after area and
+  goal changes a fresh build's, bit for bit.
+
 ### Changed
 
 - The filter's area test is inline, as every search step asks it:

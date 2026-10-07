@@ -149,7 +149,8 @@ jobs:
   # Each fuzz target runs for one minute on every push, from the seed
   # corpus in test/corpus (minimized from local campaigns): the tile loader
   # from its seed, the bake input, the query inputs, avoidance input, the
-  # searches over the whole navmesh and the runtime navmesh's changes.
+  # searches over the whole navmesh, the runtime navmesh's changes and grid
+  # flow fields.
   fuzz:
     name: fuzz
     runs-on: ubuntu-24.04
