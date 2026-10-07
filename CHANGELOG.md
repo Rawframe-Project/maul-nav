@@ -8,6 +8,10 @@ format.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-07
+
+A faster neighbour search for crowds.
+
 ### Changed
 
 - Avoidance's cell table keeps each occupied cell's run of agents, so

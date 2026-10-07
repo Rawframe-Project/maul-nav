@@ -24,7 +24,7 @@
 
 // The hash of the 100 tiles' bytes, in tile order, the same on every
 // platform.
-#define TILES_HASH 0xce22b96a7a3c9140ull
+#define TILES_HASH 0xad423bfec9078d4dull
 
 enum
 {
