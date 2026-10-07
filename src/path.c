@@ -20,39 +20,41 @@
 #include <stdint.h>
 #include <string.h>
 
-// Whether node a leaves the open list before node b: the lower total, then
-// the one made first.
-static bool Sooner(const mnavQuery* query, int32_t a, int32_t b)
+// Whether entry a leaves the open list before entry b: the lower total,
+// then the node made first.
+static bool Sooner(mnavHeapEntry a, mnavHeapEntry b)
 {
-    const mnavSearchNode* na = &query->nodes[a];
-    const mnavSearchNode* nb = &query->nodes[b];
-    double ta = na->cost + na->remaining;
-    double tb = nb->cost + nb->remaining;
-    return ta != tb ? ta < tb : a < b;
+    return a.total != b.total ? a.total < b.total : a.node < b.node;
 }
 
-static void Place(mnavQuery* query, int32_t at, int32_t n)
+// The heap entry of node n: its total, cost and heuristic summed.
+static mnavHeapEntry EntryOf(const mnavQuery* query, int32_t n)
 {
-    query->heap[at] = n;
-    query->nodes[n].heap = at;
+    return (mnavHeapEntry){query->nodes[n].cost + query->nodes[n].remaining, n};
+}
+
+static void Place(mnavQuery* query, int32_t at, mnavHeapEntry e)
+{
+    query->heap[at] = e;
+    query->nodes[e.node].heap = at;
 }
 
 static void SiftUp(mnavQuery* query, int32_t at)
 {
-    int32_t n = query->heap[at];
-    while (at > 0 && Sooner(query, n, query->heap[(at - 1) / 2]))
+    mnavHeapEntry e = query->heap[at];
+    while (at > 0 && Sooner(e, query->heap[(at - 1) / 2]))
     {
         Place(query, at, query->heap[(at - 1) / 2]);
         at = (at - 1) / 2;
     }
-    Place(query, at, n);
+    Place(query, at, e);
 }
 
 static int32_t Pop(mnavQuery* query)
 {
-    int32_t top = query->heap[0];
+    int32_t top = query->heap[0].node;
     query->nodes[top].heap = MNAV_NO_NODE;
-    int32_t last = query->heap[--query->heapCount];
+    mnavHeapEntry last = query->heap[--query->heapCount];
     int32_t at = 0;
     while (query->heapCount > 0)
     {
@@ -61,12 +63,11 @@ static int32_t Pop(mnavQuery* query)
         {
             break;
         }
-        if (child + 1 < query->heapCount &&
-            Sooner(query, query->heap[child + 1], query->heap[child]))
+        if (child + 1 < query->heapCount && Sooner(query->heap[child + 1], query->heap[child]))
         {
             child += 1;
         }
-        if (!Sooner(query, query->heap[child], last))
+        if (!Sooner(query->heap[child], last))
         {
             break;
         }
@@ -135,6 +136,7 @@ static void Open(mnavSearch* s, int32_t from, const mnavSearchNode* key, mnavPos
             node->cost = cost;
             node->length = length;
             node->parent = from;
+            query->heap[node->heap] = EntryOf(query, n);
             SiftUp(query, node->heap);
         }
         return;
@@ -149,12 +151,13 @@ static void Open(mnavSearch* s, int32_t from, const mnavSearchNode* key, mnavPos
         a,        b,        at,   cost,        length, toEnd * s->cheapest, key->slot, key->polygon,
         key->tag, key->low, from, MNAV_NO_NODE};
     query->table[cell] = n;
-    query->heap[query->heapCount] = n;
+    query->heap[query->heapCount] = EntryOf(query, n);
     SiftUp(query, query->heapCount++);
 }
 
 // Opens the polygon across an inner edge j of node n's polygon.
-static void ExpandInner(mnavSearch* s, int32_t n, const mnavTile* tile, int32_t j)
+static void ExpandInner(mnavSearch* s, int32_t n, const mnavTile* tile, const mnavFrame* f,
+                        int32_t j)
 {
     const mnavSearchNode* node = &s->query->nodes[n];
     const mnavPolygon* polygon = &tile->mesh.polygons[node->polygon];
@@ -170,11 +173,9 @@ static void ExpandInner(mnavSearch* s, int32_t n, const mnavTile* tile, int32_t 
     {
         if (other->vertices[i] == to && other->vertices[(i + 1) % other->count] == from)
         {
-            mnavFrame f = mnavFrameOf(s->navmesh, s->navmesh->slots[node->slot].x,
-                                      s->navmesh->slots[node->slot].z);
             mnavSearchNode key = {.slot = node->slot, .polygon = next, .tag = i, .low = 0};
-            Open(s, n, &key, mnavVertexWorld(&f, &tile->mesh.vertices[from]),
-                 mnavVertexWorld(&f, &tile->mesh.vertices[to]), 0.0);
+            Open(s, n, &key, mnavVertexWorld(f, &tile->mesh.vertices[from]),
+                 mnavVertexWorld(f, &tile->mesh.vertices[to]), 0.0);
             return;
         }
     }
@@ -189,7 +190,8 @@ static mnavPos3 AlongSide(mnavPos3 a, mnavPos3 b, double au, double bu, double u
 
 // Opens the polygons the tile links of edge j of node n's polygon reach,
 // or notes that no tile is loaded across it.
-static void ExpandSide(mnavSearch* s, int32_t n, const mnavTile* tile, int32_t j)
+static void ExpandSide(mnavSearch* s, int32_t n, const mnavTile* tile, const mnavFrame* f,
+                       int32_t j)
 {
     const mnavSearchNode* node = &s->query->nodes[n];
     const mnavSlot* slot = &s->navmesh->slots[node->slot];
@@ -205,14 +207,13 @@ static void ExpandSide(mnavSearch* s, int32_t n, const mnavTile* tile, int32_t j
         s->notLoaded = true;
         return;
     }
-    mnavFrame f = mnavFrameOf(s->navmesh, slot->x, slot->z);
     const mnavMeshVertex* va = &tile->mesh.vertices[polygon->vertices[j]];
     const mnavMeshVertex* vb = &tile->mesh.vertices[polygon->vertices[(j + 1) % polygon->count]];
     bool alongZ = side == 1 || side == 3;
     double au = alongZ ? va->z : va->x;
     double bu = alongZ ? vb->z : vb->x;
-    mnavPos3 a = mnavVertexWorld(&f, va);
-    mnavPos3 b = mnavVertexWorld(&f, vb);
+    mnavPos3 a = mnavVertexWorld(f, va);
+    mnavPos3 b = mnavVertexWorld(f, vb);
     for (int32_t l = tile->firstLink[node->polygon]; l < tile->firstLink[node->polygon + 1]; ++l)
     {
         const mnavLink* link = &tile->links[l];
@@ -314,16 +315,18 @@ static void Expand(mnavSearch* s, int32_t n)
     }
     // mnavSearchNode pointers stay valid as nodes are added: the array never moves.
     // The edge the node came in through leads only back.
+    const mnavSlot* slot = &s->navmesh->slots[node->slot];
+    const mnavFrame f = mnavFrameOf(s->navmesh, slot->x, slot->z);
     for (int32_t j = 0; j < polygon->count; ++j)
     {
         bool inner = polygon->neighbors[j] != MNAV_NO_INDEX;
         if (inner && j != node->tag)
         {
-            ExpandInner(s, n, tile, j);
+            ExpandInner(s, n, tile, &f, j);
         }
         if (!inner && polygon->sides[j] != 0)
         {
-            ExpandSide(s, n, tile, j);
+            ExpandSide(s, n, tile, &f, j);
         }
     }
     ExpandOffMesh(s, n);
@@ -426,7 +429,7 @@ mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
                                        0};
     query->table[mnavFindNode(query, query->nodes[0].slot, query->nodes[0].polygon, MNAV_TAG_START,
                               0)] = 0;
-    query->heap[0] = 0;
+    query->heap[0] = EntryOf(query, 0);
     query->nodeCount = 1;
     query->heapCount = 1;
     return mnav_success;
@@ -442,6 +445,7 @@ void mnavConfineSearch(mnavQuery* query, const uint8_t* inside, bool beyond, boo
         s->endSlot = -1;
         s->cheapest = 0.0;
         query->nodes[0].remaining = 0.0;
+        query->heap[0] = EntryOf(query, 0);
     }
 }
 
@@ -483,7 +487,7 @@ void mnavRestartSearch(mnavQuery* query, int32_t n)
 {
     // The way to n, its node indices sorted, in the heap's memory: a
     // lowered cost may give a node a parent made after it.
-    int32_t* sorted = query->heap;
+    int32_t* sorted = query->indexHeap;
     int32_t count = 0;
     for (int32_t at = n; at != MNAV_NO_NODE; at = query->nodes[at].parent)
     {
@@ -511,9 +515,9 @@ void mnavRestartSearch(mnavQuery* query, int32_t n)
     mnavSearch* s = &query->search;
     query->nodeCount = count;
     query->heapCount = 1;
-    query->heap[0] = last;
     query->nodes[last].heap = 0;
     query->nodes[last].remaining = Distance(query->nodes[last].at, s->end) * s->cheapest;
+    query->heap[0] = EntryOf(query, last);
     s->found = MNAV_NO_NODE;
     s->best = last;
 }

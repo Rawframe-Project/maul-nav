@@ -183,8 +183,13 @@ mnavFrame mnavFrameOf(const mnavNavmesh* navmesh, int32_t x, int32_t z);
 // tile was replaced or removed.
 mnavResult mnavCheckPolygon(const mnavNavmesh* navmesh, mnavPolygonId id);
 
-// A mesh vertex's world position in a tile's frame.
-mnavPos3 mnavVertexWorld(const mnavFrame* f, const mnavMeshVertex* v);
+// A mesh vertex's world position in a tile's frame. Inline: the searches
+// call it for every portal they open.
+static inline mnavPos3 mnavVertexWorld(const mnavFrame* f, const mnavMeshVertex* v)
+{
+    return (mnavPos3){f->x0 + v->x * f->cell, f->y0 + (v->y - MNAV_HEIGHT_OFFSET) * f->height,
+                      f->z0 + v->z * f->cell};
+}
 
 // New links for one tile, applied when the commit succeeds.
 typedef struct mnavRelink

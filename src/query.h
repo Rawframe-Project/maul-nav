@@ -27,6 +27,14 @@
 
 // A portal into a polygon, or the start or end point: where the search
 // stands, the way it came, and its cost so far.
+// An open navmesh search node and its total, its cost plus its
+// heuristic, kept beside it in the heap.
+typedef struct mnavHeapEntry
+{
+    double total;
+    int32_t node;
+} mnavHeapEntry;
+
 typedef struct mnavSearchNode
 {
     // The portal's ends, in the order of the polygon left, and its midpoint;
@@ -125,7 +133,14 @@ struct mnavQuery
         mnavGridNode* gridNodes;
     };
     int32_t nodeCount;
-    int32_t* heap;
+    // The open list, a binary heap: for a navmesh search, each node with
+    // the total it leaves by, so that comparing two reads the heap alone;
+    // for grid, surface and spatial searches, node indices.
+    union
+    {
+        mnavHeapEntry* heap;
+        int32_t* indexHeap;
+    };
     int32_t heapCount;
     // Open addressing over node keys: node indices, MNAV_NO_NODE for empty.
     int32_t* table;

@@ -264,16 +264,16 @@ static bool Sooner(const mnavQuery* q, int32_t a, int32_t b)
 
 static void Place(mnavQuery* q, int32_t at, int32_t n)
 {
-    q->heap[at] = n;
+    q->indexHeap[at] = n;
     q->nodes[n].heap = at;
 }
 
 static void SiftUp(mnavQuery* q, int32_t at)
 {
-    int32_t n = q->heap[at];
-    while (at > 0 && Sooner(q, n, q->heap[(at - 1) / 2]))
+    int32_t n = q->indexHeap[at];
+    while (at > 0 && Sooner(q, n, q->indexHeap[(at - 1) / 2]))
     {
-        Place(q, at, q->heap[(at - 1) / 2]);
+        Place(q, at, q->indexHeap[(at - 1) / 2]);
         at = (at - 1) / 2;
     }
     Place(q, at, n);
@@ -281,20 +281,20 @@ static void SiftUp(mnavQuery* q, int32_t at)
 
 static int32_t Pop(mnavQuery* q)
 {
-    int32_t top = q->heap[0];
-    int32_t last = q->heap[--q->heapCount];
+    int32_t top = q->indexHeap[0];
+    int32_t last = q->indexHeap[--q->heapCount];
     int32_t at = 0;
     for (int32_t child = 1; child < q->heapCount; child = 2 * at + 1)
     {
-        if (child + 1 < q->heapCount && Sooner(q, q->heap[child + 1], q->heap[child]))
+        if (child + 1 < q->heapCount && Sooner(q, q->indexHeap[child + 1], q->indexHeap[child]))
         {
             child += 1;
         }
-        if (!Sooner(q, q->heap[child], last))
+        if (!Sooner(q, q->indexHeap[child], last))
         {
             break;
         }
-        Place(q, at, q->heap[child]);
+        Place(q, at, q->indexHeap[child]);
         at = child;
     }
     if (q->heapCount > 0)
@@ -472,7 +472,7 @@ static mnavResult BeginRing(Ring* r, mnavPolygonId polygon)
                                    0,         0,         MNAV_NO_NODE, 0};
     q->table[mnavFindNode(q, slot, (int32_t)polygon.polygon, 0, 0)] = 0;
     q->nodeCount = 1;
-    q->heap[0] = 0;
+    q->indexHeap[0] = 0;
     q->heapCount = 1;
     r->wall = (mnavWall){false, false, r->radius, r->center, {0.0, 0.0, 0.0}};
     return mnav_success;

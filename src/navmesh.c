@@ -724,9 +724,3 @@ mnavResult mnavCheckPolygon(const mnavNavmesh* navmesh, mnavPolygonId id)
     }
     return id.polygon < (uint32_t)slot->tile->mesh.polygonCount ? mnav_success : mnav_errorInvalid;
 }
-
-mnavPos3 mnavVertexWorld(const mnavFrame* f, const mnavMeshVertex* v)
-{
-    return (mnavPos3){f->x0 + v->x * f->cell, f->y0 + (v->y - MNAV_HEIGHT_OFFSET) * f->height,
-                      f->z0 + v->z * f->cell};
-}
