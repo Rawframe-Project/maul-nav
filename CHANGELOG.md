@@ -8,6 +8,10 @@ format.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-07
+
+Tile indexes of 2D outlines.
+
 ### Added
 
 - Tile indexes of 2D outlines (mnav-0014): `mnavCreateTileIndex2D`, and
