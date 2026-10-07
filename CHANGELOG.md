@@ -8,6 +8,17 @@ format.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-07
+
+Faster nearest queries and path searches, and a sample of a world baked
+by workers sharing a tile index.
+
+### Added
+
+- `samples/bake_world.c`: a world baked from one large mesh by four
+  worker threads sharing a tile index, checked against one thread's
+  bake without it, to the byte.
+
 ### Changed
 
 - `mnavFindNearest` looks up a polygon's detail height only when the
