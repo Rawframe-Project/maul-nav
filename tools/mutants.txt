@@ -241,3 +241,24 @@ ol-set-count | src/outline.c | mnavTileIndexList(index, tileX, tileZ, &set.liste
 hr-lowered | src/path.c | query->heap[node->heap] = EntryOf(query, n); | query->heap[node->heap].node = n;
 hr-new | src/path.c | query->heap[query->heapCount] = EntryOf(query, n); | query->heap[query->heapCount] = (mnavHeapEntry){query->nodes[n].cost, n};
 hr-restart | src/path.c | query->heap[0] = EntryOf(query, last); | query->heap[0] = (mnavHeapEntry){0.0, last};
+
+# Grid flow-field repairs (flow_repair.c): raising, subtrees, offers,
+# goals and the next cells chosen. Equivalent, also under fuzz_flow:
+# fr-offer-ties and fr-reset-next (the fix pass gives every touched cell
+# and its neighbours a build's next cell, and every raised or lowered
+# cell is touched), fr-next-exact (no neighbour offers less than a
+# settled cost).
+fr-raise-once | src/flow_repair.c | if ((f->marks[cell] & mnav_flowRaised) == 0) | if (true)
+fr-diag-one | src/flow_repair.c | if (diagonal && ((nx == x && cy == y) || (cx == x && ny == y))) | if (diagonal && (nx == x && cy == y))
+fr-diag-none | src/flow_repair.c | if (diagonal && ((nx == x && cy == y) || (cx == x && ny == y))) | if (diagonal && nx == x && ny == y)
+fr-subtree-straight | src/flow_repair.c | if (n >= 0 && n != cell && f->next[n] == cell) | if (n >= 0 && n != cell && f->next[n] == cell && (dx == 0 || dy == 0))
+fr-offer-ties | src/flow_repair.c | if (cost < f->costs[cell]) | if (cost <= f->costs[cell])
+fr-goal-blocked | src/flow_repair.c | if (cell >= 0 && mnavFlowOpen(s, goals[i].x, goals[i].y)) | if (cell >= 0)
+fr-old-goal | src/flow_repair.c | if ((f->marks[f->goals[i]] & mnav_flowNewGoal) == 0) | if (false)
+fr-reset-next | src/flow_repair.c | field->next[cell] = cell; | field->next[cell] = field->next[cell];
+fr-offer-raised | src/flow_repair.c | if (OpenCell(&s, field->touched[i])) | if (false)
+fr-goal-zero | src/flow_repair.c | if (field->costs[cell] != 0.0) | if (field->costs[cell] != 0.0 && false)
+fr-around | src/flow_repair.c | OfferAround(&s, changed[i].x, changed[i].y); | OfferAround(&s, -5, -5);
+fr-next-tie | src/flow_repair.c | (f->costs[n] == f->costs[best] && n < best)) | (f->costs[n] == f->costs[best] && n > best))
+fr-next-cheaper | src/flow_repair.c | if (best == cell || f->costs[n] < f->costs[best] || | if (best == cell || f->costs[n] > f->costs[best] ||
+fr-next-exact | src/flow_repair.c | f->costs[n] + mnavFlowStepCost(s, n, cell, length) != cost) | f->costs[n] + mnavFlowStepCost(s, n, cell, length) > cost)
