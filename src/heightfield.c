@@ -303,8 +303,8 @@ mnavResult mnavBuildHeightfieldInput(mnavMemory* memory, const mnavBakeDef* def,
 
 mnavResult mnavBuildHeightfield2D(mnavMemory* memory, const mnavBakeDef* def,
                                   const mnavBakeCells* cells, const mnavOutline* outlines,
-                                  int32_t outlineCount, int32_t tileX, int32_t tileZ,
-                                  mnavHeightfield* heightfield)
+                                  int32_t outlineCount, const mnavTileIndex* index, int32_t tileX,
+                                  int32_t tileZ, mnavHeightfield* heightfield)
 {
     *heightfield = (mnavHeightfield){0};
     if (!mnavMakeTileFrame(def, cells, tileX, tileZ, &heightfield->frame))
@@ -312,8 +312,8 @@ mnavResult mnavBuildHeightfield2D(mnavMemory* memory, const mnavBakeDef* def,
         return mnav_errorRange;
     }
     mnavFragmentList list = {nullptr, 0, 0, def->limits.tileSpans};
-    mnavResult result =
-        mnavCollectOutlines(memory, def, &heightfield->frame, outlines, outlineCount, &list);
+    const mnavOutlineSet set = mnavOutlinesFor(outlines, outlineCount, index, tileX, tileZ);
+    mnavResult result = mnavCollectOutlines(memory, def, &heightfield->frame, &set, &list);
     return Finish(memory, cells, result, &list, heightfield);
 }
 

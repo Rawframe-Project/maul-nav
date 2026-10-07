@@ -337,6 +337,15 @@ static mnavResult MakeTileIndex(void** out)
     return mnavCreateTileIndex(&def, &world, 1, (mnavTileIndex**)out, nullptr);
 }
 
+static mnavResult MakeTileIndex2D(void** out)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.allocator = Allocator();
+    static const mnavVec2 ring[4] = {{1, 1}, {40, 1}, {40, 40}, {1, 40}};
+    const mnavOutline outlines[2] = {{ring, 4, mnav_areaWalkable}, {s_strip, 4, mnav_areaNone}};
+    return mnavCreateTileIndex2D(&def, outlines, 2, (mnavTileIndex**)out, nullptr);
+}
+
 static void DestroyTileIndex(void* object)
 {
     mnavDestroyTileIndex(object);
@@ -350,6 +359,7 @@ static void TestObjects(void)
     CHECK(EachRefused(MakeFlowField, DestroyFlowField), "flow fields");
     CHECK(EachRefused(MakeAvoidance, DestroyAvoidance), "avoidance sets");
     CHECK(EachRefused(MakeTileIndex, DestroyTileIndex), "tile indexes");
+    CHECK(EachRefused(MakeTileIndex2D, DestroyTileIndex), "tile indexes of outlines");
 }
 
 int main(void)

@@ -191,6 +191,172 @@ static void TestSameBytes(const mnavBakeDef* def, Place place, const char* where
     mnavDestroyBaker(baker);
 }
 
+enum
+{
+    OUTLINES = 120,
+    RING = 12
+};
+
+static mnavVec2 s_points[OUTLINES][RING];
+static mnavOutline s_outlines[OUTLINES];
+
+// Random outlines about a place: a floor under all, boxes standing on the
+// frames' edges, obstructions among them, and rings of many points.
+static void MakeOutlines(const mnavBakeDef* def, Place place)
+{
+    mnavBakeCells cells;
+    CHECK(mnavValidateBakeDef(def, &cells).result == mnav_success, "a valid def");
+    double side = (double)def->tileCells * (double)def->cellSize;
+    float x0 = (float)((double)place.tileX * side - 4.0);
+    float x1 = (float)((double)(place.tileX + place.columns) * side + 4.0);
+    float z0 = (float)((double)place.tileZ * side - 4.0);
+    float z1 = (float)((double)(place.tileZ + place.rows) * side + 4.0);
+    for (int32_t o = 0; o < OUTLINES; ++o)
+    {
+        mnavVec2* p = s_points[o];
+        int32_t count = 4;
+        if (o == 0)
+        {
+            const mnavVec2 floor[4] = {{x0, z0}, {x1, z0}, {x1, z1}, {x0, z1}};
+            memcpy(p, floor, sizeof(floor));
+        }
+        else if (o % 3 == 0)
+        {
+            // A ring of many points, up to 4 m across.
+            float cx = Random(x0, x1);
+            float cz = Random(z0, z1);
+            float r = Random(0.5f, 4.0f);
+            count = RING;
+            for (int32_t i = 0; i < RING; ++i)
+            {
+                double a = 6.283185307179586 * (double)i / (double)RING;
+                p[i] = (mnavVec2){cx + r * (float)cos(a), cz + r * (float)sin(a)};
+            }
+        }
+        else
+        {
+            // A box with a side on a frame's edge.
+            float ax =
+                o % 2 == 0 ? Edge(def, cells.border, place.tileX, place.columns) : Random(x0, x1);
+            float az =
+                o % 2 == 1 ? Edge(def, cells.border, place.tileZ, place.rows) : Random(z0, z1);
+            float w = Random(0.3f, 3.0f);
+            const mnavVec2 box[4] = {{ax, az}, {ax + w, az}, {ax + w, az + w}, {ax, az + w}};
+            memcpy(p, box, sizeof(box));
+        }
+        mnavAreaType area =
+            o == 0 ? mnav_areaWalkable : (o % 4 == 1 ? mnav_areaNone : (mnavAreaType)(2 + o % 3));
+        s_outlines[o] = (mnavOutline){p, count, area};
+    }
+}
+
+// Bakes a 2D tile by mnavBakeTile2D, and by mnavBakeTile2DInput without
+// and with the index; whether all three agree.
+static bool Bakes2DAlike(mnavBaker* baker, const mnavTileIndex* index, int32_t x, int32_t z)
+{
+    static uint8_t third[TILE_ROOM];
+    uint8_t* out[3] = {s_plain, s_indexed, third};
+    size_t sizes[3] = {0, 0, 0};
+    mnavResult results[3];
+    mnavBakeReport reports[3];
+    for (int32_t k = 0; k < 3; ++k)
+    {
+        const mnavBake2DInput input = {s_outlines, OUTLINES, k == 2 ? index : nullptr};
+        results[k] = k == 0 ? mnavBakeTile2D(baker, s_outlines, OUTLINES, x, z, &reports[k])
+                            : mnavBakeTile2DInput(baker, &input, x, z, &reports[k]);
+        if (results[k] == mnav_success &&
+            mnavCopyBakedTile(baker, out[k], TILE_ROOM, &sizes[k]) != mnav_success)
+        {
+            return false;
+        }
+    }
+    bool same = true;
+    for (int32_t k = 1; k < 3; ++k)
+    {
+        same = same && results[k] == results[0] && reports[k].triangles == reports[0].triangles &&
+               reports[k].fingerprint == reports[0].fingerprint && sizes[k] == sizes[0] &&
+               memcmp(out[k], out[0], sizes[0]) == 0;
+    }
+    return same;
+}
+
+static void TestSameBytes2D(const mnavBakeDef* def, Place place, const char* where)
+{
+    MakeOutlines(def, place);
+    mnavBaker* baker = nullptr;
+    mnavTileIndex* index = nullptr;
+    mnavBakeReport report;
+    CHECK(mnavCreateBaker(def, &baker).result == mnav_success &&
+              mnavCreateTileIndex2D(def, s_outlines, OUTLINES, &index, &report) == mnav_success,
+          "made");
+    int32_t alike = 0;
+    int32_t tiles = 0;
+    for (int32_t z = place.tileZ - 3; z < place.tileZ + place.rows + 3; ++z)
+    {
+        for (int32_t x = place.tileX - 3; x < place.tileX + place.columns + 3; ++x)
+        {
+            alike += Bakes2DAlike(baker, index, x, z) ? 1 : 0;
+            tiles += 1;
+        }
+    }
+    printf("tile index of outlines, %s: %d of %d tiles alike\n", where, alike, tiles);
+    CHECK(alike == tiles, where);
+    mnavDestroyTileIndex(index);
+    mnavDestroyBaker(baker);
+}
+
+static void TestRefusals2D(void)
+{
+    mnavBakeDef def = Def();
+    MakeOutlines(&def, (Place){0, 0, 3, 3});
+    mnavTriangleMesh meshes[MESHES];
+    MakeMeshes(meshes, &def, (Place){0, 0, 3, 3});
+    mnavTileIndex* outlines = nullptr;
+    mnavTileIndex* triangles = nullptr;
+    mnavBaker* baker = nullptr;
+    mnavBakeReport report;
+    CHECK(mnavCreateTileIndex2D(&def, s_outlines, OUTLINES, &outlines, &report) == mnav_success &&
+              mnavCreateTileIndex(&def, meshes, MESHES, &triangles, &report) == mnav_success &&
+              mnavCreateBaker(&def, &baker).result == mnav_success,
+          "made");
+    mnavBake2DInput flat = {s_outlines, OUTLINES, triangles};
+    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
+          "an index of meshes refused by a 2D bake");
+    const mnavBakeInput solid = {meshes, MESHES, nullptr, 0, nullptr, 0, outlines};
+    CHECK(mnavBakeTileInput(baker, &solid, 1, 1, &report) == mnav_errorInvalid,
+          "an index of outlines refused by a 3D bake");
+    flat.index = outlines;
+    flat.outlineCount = OUTLINES - 1;
+    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
+          "another number of outlines refused");
+    flat.outlineCount = OUTLINES;
+    s_outlines[3].pointCount -= 1;
+    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
+          "another number of points refused");
+    s_outlines[3].pointCount += 1;
+    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_success &&
+              mnavBakeTile2DInput(baker, nullptr, 1, 1, &report) == mnav_errorInvalid,
+          "fits again; a NULL input refused");
+    // An outline changed since is checked as it is read.
+    s_points[0][1].x = NAN;
+    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid && report.mesh == 0,
+          "a point not finite, refused as read");
+    mnavBakeDef tight = def;
+    tight.limits.memoryBytes = 256;
+    mnavTileIndex* none = nullptr;
+    CHECK(mnavCreateTileIndex2D(&tight, s_outlines, OUTLINES, &none, &report) ==
+                  mnav_errorInvalid &&
+              report.mesh == 0 && none == nullptr,
+          "an outline its check refuses, named");
+    MakeOutlines(&def, (Place){0, 0, 3, 3});
+    CHECK(mnavCreateTileIndex2D(&tight, s_outlines, OUTLINES, &none, &report) == mnav_errorLimit &&
+              none == nullptr,
+          "past the memory limit");
+    mnavDestroyBaker(baker);
+    mnavDestroyTileIndex(triangles);
+    mnavDestroyTileIndex(outlines);
+}
+
 static void TestRefusals(void)
 {
     mnavBakeDef def = Def();
@@ -299,5 +465,10 @@ int main(void)
     def.cellSize = 0.3f;
     TestSameBytes(&def, (Place){131060, 131062, 5, 3}, "near the extent, rounding");
     TestRefusals();
+    mnavBakeDef flat = Def();
+    TestSameBytes2D(&flat, (Place){-3, -2, 6, 3}, "about the origin");
+    flat.cellSize = 0.3f;
+    TestSameBytes2D(&flat, (Place){131060, 131062, 5, 3}, "near the extent, rounding");
+    TestRefusals2D();
     return s_failures == 0 ? 0 : 1;
 }

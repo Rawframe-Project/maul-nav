@@ -8,6 +8,16 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- Tile indexes of 2D outlines (mnav-0014): `mnavCreateTileIndex2D`, and
+  `mnavBakeTile2DInput` with an `mnavBake2DInput` record holding the
+  outlines and an optional index, which reads only the outlines listed
+  for the tile and makes the same tile to the byte. `mnavBakeTile2D` is
+  unchanged. A bake refuses an index made of the other kind of input.
+  Baking the benchmark's flat world of 576 tiles takes about 9% fewer
+  instructions with one, the tiles the same.
+
 ## [0.3.1] - 2026-10-07
 
 Faster navmesh searches, the same paths.

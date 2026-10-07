@@ -45,6 +45,16 @@ over the triangles' ground bounds whose leaves reorder them.
   until the index is made again.
 - Terrains need no index (mnav-0003 finds a tile's cells by division),
   and volumes are few; both are read as before.
+- **Outlines (0.4.0):** a 2D bake re-checked and tested every outline for
+  every tile too, about a tenth of each bake of the benchmark's flat
+  world (576 tiles from about 9,300 outlines). `mnavCreateTileIndex2D`
+  makes the same kind of index of outlines, from their bounds, and
+  `mnavBakeTile2DInput` takes an `mnavBake2DInput` record with it, as
+  `mnavBakeTileInput` takes meshes; `mnavBakeTile2D` is unchanged. An
+  index records which kind of input it lists, and a bake refuses the
+  other kind. Baking the flat world and building its hierarchy falls
+  from 20.98 G to 19.12 G instructions with an index, about 9% of the
+  bake, the tiles the same.
 - Rejected: a cache inside the baker keyed by the meshes' addresses,
   stale without notice after an edit in place; Recast's k-d tree, which
   serves any rectangle where a bake asks only for its grid's tiles, and

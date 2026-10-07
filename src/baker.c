@@ -50,6 +50,7 @@ typedef struct Input
     mnavBakeInput solid;
     const mnavOutline* outlines;
     int32_t outlineCount;
+    const mnavTileIndex* outlineIndex;
     bool flat;
 } Input;
 
@@ -109,23 +110,36 @@ void mnavDestroyBaker(mnavBaker* baker)
 
 // Checks every mesh as hostile input and their total against the input
 // limit; names the first refused mesh in the report.
-static mnavResult CheckOutlines(const mnavBaker* baker, const mnavOutline* outlines,
-                                int32_t outlineCount, mnavBakeReport* report)
+// With a tile index, checks that it fits and only the outlines it lists
+// for the tile; the total counts every outline's points.
+static mnavResult CheckOutlines(const mnavBaker* baker, const Input* in, int32_t tileX,
+                                int32_t tileZ, mnavBakeReport* report)
 {
-    if (outlineCount < 0 || (outlineCount > 0 && outlines == nullptr))
+    const mnavOutline* outlines = in->outlines;
+    int32_t outlineCount = in->outlineCount;
+    if (outlineCount < 0 || (outlineCount > 0 && outlines == nullptr) ||
+        (in->outlineIndex != nullptr &&
+         !mnavTileIndexFits2D(in->outlineIndex, &baker->def, &baker->cells, outlines,
+                              outlineCount)))
     {
         return mnav_errorInvalid;
+    }
+    const mnavOutlineSet set =
+        mnavOutlinesFor(outlines, outlineCount, in->outlineIndex, tileX, tileZ);
+    for (int32_t k = 0; k < set.count; ++k)
+    {
+        const mnavOutline* outline = mnavOutlineAt(&set, k);
+        mnavInputResult input = mnavCheckOutline(&baker->def, outline);
+        if (input.result != mnav_success)
+        {
+            report->mesh = (int32_t)(outline - outlines);
+            report->input = input;
+            return input.result;
+        }
     }
     int64_t total = 0;
     for (int32_t o = 0; o < outlineCount; ++o)
     {
-        mnavInputResult input = mnavCheckOutline(&baker->def, &outlines[o]);
-        if (input.result != mnav_success)
-        {
-            report->mesh = o;
-            report->input = input;
-            return input.result;
-        }
         total += outlines[o].pointCount;
     }
     return total > baker->def.limits.inputTriangles ? mnav_errorLimit : mnav_success;
@@ -173,7 +187,7 @@ static mnavResult CheckInput(const mnavBaker* baker, const Input* in, int32_t ti
 {
     if (in->flat)
     {
-        return CheckOutlines(baker, in->outlines, in->outlineCount, report);
+        return CheckOutlines(baker, in, tileX, tileZ, report);
     }
     const mnavTriangleMesh* meshes = in->solid.meshes;
     int32_t meshCount = in->solid.meshCount;
@@ -426,15 +440,17 @@ static uint64_t HashInput(const mnavBaker* baker, const mnavTileFrame* frame,
 // one cell.
 // Adds every outline that reaches the tile to the fingerprint, after a
 // word that keeps 2D input apart from 3D, and counts them.
-static uint64_t HashOutlines(const mnavTileFrame* frame, const mnavOutline* outlines,
-                             int32_t outlineCount, uint64_t hash, int32_t* count)
+static uint64_t HashOutlines(const mnavTileFrame* frame, const Input* in, int32_t tileX,
+                             int32_t tileZ, uint64_t hash, int32_t* count)
 {
     const uint32_t tag = 0x32444E41u;
     hash = HashWords(hash, &tag, 1);
     *count = 0;
-    for (int32_t o = 0; o < outlineCount; ++o)
+    const mnavOutlineSet set =
+        mnavOutlinesFor(in->outlines, in->outlineCount, in->outlineIndex, tileX, tileZ);
+    for (int32_t k = 0; k < set.count; ++k)
     {
-        const mnavOutline* outline = &outlines[o];
+        const mnavOutline* outline = mnavOutlineAt(&set, k);
         if (!mnavOutlineTouchesTile(frame, outline))
         {
             continue;
@@ -493,8 +509,8 @@ static mnavResult RunStages(mnavBaker* baker, const Input* in, int32_t tileX, in
     Enter(baker, report, mnav_stageRasterize);
     bool flat = in->flat;
     mnavResult result =
-        flat ? mnavBuildHeightfield2D(memory, def, cells, in->outlines, in->outlineCount, tileX,
-                                      tileZ, &s->heightfield)
+        flat ? mnavBuildHeightfield2D(memory, def, cells, in->outlines, in->outlineCount,
+                                      in->outlineIndex, tileX, tileZ, &s->heightfield)
              : mnavBuildHeightfieldInput(memory, def, cells, &in->solid, tileX, tileZ,
                                          &s->heightfield);
     if (result != mnav_success)
@@ -638,7 +654,7 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
         uint64_t settings = HashSettings(&baker->def, tileX, tileZ);
         report.fingerprint =
             in->flat
-                ? HashOutlines(&frame, in->outlines, in->outlineCount, settings, &report.triangles)
+                ? HashOutlines(&frame, in, tileX, tileZ, settings, &report.triangles)
                 : HashInput(baker, &frame, &in->solid, tileX, tileZ, settings, &report.triangles);
         result = RunStages(baker, in, tileX, tileZ, &stages, &report);
     }
@@ -666,7 +682,7 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
 mnavResult mnavBakeTile(mnavBaker* baker, const mnavTriangleMesh* meshes, int32_t meshCount,
                         int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
 {
-    Input in = {{meshes, meshCount, nullptr, 0, nullptr, 0, nullptr}, nullptr, 0, false};
+    Input in = {{meshes, meshCount, nullptr, 0, nullptr, 0, nullptr}, nullptr, 0, nullptr, false};
     return Bake(baker, &in, tileX, tileZ, reportOut);
 }
 
@@ -675,17 +691,31 @@ mnavResult mnavBakeTileInput(mnavBaker* baker, const mnavBakeInput* input, int32
 {
     if (input == nullptr)
     {
-        Input none = {{nullptr, -1, nullptr, 0, nullptr, 0, nullptr}, nullptr, 0, false};
+        Input none = {{nullptr, -1, nullptr, 0, nullptr, 0, nullptr}, nullptr, 0, nullptr, false};
         return Bake(baker, &none, tileX, tileZ, reportOut);
     }
-    Input in = {*input, nullptr, 0, false};
+    Input in = {*input, nullptr, 0, nullptr, false};
     return Bake(baker, &in, tileX, tileZ, reportOut);
 }
 
 mnavResult mnavBakeTile2D(mnavBaker* baker, const mnavOutline* outlines, int32_t outlineCount,
                           int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
 {
-    Input in = {{nullptr, 0, nullptr, 0, nullptr, 0, nullptr}, outlines, outlineCount, true};
+    Input in = {
+        {nullptr, 0, nullptr, 0, nullptr, 0, nullptr}, outlines, outlineCount, nullptr, true};
+    return Bake(baker, &in, tileX, tileZ, reportOut);
+}
+
+mnavResult mnavBakeTile2DInput(mnavBaker* baker, const mnavBake2DInput* input, int32_t tileX,
+                               int32_t tileZ, mnavBakeReport* reportOut)
+{
+    const mnavBake2DInput none = {nullptr, -1, nullptr};
+    const mnavBake2DInput* in2 = input != nullptr ? input : &none;
+    Input in = {{nullptr, 0, nullptr, 0, nullptr, 0, nullptr},
+                in2->outlines,
+                in2->outlineCount,
+                in2->index,
+                true};
     return Bake(baker, &in, tileX, tileZ, reportOut);
 }
 

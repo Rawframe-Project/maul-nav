@@ -73,7 +73,9 @@ them as they are written.
   make a tile index of the meshes once (`mnavCreateTileIndex`) and pass
   it as `mnavBakeInput.index`: each bake then reads only the triangles
   near its tile and makes the same bytes. Indexes are read-only, so
-  workers share one. After changing a mesh, make a new index.
+  workers share one. After changing a mesh, make a new index. Outlines
+  have theirs too: `mnavCreateTileIndex2D`, passed to
+  `mnavBakeTile2DInput` in an `mnavBake2DInput`.
 - **The agent.** The def's `agent` (radius, height, step height,
   maximum slope) shapes what is walkable; a navmesh serves one agent
   profile.

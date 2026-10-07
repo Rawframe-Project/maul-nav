@@ -362,6 +362,17 @@ extern "C"
         const mnavTileIndex* index;
     } mnavBakeInput;
 
+    // Everything a 2D bake reads: outlines.
+    typedef struct mnavBake2DInput
+    {
+        const mnavOutline* outlines;
+        int32_t outlineCount;
+        // The outlines' tile index, or NULL to read every outline: made by
+        // mnavCreateTileIndex2D from these outlines, unchanged since, with
+        // a def of the same tile grid. Only read during the call.
+        const mnavTileIndex* index;
+    } mnavBake2DInput;
+
     // The kind of input element a check refused.
     typedef uint8_t mnavInputElement;
 
@@ -605,6 +616,33 @@ extern "C"
                                                            mnavTileIndex** indexOut,
                                                            mnavBakeReport* reportOut);
 
+    /// Makes a tile index of 2D outlines for a def's tile grid
+    /// (mnav-0014), as mnavCreateTileIndex does of meshes: checks every
+    /// outline as a 2D bake does, then lists for each tile the outlines
+    /// whose bounds, widened by the tile's border and two cells, reach it,
+    /// in input order. A bake given the index through mnavBake2DInput reads
+    /// only the tile's list and makes the same tile, to the byte.
+    ///
+    /// @param def          The def; the index fits defs with its cell
+    ///                     size, tile cells and agent radius.
+    /// @param outlines     The outlines, in the def's frame. Only read
+    ///                     during the call.
+    /// @param outlineCount The number of outlines, at least 0.
+    /// @param indexOut     Receives the index, or NULL on failure.
+    /// @param reportOut    Receives the result, the first outline refused
+    ///                     (in the report's mesh) and what its check found,
+    ///                     and the memory peak; the other fields are 0. May
+    ///                     be NULL.
+    /// @return As mnavCreateTileIndex, for outlines.
+    /// @par Thread safety
+    /// Safe from any thread. An index is never changed after it is made,
+    /// so any number of bakes on any threads may read it at once.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileIndex2D(const mnavBakeDef* def,
+                                                             const mnavOutline* outlines,
+                                                             int32_t outlineCount,
+                                                             mnavTileIndex** indexOut,
+                                                             mnavBakeReport* reportOut);
+
     /// Destroys a tile index.
     ///
     /// @param index  The index, or NULL.
@@ -663,6 +701,27 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavBakeTile2D(mnavBaker* baker, const mnavOutline* outlines,
                                                       int32_t outlineCount, int32_t tileX,
                                                       int32_t tileZ, mnavBakeReport* reportOut);
+
+    /// Bakes tile (tileX, tileZ) of 2D outlines as mnavBakeTile2D does,
+    /// from an input record. Given a tile index of the outlines, the bake
+    /// checks only the outlines it lists for the tile, which hold every
+    /// outline reaching it, and makes the same tile to the byte; the
+    /// total of the points still counts every outline.
+    ///
+    /// @param baker     The baker; the tile it held before is dropped.
+    /// @param input     The outlines and the index, or NULL.
+    /// @param tileX     The tile's column.
+    /// @param tileZ     The tile's row.
+    /// @param reportOut Receives the report. May be NULL.
+    /// @return As mnavBakeTile2D; a NULL input is `mnav_errorInvalid`, and
+    /// so is a tile index made for another grid, for meshes, or for
+    /// another number of outlines or of points in one.
+    /// @par Thread safety
+    /// Safe from any thread; the baker is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavBakeTile2DInput(mnavBaker* baker,
+                                                           const mnavBake2DInput* input,
+                                                           int32_t tileX, int32_t tileZ,
+                                                           mnavBakeReport* reportOut);
 
     /// Copies the last baked tile's bytes into caller memory.
     ///

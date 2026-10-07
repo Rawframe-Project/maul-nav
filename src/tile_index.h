@@ -14,7 +14,8 @@
 
 #include <stdint.h>
 
-// A triangle of the input: its mesh and its place in the mesh.
+// An item of the input: a triangle, by its mesh and its place in the
+// mesh, or an outline, by its place and 0.
 typedef struct mnavIndexEntry
 {
     int32_t mesh;
@@ -28,9 +29,11 @@ struct mnavTileIndex
     int32_t tileCells;
     float cellSize;
     int32_t border;
-    // The meshes it was built from: their count and each one's triangles.
-    int32_t meshCount;
-    int32_t* triangleCounts;
+    // What it was made from: outlines or meshes, how many, and each mesh's
+    // triangles or each outline's points.
+    bool outlines;
+    int32_t sourceCount;
+    int32_t* counts;
     // The tiles listed, columns by rows from (minX, minZ), row by row; tile
     // k's triangles are entries first[k] to first[k + 1], in input order.
     int32_t minX;
@@ -47,8 +50,13 @@ bool mnavTileIndexFits(const mnavTileIndex* index, const mnavBakeDef* def,
                        const mnavBakeCells* cells, const mnavTriangleMesh* meshes,
                        int32_t meshCount);
 
-// The triangles listed for tile (tileX, tileZ): none past the tiles the
-// index covers.
+// Whether an index was built for this grid and these outlines' counts.
+bool mnavTileIndexFits2D(const mnavTileIndex* index, const mnavBakeDef* def,
+                         const mnavBakeCells* cells, const mnavOutline* outlines,
+                         int32_t outlineCount);
+
+// The items listed for tile (tileX, tileZ), triangles (mesh, triangle) or
+// outlines (outline, 0): none past the tiles the index covers.
 void mnavTileIndexList(const mnavTileIndex* index, int32_t tileX, int32_t tileZ,
                        const mnavIndexEntry** entriesOut, int32_t* countOut);
 

@@ -10,7 +10,7 @@ raster: allocator
 terrain: raster
 volume: allocator compact outline raster
 heightfield: allocator outline raster terrain tile_index
-outline: allocator raster
+outline: allocator raster tile_index
 filter: heightfield
 compact: allocator heightfield raster
 erode: allocator compact

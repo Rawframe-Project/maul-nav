@@ -224,12 +224,15 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     // A tile index of the meshes (mnav-0014), made only when they all
     // pass their checks, gives the same result and the same bytes.
     mnavTileIndex* index = nullptr;
-    if (!flat && mnavCreateTileIndex(&def, in.meshes, meshes, &index, nullptr) == mnav_success)
+    if (flat ? mnavCreateTileIndex2D(&def, in.outlines, outlines, &index, nullptr) == mnav_success
+             : mnavCreateTileIndex(&def, in.meshes, meshes, &index, nullptr) == mnav_success)
     {
         mnavBakeInput indexed = input;
         indexed.index = index;
+        const mnavBake2DInput flatIndexed = {in.outlines, outlines, index};
         mnavBakeReport report;
-        mnavResult result = mnavBakeTileInput(baker, &indexed, tileX, tileZ, &report);
+        mnavResult result = flat ? mnavBakeTile2DInput(baker, &flatIndexed, tileX, tileZ, &report)
+                                 : mnavBakeTileInput(baker, &indexed, tileX, tileZ, &report);
         static uint8_t copy[TILE_ROOM];
         size_t copySize = 0;
         Expect((result == mnav_success) == (tileSize > 0));

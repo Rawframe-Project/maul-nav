@@ -96,6 +96,11 @@ MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileIndex(const mnavBakeDef* def, c
 Makes a tile index of meshes for a def's tile grid (mnav-0014): checks every mesh as a bake does, then lists for each tile the triangles whose ground bounds, widened by the tile's border and two cells, reach it, in input order. A bake given the index through mnavBakeInput reads only the tile's list and makes the same tile, to the byte, as a bake that reads every triangle. Changing a mesh's vertices or triangles calls for a new index.  @param def       The def; the index fits defs with its cell size, tile cells and agent radius. @param meshes    The meshes, in the def's frame. Only read during the call. @param meshCount The number of meshes, at least 0. @param indexOut  Receives the index, or NULL on failure. @param reportOut Receives the result, the first mesh refused and what its check found, and the memory peak; the other fields are 0. May be NULL. @return `mnav_success`; `mnav_errorInvalid` for an invalid def, a NULL indexOut, a negative count, NULL meshes with a positive count, or a mesh its check refuses; `mnav_errorRange` for a mesh past the extent; `mnav_errorLimit` past the def's memory limit or past 2^31 - 1 listed triangles; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread. An index is never changed after it is made, so any number of bakes on any threads may read it at once.
 
 ```c
+MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileIndex2D(const mnavBakeDef* def, const mnavOutline* outlines, int32_t outlineCount, mnavTileIndex** indexOut, mnavBakeReport* reportOut);
+```
+Makes a tile index of 2D outlines for a def's tile grid (mnav-0014), as mnavCreateTileIndex does of meshes: checks every outline as a 2D bake does, then lists for each tile the outlines whose bounds, widened by the tile's border and two cells, reach it, in input order. A bake given the index through mnavBake2DInput reads only the tile's list and makes the same tile, to the byte.  @param def          The def; the index fits defs with its cell size, tile cells and agent radius. @param outlines     The outlines, in the def's frame. Only read during the call. @param outlineCount The number of outlines, at least 0. @param indexOut     Receives the index, or NULL on failure. @param reportOut    Receives the result, the first outline refused (in the report's mesh) and what its check found, and the memory peak; the other fields are 0. May be NULL. @return As mnavCreateTileIndex, for outlines. @par Thread safety Safe from any thread. An index is never changed after it is made, so any number of bakes on any threads may read it at once.
+
+```c
 void mnavDestroyTileIndex(mnavTileIndex* index);
 ```
 Destroys a tile index.  @param index  The index, or NULL. @par Thread safety Safe from any thread; the index is used by one thread at a time. No bake may be reading it.
@@ -109,6 +114,11 @@ Bakes tile (tileX, tileZ) of the meshes: checks every mesh, then rasterizes, fil
 MNAV_NODISCARD MNAV_API mnavResult mnavBakeTile2D(mnavBaker* baker, const mnavOutline* outlines, int32_t outlineCount, int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut);
 ```
 Bakes tile (tileX, tileZ) of 2D outlines (mnav-0002): checks every outline, fills the cells whose centers a walkable outline holds and no obstruction does as a flat floor at height 0, with the highest area among the outlines holding them, then erodes, partitions, traces and triangulates as mnavBakeTile does; the walkable filters, which judge heights, do not run. The report's mesh names a refused outline and its triangles count the outlines reaching the tile.  @param baker        The baker. @param outlines     The input outlines, in the def's frame. @param outlineCount The number of outlines, at least 0. @param tileX        The tile's column in the grid from the origin. @param tileZ        The tile's row. @param reportOut    Receives what the bake did. May be NULL. @return As mnavBakeTile, for outlines; also `mnav_errorLimit` for more points in all than the inputTriangles limit, or more outlines reaching the tile than the tileTriangles limit. @par Thread safety Safe from any thread; the baker is used by one thread at a time. Bakers share nothing, so one per thread bakes tiles in parallel.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavBakeTile2DInput(mnavBaker* baker, const mnavBake2DInput* input, int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut);
+```
+Bakes tile (tileX, tileZ) of 2D outlines as mnavBakeTile2D does, from an input record. Given a tile index of the outlines, the bake checks only the outlines it lists for the tile, which hold every outline reaching it, and makes the same tile to the byte; the total of the points still counts every outline.  @param baker     The baker; the tile it held before is dropped. @param input     The outlines and the index, or NULL. @param tileX     The tile's column. @param tileZ     The tile's row. @param reportOut Receives the report. May be NULL. @return As mnavBakeTile2D; a NULL input is `mnav_errorInvalid`, and so is a tile index made for another grid, for meshes, or for another number of outlines or of points in one. @par Thread safety Safe from any thread; the baker is used by one thread at a time.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* buffer, size_t capacity, size_t* sizeOut);
@@ -485,4 +495,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-88 functions across 11 headers.
+90 functions across 11 headers.

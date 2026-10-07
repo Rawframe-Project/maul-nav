@@ -26,13 +26,11 @@ static int64_t FloorDiv(int64_t a, int64_t b)
     return (a % b != 0 && (a < 0) != (b < 0)) ? q - 1 : q;
 }
 
-// The tiles, along one axis, that a triangle with corners a, b and c on
-// that axis may reach.
-static void TileRange(const mnavTileIndex* index, float a, float b, float c, int64_t* lowOut,
+// The tiles, along one axis, that an input spanning low to high on that
+// axis may reach.
+static void TileRange(const mnavTileIndex* index, float low, float high, int64_t* lowOut,
                       int64_t* highOut)
 {
-    float low = fminf(a, fminf(b, c));
-    float high = fmaxf(a, fmaxf(b, c));
     int64_t lowCell = (int64_t)floor((double)low / (double)index->cellSize) - MARGIN_CELLS;
     int64_t highCell = (int64_t)floor((double)high / (double)index->cellSize) + MARGIN_CELLS;
     *lowOut = FloorDiv(lowCell - index->border, index->tileCells);
@@ -51,23 +49,61 @@ static Reach TriangleReach(const mnavTileIndex* index, const mnavTriangleMesh* m
 {
     const int32_t* corner = mesh->indices + (size_t)t * 3;
     const mnavVec3* v = mesh->vertices;
+    mnavVec3 a = v[corner[0]];
+    mnavVec3 b = v[corner[1]];
+    mnavVec3 c = v[corner[2]];
     Reach reach;
-    TileRange(index, v[corner[0]].x, v[corner[1]].x, v[corner[2]].x, &reach.x0, &reach.x1);
-    TileRange(index, v[corner[0]].z, v[corner[1]].z, v[corner[2]].z, &reach.z0, &reach.z1);
+    TileRange(index, fminf(a.x, fminf(b.x, c.x)), fmaxf(a.x, fmaxf(b.x, c.x)), &reach.x0,
+              &reach.x1);
+    TileRange(index, fminf(a.z, fminf(b.z, c.z)), fmaxf(a.z, fmaxf(b.z, c.z)), &reach.z0,
+              &reach.z1);
     return reach;
 }
 
-// Finds the tiles the triangles reach and how many entries they make.
-static mnavResult Measure(mnavTileIndex* index, const mnavTriangleMesh* meshes, int32_t meshCount,
-                          int64_t* entriesOut)
+static Reach OutlineReach(const mnavTileIndex* index, const mnavOutline* outline)
+{
+    mnavVec2 low = outline->points[0];
+    mnavVec2 high = low;
+    for (int32_t i = 1; i < outline->pointCount; ++i)
+    {
+        low = (mnavVec2){fminf(low.x, outline->points[i].x), fminf(low.y, outline->points[i].y)};
+        high = (mnavVec2){fmaxf(high.x, outline->points[i].x), fmaxf(high.y, outline->points[i].y)};
+    }
+    Reach reach;
+    TileRange(index, low.x, high.x, &reach.x0, &reach.x1);
+    TileRange(index, low.y, high.y, &reach.z0, &reach.z1);
+    return reach;
+}
+
+// What an index lists: meshes' triangles, or outlines, each one item.
+typedef struct Source
+{
+    const mnavTriangleMesh* meshes;
+    const mnavOutline* outlines;
+    int32_t count;
+} Source;
+
+static int32_t Items(Source s, int32_t g)
+{
+    return s.meshes != nullptr ? s.meshes[g].triangleCount : 1;
+}
+
+static Reach ItemReach(const mnavTileIndex* index, Source s, int32_t g, int32_t i)
+{
+    return s.meshes != nullptr ? TriangleReach(index, &s.meshes[g], i)
+                               : OutlineReach(index, &s.outlines[g]);
+}
+
+// Finds the tiles the items reach and how many entries they make.
+static mnavResult Measure(mnavTileIndex* index, Source s, int64_t* entriesOut)
 {
     Reach all = {INT64_MAX, INT64_MIN, INT64_MAX, INT64_MIN};
     int64_t entries = 0;
-    for (int32_t m = 0; m < meshCount; ++m)
+    for (int32_t m = 0; m < s.count; ++m)
     {
-        for (int32_t t = 0; t < meshes[m].triangleCount; ++t)
+        for (int32_t t = 0; t < Items(s, m); ++t)
         {
-            Reach r = TriangleReach(index, &meshes[m], t);
+            Reach r = ItemReach(index, s, m, t);
             all.x0 = r.x0 < all.x0 ? r.x0 : all.x0;
             all.x1 = r.x1 > all.x1 ? r.x1 : all.x1;
             all.z0 = r.z0 < all.z0 ? r.z0 : all.z0;
@@ -95,16 +131,15 @@ static mnavResult Measure(mnavTileIndex* index, const mnavTriangleMesh* meshes, 
     return mnav_success;
 }
 
-// Calls visit for every tile each triangle reaches, triangles in input
-// order: counting, then filling.
-static void Fill(mnavTileIndex* index, const mnavTriangleMesh* meshes, int32_t meshCount,
-                 bool count)
+// Visits every tile each item reaches, items in input order: counting,
+// then filling.
+static void Fill(mnavTileIndex* index, Source s, bool count)
 {
-    for (int32_t m = 0; m < meshCount; ++m)
+    for (int32_t m = 0; m < s.count; ++m)
     {
-        for (int32_t t = 0; t < meshes[m].triangleCount; ++t)
+        for (int32_t t = 0; t < Items(s, m); ++t)
         {
-            Reach r = TriangleReach(index, &meshes[m], t);
+            Reach r = ItemReach(index, s, m, t);
             for (int64_t z = r.z0; z <= r.z1; ++z)
             {
                 for (int64_t x = r.x0; x <= r.x1; ++x)
@@ -131,25 +166,26 @@ static void Release(mnavTileIndex* index)
     mnavRelease(&memory, index->entries, (size_t)index->entryCount, sizeof(mnavIndexEntry),
                 alignof(mnavIndexEntry));
     mnavRelease(&memory, index->first, (size_t)tiles + 1, sizeof(int32_t), alignof(int32_t));
-    mnavRelease(&memory, index->triangleCounts, (size_t)index->meshCount, sizeof(int32_t),
+    mnavRelease(&memory, index->counts, (size_t)index->sourceCount, sizeof(int32_t),
                 alignof(int32_t));
     mnavRelease(&memory, index, 1, sizeof(mnavTileIndex), alignof(mnavTileIndex));
 }
 
-static mnavResult Build(mnavTileIndex* index, const mnavTriangleMesh* meshes, int32_t meshCount)
+static mnavResult Build(mnavTileIndex* index, Source s)
 {
-    mnavResult result = mnavAllocate(&index->memory, (size_t)meshCount, sizeof(int32_t),
-                                     alignof(int32_t), (void**)&index->triangleCounts);
+    mnavResult result = mnavAllocate(&index->memory, (size_t)s.count, sizeof(int32_t),
+                                     alignof(int32_t), (void**)&index->counts);
     if (result != mnav_success)
     {
         return result;
     }
-    for (int32_t m = 0; m < meshCount; ++m)
+    for (int32_t m = 0; m < s.count; ++m)
     {
-        index->triangleCounts[m] = meshes[m].triangleCount;
+        index->counts[m] =
+            s.meshes != nullptr ? s.meshes[m].triangleCount : s.outlines[m].pointCount;
     }
     int64_t entries = 0;
-    result = Measure(index, meshes, meshCount, &entries);
+    result = Measure(index, s, &entries);
     int32_t tiles = index->columns * index->rows;
     if (result == mnav_success)
     {
@@ -172,12 +208,12 @@ static mnavResult Build(mnavTileIndex* index, const mnavTriangleMesh* meshes, in
     }
     // Counts, sums them into each tile's end, fills each tile from its
     // start up to that end, then moves the ends back to starts.
-    Fill(index, meshes, meshCount, true);
+    Fill(index, s, true);
     for (int32_t k = 0; k < tiles; ++k)
     {
         index->first[k + 1] += index->first[k];
     }
-    Fill(index, meshes, meshCount, false);
+    Fill(index, s, false);
     for (int32_t k = tiles; k > 0; --k)
     {
         index->first[k] = index->first[k - 1];
@@ -186,16 +222,53 @@ static mnavResult Build(mnavTileIndex* index, const mnavTriangleMesh* meshes, in
     return mnav_success;
 }
 
+// Makes an index of the checked input for the def's grid.
+static mnavResult Make(const mnavBakeDef* def, const mnavBakeCells* cells, Source s,
+                       mnavTileIndex** indexOut, mnavBakeReport* report)
+{
+    mnavMemory memory = mnavMakeMemory(def->allocator, def->limits.memoryBytes);
+    mnavTileIndex* index = nullptr;
+    mnavResult result =
+        mnavAllocate(&memory, 1, sizeof(mnavTileIndex), alignof(mnavTileIndex), (void**)&index);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    *index = (mnavTileIndex){.memory = memory,
+                             .tileCells = def->tileCells,
+                             .cellSize = def->cellSize,
+                             .border = cells->border,
+                             .outlines = s.outlines != nullptr,
+                             .sourceCount = s.count};
+    result = Build(index, s);
+    if (result != mnav_success)
+    {
+        Release(index);
+        return result;
+    }
+    report->memoryPeak = index->memory.peak;
+    *indexOut = index;
+    return mnav_success;
+}
+
+// A report cleared for an index's making: the input stage, no input
+// refused.
+static mnavBakeReport* Begin(mnavBakeReport* reportOut, mnavBakeReport* ignored)
+{
+    mnavBakeReport* report = reportOut != nullptr ? reportOut : ignored;
+    *report = (mnavBakeReport){0};
+    report->stage = mnav_stageInput;
+    report->mesh = -1;
+    report->input = (mnavInputResult){mnav_success, mnav_elementNone, -1};
+    return report;
+}
+
 mnavResult mnavCreateTileIndex(const mnavBakeDef* def, const mnavTriangleMesh* meshes,
                                int32_t meshCount, mnavTileIndex** indexOut,
                                mnavBakeReport* reportOut)
 {
     mnavBakeReport ignored;
-    mnavBakeReport* report = reportOut != nullptr ? reportOut : &ignored;
-    *report = (mnavBakeReport){0};
-    report->stage = mnav_stageInput;
-    report->mesh = -1;
-    report->input = (mnavInputResult){mnav_success, mnav_elementNone, -1};
+    mnavBakeReport* report = Begin(reportOut, &ignored);
     if (indexOut == nullptr)
     {
         return report->result = mnav_errorInvalid;
@@ -217,28 +290,39 @@ mnavResult mnavCreateTileIndex(const mnavBakeDef* def, const mnavTriangleMesh* m
             return report->result = input.result;
         }
     }
-    mnavMemory memory = mnavMakeMemory(def->allocator, def->limits.memoryBytes);
-    mnavTileIndex* index = nullptr;
-    mnavResult result =
-        mnavAllocate(&memory, 1, sizeof(mnavTileIndex), alignof(mnavTileIndex), (void**)&index);
-    if (result != mnav_success)
+    return report->result =
+               Make(def, &cells, (Source){meshes, nullptr, meshCount}, indexOut, report);
+}
+
+mnavResult mnavCreateTileIndex2D(const mnavBakeDef* def, const mnavOutline* outlines,
+                                 int32_t outlineCount, mnavTileIndex** indexOut,
+                                 mnavBakeReport* reportOut)
+{
+    mnavBakeReport ignored;
+    mnavBakeReport* report = Begin(reportOut, &ignored);
+    if (indexOut == nullptr)
     {
-        return report->result = result;
+        return report->result = mnav_errorInvalid;
     }
-    *index = (mnavTileIndex){.memory = memory,
-                             .tileCells = def->tileCells,
-                             .cellSize = def->cellSize,
-                             .border = cells.border,
-                             .meshCount = meshCount};
-    result = Build(index, meshes, meshCount);
-    if (result != mnav_success)
+    *indexOut = nullptr;
+    mnavBakeCells cells = {0};
+    if (def == nullptr || outlineCount < 0 || (outlineCount > 0 && outlines == nullptr) ||
+        mnavCheckBakeDef(def, &cells).result != mnav_success)
     {
-        Release(index);
-        return report->result = result;
+        return report->result = mnav_errorInvalid;
     }
-    report->memoryPeak = index->memory.peak;
-    *indexOut = index;
-    return report->result = mnav_success;
+    for (int32_t o = 0; o < outlineCount; ++o)
+    {
+        mnavInputResult input = mnavCheckOutline(def, &outlines[o]);
+        if (input.result != mnav_success)
+        {
+            report->mesh = o;
+            report->input = input;
+            return report->result = input.result;
+        }
+    }
+    return report->result =
+               Make(def, &cells, (Source){nullptr, outlines, outlineCount}, indexOut, report);
 }
 
 void mnavDestroyTileIndex(mnavTileIndex* index)
@@ -249,18 +333,45 @@ void mnavDestroyTileIndex(mnavTileIndex* index)
     }
 }
 
+// Whether an index was made for the def's grid, of this kind of input and
+// this many of it.
+static bool FitsGrid(const mnavTileIndex* index, const mnavBakeDef* def, const mnavBakeCells* cells,
+                     bool outlines, int32_t count)
+{
+    return index->tileCells == def->tileCells && index->cellSize == def->cellSize &&
+           index->border == cells->border && index->outlines == outlines &&
+           index->sourceCount == count;
+}
+
 bool mnavTileIndexFits(const mnavTileIndex* index, const mnavBakeDef* def,
                        const mnavBakeCells* cells, const mnavTriangleMesh* meshes,
                        int32_t meshCount)
 {
-    if (index->tileCells != def->tileCells || index->cellSize != def->cellSize ||
-        index->border != cells->border || index->meshCount != meshCount)
+    if (!FitsGrid(index, def, cells, false, meshCount))
     {
         return false;
     }
     for (int32_t m = 0; m < meshCount; ++m)
     {
-        if (index->triangleCounts[m] != meshes[m].triangleCount)
+        if (index->counts[m] != meshes[m].triangleCount)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool mnavTileIndexFits2D(const mnavTileIndex* index, const mnavBakeDef* def,
+                         const mnavBakeCells* cells, const mnavOutline* outlines,
+                         int32_t outlineCount)
+{
+    if (!FitsGrid(index, def, cells, true, outlineCount))
+    {
+        return false;
+    }
+    for (int32_t o = 0; o < outlineCount; ++o)
+    {
+        if (index->counts[o] != outlines[o].pointCount)
         {
             return false;
         }
