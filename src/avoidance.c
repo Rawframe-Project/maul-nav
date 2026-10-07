@@ -40,6 +40,13 @@
 #define ENTRIES_PER_VERTEX 8
 
 // An agent's grid cell, id and index, sorted to find neighbours.
+// An occupied cell's keys, first to end; first is -1 in a free slot.
+typedef struct Run
+{
+    int32_t first;
+    int32_t end;
+} Run;
+
 typedef struct Key
 {
     int64_t x;
@@ -64,10 +71,9 @@ struct mnavAvoidance
     mnavAvoidanceDef def;
     Key* keys;
     Key* scratch;
-    // Each occupied cell's first key, by a hash of the cell: twice the
-    // agents' room, a power of two, of which a step uses what its agents
-    // need.
-    int32_t* table;
+    // Each occupied cell's keys, by a hash of the cell: twice the agents'
+    // room, a power of two, of which a step uses what its agents need.
+    Run* table;
     int32_t tableCapacity;
     uint32_t tableMask;
     Neighbor* neighbors;
@@ -142,8 +148,8 @@ static mnavResult Allocate(mnavAvoidance* a)
     a->tableCapacity = TableSize((int32_t)agents);
     if (result == mnav_success)
     {
-        result = mnavAllocate(&a->memory, (size_t)a->tableCapacity, sizeof(int32_t),
-                              alignof(int32_t), (void**)&a->table);
+        result = mnavAllocate(&a->memory, (size_t)a->tableCapacity, sizeof(Run), alignof(Run),
+                              (void**)&a->table);
     }
     if (result == mnav_success)
     {
@@ -240,7 +246,7 @@ void mnavDestroyAvoidance(mnavAvoidance* avoidance)
     size_t near = (size_t)limits->obstacleNeighbors;
     size_t lines = neighbors + near;
     mnavRelease(&memory, avoidance->keys, agents, sizeof(Key), alignof(Key));
-    mnavRelease(&memory, avoidance->table, (size_t)avoidance->tableCapacity, sizeof(int32_t),
+    mnavRelease(&memory, avoidance->table, (size_t)avoidance->tableCapacity, sizeof(Run),
                 alignof(int32_t));
     mnavRelease(&memory, avoidance->scratch, agents, sizeof(Key), alignof(Key));
     mnavRelease(&memory, avoidance->neighbors, neighbors, sizeof(Neighbor), alignof(Neighbor));
@@ -322,42 +328,48 @@ static uint32_t CellHash(int64_t x, int64_t y)
     return (uint32_t)(h ^ (h >> 32));
 }
 
-// Fills the cell table from the sorted keys: each occupied cell's first
-// key, probed linearly from its hash.
+// Fills the cell table from the sorted keys: each occupied cell's run of
+// keys, probed linearly from its hash.
 static void BuildTable(mnavAvoidance* a, int32_t count)
 {
     int32_t size = TableSize(count);
     a->tableMask = (uint32_t)size - 1u;
-    memset(a->table, 0xFF, (size_t)size * sizeof(int32_t));
+    for (int32_t s = 0; s < size; ++s)
+    {
+        a->table[s] = (Run){-1, -1};
+    }
+    Run* run = nullptr;
     for (int32_t k = 0; k < count; ++k)
     {
         const Key* key = &a->keys[k];
         if (k > 0 && key->x == a->keys[k - 1].x && key->y == a->keys[k - 1].y)
         {
+            run->end = k + 1;
             continue;
         }
         uint32_t slot = CellHash(key->x, key->y) & a->tableMask;
-        while (a->table[slot] >= 0)
+        while (a->table[slot].first >= 0)
         {
             slot = (slot + 1u) & a->tableMask;
         }
-        a->table[slot] = k;
+        run = &a->table[slot];
+        *run = (Run){k, k + 1};
     }
 }
 
-// The first key of cell (x, y), or -1 when no agent is in it.
-static int32_t FirstIn(const mnavAvoidance* a, int64_t x, int64_t y)
+// The keys of cell (x, y), an empty run when no agent is in it.
+static Run RunIn(const mnavAvoidance* a, int64_t x, int64_t y)
 {
     uint32_t slot = CellHash(x, y) & a->tableMask;
-    for (int32_t k = a->table[slot]; k >= 0; k = a->table[slot])
+    for (Run run = a->table[slot]; run.first >= 0; run = a->table[slot])
     {
-        if (a->keys[k].x == x && a->keys[k].y == y)
+        if (a->keys[run.first].x == x && a->keys[run.first].y == y)
         {
-            return k;
+            return run;
         }
         slot = (slot + 1u) & a->tableMask;
     }
-    return -1;
+    return (Run){0, 0};
 }
 
 static bool NeighborBefore(const Neighbor* a, const Neighbor* b)
@@ -398,13 +410,13 @@ static int64_t CellOf(double v, double size)
 
 // Keeps the agents of cell (x, y) within range of agent i; returns the
 // count kept.
-static int32_t Scan(mnavAvoidance* a, const mnavAgent* agents, int32_t count, int32_t i, int64_t x,
-                    int64_t y, int32_t found)
+static int32_t Scan(mnavAvoidance* a, const mnavAgent* agents, int32_t i, int64_t x, int64_t y,
+                    int32_t found)
 {
     const mnavAgent* self = &agents[i];
     double rangeSq = a->def.neighborDistance * a->def.neighborDistance;
-    int32_t first = FirstIn(a, x, y);
-    for (int32_t k = first; k >= 0 && k < count && a->keys[k].x == x && a->keys[k].y == y; ++k)
+    Run run = RunIn(a, x, y);
+    for (int32_t k = run.first; k < run.end; ++k)
     {
         const Key* key = &a->keys[k];
         double dx = key->position.x - self->position.x;
@@ -425,7 +437,7 @@ static int32_t Scan(mnavAvoidance* a, const mnavAgent* agents, int32_t count, in
 // ring nearer than that to nothing kept holds no agent it would keep
 // (ties at the worst distance are still looked at), and the search stops.
 // The neighbours are those a search of every cell in range finds.
-static int32_t Neighbors(mnavAvoidance* a, const mnavAgent* agents, int32_t count, int32_t i)
+static int32_t Neighbors(mnavAvoidance* a, const mnavAgent* agents, int32_t i)
 {
     double range = a->def.neighborDistance;
     double size = range / CELL_DIVISIONS;
@@ -446,7 +458,7 @@ static int32_t Neighbors(mnavAvoidance* a, const mnavAgent* agents, int32_t coun
             bool side = x == cx - r || x == cx + r;
             for (int64_t y = cy - r; y <= cy + r; y += side || r == 0 ? 1 : 2 * r)
             {
-                found = Scan(a, agents, count, i, x, y, found);
+                found = Scan(a, agents, i, x, y, found);
             }
         }
     }
@@ -455,8 +467,7 @@ static int32_t Neighbors(mnavAvoidance* a, const mnavAgent* agents, int32_t coun
 
 // The new velocity of agent i: its obstacle lines, then its neighbours',
 // the 2D program over them all and the 3D one when they leave nothing.
-static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, int32_t agentCount, double step,
-                      int32_t i)
+static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, double step, int32_t i)
 {
     const mnavAgent* self = &agents[i];
     int32_t near = mnavNearObstacles(self, a->vertices, &a->grid, a->def.obstacleTimeHorizon,
@@ -464,7 +475,7 @@ static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, int32_t agentCo
     int32_t fixed = mnavObstacleLines(self, a->vertices, a->near, near, a->def.obstacleTimeHorizon,
                                       step, a->lines);
     int32_t count = fixed;
-    int32_t neighbors = Neighbors(a, agents, agentCount, i);
+    int32_t neighbors = Neighbors(a, agents, i);
     for (int32_t n = 0; n < neighbors; ++n)
     {
         const mnavAgent* other = &agents[a->neighbors[n].index];
@@ -538,7 +549,7 @@ mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t 
     BuildTable(avoidance, agentCount);
     for (int32_t i = 0; i < agentCount; ++i)
     {
-        velocitiesOut[i] = Solve(avoidance, agents, agentCount, step, i);
+        velocitiesOut[i] = Solve(avoidance, agents, step, i);
     }
     return mnav_success;
 }
@@ -600,7 +611,7 @@ mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance, const mnavAgent* agents,
                           a->position.y + a->radius * s_outline[(k + 1) % 16][1]};
             mnavDrawLine(buffer, p, q, mnav_debugAgent, 0);
         }
-        int32_t count = Neighbors(avoidance, agents, agentCount, i);
+        int32_t count = Neighbors(avoidance, agents, i);
         for (int32_t n = 0; n < count; ++n)
         {
             const mnavAgent* b = &agents[avoidance->neighbors[n].index];

@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- Avoidance's cell table keeps each occupied cell's run of agents, so
+  a neighbour search reads a cell's agents without testing each one's
+  cell: the benchmark's doorway of 1000 agents takes 3.6% fewer
+  instructions and about 4% less time a step, every velocity the same.
+
 ## [0.4.2] - 2026-10-07
 
 Faster grid flow fields and path searches, and a fuzz target for grid
