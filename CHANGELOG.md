@@ -8,6 +8,11 @@ format.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-07
+
+Faster grid flow fields and path searches, and a fuzz target for grid
+flow fields.
+
 ### Added
 
 - A fuzz target for grid flow fields, `fuzz_flow`, with its seed

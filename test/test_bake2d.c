@@ -17,7 +17,7 @@
 #include <string.h>
 
 // The hash of the room's tile bytes, the same on every platform.
-#define ROOM_HASH 0x833b6f240920478bull
+#define ROOM_HASH 0x46541fd7503690f8ull
 
 enum
 {
