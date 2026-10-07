@@ -50,8 +50,8 @@ local search.
   nodes, since a short way forced through entrances can be much longer.
 - **Updates:** a commit that changes only polygon areas redoes only
   the edges from transitions entering the clusters it touched, and
-  those entering the clusters with transitions out into the tiles it
-  touched.
+  those entering the clusters with a transition out whose crossing
+  polygon the filter has come to include or exclude.
 - **Fallbacks:** a start and end in one cluster, an end the graph does
   not reach, or a step that finds no way take the plain search.
 
@@ -74,9 +74,13 @@ local search.
   change there changes that cluster's edges too. In 0.1.0 the update
   kept them, and a fuzz target found the graph it gave differing from a
   build's (an edge kept to a crossing left out by the filter); such
-  clusters are now searched again too. On the test world an area change
-  in one tile searches 27 of 114 transitions again, against 10 before;
-  on the benchmark's flat world, 60 of 588 against 20, at 59.9 million
-  instructions an update against 18.0 million, still a tenth of a
-  build. Searching fewer would mean repairing single edge costs, which
-  that tenth does not call for.
+  clusters are now searched again too. Those searches open the crossing
+  polygon but never walk it, so its area's cost enters none of their
+  costs; only whether the filter includes it does. Each transition
+  keeps that, and the cluster it leaves is searched again only when it
+  flips (0.2.5). On the benchmark's flat world an area change then
+  searches 20 of 588 transitions, as before 0.2.0, at 18.0 million
+  instructions an update against 59.9 million when every tile change
+  marked the cluster before it; 300 random updates under a filter
+  leaving an area out, 119 of their changes to it, gave graphs the same
+  as a build's to the last edge cost.

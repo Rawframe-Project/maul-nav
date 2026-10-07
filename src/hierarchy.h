@@ -38,6 +38,10 @@ typedef struct mnavTransition
     int32_t runHigh;
     // The transition crossing the same portal the other way, or -1.
     int32_t reverse;
+    // Whether the hierarchy's filter included the polygon entered when
+    // the graph was last brought up to date: all the searches of the
+    // cluster left see of that polygon.
+    bool included;
 } mnavTransition;
 
 // An edge: the transition it leads to and what reaching it costs.

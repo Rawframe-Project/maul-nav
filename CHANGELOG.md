@@ -8,6 +8,14 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- `mnavUpdateHierarchy` searches again the cluster before a changed
+  tile only when the filter has come to include or exclude the polygon
+  its transition crosses into, the only thing those searches see of
+  it: a third of the work after an area change on the benchmark, the
+  graph still the one a build makes.
+
 ## [0.2.4] - 2026-10-07
 
 Documentation of three search boundaries, and the mutation tests behind

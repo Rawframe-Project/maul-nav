@@ -810,6 +810,95 @@ static void TestLimitsAndChecks(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// The hash of the hierarchical paths between 16 pairs of points.
+static uint64_t PathsHash(mnavQuery* query, mnavHierarchy* h, const mnavNavmesh* navmesh,
+                          float side)
+{
+    uint64_t hash = MNAV_HASH_INIT;
+    uint32_t s = 3u;
+    for (int32_t k = 0; k < 16; ++k)
+    {
+        double v[4];
+        for (int32_t c = 0; c < 4; ++c)
+        {
+            s = s * 1664525u + 1013904223u;
+            v[c] = (double)(s >> 8 & 0xFFFFu) / 65536.0 * (double)side;
+        }
+        mnavNearest a = {0};
+        mnavNearest b = {0};
+        const mnavVec3 box = {2.0f, 4.0f, 2.0f};
+        mnavPath path;
+        if (mnavFindNearest(navmesh, nullptr, (mnavPos3){v[0], 0.0, v[1]}, box, &a) ==
+                mnav_success &&
+            mnavFindNearest(navmesh, nullptr, (mnavPos3){v[2], 0.0, v[3]}, box, &b) ==
+                mnav_success &&
+            a.polygon.slot != 0 && b.polygon.slot != 0 &&
+            mnavFindHierarchicalPath(query, h, navmesh, a.polygon, a.point, b.polygon, b.point,
+                                     &path) == mnav_success)
+        {
+            hash = mnavHash64(hash, &path.cost, (int32_t)sizeof(path.cost));
+            hash = mnavHash64(hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));
+        }
+    }
+    return hash;
+}
+
+static void TestUpdatesMatchBuildsUnderAFilter(float side)
+{
+    // Rounds of area changes on random polygons, some to an area the
+    // filter leaves out: brought up to date, the hierarchy must give the
+    // edges and paths a build gives. Whether a crossing's polygon is left
+    // out is all the searches of the cluster before it see of it.
+    mnavNavmesh* navmesh = Load(false);
+    mnavQuery* query = Query(4096);
+    mnavQueryFilter filter = mnavDefaultQueryFilter();
+    filter.areas &= ~((uint64_t)1 << 5);
+    filter.costs[3] = 2.5f;
+    mnavHierarchyDef def = Small();
+    def.clusterTiles = 2;
+    mnavHierarchy* updated = nullptr;
+    mnavHierarchy* built = nullptr;
+    CHECK(mnavCreateHierarchy(&def, &updated) == mnav_success &&
+              mnavCreateHierarchy(&def, &built) == mnav_success &&
+              mnavBuildHierarchy(updated, query, navmesh, &filter, nullptr) == mnav_success,
+          "built");
+    uint32_t s = 17u;
+    bool same = true;
+    for (int32_t round = 0; round < 40; ++round)
+    {
+        for (int32_t c = 0; c < 2; ++c)
+        {
+            s = s * 1664525u + 1013904223u;
+            double x = (double)(s >> 8 & 0xFFFFu) / 65536.0 * (double)side;
+            s = s * 1664525u + 1013904223u;
+            double z = (double)(s >> 8 & 0xFFFFu) / 65536.0 * (double)side;
+            mnavNearest n = {0};
+            s = s * 1664525u + 1013904223u;
+            if (mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 0.0, z},
+                                (mnavVec3){2.0f, 4.0f, 2.0f}, &n) == mnav_success &&
+                n.polygon.slot != 0)
+            {
+                CHECK(mnavStageArea(navmesh, n.polygon, (mnavAreaType)(1 + (s >> 8) % 5)) ==
+                          mnav_success,
+                      "staged");
+            }
+        }
+        mnavHierarchyReport a;
+        mnavHierarchyReport b;
+        CHECK(mnavCommit(navmesh) == mnav_success &&
+                  mnavUpdateHierarchy(updated, query, navmesh, &a) == mnav_success &&
+                  mnavBuildHierarchy(built, query, navmesh, &filter, &b) == mnav_success,
+              "brought up to date");
+        same = same && a.transitions == b.transitions && a.edges == b.edges &&
+               PathsHash(query, updated, navmesh, side) == PathsHash(query, built, navmesh, side);
+    }
+    CHECK(same, "an update gives the graph a build gives");
+    mnavDestroyHierarchy(built);
+    mnavDestroyHierarchy(updated);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestUpdatePastTheTileLimit(void)
 {
     // A graph built over eight tiles with room for eight; a ninth tile
@@ -859,6 +948,7 @@ int main(void)
     TestUpdates();
     TestNegativePlaces();
     TestUpdatePastTheTileLimit();
+    TestUpdatesMatchBuildsUnderAFilter(side);
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
         free(s_bytes[t]);

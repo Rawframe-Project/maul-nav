@@ -292,7 +292,8 @@ static mnavTransition Cross(const mnavHierarchy* h, const mnavNavmesh* navmesh, 
         side,
         runLow,
         runHigh,
-        -1};
+        -1,
+        false};
 }
 
 // Whether tile link l of a tile leaves the cluster across a side.
@@ -380,7 +381,8 @@ static mnavResult AddLinks(mnavHierarchy* h, const mnavNavmesh* navmesh)
                              0,
                              low,
                              low,
-                             -1};
+                             -1,
+                             false};
     }
     return mnav_success;
 }
@@ -607,10 +609,22 @@ static uint64_t LinkHash(const mnavNavmesh* navmesh)
     return hash;
 }
 
+// Whether the hierarchy's filter includes the polygon transition u enters.
+static bool Included(const mnavHierarchy* h, const mnavNavmesh* navmesh, int32_t u)
+{
+    const mnavTransition* t = &h->transitions[u];
+    const mnavTile* tile = navmesh->slots[t->slot].tile;
+    return mnavIncludes(&h->filter, tile->mesh.polygons[t->polygon].area);
+}
+
 // Keeps what the graph is built from: each slot's tile generation and
-// areas, and the links.
+// areas, the links, and whether each transition's polygon is included.
 static void Stamp(mnavHierarchy* h, const mnavNavmesh* navmesh)
 {
+    for (int32_t u = 0; u < h->transitionCount; ++u)
+    {
+        h->transitions[u].included = Included(h, navmesh, u);
+    }
     memset(h->generations, 0, (size_t)navmesh->slotCount * sizeof(uint32_t));
     for (int32_t i = 0; i < navmesh->placeCount; ++i)
     {
@@ -648,7 +662,9 @@ static bool SameShape(const mnavHierarchy* h, const mnavNavmesh* navmesh)
 // Marks the clusters holding a tile whose areas changed; whether a link
 // lands in one, which may change the transitions. A transition's
 // crossing lies in the tile it enters, and the searches of the cluster it
-// leaves end there: when that tile changed, that cluster is marked too.
+// leaves end there, opening the polygon entered but never walking it: its
+// area costs them nothing, so that cluster is marked only when the
+// filter has come to include or exclude it.
 static bool MarkDirty(mnavHierarchy* h, const mnavNavmesh* navmesh)
 {
     memset(h->dirty, 0, (size_t)h->clusterCount);
@@ -676,8 +692,10 @@ static bool MarkDirty(mnavHierarchy* h, const mnavNavmesh* navmesh)
     }
     for (int32_t u = 0; u < h->transitionCount; ++u)
     {
-        const mnavTransition* tr = &h->transitions[u];
-        h->dirty[tr->from] = h->changed[tr->slot] != 0 ? 1 : h->dirty[tr->from];
+        mnavTransition* tr = &h->transitions[u];
+        bool now = h->changed[tr->slot] != 0 ? Included(h, navmesh, u) : tr->included;
+        h->dirty[tr->from] = now != tr->included ? 1 : h->dirty[tr->from];
+        tr->included = now;
     }
     return false;
 }
