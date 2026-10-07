@@ -90,6 +90,24 @@ static void TestLevelBakesAndCopies(void)
     mnavDestroyBaker(baker);
 }
 
+static void TestFlatFloorAtNoSlope(void)
+{
+    // The steepest walkable slope is walkable: with 0 degrees allowed, a
+    // floor with no slope at all is still floor.
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.agent.maxSlopeDegrees = 0.0f;
+    mnavBaker* baker = nullptr;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
+    const mnavVec3 floor[4] = {
+        {-1.0f, 0.0f, -1.0f}, {-1.0f, 0.0f, 33.0f}, {33.0f, 0.0f, 33.0f}, {33.0f, 0.0f, -1.0f}};
+    const int32_t quad[6] = {0, 1, 2, 0, 2, 3};
+    const mnavTriangleMesh mesh = {floor, 4, quad, 2, nullptr};
+    mnavBakeReport report;
+    CHECK(mnavBakeTile(baker, &mesh, 1, 0, 0, &report) == mnav_success && report.polygons > 0,
+          "a flat floor is walkable at a slope of 0");
+    mnavDestroyBaker(baker);
+}
+
 static void TestBakesDoNotDependOnWhatCameBefore(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
@@ -315,6 +333,7 @@ int main(void)
 {
     TestCreateChecksTheDef();
     TestLevelBakesAndCopies();
+    TestFlatFloorAtNoSlope();
     TestBakesDoNotDependOnWhatCameBefore();
     TestFingerprintFollowsTheTilesInput();
     TestDetailSearchesAsFarAsWallsStray();
