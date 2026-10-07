@@ -1,0 +1,189 @@
+# Mutants of maul-nav for tools/mutate.py: name | file | line | mutant line.
+# The sweeps of items 40 to 54 ran these; each survivor was killed by a
+# test added then, or judged equivalent with its reason in the commit
+# that followed. Run on a clean tree:
+#   python3 tools/mutate.py tools/mutants.txt build results.txt
+# 0.2.2 speed-ups: the neighbour ring search and the polygon merge (item 40)
+ring-stop-early | src/avoidance.c | double near = r > 1 ? (double)(r - 1) * size * (1.0 - 0x1p-20) : 0.0; | double near = r > 1 ? (double)r * size * (1.0 - 0x1p-20) : 0.0;
+ring-last-ring | src/avoidance.c | for (int64_t r = 0; r <= CELL_DIVISIONS + 1; ++r) | for (int64_t r = 0; r <= CELL_DIVISIONS; ++r)
+ring-stop-partial | src/avoidance.c | if (near >= range || (found == limit && near * near > a->neighbors[found - 1].distance)) | if (near >= range || (found > 0 && limit > 0 && near * near > a->neighbors[found - 1].distance))
+ring-one-row | src/avoidance.c | for (int64_t y = cy - r; y <= cy + r; y += side || r == 0 ? 1 : 2 * r) | for (int64_t y = cy - r; y <= cy + r; y += side || r == 0 ? 1 : 4 * r)
+merge-tie-last | src/polymesh.c | bool first = value == best->value && (j < best->a || (j == best->a && k < best->b)); | bool first = value == best->value && (j > best->a || (j == best->a && k > best->b));
+merge-overwrite | src/polymesh.c | while (table[slot] >= 0) | while (false && table[slot] >= 0)
+merge-k-any | src/polymesh.c | if (k > j && other->vertices[edge] == to && | if (k != j && other->vertices[edge] == to &&
+
+# The query core: funnel, raycast, A* open list, corridor merges (item 41)
+funnel-right-strict | src/funnel.c | if (Area2(f.apex, f.right, p[i].right) >= 0.0) | if (Area2(f.apex, f.right, p[i].right) > 0.0)
+funnel-left-corner-strict | src/funnel.c | if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) >= 0.0) | if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) > 0.0)
+funnel-no-same-apex | src/funnel.c | if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) >= 0.0) | if (Area2(f.apex, f.left, p[i].right) >= 0.0)
+funnel-last-point | src/funnel.c | Push(query, &count, p[last].left); | Push(query, &count, p[last].right);
+portals-no-midpoint | src/funnel.c | if (node->tag != MNAV_TAG_END) | if (node->tag == MNAV_TAG_END)
+link-point-index | src/funnel.c | count - 1}; | count};
+ray-outward-strict | src/raycast.c | if (outward <= 0.0) | if (outward < 0.0)
+ray-link-span | src/raycast.c | if (link->edge == j && u >= link->low && u <= link->high && included) | if (link->edge == j && u > link->low && u < link->high && included)
+ray-leaves-strict | src/raycast.c | if (Leaves(&w, corners[k], corners[(k + 1) % sides]) <= t) | if (Leaves(&w, corners[k], corners[(k + 1) % sides]) < t)
+ray-last-wall | src/raycast.c | wall = wall < 0 ? k : wall; | wall = k;
+ray-node-limit | src/raycast.c | if (count == query->limits.nodes) | if (count > query->limits.nodes)
+shortcut-at | src/corridor.c | if (at >= last) | if (at > last)
+mergestart-farthest | src/corridor.c | farthest = j >= 0 ? i : -1; | farthest = j > 0 ? i : -1;
+funnel-crossed-never | src/funnel.c | crossed = node->tag == MNAV_TAG_OFFMESH; | crossed = false;
+ray-exit-floor | src/raycast.c | return best > t ? best : t; | return best > t ? best : best;
+heap-tie | src/path.c | return ta != tb ? ta < tb : a < b; | return ta != tb ? ta < tb : a > b;
+heap-child | src/path.c | Sooner(query, query->heap[child + 1], query->heap[child])) | Sooner(query, query->heap[child], query->heap[child + 1]))
+heap-no-remaining | src/path.c | double ta = na->cost + na->remaining; | double ta = na->cost;
+mergeend-tail | src/corridor.c | int32_t tail = move->polygonCount - at - 1; | int32_t tail = move->polygonCount - at - 2;
+
+# Hierarchy update, navmesh flow field, off-mesh link checks (item 42)
+dirty-from-skip | src/hierarchy.c | h->dirty[tr->from] = h->changed[tr->slot] != 0 ? 1 : h->dirty[tr->from]; | h->dirty[tr->from] = h->dirty[tr->from];
+landing-ignored | src/hierarchy.c | if (h->dirty[h->clusterOf[landing.slot - 1]] != 0) | if (false && h->dirty[h->clusterOf[landing.slot - 1]] != 0)
+sameshape-held | src/hierarchy.c | return held == navmesh->placeCount; | return held >= 0;
+research-cluster | src/hierarchy.c | if (h->dirty[h->transitions[u].cluster] != 0) | if (h->dirty[h->transitions[u].from] != 0)
+commits-shortcut | src/hierarchy.c | if (h->commits == navmesh->commits) | if (h->commits <= navmesh->commits)
+hash-not-kept | src/hierarchy.c | h->areaHashes[slot] = hash; | (void)hash;
+sameshape-limit | src/hierarchy.c | if (navmesh->slotCount > h->def.limits.tiles || h->linkHash != LinkHash(navmesh)) | if (h->linkHash != LinkHash(navmesh))
+nf-tie | src/navflow.c | return f->ways[a].cost != f->ways[b].cost ? f->ways[a].cost < f->ways[b].cost : a < b; | return f->ways[a].cost != f->ways[b].cost ? f->ways[a].cost < f->ways[b].cost : a > b;
+nf-flat-edge | src/navflow.c | if (bu == au) | if (bu == au && false)
+nf-rising | src/navflow.c | bool rising = bu > au; | bool rising = bu < au;
+nf-link-cost | src/navflow.c | (double)link->def.cost; | 0.0;
+nf-landing-swap | src/navflow.c | double cost = f->ways[q].cost + Distance(landing, f->ways[q].place) * areaCost + | double cost = f->ways[q].cost + Distance(landing, takeoff) * areaCost +
+nf-done-skip | src/navflow.c | f->places[p] == DONE) | false)
+ext-strict | src/offmesh.c | return fabs(p.x - def->origin.x) <= ground && fabs(p.z - def->origin.z) <= ground && | return fabs(p.x - def->origin.x) < ground && fabs(p.z - def->origin.z) <= ground &&
+ext-vertical | src/offmesh.c | fabs(p.y - def->origin.y) <= vertical; | fabs(p.y - def->origin.y) <= vertical * 2.0;
+ext-ground | src/offmesh.c | return fabs(p.x - def->origin.x) <= ground && fabs(p.z - def->origin.z) <= ground && | return fabs(p.x - def->origin.x) <= ground * 2.0 && fabs(p.z - def->origin.z) <= ground &&
+radius-zero | src/offmesh.c | bool radius = def->radius >= 0.0f && def->radius <= MNAV_MAX_LINK_RADIUS; | bool radius = def->radius > 0.0f && def->radius <= MNAV_MAX_LINK_RADIUS;
+flat-any | src/offmesh.c | return def->width > 0.0f && flat ? mnav_errorInvalid : mnav_success; | return flat ? mnav_errorInvalid : mnav_success;
+flat-never | src/offmesh.c | return def->width > 0.0f && flat ? mnav_errorInvalid : mnav_success; | return false && flat ? mnav_errorInvalid : mnav_success;
+kind-range | src/offmesh.c | if (!(radius && cost && width && def->kind < MNAV_LINK_KINDS)) | if (!(radius && cost && width && def->kind <= MNAV_LINK_KINDS))
+
+# Avoidance: ORCA programs, pair lines, obstacles (item 47)
+bound-parallel-sign | src/orca.c | if (numerator < 0.0) | if (numerator > 0.0)
+bound-empty | src/orca.c | if (*left > *right) | if (*left >= *right)
+lp1-tangent | src/orca.c | if (discriminant < 0.0) | if (discriminant <= 0.0)
+lp1-direction | src/orca.c | t = mnavDot2(wanted, line->direction) > 0.0 ? right : left; | t = mnavDot2(wanted, line->direction) > 0.0 ? left : right;
+lp1-no-clamp | src/orca.c | t = t < left ? left : (t > right ? right : t); | t = t > right ? right : t;
+lp2-speed-edge | src/orca.c | else if (mnavDot2(wanted, wanted) > radius * radius) | else if (mnavDot2(wanted, wanted) >= radius * radius)
+lp2-violated | src/orca.c | if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) > 0.0) | if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) >= 0.0)
+lp3-distance | src/orca.c | if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) <= distance) | if (mnavDet2(lines[i].direction, mnavSub2(lines[i].point, *result)) < distance)
+lp3-no-fixed | src/orca.c | for (int32_t k = 0; k < fixed; ++k) | for (int32_t k = 0; k < 0 && k < fixed; ++k)
+bisector-parallel | src/orca.c | if (mnavDot2(i->direction, j->direction) > 0.0) | if (mnavDot2(i->direction, j->direction) < 0.0)
+pair-cutoff | src/orca.c | if (dot < 0.0 && dot * dot > combinedSq * wSq) | if (dot < 0.0 && dot * dot < combinedSq * wSq)
+pair-leg-side | src/orca.c | if (mnavDet2(position, w) > 0.0) | if (mnavDet2(position, w) < 0.0)
+pair-no-share | src/orca.c | line.point = mnavAdd2(selfVelocity, mnavScale2(u, share)); | line.point = mnavAdd2(selfVelocity, mnavScale2(u, share * 0.0 + 1.0));
+pair-lower-id | src/orca.c | : (mnavPos2){lowerId ? -1.0 : 1.0, 0.0}; | : (mnavPos2){lowerId ? 1.0 : -1.0, 0.0};
+obs-gap-floor | src/obstacle.c | gap = gap > 0.0 ? gap : 0.0; | gap = gap;
+obs-range-edge | src/obstacle.c | if (left >= 0.0 || left * left / length >= range * range) | if (left > 0.0 || left * left / length >= range * range)
+obs-segment-clamp | src/obstacle.c | mnavPos2 at = r < 0.0 ? a : (r > 1.0 ? b : mnavAdd2(a, mnavScale2(edge, r))); | mnavPos2 at = mnavAdd2(a, mnavScale2(edge, r));
+obs-near-limit | src/obstacle.c | if (count == limit && !NearBefore(vertices, candidate, list[count - 1])) | if (count == limit && NearBefore(vertices, candidate, list[count - 1]))
+obs-covered | src/obstacle.c | if (mnavDet2(mnavSub2(c1, lines[j].point), lines[j].direction) - margin >= -COVERED && | if (mnavDet2(mnavSub2(c1, lines[j].point), lines[j].direction) - margin > COVERED &&
+obs-convex1 | src/obstacle.c | if (!vs[legs->o1].convex) | if (vs[legs->o1].convex)
+obs-cut-choice | src/obstacle.c | if (cut <= left && cut <= right) | if (cut < left && cut < right)
+obs-side-pick | src/obstacle.c | if (left <= right) | if (left < right)
+obs-inside-seg | src/obstacle.c | if (s >= 0.0 && s <= 1.0 && distSqLine <= radiusSq) | if (distSqLine <= radiusSq)
+
+# Tile loading, grid search, grid flow repair (item 49)
+tile-least | src/tile.c | return least <= (int64_t)counts->payload && counts->detailTriangles >= counts->polygons; | return least < (int64_t)counts->payload && counts->detailTriangles >= counts->polygons;
+tile-triangles-least | src/tile.c | return least <= (int64_t)counts->payload && counts->detailTriangles >= counts->polygons; | return least <= (int64_t)counts->payload && counts->detailTriangles >= 0;
+tile-vertex-edge | src/tile.c | if (r->exhausted || vertex->x > mesh->tileCells || vertex->z > mesh->tileCells) | if (r->exhausted || vertex->x > mesh->tileCells + 1 || vertex->z > mesh->tileCells)
+tile-polygon-count | src/tile.c | if (count < 3 || count > MNAV_POLYGON_VERTICES || area == mnav_areaNone || | if (count < 2 || count > MNAV_POLYGON_VERTICES || area == mnav_areaNone ||
+tile-area-none | src/tile.c | if (count < 3 || count > MNAV_POLYGON_VERTICES || area == mnav_areaNone || | if (count < 3 || count > MNAV_POLYGON_VERTICES ||
+tile-side-range | src/tile.c | if (vertex >= (uint64_t)mesh->vertexCount || !linked || side > 4) | if (vertex >= (uint64_t)mesh->vertexCount || !linked || side > 5)
+tile-degenerate-edge | src/tile.c | if (a->x == b->x && a->z == b->z) | if (a->x == b->x && a->z == b->z && false)
+tile-convex | src/tile.c | if (Area2(a, b, &mesh->vertices[polygon->vertices[j]]) > 0) | if (Area2(a, b, &mesh->vertices[polygon->vertices[j]]) >= 0)
+tile-parts | src/tile.c | if (r->exhausted || count > MNAV_DETAIL_VERTICES || parts < 1 || | if (r->exhausted || count > MNAV_DETAIL_VERTICES || parts < 0 ||
+tile-outline | src/tile.c | if (r->exhausted || !inside || triangle->outline > 7) | if (r->exhausted || !inside || triangle->outline > 8)
+tile-trailing | src/tile.c | if (result.result == mnav_success && r->left != 0) | if (result.result == mnav_success && r->left > 1)
+grid-tie | src/grid.c | return ta != tb ? ta < tb : a < b; | return ta != tb ? ta < tb : a > b;
+grid-forced-x | src/grid.c | return (Open(g, x, y - 1) && !Open(g, x - dx, y - 1)) || | return (Open(g, x, y - 1) && !Open(g, x + dx, y - 1)) ||
+grid-forced-y | src/grid.c | (Open(g, x + 1, y) && !Open(g, x + 1, y - dy)); | (Open(g, x + 1, y) && !Open(g, x + 1, y + dy));
+grid-diag-straight | src/grid.c | (diagonal ? StraightFinds(g, x, y, dx, 0) || StraightFinds(g, x, y, 0, dy) | (diagonal ? StraightFinds(g, x, y, dx, 0)
+grid-diag-corner | src/grid.c | if (diagonal && !(Open(g, x + dx, y) && Open(g, x, y + dy))) | if (diagonal && !(Open(g, x + dx, y) || Open(g, x, y + dy)))
+grid-too-long | src/grid.c | if (parent->length + length + remaining > g->limit) | if (parent->length + length + remaining >= g->limit)
+grid-closed | src/grid.c | if (n->heap == MNAV_CLOSED || total >= n->cost) | if (total >= n->cost)
+grid-equal-cost | src/grid.c | if (n->heap == MNAV_CLOSED || total >= n->cost) | if (n->heap == MNAV_CLOSED || total > n->cost)
+repair-diagonal | src/flow_repair.c | if (diagonal && ((nx == x && cy == y) || (cx == x && ny == y))) | if (false && diagonal && ((nx == x && cy == y) || (cx == x && ny == y)))
+repair-lower | src/flow_repair.c | if (cost < f->costs[cell]) | if (cost <= f->costs[cell])
+repair-best-tie | src/flow_repair.c | (f->costs[n] == f->costs[best] && n < best)) | (f->costs[n] == f->costs[best] && n > best))
+
+# The bake's later stages: contours, detail, welding, merging, ears (item 50)
+contour-farthest | src/contour.c | if (d > distance) | if (d >= distance)
+contour-error | src/contour.c | if (farthest >= 0 && distance > edgeError * edgeError) | if (farthest >= 0 && distance >= edgeError * edgeError)
+contour-length | src/contour.c | if (wall && dx * dx + dz * dz > edgeLength * edgeLength && between > 1) | if (wall && dx * dx + dz * dz >= edgeLength * edgeLength && between > 1)
+contour-between | src/contour.c | if (wall && dx * dx + dz * dz > edgeLength * edgeLength && between > 1) | if (wall && dx * dx + dz * dz > edgeLength * edgeLength && between > 0)
+contour-min | src/contour.c | if (count < 3) | if (count < 2)
+detail-sqrt | src/detail.c | if ((root + bit) * (root + bit) <= v) | if ((root + bit) * (root + bit) < v)
+detail-worst | src/detail.c | if (off > worst) | if (off >= worst)
+detail-edge-error | src/detail.c | if (worstAt >= 0 && worst * SUBCELLS > (int64_t)error * (b - a)) | if (worstAt >= 0 && worst * SUBCELLS >= (int64_t)error * (b - a))
+detail-thin | src/detail.c | if (area >= 0 || 4 * area * area < sample * sample * (dx * dx + dz * dz)) | if (area > 0 || 4 * area * area < sample * sample * (dx * dx + dz * dz))
+detail-small | src/detail.c | if (n < 3 || sample == 0 || maxX - minX < sample || maxZ - minZ < sample) | if (n < 3 || sample == 0 || maxX - minX <= sample || maxZ - minZ < sample)
+detail-error | src/detail.c | if (off > (int64_t)builder->settings.error * area) | if (off >= (int64_t)builder->settings.error * area)
+detail-full | src/detail.c | if (part->vertexCount >= MNAV_DETAIL_VERTICES) | if (part->vertexCount > MNAV_DETAIL_VERTICES)
+weld-height | src/polymesh.c | if (w->x == v->x && w->z == v->z && dy >= -WELD_HEIGHT && dy <= WELD_HEIGHT) | if (w->x == v->x && w->z == v->z && dy > -WELD_HEIGHT && dy < WELD_HEIGHT)
+merge-limit | src/polymesh.c | if (na + nb - 2 > MNAV_POLYGON_VERTICES) | if (na + nb - 2 >= MNAV_POLYGON_VERTICES)
+merge-turn | src/polymesh.c | if (turnA >= 0 || turnB >= 0) | if (turnA > 0 || turnB > 0)
+merge-value | src/polymesh.c | if (value > best->value || (value > 0 && first)) | if (value > best->value || (value >= 0 && first))
+fan-area | src/polymesh.c | if (area >= 0) | if (area > 0)
+ear-shortest | src/triangulate.c | if (best < 0 || length < bestLength) | if (best < 0 || length <= bestLength)
+ear-same-ground | src/triangulate.c | if (mnavSameGround(d0, p0) || mnavSameGround(d1, p0) || mnavSameGround(d0, p1) || | if (mnavSameGround(d1, p0) || mnavSameGround(d0, p1) ||
+ear-loose | src/triangulate.c | bool meets = loose ? mnavIntersectProper(d0, d1, p0, p1) : mnavIntersect(d0, d1, p0, p1); | bool meets = loose ? mnavIntersectProper(d0, d1, p0, p1) : mnavIntersectProper(d0, d1, p0, p1);
+
+# The navmesh's state: staging, commit, links, link generation (item 51)
+nm-tier-dynamic | src/navmesh.c | if (result.result == mnav_success && navmesh->def.tier < mnav_tierDynamic && | if (result.result == mnav_success && navmesh->def.tier < mnav_tierModifiers &&
+nm-generation | src/navmesh.c | if (slot->tile == nullptr || slot->generation != id.generation || | if (slot->tile == nullptr || slot->generation == 0u ||
+nm-overlap-empty | src/navmesh.c | if (lo >= hi || !CloseAt(a, b, lo, step) || !CloseAt(a, b, hi, step)) | if (lo > hi || !CloseAt(a, b, lo, step) || !CloseAt(a, b, hi, step))
+nm-close-step | src/navmesh.c | return difference <= step * scale; | return difference < step * scale;
+nm-order | src/navmesh.c | while (j > 0 && Before(item.x, item.z, staged[j - 1].x, staged[j - 1].z)) | while (j > 1 && Before(item.x, item.z, staged[j - 1].x, staged[j - 1].z))
+nm-slot-reuse | src/navmesh.c | if (plan->slots[s].tile == nullptr && !plan->slots[s].retired) | if (plan->slots[s].tile == nullptr)
+nm-beside | src/navmesh.c | if ((dx == 0 && dz == 0) || beside) | if (beside)
+nm-tile-limit | src/navmesh.c | if (plan->placeCount > navmesh->def.limits.tiles) | if (plan->placeCount > navmesh->def.limits.tiles + 1)
+om-link-limit | src/offmesh.c | if (navmesh->linksHeld + n > navmesh->def.limits.links) | if (navmesh->linksHeld + n > 1 + navmesh->def.limits.links)
+om-crossings | src/offmesh.c | return gaps >= (double)(MNAV_MAX_LINK_CROSSINGS - 1) ? MNAV_MAX_LINK_CROSSINGS | return gaps > (double)(MNAV_MAX_LINK_CROSSINGS - 1) ? MNAV_MAX_LINK_CROSSINGS
+om-twoway | src/offmesh.c | if (link->def.twoWay) | if (!link->def.twoWay)
+om-span | src/offmesh.c | if (link->state.attached && link->state.enabled && span > 0.0) | if (link->state.attached && link->state.enabled && span >= 0.0)
+om-enabled | src/offmesh.c | if (!state->attached || !link->enabled) | if (!state->attached)
+lg-detour-off | src/linkgen.c | if (g->def->detour == 0.0f) | if (g->def->detour < 0.0f)
+lg-dedupe | src/linkgen.c | if (Distance(g->links[i].start, start) <= d && Distance(g->links[i].end, end) <= d) | if (Distance(g->links[i].start, start) < d && Distance(g->links[i].end, end) <= d)
+lg-drop-step | src/linkgen.c | if (d->dropMax > 0.0f && (double)d->dropMax > g->step) | if (d->dropMax > 0.0f && (double)d->dropMax >= g->step)
+lg-facing | src/linkgen.c | if (nx * ((a.x + b.x) * 0.5 - c.x) + nz * ((a.z + b.z) * 0.5 - c.z) < 0.0) | if (nx * ((a.x + b.x) * 0.5 - c.x) + nz * ((a.z + b.z) * 0.5 - c.z) > 0.0)
+lg-in-range | src/linkgen.c | if (p->x >= tileX0 && p->x <= tileX1 && p->z >= tileZ0 && p->z <= tileZ1) | if (p->x >= tileX0 && p->x < tileX1 && p->z >= tileZ0 && p->z <= tileZ1)
+
+# Spatial queries and the hierarchical path (items 52, 53)
+near-best | src/nearest.c | if (d < bestDistance) | if (d <= bestDistance)
+near-tie | src/nearest.c | if (area == 0.0 || d >= best) | if (area == 0.0 || d > best)
+near-box | src/nearest.c | if (fabs(dx) > s->half.x || fabs(dy) > s->half.y || fabs(dz) > s->half.z) | if (fabs(dx) >= s->half.x || fabs(dy) > s->half.y || fabs(dz) > s->half.z)
+near-score | src/nearest.c | double score = over ? (beyond > 0.0 ? beyond * beyond : 0.0) : distance; | double score = over ? (beyond * beyond) : distance;
+near-places | src/nearest.c | if (navmesh->places[middle].x < x0) | if (navmesh->places[middle].x <= x0)
+surf-best | src/surface.c | if (d < m->bestDistance) | if (d <= m->bestDistance)
+surf-radius | src/surface.c | if (Distance2(Nearest(a, b, m->center), m->center) > m->radius2) | if (Distance2(Nearest(a, b, m->center), m->center) >= m->radius2)
+surf-below | src/surface.c | bool below = u <= (e->au < e->bu ? e->au : e->bu); | bool below = u < (e->au < e->bu ? e->au : e->bu);
+surf-above | src/surface.c | bool above = u >= (e->au < e->bu ? e->bu : e->au); | bool above = u > (e->au < e->bu ? e->bu : e->au);
+surf-holds | src/surface.c | if ((b.x - a.x) * (p.z - a.z) - (p.x - a.x) * (b.z - a.z) > 0.0) | if ((b.x - a.x) * (p.z - a.z) - (p.x - a.x) * (b.z - a.z) >= 0.0)
+rand-fan | src/spatial.c | while (k + 2 < count && pick > fabs(Twice(c[0], c[k], c[k + 1]))) | while (k + 2 < count && pick >= fabs(Twice(c[0], c[k], c[k + 1])))
+rand-fold | src/spatial.c | if (s + t > 1.0) | if (s + t >= 1.0)
+rand-pick | src/spatial.c | if (pick >= 0.0 && pick < sum + area) | if (pick >= 0.0 && pick <= sum + area)
+wall-tie | src/spatial.c | return ca != cb ? ca < cb : a < b; | return ca != cb ? ca < cb : a > b;
+wall-keep | src/spatial.c | if (distance > r->radius || (r->wall.found && distance >= r->wall.distance)) | if (distance > r->radius || (r->wall.found && distance > r->wall.distance))
+wall-reach | src/spatial.c | if (SegmentDistance(r->center, a, b, &nearest) > r->radius * r->radius) | if (SegmentDistance(r->center, a, b, &nearest) >= r->radius * r->radius)
+hp-closed | src/hierarchy_path.c | if (h->places[u] == MNAV_CLOSED || cost >= h->costs[u]) | if (cost >= h->costs[u])
+hp-equal | src/hierarchy_path.c | if (h->places[u] == MNAV_CLOSED || cost >= h->costs[u]) | if (h->places[u] == MNAV_CLOSED || cost > h->costs[u])
+hp-tie | src/hierarchy_path.c | return ta != tb ? ta < tb : a < b; | return ta != tb ? ta < tb : a > b;
+hp-side | src/hierarchy_path.c | if (t->side == 0 && t->cluster == cluster) | if (t->cluster == cluster)
+
+# The bake's early stages: raster, filters, compact, erosion, regions (item 54)
+ras-slope | src/raster.c | if (area == mnav_areaNone || ny < cosMaxSlope * length) | if (area == mnav_areaNone || ny <= cosMaxSlope * length)
+ras-cross | src/raster.c | if ((da < 0.0f && db > 0.0f) || (da > 0.0f && db < 0.0f)) | if ((da < 0.0f && db >= 0.0f) || (da > 0.0f && db <= 0.0f))
+ras-below | src/raster.c | if (db <= 0.0f) | if (db < 0.0f)
+ras-above | src/raster.c | if (db >= 0.0f) | if (db > 0.0f)
+ras-cell-min | src/raster.c | if (cell->count < 3) | if (cell->count < 2)
+fil-ledge-step | src/filter.c | if (!walkable && belowWalkable && (int32_t)span->top - belowTop <= step) | if (!walkable && belowWalkable && (int32_t)span->top - belowTop < step)
+fil-clearance | src/filter.c | if (Min(ceiling, underCeiling) - floor >= height) | if (Min(ceiling, underCeiling) - floor > height)
+fil-gap | src/filter.c | if (Min(ceiling, neighborCeiling) - Max(floor, neighborFloor) < height) | if (Min(ceiling, neighborCeiling) - Max(floor, neighborFloor) <= height)
+fil-climb | src/filter.c | if (difference >= -step && difference <= step) | if (difference > -step && difference < step)
+fil-low | src/filter.c | if (Ceiling(heightfield, i, end) - (int32_t)heightfield->spans[i].top < height) | if (Ceiling(heightfield, i, end) - (int32_t)heightfield->spans[i].top <= height)
+cmp-link | src/compact.c | if (shared >= height && rise >= -step && rise <= step) | if (shared > height && rise > -step && rise < step)
+cmp-bounds | src/compact.c | if (nx < 0 || nz < 0 || nx >= width || nz >= width) | if (nx < 0 || nz < 0 || nx > width || nz > width)
+ero-relax | src/erode.c | if (candidate < distance[i]) | if (candidate <= distance[i])
+ero-threshold | src/erode.c | if (distance[i] < threshold) | if (distance[i] <= threshold)
+reg-border-lo | src/region.c | if (z < border) | if (z <= border)
+reg-border-hi | src/region.c | if (z >= width - border) | if (z > width - border)
+reg-sweep | src/region.c | if (sweeps->below[sweep] == 0 || sweeps->below[sweep] == below) | if (sweeps->below[sweep] == below)
+reg-layer | src/region.c | if (graph->layer[root] != 0) | if (graph->layer[root] == 0)

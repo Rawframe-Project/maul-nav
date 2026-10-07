@@ -63,6 +63,16 @@ cmake --build build
 ctest --test-dir build
 ```
 
+The suite is checked against hand-picked mutants: `tools/mutants.txt`
+lists 167 one-line changes to the library, each of which a test kills
+or which was judged equivalent when it was written. To run them, on a
+clean tree (hours; not part of CI):
+
+```sh
+python3 tools/mutate.py --check tools/mutants.txt
+python3 tools/mutate.py tools/mutants.txt build results.txt
+```
+
 ## Design
 
 The rules every Maul library follows are in `docs/conventions.md` and
