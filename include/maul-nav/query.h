@@ -686,7 +686,9 @@ extern "C"
     /// searching from its polygon across the edges that come within the
     /// radius, off-mesh links aside. An edge is a wall when no polygon the
     /// filter includes lies across it, a tile side with no tile loaded
-    /// beyond included.
+    /// beyond included. A wall exactly the radius away lies within it; of
+    /// walls at the same distance it gives one, the same on every
+    /// platform, but which one is not promised.
     ///
     /// @param query   The context; its last search ends.
     /// @param navmesh The navmesh.

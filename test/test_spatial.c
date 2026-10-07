@@ -216,6 +216,46 @@ static void TestWalls(mnavNavmesh* navmesh)
     mnavDestroyQuery(query);
 }
 
+static void TestWallAtTheRadius(mnavNavmesh* navmesh)
+{
+    // A wall exactly as far as the radius lies within it. From centers
+    // over the world (those on the navmesh), the nearest wall within
+    // 20 m, then a search with the radius set to its distance: the same
+    // wall, at the same distance and point.
+    mnavQuery* query = Query(4096);
+    int32_t tried = 0;
+    bool same = true;
+    for (int32_t i = 0; i < 13; ++i)
+    {
+        for (int32_t k = 0; k < 13; ++k)
+        {
+            double x = 2.0 + 5.0 * i;
+            double z = 2.0 + 5.0 * k;
+            mnavNearest n = {0};
+            mnavWall far;
+            mnavWall exact;
+            if (mnavFindNearest(navmesh, nullptr, (mnavPos3){x, x * (double)SLOPE, z},
+                                (mnavVec3){0.5f, 2.0f, 0.5f}, &n) != mnav_success ||
+                n.polygon.slot == 0 ||
+                mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 20.0, &far) !=
+                    mnav_success ||
+                !far.found)
+            {
+                continue;
+            }
+            tried += 1;
+            same = same &&
+                   mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, far.distance,
+                                        &exact) == mnav_success &&
+                   exact.found && exact.distance == far.distance && exact.point.x == far.point.x &&
+                   exact.point.z == far.point.z;
+        }
+    }
+    printf("walls at the radius: %d centers\n", tried);
+    CHECK(tried > 100 && same, "a wall at exactly the radius is found");
+    mnavDestroyQuery(query);
+}
+
 static void TestRandomPoints(const mnavNavmesh* navmesh)
 {
     // Every point lies on its polygon; the same seed gives the same point;
@@ -328,6 +368,7 @@ int main(void)
     mnavNavmesh* navmesh = Load();
     TestHeights(navmesh);
     TestWalls(navmesh);
+    TestWallAtTheRadius(navmesh);
     TestRandomPoints(navmesh);
     TestAroundAndReachable(navmesh);
     mnavDestroyNavmesh(navmesh);
