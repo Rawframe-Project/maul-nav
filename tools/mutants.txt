@@ -273,3 +273,12 @@ fr-next-exact | src/flow_repair.c | f->costs[n] + mnavFlowStepCost(s, n, cell, l
 near-prune-ties | src/nearest.c | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz > s->bestScore)) | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz >= s->bestScore))
 near-prune-over | src/nearest.c | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz > s->bestScore)) | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (dx * dx + dz * dz > s->bestScore))
 near-stop | src/nearest.c | if (best == 0.0) | if (best < 0.0)
+
+# Avoidance's cell runs: each occupied cell's first and end key.
+run-end-stays | src/avoidance.c | run->end = k + 1; | run->end = run->end;
+run-end-short | src/avoidance.c | run->end = k + 1; | run->end = k;
+run-first-end | src/avoidance.c | *run = (Run){k, k + 1}; | *run = (Run){k, k};
+run-scan-last | src/avoidance.c | for (int32_t k = run.first; k < run.end; ++k) | for (int32_t k = run.first; k + 1 < run.end; ++k)
+run-scan-past | src/avoidance.c | for (int32_t k = run.first; k < run.end; ++k) | for (int32_t k = run.first; k <= run.end && k < run.end + 1 && k < a->def.limits.agents; ++k)
+run-probe-stop | src/avoidance.c | for (Run run = a->table[slot]; run.first >= 0; run = a->table[slot]) | for (Run run = a->table[slot]; run.first > 0; run = a->table[slot])
+run-place-over | src/avoidance.c | while (a->table[slot].first >= 0) | while (a->table[slot].first > 0)
