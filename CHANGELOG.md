@@ -8,6 +8,10 @@ format.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-10-07
+
+A fix found by fuzzing the tile index, and a fuller guide.
+
 ### Fixed
 
 - `mnavCreateTileIndex` and `mnavCreateTileIndex2D` refused input
