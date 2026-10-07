@@ -28,9 +28,9 @@ shortcut-at | src/corridor.c | if (at >= last) | if (at > last)
 mergestart-farthest | src/corridor.c | farthest = j >= 0 ? i : -1; | farthest = j > 0 ? i : -1;
 funnel-crossed-never | src/funnel.c | crossed = node->tag == MNAV_TAG_OFFMESH; | crossed = false;
 ray-exit-floor | src/raycast.c | return best > t ? best : t; | return best > t ? best : best;
-heap-tie | src/path.c | return ta != tb ? ta < tb : a < b; | return ta != tb ? ta < tb : a > b;
-heap-child | src/path.c | Sooner(query, query->heap[child + 1], query->heap[child])) | Sooner(query, query->heap[child], query->heap[child + 1]))
-heap-no-remaining | src/path.c | double ta = na->cost + na->remaining; | double ta = na->cost;
+heap-tie | src/path.c | return a.total != b.total ? a.total < b.total : a.node < b.node; | return a.total != b.total ? a.total < b.total : a.node > b.node;
+heap-child | src/path.c | if (child + 1 < query->heapCount && Sooner(query->heap[child + 1], query->heap[child])) | if (child + 1 < query->heapCount && Sooner(query->heap[child], query->heap[child + 1]))
+heap-no-remaining | src/path.c | return (mnavHeapEntry){query->nodes[n].cost + query->nodes[n].remaining, n}; | return (mnavHeapEntry){query->nodes[n].cost, n};
 mergeend-tail | src/corridor.c | int32_t tail = move->polygonCount - at - 1; | int32_t tail = move->polygonCount - at - 2;
 
 # Hierarchy update, navmesh flow field, off-mesh link checks (item 42)
@@ -197,12 +197,12 @@ ti-margin-1 | src/tile_index.c | #define MARGIN_CELLS 2 | #define MARGIN_CELLS 1
 ti-margin-0 | src/tile_index.c | #define MARGIN_CELLS 2 | #define MARGIN_CELLS 0
 ti-floordiv-trunc | src/tile_index.c | return (a % b != 0 && (a < 0) != (b < 0)) ? q - 1 : q; | return q;
 ti-floordiv-exact | src/tile_index.c | return (a % b != 0 && (a < 0) != (b < 0)) ? q - 1 : q; | return ((a < 0) != (b < 0)) ? q - 1 : q;
-ti-low-max | src/tile_index.c | float low = fminf(a, fminf(b, c)); | float low = fminf(a, b);
-ti-high-two | src/tile_index.c | float high = fmaxf(a, fmaxf(b, c)); | float high = fmaxf(a, b);
+ti-low-max | src/tile_index.c | TileRange(index, fminf(a.x, fminf(b.x, c.x)), fmaxf(a.x, fmaxf(b.x, c.x)), &reach.x0, | TileRange(index, fminf(a.x, b.x), fmaxf(a.x, fmaxf(b.x, c.x)), &reach.x0,
+ti-high-two | src/tile_index.c | TileRange(index, fminf(a.x, fminf(b.x, c.x)), fmaxf(a.x, fmaxf(b.x, c.x)), &reach.x0, | TileRange(index, fminf(a.x, fminf(b.x, c.x)), fmaxf(a.x, b.x), &reach.x0,
 ti-low-border | src/tile_index.c | *lowOut = FloorDiv(lowCell - index->border, index->tileCells); | *lowOut = FloorDiv(lowCell, index->tileCells);
 ti-high-border | src/tile_index.c | *highOut = FloorDiv(highCell + index->border, index->tileCells); | *highOut = FloorDiv(highCell, index->tileCells);
 ti-high-ceil | src/tile_index.c | int64_t highCell = (int64_t)floor((double)high / (double)index->cellSize) + MARGIN_CELLS; | int64_t highCell = (int64_t)ceil((double)high / (double)index->cellSize) + MARGIN_CELLS;
-ti-z-from-x | src/tile_index.c | TileRange(index, v[corner[0]].z, v[corner[1]].z, v[corner[2]].z, &reach.z0, &reach.z1); | TileRange(index, v[corner[0]].x, v[corner[1]].x, v[corner[2]].x, &reach.z0, &reach.z1);
+ti-z-from-x | src/tile_index.c | TileRange(index, fminf(a.z, fminf(b.z, c.z)), fmaxf(a.z, fmaxf(b.z, c.z)), &reach.z0, | TileRange(index, fminf(a.x, fminf(b.x, c.x)), fmaxf(a.x, fmaxf(b.x, c.x)), &reach.z0,
 ti-all-x1 | src/tile_index.c | all.x1 = r.x1 > all.x1 ? r.x1 : all.x1; | all.x1 = r.x1;
 ti-all-z0 | src/tile_index.c | all.z0 = r.z0 < all.z0 ? r.z0 : all.z0; | all.z0 = r.z0 > all.z0 ? r.z0 : all.z0;
 ti-entries-one | src/tile_index.c | entries += (r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1); | entries += (r.x1 - r.x0 + 1) * (r.z1 - r.z0);
@@ -214,11 +214,11 @@ ti-count-k | src/tile_index.c | index->first[k + 1] += 1; | index->first[k] += 1
 ti-prefix | src/tile_index.c | index->first[k + 1] += index->first[k]; | index->first[k + 1] += 0;
 ti-shift | src/tile_index.c | index->first[k] = index->first[k - 1]; | index->first[k] = index->first[k];
 ti-zero-first | src/tile_index.c | index->first[0] = 0; | index->first[0] = index->first[0];
-ti-fits-border | src/tile_index.c | index->border != cells->border || index->meshCount != meshCount) | index->border > cells->border || index->meshCount != meshCount)
-ti-fits-counts | src/tile_index.c | if (index->triangleCounts[m] != meshes[m].triangleCount) | if (index->triangleCounts[m] < meshes[m].triangleCount)
+ti-fits-border | src/tile_index.c | index->border == cells->border && index->outlines == outlines && | index->border <= cells->border && index->outlines == outlines &&
+ti-fits-counts | src/tile_index.c | if (index->counts[m] != meshes[m].triangleCount) | if (index->counts[m] < meshes[m].triangleCount)
 ti-list-high | src/tile_index.c | if (x < 0 || z < 0 || x >= index->columns || z >= index->rows) | if (x < 0 || z < 0 || x > index->columns || z >= index->rows)
 ti-list-count | src/tile_index.c | *countOut = index->first[k + 1] - index->first[k]; | *countOut = index->first[k + 1] - index->first[k] - (index->first[k + 1] > index->first[k] ? 1 : 0);
-ti-create-check | src/tile_index.c | if (input.result != mnav_success) | if (false)
+ti-create-check | src/tile_index.c | mnavInputResult input = mnavCheckTriangleMesh(def, &meshes[m]); | mnavInputResult input = {mnav_success, mnav_elementNone, -1};
 bk-indexed-check | src/baker.c | mnavCheckMeshTriangle(&baker->def, &solid->meshes[list[k].mesh], list[k].triangle); | (mnavInputResult){mnav_success, mnav_elementNone, -1};
 bk-hash-both | src/baker.c | for (int32_t m = 0; m < input->meshCount && input->index == nullptr; ++m) | for (int32_t m = 0; m < input->meshCount && input->index == (void*)1; ++m)
 in-triangle-vertices | src/input.c | for (int k = 0; k < 3 && result.result == mnav_success; ++k) | for (int k = 0; k < 2 && result.result == mnav_success; ++k)
