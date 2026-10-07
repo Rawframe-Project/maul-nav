@@ -8,6 +8,10 @@ format.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-07
+
+Faster navmesh searches, the same paths.
+
 ### Changed
 
 - Navmesh path searches keep each open node's total beside it in the
@@ -15,7 +19,6 @@ format.
   polygon's frame once per expansion: building the benchmark's
   hierarchy takes 7.9% fewer instructions and 7.3% fewer cycles, the
   paths the same. A query context holds 12 more bytes per node.
-
 - `tools/mutants.txt` holds the tile index's 30 mutants, and
   `test_tile_index` places meshes below the origin, in shapes longer
   one way, and near the extent with a cell size that rounds, bakes
