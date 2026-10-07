@@ -242,8 +242,13 @@ static uint64_t HashTriangle(const mnavBaker* baker, const mnavTileFrame* frame,
                              const mnavVec3 corners[3], mnavAreaType given, uint64_t hash,
                              int32_t* count)
 {
+    // The cheap test first: most triangles of a large mesh miss the tile.
+    if (!mnavTriangleTouchesTile(frame, corners))
+    {
+        return hash;
+    }
     int32_t area = mnavTriangleArea(corners, given, baker->cells.cosMaxSlope);
-    if (area < 0 || !mnavTriangleTouchesTile(frame, corners))
+    if (area < 0)
     {
         return hash;
     }

@@ -21,8 +21,13 @@ static mnavResult AddTriangle(mnavMemory* memory, const mnavBakeDef* def,
                               const mnavVec3 corners[3], mnavAreaType given, int32_t* touching,
                               mnavFragmentList* list)
 {
+    // The cheap test first: most triangles of a large mesh miss the tile.
+    if (!mnavTriangleTouchesTile(frame, corners))
+    {
+        return mnav_success;
+    }
     int32_t area = mnavTriangleArea(corners, given, cells->cosMaxSlope);
-    if (area < 0 || !mnavTriangleTouchesTile(frame, corners))
+    if (area < 0)
     {
         return mnav_success;
     }

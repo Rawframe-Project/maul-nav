@@ -11,6 +11,7 @@
 
 #include "maul-nav/bake.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -216,6 +217,29 @@ static void TestBoundaryEdgeLeavesNoSliver(void)
     Release(&bake);
 }
 
+// A triangle standing on the plane x = at, from z = 1 to 2 m.
+static bool TouchesAt(const mnavTileFrame* frame, float at)
+{
+    const mnavVec3 corners[3] = {{at, 0, 1}, {at, 2, 1.5f}, {at, 0, 2}};
+    return mnavTriangleTouchesTile(frame, corners);
+}
+
+static void TestTriangleOnTheTileEdges(void)
+{
+    // 40 cells of 0.25 m from x = -1.25 to 8.75 m, exact in floats. A
+    // wall exactly on the near edge reaches cell 0; one exactly on the far
+    // edge reaches cell 40, past the tile; one a float below it, cell 39.
+    const mnavTileFrame frame = {40, -1.25f, -1.25f, 0.25f, 0.2f};
+    CHECK(TouchesAt(&frame, -1.25f), "a wall on the near edge is in");
+    CHECK(!TouchesAt(&frame, nextafterf(-1.25f, -2.0f)), "a float before it is out");
+    CHECK(!TouchesAt(&frame, -1.5f), "a cell before it is out");
+    CHECK(!TouchesAt(&frame, 8.75f), "a wall on the far edge is out");
+    CHECK(TouchesAt(&frame, nextafterf(8.75f, 0.0f)), "a float before it is in");
+    CHECK(!TouchesAt(&frame, 9.25f) && !TouchesAt(&frame, 500.0f), "past it is out");
+    const mnavVec3 across[3] = {{-50, 0, 1}, {60, 0, 1.5f}, {-50, 0, 2}};
+    CHECK(mnavTriangleTouchesTile(&frame, across), "a triangle across the tile is in");
+}
+
 static void TestNeighborTileSeesOnlyItsBorder(void)
 {
     // Tile (1, 0) starts at x = 32 m less a 1.25 m border: the floor
@@ -348,6 +372,7 @@ int main(void)
     TestStackedFloorsKeepSeparateSpans();
     TestMergedAreaDoesNotDependOnOrder();
     TestBoundaryEdgeLeavesNoSliver();
+    TestTriangleOnTheTileEdges();
     TestNeighborTileSeesOnlyItsBorder();
     TestLimitsAreTyped();
     TestAllocatorFailureIsCapacity();
