@@ -6,6 +6,7 @@ top-level project (`MAUL_NAV_BUILD_SAMPLES`).
 | Program | What it shows |
 |---|---|
 | `walk.c` | From geometry to a walking agent: a floor with a wall baked into four tiles, loaded into a navmesh, a path round the wall, and an agent following it through a path corridor a meter a step. |
+| `bake_world.c` | Baking a world from one large mesh: hills with walls, about 33,000 triangles over 4 by 4 tiles. A tile index is made once and shared by four worker threads, each with its own baker; the tiles are checked against a one-thread bake without the index, to the byte, then loaded and crossed by a path. |
 | `crowd.c` | Avoidance on its own, with no navmesh: two rows of agents swap sides round a pillar; the host passes the agents each step and moves them itself. |
 | `minimal/` | A separate project that uses only the installed package, in C17: it checks the linked version, bakes one tile and finds a path across it. CI builds it against a fresh install. |
 
