@@ -23,6 +23,7 @@
 #        mutate.py --check <mutants file>   (each mutant applies; nothing built)
 
 import os
+import re
 import subprocess
 import sys
 
@@ -68,8 +69,11 @@ def test(build, timeout):
                   timeout=timeout * 4)
     except subprocess.TimeoutExpired:
         return "killed: the suite ran past its time"
-    failed = [line.strip() for line in ran.stdout.split("\n") if "(Failed)" in line
-              or "(SEGFAULT)" in line or "(Timeout)" in line]
+    # ctest lists every failed test, whatever the kind (failed, a signal,
+    # a timeout, an abort), after this line.
+    listed = ran.stdout.split("The following tests FAILED:")
+    failed = [line.strip() for line in listed[-1].split("\n")[1:]
+              if re.match(r"\s*\d+ - ", line)] if len(listed) > 1 else []
     return f"killed: {', '.join(failed)}" if ran.returncode != 0 else "SURVIVED"
 
 

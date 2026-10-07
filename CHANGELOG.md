@@ -8,6 +8,14 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- `tools/mutants.txt` holds the tile index's 30 mutants, and
+  `test_tile_index` places meshes below the origin, in shapes longer
+  one way, and near the extent with a cell size that rounds, bakes
+  three tiles past the index on every side, and checks every corner of
+  a triangle read; `tools/mutate.py` names tests that abort.
+
 ## [0.3.0] - 2026-10-07
 
 Tile indexes for bakes from large meshes, and a faster tile test.

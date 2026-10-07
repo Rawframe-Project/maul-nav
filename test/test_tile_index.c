@@ -42,18 +42,47 @@ static mnavBakeDef Def(void)
     return def;
 }
 
-// Random meshes about tiles 0 to 3 of a def of 8 m tiles: floors and
-// slivers, triangles across tiles, and walls exactly on tile sides and on
-// the borders' edges, 1.25 m either side of them.
-static void MakeMeshes(mnavTriangleMesh meshes[MESHES], float offset)
+// Where the meshes lie: the first tile along X and Z and how many tiles
+// they span each way.
+typedef struct Place
 {
+    int32_t tileX;
+    int32_t tileZ;
+    int32_t columns;
+    int32_t rows;
+} Place;
+
+// A place along one axis where the bake's frames have an edge, computed
+// as the bake computes them, a cell count times the cell size, at times a
+// float to either side: a tile's side or its border's edge.
+static float Edge(const mnavBakeDef* def, int32_t border, int32_t first, int32_t count)
+{
+    const int32_t offsets[4] = {-border, 0, def->tileCells, def->tileCells + border};
+    int32_t tile = first - 1 + (int32_t)Random(0.0f, (float)count + 2.0f);
+    int64_t cell = (int64_t)tile * def->tileCells + offsets[(int32_t)Random(0.0f, 4.0f)];
+    float at = (float)cell * def->cellSize;
+    float side = Random(0.0f, 3.0f);
+    return side < 1.0f ? nextafterf(at, -INFINITY) : (side < 2.0f ? at : nextafterf(at, INFINITY));
+}
+
+// Random meshes about a place: floors and slivers, triangles across
+// tiles, and walls standing on the frames' edges along X and along Z.
+static void MakeMeshes(mnavTriangleMesh meshes[MESHES], const mnavBakeDef* def, Place place)
+{
+    mnavBakeCells cells;
+    CHECK(mnavValidateBakeDef(def, &cells).result == mnav_success, "a valid def");
+    double side = (double)def->tileCells * (double)def->cellSize;
+    float x0 = (float)((double)place.tileX * side - 4.0);
+    float x1 = (float)((double)(place.tileX + place.columns) * side + 4.0);
+    float z0 = (float)((double)place.tileZ * side - 4.0);
+    float z1 = (float)((double)(place.tileZ + place.rows) * side + 4.0);
     for (int32_t m = 0; m < MESHES; ++m)
     {
         for (int32_t t = 0; t < TRIANGLES; ++t)
         {
             mnavVec3* v = &s_vertices[m][t * 3];
-            float x = Random(-4.0f, 36.0f);
-            float z = Random(-4.0f, 36.0f);
+            float x = Random(x0, x1);
+            float z = Random(z0, z1);
             float y = Random(0.0f, 2.0f);
             int32_t kind = t % 4;
             if (kind == 0)
@@ -64,21 +93,28 @@ static void MakeMeshes(mnavTriangleMesh meshes[MESHES], float offset)
                 v[1] = (mnavVec3){x, y, z + s};
                 v[2] = (mnavVec3){x + s, y, z};
             }
-            else if (kind == 1)
+            else if (kind == 1 && t % 8 == 1)
             {
-                // A wall standing on a tile's side or a border's edge.
-                const float edges[3] = {0.0f, -1.25f, 1.25f};
-                float at = 8.0f * (float)(int32_t)Random(0.0f, 5.0f) + edges[t % 3];
+                // A wall on a frame's edge across X.
+                float at = Edge(def, cells.border, place.tileX, place.columns);
                 v[0] = (mnavVec3){at, 0.0f, z};
                 v[1] = (mnavVec3){at, 2.0f, z + 0.5f};
                 v[2] = (mnavVec3){at, 0.0f, z + 1.0f};
+            }
+            else if (kind == 1)
+            {
+                // A wall on a frame's edge across Z.
+                float at = Edge(def, cells.border, place.tileZ, place.rows);
+                v[0] = (mnavVec3){x, 0.0f, at};
+                v[1] = (mnavVec3){x + 0.5f, 2.0f, at};
+                v[2] = (mnavVec3){x + 1.0f, 0.0f, at};
             }
             else if (kind == 2)
             {
                 // A large triangle across several tiles.
                 v[0] = (mnavVec3){x, y, z};
-                v[1] = (mnavVec3){Random(-4.0f, 36.0f), y, Random(-4.0f, 36.0f)};
-                v[2] = (mnavVec3){Random(-4.0f, 36.0f), y + 0.5f, Random(-4.0f, 36.0f)};
+                v[1] = (mnavVec3){Random(x0, x1), y, Random(z0, z1)};
+                v[2] = (mnavVec3){Random(x0, x1), y + 0.5f, Random(z0, z1)};
             }
             else
             {
@@ -89,8 +125,6 @@ static void MakeMeshes(mnavTriangleMesh meshes[MESHES], float offset)
             }
             for (int32_t c = 0; c < 3; ++c)
             {
-                v[c].x += offset;
-                v[c].z += offset;
                 s_indices[m][t * 3 + c] = t * 3 + c;
             }
             s_areas[m][t] = (mnavAreaType)(1 + t % 3);
@@ -126,24 +160,26 @@ static bool BakesAlike(mnavBaker* baker, const mnavBakeInput* input, int32_t x, 
            first == second && memcmp(s_plain, s_indexed, first) == 0;
 }
 
-static void TestSameBytes(float offset, int32_t from, int32_t to, const char* where)
+// Bakes every tile the meshes reach, and three more on every side, past
+// the tiles the index lists (walls stand on frames' edges a tile out),
+// with and without the index.
+static void TestSameBytes(const mnavBakeDef* def, Place place, const char* where)
 {
-    mnavBakeDef def = Def();
     mnavTriangleMesh meshes[MESHES];
-    MakeMeshes(meshes, offset);
+    MakeMeshes(meshes, def, place);
     mnavBaker* baker = nullptr;
     mnavTileIndex* index = nullptr;
     mnavBakeReport report;
-    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavCreateTileIndex(&def, meshes, MESHES, &index, &report) == mnav_success &&
+    CHECK(mnavCreateBaker(def, &baker).result == mnav_success &&
+              mnavCreateTileIndex(def, meshes, MESHES, &index, &report) == mnav_success &&
               report.memoryPeak > 0,
           "made");
     const mnavBakeInput input = {meshes, MESHES, nullptr, 0, nullptr, 0, index};
     int32_t alike = 0;
     int32_t tiles = 0;
-    for (int32_t z = from; z <= to; ++z)
+    for (int32_t z = place.tileZ - 3; z < place.tileZ + place.rows + 3; ++z)
     {
-        for (int32_t x = from; x <= to; ++x)
+        for (int32_t x = place.tileX - 3; x < place.tileX + place.columns + 3; ++x)
         {
             alike += BakesAlike(baker, &input, x, z) ? 1 : 0;
             tiles += 1;
@@ -159,7 +195,7 @@ static void TestRefusals(void)
 {
     mnavBakeDef def = Def();
     mnavTriangleMesh meshes[MESHES];
-    MakeMeshes(meshes, 0.0f);
+    MakeMeshes(meshes, &def, (Place){0, 0, 4, 4});
     mnavTileIndex* index = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateTileIndex(&def, meshes, MESHES, nullptr, &report) == mnav_errorInvalid &&
@@ -237,6 +273,16 @@ static void TestRefusals(void)
               report.mesh == 2 && report.input.element == mnav_elementVertex,
           "a vertex not finite, refused as read");
     memcpy(s_vertices[2], kept, sizeof(kept));
+    // Only each triangle's third vertex past the extent: every corner is
+    // checked.
+    for (int32_t v = 2; v < TRIANGLES * 3; v += 3)
+    {
+        s_vertices[2][v].x = 1e30f;
+    }
+    CHECK(mnavBakeTileInput(baker, &input, 1, 1, &report) == mnav_errorRange && report.mesh == 2 &&
+              report.input.element == mnav_elementVertex,
+          "a third corner past the extent, refused as read");
+    memcpy(s_vertices[2], kept, sizeof(kept));
     CHECK(mnavBakeTileInput(baker, &input, 1, 1, &report) == mnav_success, "restored");
     mnavDestroyBaker(baker);
     mnavDestroyTileIndex(index);
@@ -244,10 +290,14 @@ static void TestRefusals(void)
 
 int main(void)
 {
-    TestSameBytes(0.0f, -1, 4, "tiles -1 to 4");
-    // Near the largest extent, 2^22 cells of 0.25 m, where the tiles'
-    // corners round most: the meshes reach tiles 131062 to 131067.
-    TestSameBytes(1048500.0f, 131061, 131068, "near the extent");
+    mnavBakeDef def = Def();
+    // About the origin, below it on both axes, more tiles along X than Z.
+    TestSameBytes(&def, (Place){-3, -2, 6, 3}, "about the origin");
+    // Near the largest extent, 2^22 cells: of 0.25 m, where a frame's
+    // corner is exact, and of 0.3 m, where it rounds by up to half a cell.
+    TestSameBytes(&def, (Place){131060, 131062, 3, 5}, "near the extent");
+    def.cellSize = 0.3f;
+    TestSameBytes(&def, (Place){131060, 131062, 5, 3}, "near the extent, rounding");
     TestRefusals();
     return s_failures == 0 ? 0 : 1;
 }

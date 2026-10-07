@@ -34,7 +34,7 @@ heap-no-remaining | src/path.c | double ta = na->cost + na->remaining; | double 
 mergeend-tail | src/corridor.c | int32_t tail = move->polygonCount - at - 1; | int32_t tail = move->polygonCount - at - 2;
 
 # Hierarchy update, navmesh flow field, off-mesh link checks (item 42)
-dirty-from-skip | src/hierarchy.c | h->dirty[tr->from] = h->changed[tr->slot] != 0 ? 1 : h->dirty[tr->from]; | h->dirty[tr->from] = h->dirty[tr->from];
+dirty-from-skip | src/hierarchy.c | h->dirty[tr->from] = now != tr->included ? 1 : h->dirty[tr->from]; | h->dirty[tr->from] = h->dirty[tr->from];
 landing-ignored | src/hierarchy.c | if (h->dirty[h->clusterOf[landing.slot - 1]] != 0) | if (false && h->dirty[h->clusterOf[landing.slot - 1]] != 0)
 sameshape-held | src/hierarchy.c | return held == navmesh->placeCount; | return held >= 0;
 research-cluster | src/hierarchy.c | if (h->dirty[h->transitions[u].cluster] != 0) | if (h->dirty[h->transitions[u].from] != 0)
@@ -187,3 +187,39 @@ reg-border-lo | src/region.c | if (z < border) | if (z <= border)
 reg-border-hi | src/region.c | if (z >= width - border) | if (z > width - border)
 reg-sweep | src/region.c | if (sweeps->below[sweep] == 0 || sweeps->below[sweep] == below) | if (sweeps->below[sweep] == below)
 reg-layer | src/region.c | if (graph->layer[root] != 0) | if (graph->layer[root] == 0)
+
+# The tile index (tile_index.c), the bake's indexed paths and the split
+# mesh checks (0.3.0). Equivalent: ti-margin-1 (a frame's corner rounds
+# by at most half a cell), ti-floordiv-exact and ti-high-ceil (extra
+# candidates only, which the exact tile test rejects). ti-list-high
+# reads one past the offsets: killed under AddressSanitizer.
+ti-margin-1 | src/tile_index.c | #define MARGIN_CELLS 2 | #define MARGIN_CELLS 1
+ti-margin-0 | src/tile_index.c | #define MARGIN_CELLS 2 | #define MARGIN_CELLS 0
+ti-floordiv-trunc | src/tile_index.c | return (a % b != 0 && (a < 0) != (b < 0)) ? q - 1 : q; | return q;
+ti-floordiv-exact | src/tile_index.c | return (a % b != 0 && (a < 0) != (b < 0)) ? q - 1 : q; | return ((a < 0) != (b < 0)) ? q - 1 : q;
+ti-low-max | src/tile_index.c | float low = fminf(a, fminf(b, c)); | float low = fminf(a, b);
+ti-high-two | src/tile_index.c | float high = fmaxf(a, fmaxf(b, c)); | float high = fmaxf(a, b);
+ti-low-border | src/tile_index.c | *lowOut = FloorDiv(lowCell - index->border, index->tileCells); | *lowOut = FloorDiv(lowCell, index->tileCells);
+ti-high-border | src/tile_index.c | *highOut = FloorDiv(highCell + index->border, index->tileCells); | *highOut = FloorDiv(highCell, index->tileCells);
+ti-high-ceil | src/tile_index.c | int64_t highCell = (int64_t)floor((double)high / (double)index->cellSize) + MARGIN_CELLS; | int64_t highCell = (int64_t)ceil((double)high / (double)index->cellSize) + MARGIN_CELLS;
+ti-z-from-x | src/tile_index.c | TileRange(index, v[corner[0]].z, v[corner[1]].z, v[corner[2]].z, &reach.z0, &reach.z1); | TileRange(index, v[corner[0]].x, v[corner[1]].x, v[corner[2]].x, &reach.z0, &reach.z1);
+ti-all-x1 | src/tile_index.c | all.x1 = r.x1 > all.x1 ? r.x1 : all.x1; | all.x1 = r.x1;
+ti-all-z0 | src/tile_index.c | all.z0 = r.z0 < all.z0 ? r.z0 : all.z0; | all.z0 = r.z0 > all.z0 ? r.z0 : all.z0;
+ti-entries-one | src/tile_index.c | entries += (r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1); | entries += (r.x1 - r.x0 + 1) * (r.z1 - r.z0);
+ti-entries-limit | src/tile_index.c | if (entries > INT32_MAX) | if (entries > 1000)
+ti-rows | src/tile_index.c | index->rows = (int32_t)(all.z1 - all.z0 + 1); | index->rows = (int32_t)(all.z1 - all.z0);
+ti-fill-z-end | src/tile_index.c | for (int64_t z = r.z0; z <= r.z1; ++z) | for (int64_t z = r.z0; z < r.z1; ++z)
+ti-k-rows | src/tile_index.c | int64_t k = (x - index->minX) + (z - index->minZ) * index->columns; | int64_t k = (x - index->minX) + (z - index->minZ) * index->rows;
+ti-count-k | src/tile_index.c | index->first[k + 1] += 1; | index->first[k] += 1;
+ti-prefix | src/tile_index.c | index->first[k + 1] += index->first[k]; | index->first[k + 1] += 0;
+ti-shift | src/tile_index.c | index->first[k] = index->first[k - 1]; | index->first[k] = index->first[k];
+ti-zero-first | src/tile_index.c | index->first[0] = 0; | index->first[0] = index->first[0];
+ti-fits-border | src/tile_index.c | index->border != cells->border || index->meshCount != meshCount) | index->border > cells->border || index->meshCount != meshCount)
+ti-fits-counts | src/tile_index.c | if (index->triangleCounts[m] != meshes[m].triangleCount) | if (index->triangleCounts[m] < meshes[m].triangleCount)
+ti-list-high | src/tile_index.c | if (x < 0 || z < 0 || x >= index->columns || z >= index->rows) | if (x < 0 || z < 0 || x > index->columns || z >= index->rows)
+ti-list-count | src/tile_index.c | *countOut = index->first[k + 1] - index->first[k]; | *countOut = index->first[k + 1] - index->first[k] - (index->first[k + 1] > index->first[k] ? 1 : 0);
+ti-create-check | src/tile_index.c | if (input.result != mnav_success) | if (false)
+bk-indexed-check | src/baker.c | mnavCheckMeshTriangle(&baker->def, &solid->meshes[list[k].mesh], list[k].triangle); | (mnavInputResult){mnav_success, mnav_elementNone, -1};
+bk-hash-both | src/baker.c | for (int32_t m = 0; m < input->meshCount && input->index == nullptr; ++m) | for (int32_t m = 0; m < input->meshCount && input->index == (void*)1; ++m)
+in-triangle-vertices | src/input.c | for (int k = 0; k < 3 && result.result == mnav_success; ++k) | for (int k = 0; k < 2 && result.result == mnav_success; ++k)
+in-shape-limit | src/input.c | if (mesh->triangleCount > def->limits.inputTriangles) | if (mesh->triangleCount > def->limits.inputTriangles + 1000000)
