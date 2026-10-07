@@ -12,8 +12,8 @@ format.
 
 - Baking tests whether a triangle reaches the tile before its slope, and
   rejects triangles a cell or more outside the tile without dividing:
-  9.6% fewer instructions baking the benchmark's 64 tiles from one
-  mesh, the tiles the same to the byte.
+  11.8% fewer instructions in a Release build baking the benchmark's
+  64 tiles from one mesh, the tiles the same to the byte.
 
 ## [0.2.5] - 2026-10-07
 
