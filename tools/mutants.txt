@@ -233,3 +233,11 @@ ti2-fits-kind | src/tile_index.c | index->border == cells->border && index->outl
 bk2-check-listed | src/baker.c | mnavInputResult input = mnavCheckOutline(&baker->def, outline); | mnavInputResult input = {mnav_success, mnav_elementNone, -1};
 ol-at-index | src/outline.h | return &set->outlines[set->indexed ? set->listed[k].mesh : k]; | return &set->outlines[k];
 ol-set-count | src/outline.c | mnavTileIndexList(index, tileX, tileZ, &set.listed, &set.count); | mnavTileIndexList(index, tileX, tileZ, &set.listed, &set.count); set.count -= set.count > 0;
+
+# The search heap's stored totals (0.3.1): a lowered cost's refresh and a
+# new node's total. Equivalent: the restart's refresh, and the confined
+# start's (the same line as the search's first, so not listed), since
+# each leaves the heap one entry, popped before any comparison.
+hr-lowered | src/path.c | query->heap[node->heap] = EntryOf(query, n); | query->heap[node->heap].node = n;
+hr-new | src/path.c | query->heap[query->heapCount] = EntryOf(query, n); | query->heap[query->heapCount] = (mnavHeapEntry){query->nodes[n].cost, n};
+hr-restart | src/path.c | query->heap[0] = EntryOf(query, last); | query->heap[0] = (mnavHeapEntry){0.0, last};
