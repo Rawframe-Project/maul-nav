@@ -64,6 +64,13 @@ static void TestStepDecidesOverAgainstBeside(void)
     // above it: (1.6 - 0.75)^2 = 0.7225 loses to 0.35^2 + 0.6^2 = 0.4825.
     CHECK(NearestPolygon(navmesh, 9.9, 1.6) == 1, "beyond the step, the floor beside wins");
     mnavDestroyNavmesh(navmesh);
+    // With the high floor 1.25 m up, at its height 0.5 m from its edge:
+    // the low floor scores (1.25 - 0.75)^2 = 0.25 and the high one 0.5^2,
+    // exactly; the tie goes to the nearer, the high floor at 0.5 m, not
+    // the low one 1.25 m below.
+    navmesh = TwoFloors(10);
+    CHECK(NearestPolygon(navmesh, 9.75, 1.25) == 1, "a tie in score goes to the nearer");
+    mnavDestroyNavmesh(navmesh);
 }
 
 int main(void)

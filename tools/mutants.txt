@@ -149,7 +149,7 @@ lg-in-range | src/linkgen.c | if (p->x >= tileX0 && p->x <= tileX1 && p->z >= ti
 # Spatial queries and the hierarchical path (items 52, 53)
 near-best | src/nearest.c | if (d < bestDistance) | if (d <= bestDistance)
 near-tie | src/nearest.c | if (area == 0.0 || d >= best) | if (area == 0.0 || d > best)
-near-box | src/nearest.c | if (fabs(dx) > s->half.x || fabs(dy) > s->half.y || fabs(dz) > s->half.z) | if (fabs(dx) >= s->half.x || fabs(dy) > s->half.y || fabs(dz) > s->half.z)
+near-box | src/nearest.c | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz > s->bestScore)) | if (fabs(dx) >= s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz > s->bestScore))
 near-score | src/nearest.c | double score = over ? (beyond > 0.0 ? beyond * beyond : 0.0) : distance; | double score = over ? (beyond * beyond) : distance;
 near-places | src/nearest.c | if (navmesh->places[middle].x < x0) | if (navmesh->places[middle].x <= x0)
 surf-best | src/surface.c | if (d < m->bestDistance) | if (d <= m->bestDistance)
@@ -262,3 +262,14 @@ fr-around | src/flow_repair.c | OfferAround(&s, changed[i].x, changed[i].y); | O
 fr-next-tie | src/flow_repair.c | (f->costs[n] == f->costs[best] && n < best)) | (f->costs[n] == f->costs[best] && n > best))
 fr-next-cheaper | src/flow_repair.c | if (best == cell || f->costs[n] < f->costs[best] || | if (best == cell || f->costs[n] > f->costs[best] ||
 fr-next-exact | src/flow_repair.c | f->costs[n] + mnavFlowStepCost(s, n, cell, length) != cost) | f->costs[n] + mnavFlowStepCost(s, n, cell, length) > cost)
+
+# The nearest query's prune before a detail height (0.4.1). Survivors:
+# near-stop is equivalent (after a distance of 0 every later detail
+# triangle is passed over by d >= best). near-prune-over can only prune
+# a polygon the point is over when its rounded ground distance, about
+# 1e-15 m, beats the best: two layers within a step under one point,
+# which a bake never makes as the agent's height parts them, or a point
+# within rounding of a shared edge, where either polygon is right.
+near-prune-ties | src/nearest.c | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz > s->bestScore)) | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz >= s->bestScore))
+near-prune-over | src/nearest.c | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz > s->bestScore)) | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (dx * dx + dz * dz > s->bestScore))
+near-stop | src/nearest.c | if (best == 0.0) | if (best < 0.0)
