@@ -96,9 +96,20 @@ static mnavPos3 Midpoint(mnavPos3 a, mnavPos3 b)
     return (mnavPos3){(a.x + b.x) * 0.5, (a.y + b.y) * 0.5, (a.z + b.z) * 0.5};
 }
 
+// What names a node: the polygon entered, its slot, the portal's tag and
+// the link's start along the side. Only these four, so that a key costs
+// no more to make than they do.
+typedef struct Key
+{
+    int32_t slot;
+    int32_t polygon;
+    int32_t tag;
+    int32_t low;
+} Key;
+
 // Opens the node behind a portal from node from, or lowers its cost when
 // this way is cheaper; closed nodes are final.
-static void Open(mnavSearch* s, int32_t from, const mnavSearchNode* key, mnavPos3 a, mnavPos3 b,
+static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPos3 b,
                  double linkCost)
 {
     mnavQuery* query = s->query;
@@ -173,7 +184,7 @@ static void ExpandInner(mnavSearch* s, int32_t n, const mnavTile* tile, const mn
     {
         if (other->vertices[i] == to && other->vertices[(i + 1) % other->count] == from)
         {
-            mnavSearchNode key = {.slot = node->slot, .polygon = next, .tag = i, .low = 0};
+            Key key = {.slot = node->slot, .polygon = next, .tag = i, .low = 0};
             Open(s, n, &key, mnavVertexWorld(f, &tile->mesh.vertices[from]),
                  mnavVertexWorld(f, &tile->mesh.vertices[to]), 0.0);
             return;
@@ -228,10 +239,10 @@ static void ExpandSide(mnavSearch* s, int32_t n, const mnavTile* tile, const mna
         bool rising = bu > au;
         mnavPos3 first = AlongSide(a, b, au, bu, rising ? link->low : link->high);
         mnavPos3 second = AlongSide(a, b, au, bu, rising ? link->high : link->low);
-        mnavSearchNode key = {.slot = (int32_t)link->target.slot - 1,
-                              .polygon = (int32_t)link->target.polygon,
-                              .tag = MNAV_TAG_LINK + facing,
-                              .low = link->low};
+        Key key = {.slot = (int32_t)link->target.slot - 1,
+                   .polygon = (int32_t)link->target.polygon,
+                   .tag = MNAV_TAG_LINK + facing,
+                   .low = link->low};
         Open(s, n, &key, first, second, 0.0);
     }
 }
@@ -257,10 +268,10 @@ static void ExpandArrivals(mnavSearch* s, int32_t n)
         {
             continue;
         }
-        mnavSearchNode key = {.slot = (int32_t)takeoff.slot - 1,
-                              .polygon = (int32_t)takeoff.polygon,
-                              .tag = MNAV_TAG_OFFMESH,
-                              .low = arrival.link * 2 + (arrival.reverse ? 1 : 0)};
+        Key key = {.slot = (int32_t)takeoff.slot - 1,
+                   .polygon = (int32_t)takeoff.polygon,
+                   .tag = MNAV_TAG_OFFMESH,
+                   .low = arrival.link * 2 + (arrival.reverse ? 1 : 0)};
         mnavPos3 landing = arrival.reverse ? state->start : state->end;
         mnavPos3 from = arrival.reverse ? state->end : state->start;
         Open(s, n, &key, landing, from, (double)link->def.cost);
@@ -293,10 +304,10 @@ static void ExpandOffMesh(mnavSearch* s, int32_t n)
         {
             continue;
         }
-        mnavSearchNode key = {.slot = (int32_t)landing.slot - 1,
-                              .polygon = (int32_t)landing.polygon,
-                              .tag = MNAV_TAG_OFFMESH,
-                              .low = attachment.link * 2 + (attachment.reverse ? 1 : 0)};
+        Key key = {.slot = (int32_t)landing.slot - 1,
+                   .polygon = (int32_t)landing.polygon,
+                   .tag = MNAV_TAG_OFFMESH,
+                   .low = attachment.link * 2 + (attachment.reverse ? 1 : 0)};
         Open(s, n, &key, attachment.reverse ? state->end : state->start,
              attachment.reverse ? state->start : state->end, (double)link->def.cost);
     }
@@ -309,8 +320,7 @@ static void Expand(mnavSearch* s, int32_t n)
     const mnavPolygon* polygon = &tile->mesh.polygons[node->polygon];
     if (node->slot == s->endSlot && node->polygon == s->endPolygon)
     {
-        mnavSearchNode key = {
-            .slot = node->slot, .polygon = node->polygon, .tag = MNAV_TAG_END, .low = 0};
+        Key key = {.slot = node->slot, .polygon = node->polygon, .tag = MNAV_TAG_END, .low = 0};
         Open(s, n, &key, s->end, s->end, 0.0);
     }
     // mnavSearchNode pointers stay valid as nodes are added: the array never moves.

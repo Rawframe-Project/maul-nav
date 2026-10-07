@@ -16,6 +16,9 @@ format.
   triangle holding the point. Streaming the benchmark's terrain with
   512 off-mesh links, whose ends are snapped again at each commit,
   takes 15% fewer instructions; the results are the same.
+- Path searches name the node behind a portal by its four fields, not
+  a whole search node zeroed for each edge: path queries on the
+  benchmark take about 5% less time, the paths the same.
 
 ## [0.4.0] - 2026-10-07
 
