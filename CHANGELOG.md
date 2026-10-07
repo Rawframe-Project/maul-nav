@@ -8,6 +8,15 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- `mnavFindNearest` looks up a polygon's detail height only when the
+  polygon can still win (a point beside it whose ground distance alone
+  loses is passed over), and a detail height stops at the first detail
+  triangle holding the point. Streaming the benchmark's terrain with
+  512 off-mesh links, whose ends are snapped again at each commit,
+  takes 15% fewer instructions; the results are the same.
+
 ## [0.4.0] - 2026-10-07
 
 Tile indexes of 2D outlines.
