@@ -8,6 +8,25 @@ format.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-07
+
+Documentation of three search boundaries, and the mutation tests behind
+them.
+
+### Changed
+
+- `mnavFindWallDistance` says a wall exactly the radius away lies
+  within it, and that of walls at the same distance it gives one, the
+  same everywhere but not promised.
+- `mnavFindHierarchicalPath` says that where routes through the
+  clusters cost the same it takes one, the same everywhere but not
+  promised, and the refined paths may differ a little in cost.
+
+### Added
+
+- `tools/mutate.py` and `tools/mutants.txt`: the 167 one-line mutants
+  the tests were checked against, and the runner, not part of CI.
+
 ## [0.2.3] - 2026-10-07
 
 Avoidance keeps agents out of circle obstacles they overlap.
