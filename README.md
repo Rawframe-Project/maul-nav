@@ -3,8 +3,9 @@
 Navigation for games, engines and simulations: navmesh generation from
 triangle meshes, heightfields and 2D polygons, a versioned navmesh
 format that loads hostile input safely, path and spatial queries, path
-corridors, off-mesh links, flow fields for mass movement, and local
-avoidance as a separate component. Written in C23 with public headers
+corridors, off-mesh links, flow fields for mass movement, flight
+volumes for agents that fly or swim, and local avoidance as a separate
+component. Written in C23 with public headers
 any C17 or C++17 program can include, with no dependencies and an MIT
 license.
 
@@ -29,6 +30,9 @@ It has:
   host-declared kinds, toggled at runtime and generated automatically;
 - runtime changes by declared tier (static, modifiers only, dynamic),
   committed at a point the host chooses;
+- flight volumes for agents that fly or swim: sparse voxel octree
+  tiles baked from the same input, streamed as navmesh tiles are, with
+  any-angle paths (Lazy Theta*), raycasts and nearest open points;
 - velocity-space avoidance (ORCA), a component that needs no navmesh;
 - debug geometry as plain vertices and indices, and bake reports.
 
@@ -44,14 +48,15 @@ the clock a bake may read for its report.
 
 Version 0.5.0. Everything listed above is built and tested on every CI
 platform; fuzz targets cover tiles, bake input, queries, avoidance,
-the searches over a whole navmesh, grid flow fields and the exact
-shortest path beside the A* one. Before 1.0.0 a
+the searches over a whole navmesh, grid flow fields, the exact
+shortest path beside the A* one, and flight tiles and queries. Before 1.0.0 a
 minor release may change the API, the ABI and the tile format.
 
 ## Documentation
 
 - [The guide](docs/guide.md) walks through baking, the navmesh,
-  queries, corridors, flow fields, avoidance and debug output.
+  queries, corridors, flow fields, flight volumes, avoidance and debug
+  output.
 - [The API reference](docs/api.md) lists all 107 public functions,
   generated from the headers.
 - [The samples](docs/samples.md) are small complete programs.

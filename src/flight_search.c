@@ -285,10 +285,27 @@ static void Repair(void* context, mnavFlightBlock block)
     }
 }
 
+// The points a node's way bends through from the neighbor that reached
+// it, in order: that neighbor's block's center and, for the end, whose
+// point is anywhere in its block, the face point nearest the center. The
+// neighbor's block holds the first step, the face is crossed within its
+// edges, and the end's block holds the last. Returns their number.
+static int32_t Bend(const Search* s, const Node* n, double out[2][3])
+{
+    const Node* via = &s->nodes[n->via];
+    Center(via, out[0]);
+    if (!SameBlock(n->block, s->endBlock))
+    {
+        return 1;
+    }
+    FacePoint(via->block, n->block, out[0], out[1]);
+    return 2;
+}
+
 // Checks a node just taken off the open list against its parent: out of
 // sight, it takes the neighbor that reached it, straight when in sight
-// and else bending through its block's center, which the block holds;
-// or a closed neighbor in sight that reaches it cheaper.
+// and else bending (Bend); or a closed neighbor in sight that reaches it
+// cheaper.
 static void Settle(Search* s, int32_t node)
 {
     Node* n = &s->nodes[node];
@@ -304,9 +321,10 @@ static void Settle(Search* s, int32_t node)
     }
     else
     {
-        double center[3];
-        Center(via, center);
-        n->cost = via->cost + Distance(via->point, center) + Distance(center, n->point);
+        double bend[2][3];
+        int32_t count = Bend(s, n, bend);
+        n->cost = via->cost + Distance(via->point, bend[0]) + Distance(bend[count - 1], n->point) +
+                  (count == 2 ? Distance(bend[0], bend[1]) : 0.0);
         n->bend = 1;
     }
     n->parent = n->via;
@@ -349,9 +367,13 @@ static mnavFlightPath PathTo(const Search* s, const mnavFlightFrame* frame, int3
         points[count++] = mnavFlightToWorld(frame, s->nodes[n].point);
         if (s->nodes[n].bend != 0)
         {
-            double center[3];
-            Center(&s->nodes[s->nodes[n].parent], center);
-            points[count++] = mnavFlightToWorld(frame, center);
+            // The end alone bends through two points, and the start never
+            // bends, so the points still number at most twice the nodes.
+            double bend[2][3];
+            for (int32_t k = Bend(s, &s->nodes[n], bend) - 1; k >= 0; --k)
+            {
+                points[count++] = mnavFlightToWorld(frame, bend[k]);
+            }
         }
     }
     for (int32_t i = 0; i < count / 2; ++i)

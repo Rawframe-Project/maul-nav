@@ -76,7 +76,8 @@ typedef struct mnavGridNode
 // its lowest voxel and side; the point the path passes in it, in voxels
 // of the volume's frame; its length so far and the distance left, in
 // voxels; the way it came, and the neighbor that reached it; whether the
-// way bends through that neighbor's block's center; and its place in the
+// way bends through that neighbor's block's center (and, for the end,
+// the face beyond); and its place in the
 // open list, MNAV_NO_NODE before it enters it, or MNAV_CLOSED.
 typedef struct mnavFlightSearchNode
 {

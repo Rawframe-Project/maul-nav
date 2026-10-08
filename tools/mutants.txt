@@ -301,7 +301,7 @@ ti-list-high | src/tile_index.c | if (x < 0 || z < 0 || x >= index->columns || z
 ti-list-count | src/tile_index.c | *countOut = index->first[k + 1] - index->first[k]; | *countOut = index->first[k + 1] - index->first[k] - (index->first[k + 1] > index->first[k] ? 1 : 0);
 ti-create-check | src/tile_index.c | mnavInputResult input = mnavCheckTriangleMesh(def, &meshes[m]); | mnavInputResult input = {mnav_success, mnav_elementNone, -1};
 bk-indexed-check | src/baker.c | mnavCheckMeshTriangle(&baker->def, &solid->meshes[list[k].mesh], list[k].triangle); | (mnavInputResult){mnav_success, mnav_elementNone, -1};
-bk-hash-both | src/baker.c | for (int32_t m = 0; m < input->meshCount && input->index == nullptr; ++m) | for (int32_t m = 0; m < input->meshCount && input->index == (void*)1; ++m)
+bk-hash-both | src/fingerprint.c | for (int32_t m = 0; m < input->meshCount && input->index == nullptr; ++m) | for (int32_t m = 0; m < input->meshCount && input->index == (void*)1; ++m)
 in-triangle-vertices | src/input.c | for (int k = 0; k < 3 && result.result == mnav_success; ++k) | for (int k = 0; k < 2 && result.result == mnav_success; ++k)
 in-shape-limit | src/input.c | if (mesh->triangleCount > def->limits.inputTriangles) | if (mesh->triangleCount > def->limits.inputTriangles + 1000000)
 
@@ -407,3 +407,36 @@ sh-one-cost | src/shortest.c | if (any && c != cost) | if (false && any && c != 
 sh-fallback-off | src/shortest.c | reach != mnav_pathFound && reach != mnav_pathOutOfNodes) | false)
 sh-link-cost | src/shortest.c | *linkCost += (double)s->navmesh->links[node->low / 2].def.cost; | *linkCost += 0.0;
 sh-land-free | src/shortest.c | node->cost + walk * s->cost + (double)link->def.cost, | node->cost + walk * s->cost,
+
+# Flight volumes (mnav-0015): the bake, the tile format, the space walks,
+# the path search, the probes, the def and the volume
+fl-ground-off | src/flight.c | if (groundBelow && first < last) | if (false && groundBelow && first < last)
+fl-ball-wider | src/flight.c | while ((h + 1) * (h + 1) <= rest) | while ((h + 1) * (h + 1) <= rest + 1)
+fl-full-leaf-mixed | src/flight.c | : (value == UINT64_MAX ? MNAV_FLIGHT_SOLID : MNAV_FLIGHT_MIXED); | : (value == UINT64_MAX ? MNAV_FLIGHT_MIXED : MNAV_FLIGHT_MIXED);
+fl-solid-mask-off | src/flight.c | node.mask |= (uint16_t)(c == MNAV_FLIGHT_SOLID ? 1u << (o + 8) : 0u); | node.mask |= (uint16_t)(c == MNAV_FLIGHT_SOLID ? 0u : 0u);
+fl-node-limit-off | src/flight.c | if (nodes > limits->tileNodes || leaves > limits->tileLeaves) | if (nodes > limits->tileNodes + 1000000 || leaves > limits->tileLeaves + 1000000)
+fl-range-from | src/flight.c | from = from < 0 ? 0 : from; | from = from < 0 ? 1 : from;
+ft-mask-loose | src/flight_tile.c | return (mixed & solid) == 0 && (mixed != 0 || (solid != 0 && solid != 0xFFu)); | return (mixed & solid) == 0;
+ft-leaf-full-ok | src/flight_tile.c | if (tile->leaves[k] == 0 || tile->leaves[k] == UINT64_MAX) | if (tile->leaves[k] == 0)
+ft-root-class | src/flight_tile.c | if (tile->roots[c] > MNAV_FLIGHT_MIXED) | if (tile->roots[c] > MNAV_FLIGHT_MIXED + 1)
+ft-nodes-spare | src/flight_tile.c | if (w.node != tile->nodeCount) | if (w.node > tile->nodeCount)
+ft-leaves-spare | src/flight_tile.c | if (w.leaf != tile->leafCount) | if (w.leaf > tile->leafCount)
+ft-leaf-limit-off | src/flight_tile.c | if (h->nodes > def->limits.tileNodes || h->leaves > def->limits.tileLeaves) | if (h->nodes > def->limits.tileNodes)
+ft-flags-unread | src/flight_tile.c | valid &= mnavGetU16(&r) == (def->groundBelow ? FLAG_GROUND_BELOW : 0u); | (void)mnavGetU16(&r);
+fs-floor-div | src/flight_space.c | return (a % b != 0 && a < 0) ? q - 1 : q; | return q;
+fs-cache-z | src/flight_space.c | if (!c->cached || tileX != c->tileX || tileZ != c->tileZ) | if (!c->cached || tileX != c->tileX)
+fs-face-inside | src/flight_space.c | r.lo[axis] = f % 2 != 0 ? r.hi[axis] : r.lo[axis] - 1; | r.lo[axis] = f % 2 != 0 ? r.hi[axis] - 1 : r.lo[axis] - 1;
+fs-corners-off | src/flight_space.c | if ((m & ~tied) != 0 || m == tied) | if (true || (m & ~tied) != 0 || m == tied)
+fs-leaf-solid | src/flight_space.c | if ((leaf >> k & 1u) == 0 && Meets(r, vx, vy, vz, 1)) | if (Meets(r, vx, vy, vz, 1))
+sr-size-blind | src/flight_search.c | return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3]; | return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
+sr-on-face | src/flight_search.c | out[k] = b[k] == (int32_t)lo ? lo + INSET : lo - INSET; | out[k] = lo;
+sr-edge-inset-off | src/flight_search.c | lo += EDGE_INSET; | lo += 0.0;
+sr-sight-off | src/flight_search.c | if (n->parent == MNAV_NO_NODE || InSight(s, s->nodes[n->parent].point, n->point)) | if (true)
+sr-via-unseen | src/flight_search.c | if (n->parent != n->via && InSight(s, via->point, n->point)) | if (n->parent != n->via)
+sr-bend-no-face | src/flight_search.c | if (!SameBlock(n->block, s->endBlock)) | if (true)
+sr-not-loaded-off | src/flight_search.c | if (mnavFlightFace(&s->cursor, &b, f, visit, s) == MNAV_SPACE_UNLOADED) | if (false)
+pr-high-face | src/flight_probe.c | double high = lo[k] + (double)size - INSET; | double high = lo[k] + (double)size;
+pr-stop-kind | src/flight_probe.c | hitOut->stop = held == MNAV_SPACE_OPEN    ? mnav_flightClear | hitOut->stop = held == MNAV_SPACE_UNLOADED ? mnav_flightClear
+fd-radius-margin | src/flight_def.c | !mnavToCells(def->radius, def->voxelSize, true, def->tileVoxels - FLIGHT_BORDER_MARGIN, | !mnavToCells(def->radius, def->voxelSize, true, def->tileVoxels,
+fd-ceiling-top | src/flight_def.c | return top > MNAV_MAX_HEIGHT_CELLS ? mnav_flightSettingCeiling : mnav_flightSettingNone; | return mnav_flightSettingNone;
+fv-removal-count | src/flight_volume.c | count += e->removal ? (held ? -1 : 0) : (held ? 0 : 1); | count += e->removal ? 0 : (held ? 0 : 1);

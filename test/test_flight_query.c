@@ -452,10 +452,16 @@ static void TestRaycasts(const mnavFlightVolume* volume)
         // floor and ceiling too.
         int32_t v[3];
         RandomOpen(v);
-        const double a[3] = {v[0] + (double)Random(), v[1] + (double)Random(),
-                             v[2] + (double)Random()};
-        const double b[3] = {(double)Random() * 80.0 - 8.0, (double)Random() * 40.0 - 4.0,
-                             (double)Random() * 80.0 - 8.0};
+        // One draw a statement: an initializer's order is unspecified.
+        double a[3];
+        double b[3];
+        for (int32_t i = 0; i < 3; ++i)
+        {
+            a[i] = v[i] + (double)Random();
+        }
+        b[0] = (double)Random() * 80.0 - 8.0;
+        b[1] = (double)Random() * 40.0 - 4.0;
+        b[2] = (double)Random() * 80.0 - 8.0;
         mnavFlightHit hit;
         CHECK(mnavFlightRaycast(volume, At(a[0], a[1], a[2]), At(b[0], b[1], b[2]), &hit) ==
                   mnav_success,
@@ -516,8 +522,10 @@ static void TestNearest(const mnavFlightVolume* volume)
     int32_t found = 0;
     for (int32_t k = 0; k < 150; ++k)
     {
-        const double p[3] = {(double)Random() * SIDE, (double)Random() * LAYERS,
-                             (double)Random() * SIDE};
+        double p[3];
+        p[0] = (double)Random() * SIDE;
+        p[1] = (double)Random() * LAYERS;
+        p[2] = (double)Random() * SIDE;
         mnavPos3 nearest;
         bool any = false;
         CHECK(mnavFindNearestFlightPoint(volume, At(p[0], p[1], p[2]), 2.5f, &nearest, &any) ==
@@ -679,6 +687,125 @@ static void TestRefusals(const mnavFlightVolume* volume)
           "nearest refusals");
 }
 
+// A volume of 2 by 2 tiles of 16 voxels, one cube high, over a floor,
+// with boxes given as their lowest corner and sizes.
+static mnavFlightVolume* Small(const float boxes[][6], int32_t count, float radius)
+{
+    static mnavVec3 vertices[4 + 4 * 8];
+    static int32_t indices[6 + 4 * 36];
+    const mnavVec3 floor[4] = {{-4, 0, -4}, {-4, 0, 36}, {36, 0, 36}, {36, 0, -4}};
+    const int32_t quad[6] = {0, 1, 2, 0, 2, 3};
+    static const int32_t faces[36] = {0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1,
+                                      2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3};
+    memcpy(vertices, floor, sizeof(floor));
+    memcpy(indices, quad, sizeof(quad));
+    for (int32_t b = 0; b < count; ++b)
+    {
+        for (int32_t c = 0; c < 8; ++c)
+        {
+            vertices[4 + b * 8 + c] = (mnavVec3){boxes[b][0] + ((c & 1) != 0 ? boxes[b][3] : 0.0f),
+                                                 boxes[b][1] + ((c & 2) != 0 ? boxes[b][4] : 0.0f),
+                                                 boxes[b][2] + ((c & 4) != 0 ? boxes[b][5] : 0.0f)};
+        }
+        for (int32_t k = 0; k < 36; ++k)
+        {
+            indices[6 + b * 36 + k] = 4 + b * 8 + faces[k];
+        }
+    }
+    mnavTriangleMesh mesh = {vertices, 4 + count * 8, indices, 2 + count * 12, nullptr};
+    mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    mnavFlightDef def = mnavDefaultFlightDef();
+    def.allocator = CountingAllocator();
+    def.tileVoxels = 16;
+    def.floor = 0.0f;
+    def.ceiling = 16.0f;
+    def.radius = radius;
+    def.groundBelow = false;
+    mnavFlightBaker* baker = nullptr;
+    mnavFlightVolume* volume = nullptr;
+    CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success &&
+              mnavCreateFlightVolume(&def, &volume).result == mnav_success,
+          "a small volume");
+    static uint8_t bytes[TILE_BYTES];
+    int32_t wrong = 0;
+    for (int32_t t = 0; t < 4; ++t)
+    {
+        size_t size = 0;
+        wrong += mnavBakeFlightTile(baker, &input, t % 2, t / 2, nullptr) != mnav_success;
+        wrong += mnavCopyFlightTile(baker, bytes, TILE_BYTES, &size) != mnav_success;
+        wrong += mnavStageFlightTile(volume, bytes, size).result != mnav_success;
+    }
+    CHECK(wrong == 0 && mnavCommitFlight(volume) == mnav_success, "its tiles");
+    mnavDestroyFlightBaker(baker);
+    return volume;
+}
+
+static bool OpenAt(const mnavFlightVolume* volume, double x, double y, double z)
+{
+    bool open = false;
+    return mnavIsFlightOpen(volume, (mnavPos3){x, y, z}, &open) == mnav_success && open;
+}
+
+// Whether every step of a path is clear by the raycast.
+static bool StepsClear(const mnavFlightVolume* volume, const mnavFlightPath* path)
+{
+    for (int32_t i = 0; i + 1 < path->pointCount; ++i)
+    {
+        mnavFlightHit hit;
+        if (mnavFlightRaycast(volume, path->points[i], path->points[i + 1], &hit) != mnav_success ||
+            hit.stop != mnav_flightClear)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Two boxes meeting at an edge: no ray and no path slips through it.
+static void TestEdge(void)
+{
+    // Kept off the voxels' faces: a triangle on a face marks both voxels.
+    const float boxes[2][6] = {{4.25f, 1.25f, 4.25f, 3.5f, 7.5f, 3.5f},
+                               {8.25f, 1.25f, 8.25f, 3.5f, 7.5f, 3.5f}};
+    mnavFlightVolume* volume = Small(boxes, 2, 0.0f);
+    // The voxels on either side of the edge at (8, 8) are open, those it
+    // joins solid.
+    bool shape = OpenAt(volume, 7.5, 4.5, 8.5) && OpenAt(volume, 8.5, 4.5, 7.5) &&
+                 !OpenAt(volume, 7.5, 4.5, 7.5) && !OpenAt(volume, 8.5, 4.5, 8.5);
+    CHECK(shape, "two boxes meeting at an edge");
+    mnavFlightHit hit;
+    CHECK(mnavFlightRaycast(volume, (mnavPos3){7.5, 4.5, 8.5}, (mnavPos3){8.5, 4.5, 7.5}, &hit) ==
+                  mnav_success &&
+              hit.stop == mnav_flightBlocked,
+          "a ray through the edge is blocked");
+    mnavQuery* query = Query(16384, 1000.0f);
+    mnavFlightPath path;
+    CHECK(mnavFindFlightPath(query, volume, (mnavPos3){7.5, 4.5, 8.5}, (mnavPos3){8.5, 4.5, 7.5},
+                             &path) == mnav_success &&
+              path.end == mnav_pathFound && path.length > 2.0 && StepsClear(volume, &path),
+          "a path goes around the edge");
+    mnavDestroyQuery(query);
+    mnavDestroyFlightVolume(volume);
+}
+
+// A path whose end, deep in a large block, is out of sight of the block
+// that reached it: its way bends through that block's center and then
+// the face between them (found by fuzz_flight).
+static void TestBendToTheEnd(void)
+{
+    const float boxes[2][6] = {{4.0f, 4.0f, 1.0f, 4.0f, 1.0f, 1.0f},
+                               {0.0f, 5.0f, 4.0f, 5.0f, 5.0f, 1.0f}};
+    mnavFlightVolume* volume = Small(boxes, 2, 1.5f);
+    mnavQuery* query = Query(32768, 1000.0f);
+    mnavFlightPath path;
+    CHECK(mnavFindFlightPath(query, volume, (mnavPos3){2.125, 4.125, 12.125},
+                             (mnavPos3){8.125, 12.125, 0.625}, &path) == mnav_success &&
+              path.end == mnav_pathFound && StepsClear(volume, &path),
+          "every step clear to the end");
+    mnavDestroyQuery(query);
+    mnavDestroyFlightVolume(volume);
+}
+
 int main(void)
 {
     mnavFlightVolume* volume = Volume(-1, -1);
@@ -691,6 +818,8 @@ int main(void)
     TestRefusals(volume);
     mnavDestroyFlightVolume(volume);
     TestHole();
+    TestEdge();
+    TestBendToTheEnd();
     CHECK(s_held == 0, "every byte given back");
     return s_failures == 0 ? 0 : 1;
 }

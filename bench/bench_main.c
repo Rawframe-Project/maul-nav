@@ -10,7 +10,8 @@
 // with avoidance; then builds flow fields over a grid of 512 by 512 cells;
 // then, on a flat world of 24 by 24 tiles with pillars and walls baked
 // from outlines, builds a hierarchy and finds long paths with and without
-// it.
+// it; then bakes the terrain and 300 floating boxes into a flight volume
+// and finds fliers' paths and casts their rays through it.
 // Prints each section's counts and bytes, which do not depend on the
 // machine, as comment lines, then its named results, the best of five
 // runs. Given a baseline file, such as bench/baseline.txt, it prints each
@@ -23,6 +24,7 @@
 #include "maul-nav/avoidance.h"
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/flight.h"
 #include "maul-nav/flow.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/navflow.h"
@@ -915,6 +917,205 @@ static void Hierarchy(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// The flight section: boxes 2 to 10 m across floating 4 to 40 m over the
+// terrain, which, with the terrain, a flight volume of 1 m voxels holds
+// from 2 m below the ground to 62 m up.
+enum
+{
+    DEBRIS = 300,
+    FLIGHT_PATHS = 200,
+    FLIGHT_RAYS = 2000
+};
+
+static mnavVec3 s_debrisVertices[DEBRIS * 8];
+static int32_t s_debrisIndices[DEBRIS * 36];
+
+static float Unit(uint32_t* state)
+{
+    *state = *state * 1664525u + 1013904223u;
+    return (float)(*state >> 8 & 0xFFFFu) / 65536.0f;
+}
+
+static mnavTriangleMesh Debris(void)
+{
+    const int32_t faces[36] = {0, 2, 3, 0, 3, 1, 4, 5, 7, 4, 7, 6, 0, 1, 5, 0, 5, 4,
+                               2, 6, 7, 2, 7, 3, 0, 4, 6, 0, 6, 2, 1, 3, 7, 1, 7, 5};
+    uint32_t state = 11;
+    for (int32_t b = 0; b < DEBRIS; ++b)
+    {
+        float side = 2.0f + 8.0f * Unit(&state);
+        float x0 = Unit(&state) * ((float)TILES * 32.0f - side);
+        float y0 = 4.0f + 36.0f * Unit(&state);
+        float z0 = Unit(&state) * ((float)TILES * 32.0f - side);
+        for (int32_t k = 0; k < 8; ++k)
+        {
+            s_debrisVertices[b * 8 + k] =
+                (mnavVec3){x0 + ((k & 1) ? side : 0.0f), y0 + ((k & 4) ? side : 0.0f),
+                           z0 + ((k & 2) ? side : 0.0f)};
+        }
+        for (int32_t k = 0; k < 36; ++k)
+        {
+            s_debrisIndices[b * 36 + k] = b * 8 + faces[k];
+        }
+    }
+    return (mnavTriangleMesh){s_debrisVertices, DEBRIS * 8, s_debrisIndices, DEBRIS * 12, NULL};
+}
+
+static mnavFlightDef FlightDef(void)
+{
+    mnavFlightDef def = mnavDefaultFlightDef();
+    def.allocator = (mnavAllocator){Alloc, Free, NULL};
+    def.floor = -2.0f;
+    def.ceiling = 62.0f;
+    return def;
+}
+
+// Bakes the flight tiles, the best of the runs, into a committed volume.
+static mnavFlightVolume* FlightBake(void)
+{
+    mnavFlightDef def = FlightDef();
+    mnavTriangleMesh meshes[2] = {Terrain(), Debris()};
+    mnavBakeInput input = {meshes, 2, NULL, 0, NULL, 0, NULL};
+    static uint8_t buffer[TILE_BYTES];
+    mnavFlightVolume* volume = NULL;
+    Check(mnavCreateFlightVolume(&def, &volume).result, "flight volume");
+    double best = 1e30;
+    size_t bytes = 0;
+    int64_t nodes = 0;
+    int64_t leaves = 0;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        mnavFlightBaker* baker = NULL;
+        Check(mnavCreateFlightBaker(&def, &baker).result, "flight baker");
+        double start = Seconds();
+        bytes = 0;
+        nodes = 0;
+        leaves = 0;
+        for (int32_t t = 0; t < TILES * TILES; ++t)
+        {
+            mnavFlightBakeReport report;
+            size_t size = 0;
+            Check(mnavBakeFlightTile(baker, &input, t % TILES, t / TILES, &report), "flight bake");
+            Check(mnavCopyFlightTile(baker, buffer, TILE_BYTES, &size), "flight copy");
+            if (run == 0)
+            {
+                Check(mnavStageFlightTile(volume, buffer, size).result, "flight stage");
+            }
+            bytes += size;
+            nodes += report.nodes;
+            leaves += report.leaves;
+        }
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+        mnavDestroyFlightBaker(baker);
+    }
+    Check(mnavCommitFlight(volume), "flight commit");
+    printf("# flight bake: %d tiles, %lld nodes, %lld leaves, %zu bytes, %.0f us per tile\n",
+           TILES * TILES, (long long)nodes, (long long)leaves, bytes, best * 1e6 / (TILES * TILES));
+    Report("flight bake, a tile", best * 1e6 / (TILES * TILES), "us");
+    return volume;
+}
+
+// A point open to the flier, snapped from one drawn over the volume.
+static mnavPos3 FlightPoint(const mnavFlightVolume* volume, uint32_t* state)
+{
+    for (;;)
+    {
+        // One draw a statement: an initializer's order is unspecified.
+        double x = (double)Unit(state) * TILES * 32.0;
+        double y = 4.0 + 50.0 * (double)Unit(state);
+        double z = (double)Unit(state) * TILES * 32.0;
+        mnavPos3 p = {x, y, z};
+        mnavPos3 open;
+        bool found = false;
+        Check(mnavFindNearestFlightPoint(volume, p, 4.0f, &open, &found), "flight nearest");
+        if (found)
+        {
+            return open;
+        }
+    }
+}
+
+static void FlightPaths(const mnavFlightVolume* volume)
+{
+    static mnavPos3 ends[FLIGHT_PATHS][2];
+    uint32_t state = 5;
+    for (int32_t k = 0; k < FLIGHT_PATHS; ++k)
+    {
+        ends[k][0] = FlightPoint(volume, &state);
+        ends[k][1] = FlightPoint(volume, &state);
+    }
+    mnavQueryDef def = mnavDefaultQueryDef();
+    def.limits.nodes = 65536;
+    mnavQuery* query = NULL;
+    Check(mnavCreateQuery(&def, &query), "query");
+    double best = 1e30;
+    int32_t found = 0;
+    int64_t points = 0;
+    double length = 0.0;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        found = 0;
+        points = 0;
+        length = 0.0;
+        double start = Seconds();
+        for (int32_t k = 0; k < FLIGHT_PATHS; ++k)
+        {
+            mnavFlightPath path;
+            Check(mnavFindFlightPath(query, volume, ends[k][0], ends[k][1], &path), "flight path");
+            found += path.end == mnav_pathFound ? 1 : 0;
+            points += path.pointCount;
+            length += path.length;
+        }
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+    }
+    mnavDestroyQuery(query);
+    printf("# flight paths: %d of %d found, %.1f m in all, %lld points, %.1f us per path\n", found,
+           FLIGHT_PATHS, length, (long long)points, best * 1e6 / FLIGHT_PATHS);
+    Report("flight path query", best * 1e6 / FLIGHT_PATHS, "us");
+}
+
+static void FlightRays(const mnavFlightVolume* volume)
+{
+    static mnavPos3 ends[FLIGHT_RAYS][2];
+    uint32_t state = 9;
+    for (int32_t k = 0; k < FLIGHT_RAYS; ++k)
+    {
+        ends[k][0] = FlightPoint(volume, &state);
+        double dx = 60.0 * (double)Unit(&state) - 30.0;
+        double dy = 20.0 * (double)Unit(&state) - 10.0;
+        double dz = 60.0 * (double)Unit(&state) - 30.0;
+        ends[k][1] = (mnavPos3){ends[k][0].x + dx, ends[k][0].y + dy, ends[k][0].z + dz};
+    }
+    double best = 1e30;
+    int32_t clear = 0;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        clear = 0;
+        double start = Seconds();
+        for (int32_t k = 0; k < FLIGHT_RAYS; ++k)
+        {
+            mnavFlightHit hit;
+            Check(mnavFlightRaycast(volume, ends[k][0], ends[k][1], &hit), "flight ray");
+            clear += hit.stop == mnav_flightClear ? 1 : 0;
+        }
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+    }
+    printf("# flight rays: %d of %d clear, %.2f us per ray\n", clear, FLIGHT_RAYS,
+           best * 1e6 / FLIGHT_RAYS);
+    Report("flight raycast", best * 1e6 / FLIGHT_RAYS, "us");
+}
+
+static void Flight(void)
+{
+    mnavFlightVolume* volume = FlightBake();
+    FlightPaths(volume);
+    FlightRays(volume);
+    mnavDestroyFlightVolume(volume);
+}
+
 int main(int argc, char** argv)
 {
     if (argc > 1)
@@ -934,6 +1135,7 @@ int main(int argc, char** argv)
     Doorway();
     Flow();
     Hierarchy();
+    Flight();
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
         free(s_tiles[t]);

@@ -39,6 +39,11 @@ format.
     within a radius.
 - `mnavTileSection` names a flight tile's cube classes, nodes and
   leaves.
+- `fuzz_flight`, a fuzz target over the flight tile loader and over
+  paths, raycasts and nearest points in baked volumes, checked against
+  every voxel.
+- Bench lines for flight volumes: a tile's bake, a path query and a
+  raycast over the bench terrain with 300 floating boxes.
 
 ## [0.5.0] - 2026-10-08
 

@@ -1,7 +1,7 @@
 # Maul Nav guide
 
 This guide walks through the library in the order a program uses it:
-bake tiles, load them into a navmesh, query it, follow paths, move
+bake tiles, load them into a navmesh, query it, follow paths, fly, move
 crowds and draw what happened. Every function named here is described
 in full in [the API reference](api.md); the design records behind each
 part are in `adr/`. `samples/walk.c` and `samples/crowd.c` are complete
@@ -224,6 +224,40 @@ When many agents share goals, one search serves them all.
   `mnavContinueNavFlow` work over a box of tiles in budgeted steps. A
   commit makes the field stale; build it again, in steps if you like,
   while agents read the last one.
+
+## Flight volumes
+
+Agents that fly or swim are not bound to the ground, so a navmesh does
+not describe where they may go. A flight volume (`maul-nav/flight.h`)
+does: each tile is a sparse voxel octree of the space a flier's center
+may occupy.
+
+- **The def.** `mnavDefaultFlightDef`, then set the voxel size, the
+  tile's side in voxels (4 times a power of 2), the floor and ceiling
+  in meters, and the flier's radius. Leave `groundBelow` on for worlds
+  with ground, so that the space under a terrain is solid; turn it off
+  for open space, where it would fill below every floating piece.
+- **Baking.** `mnavCreateFlightBaker`, then `mnavBakeFlightTile` with
+  the same `mnavBakeInput` a navmesh bake takes, then
+  `mnavCopyFlightTile`. A voxel any triangle touches is solid, and so is
+  every voxel within the flier's radius of one. Triangles are surfaces:
+  a closed mesh's inside stays open space, which no path from outside
+  reaches. Tiles are independent calls, as navmesh tiles are, and give
+  the same bytes on every platform.
+- **Loading.** `mnavCreateFlightVolume`, then `mnavStageFlightTile`
+  and `mnavStageFlightTileRemoval`, then `mnavCommitFlight`, as with
+  the navmesh. Every byte is checked; a tile baked with other settings
+  is refused. `mnavGetFlightTile` reads a committed tile's
+  fingerprint.
+- **Queries.**
+  - `mnavIsFlightOpen` tells whether a point is open to the flier.
+  - `mnavFindNearestFlightPoint` finds the nearest open point within a
+    radius; snap a path's ends with it first.
+  - `mnavFindFlightPath` finds a path in an `mnavQuery` context, with
+    its node budget and path length limit. Its points are each in sight
+    of the next.
+  - `mnavFlightRaycast` stops at the first blocked voxel or place with
+    no tile.
 
 ## Avoidance
 
