@@ -11,6 +11,7 @@
 
 #include "allocator.h"
 #include "bake_def.h"
+#include "flight_def.h"
 #include "heightfield.h"
 #include "raster.h"
 
@@ -31,15 +32,6 @@ typedef struct Grid
     int32_t layers;
     int32_t words;
 } Grid;
-
-bool mnavCheckFlightSettings(const mnavFlightSettings* flight)
-{
-    int32_t side = flight->tileVoxels;
-    bool power = side >= 16 && side <= 512 && (side & (side - 1)) == 0;
-    return flight->voxel >= MNAV_MIN_CELL_SIZE && flight->voxel <= MNAV_MAX_CELL_SIZE && power &&
-           isfinite(flight->floor) && isfinite(flight->ceiling) &&
-           flight->ceiling > flight->floor && isfinite(flight->radius) && flight->radius >= 0.0f;
-}
 
 static uint64_t* Column(const Grid* g, int32_t x, int32_t z)
 {
@@ -248,8 +240,13 @@ static int32_t ChildAt(int32_t n, int32_t x, int32_t y, int32_t z, int32_t o)
 }
 
 // Grows the tile's nodes and leaves to hold needed of each.
-static mnavResult Room(mnavMemory* memory, mnavFlightTile* t, int32_t nodes, int32_t leaves)
+static mnavResult Room(mnavMemory* memory, const mnavFlightLimits* limits, mnavFlightTile* t,
+                       int32_t nodes, int32_t leaves)
 {
+    if (nodes > limits->tileNodes || leaves > limits->tileLeaves)
+    {
+        return mnav_errorLimit;
+    }
     mnavResult r = mnavReserve(memory, (void**)&t->nodes, &t->nodeCapacity, t->nodeCount, nodes,
                                sizeof(mnavFlightNode), alignof(mnavFlightNode));
     return r == mnav_success
@@ -261,8 +258,8 @@ static mnavResult Room(mnavMemory* memory, mnavFlightTile* t, int32_t nodes, int
 // Appends one cube's nodes, level by level from its root, and the mixed
 // leaves below them. cur and next hold three coordinates per block, room
 // for the deepest level's blocks.
-static mnavResult Emit(mnavMemory* memory, const Levels* v, int32_t* cur, int32_t* next,
-                       mnavFlightTile* t)
+static mnavResult Emit(mnavMemory* memory, const mnavFlightLimits* limits, const Levels* v,
+                       int32_t* cur, int32_t* next, mnavFlightTile* t)
 {
     int32_t count = 1;
     cur[0] = 0;
@@ -273,7 +270,7 @@ static mnavResult Emit(mnavMemory* memory, const Levels* v, int32_t* cur, int32_
     for (int32_t l = v->count - 1; l >= 0; --l, n *= 2)
     {
         int32_t base = t->nodeCount;
-        mnavResult r = Room(memory, t, base + count, t->leafCount + count * 8);
+        mnavResult r = Room(memory, limits, t, base + count, t->leafCount + count * 8);
         if (r != mnav_success)
         {
             return r;
@@ -337,29 +334,44 @@ static void DropGrid(mnavMemory* memory, Grid* g)
     g->bits = nullptr;
 }
 
-// The tile's voxels with a border of r columns, dilated: the heightfield
-// of def at the voxel size, marked, then spread by a ball of r.
-static mnavResult Voxels(mnavMemory* memory, const mnavBakeDef* def, const mnavBakeCells* cells,
-                         const mnavFlightSettings* flight, const mnavBakeInput* input,
-                         int32_t tileX, int32_t tileZ, int32_t floorVoxel, Grid* out)
+// What a tile is built from: the heightfield's def and cells at the
+// voxel size, the input, the tile's place and floor voxel, and whether
+// the ground's columns are solid below.
+typedef struct Build
+{
+    const mnavBakeDef* def;
+    const mnavBakeCells* cells;
+    const mnavBakeInput* input;
+    int32_t tileX;
+    int32_t tileZ;
+    int32_t floorVoxel;
+    bool groundBelow;
+} Build;
+
+// The tile's voxels with a border of the radius's columns, dilated: the
+// heightfield at the voxel size, marked, then spread by a ball of the
+// radius. spansOut receives the heightfield's spans.
+static mnavResult Voxels(mnavMemory* memory, const Build* b, Grid* out, int32_t* spansOut)
 {
     // A tile index lists triangles for the navmesh's tiles and border,
     // not the volume's: every triangle is read.
-    mnavBakeInput all = *input;
+    mnavBakeInput all = *b->input;
     all.index = nullptr;
     mnavHeightfield hf = {0};
-    mnavResult r = mnavBuildHeightfieldInput(memory, def, cells, &all, tileX, tileZ, &hf);
+    mnavResult r =
+        mnavBuildHeightfieldInput(memory, b->def, b->cells, &all, b->tileX, b->tileZ, &hf);
     Grid raw = *out;
     r = r == mnav_success ? MakeGrid(memory, &raw) : r;
     if (r == mnav_success)
     {
-        Mark(&hf, cells->border - cells->agentRadius, floorVoxel, flight->groundBelow, &raw);
+        *spansOut = hf.spanCount;
+        Mark(&hf, b->cells->border - b->cells->agentRadius, b->floorVoxel, b->groundBelow, &raw);
     }
     mnavReleaseHeightfield(memory, &hf);
     r = r == mnav_success ? MakeGrid(memory, out) : r;
     if (r == mnav_success)
     {
-        Dilate(&raw, out, cells->agentRadius);
+        Dilate(&raw, out, b->cells->agentRadius);
     }
     DropGrid(memory, &raw);
     return r;
@@ -418,7 +430,8 @@ static mnavResult MakeScratch(mnavMemory* memory, int32_t side, Scratch* s)
 }
 
 // Each cube's octree from the dilated grid, its border r columns wide.
-static mnavResult Cubes(mnavMemory* memory, const Grid* g, int32_t r, mnavFlightTile* t)
+static mnavResult Cubes(mnavMemory* memory, const mnavFlightLimits* limits, const Grid* g,
+                        int32_t r, mnavFlightTile* t)
 {
     Scratch s;
     mnavResult result = MakeScratch(memory, t->side, &s);
@@ -431,59 +444,40 @@ static mnavResult Cubes(mnavMemory* memory, const Grid* g, int32_t r, mnavFlight
         t->rootNodes[c] = root == MNAV_FLIGHT_MIXED ? t->nodeCount : -1;
         if (root == MNAV_FLIGHT_MIXED)
         {
-            result = Emit(memory, &s.levels, s.lists[0], s.lists[1], t);
+            result = Emit(memory, limits, &s.levels, s.lists[0], s.lists[1], t);
         }
     }
     DropScratch(memory, &s);
     return result;
 }
 
-// The def the heightfield is built with: cells and cell heights of one
-// voxel, tiles of the volume's side, the flier's radius, and nothing of
-// the walking agent's that could refuse it.
-static mnavBakeDef VoxelDef(const mnavBakeDef* def, const mnavFlightSettings* flight)
+mnavResult mnavBuildFlightTile(mnavMemory* memory, const mnavFlightDef* def,
+                               const mnavFlightShape* shape, const mnavBakeInput* input,
+                               int32_t tileX, int32_t tileZ, mnavFlightTile* tileOut,
+                               int32_t* spansOut)
 {
-    mnavBakeDef voxels = *def;
-    voxels.cellSize = flight->voxel;
-    voxels.cellHeight = flight->voxel;
-    voxels.tileCells = flight->tileVoxels;
-    voxels.agent.radius = flight->radius;
-    voxels.agent.height = flight->voxel;
-    voxels.agent.stepHeight = 0.0f;
-    voxels.detailSampleDistance = 0.0f;
-    voxels.detailMaxError = 0.0f;
-    voxels.maxEdgeLength = 0.0f;
-    return voxels;
-}
-
-mnavResult mnavBakeFlightTile(mnavMemory* memory, const mnavBakeDef* def,
-                              const mnavFlightSettings* flight, const mnavBakeInput* input,
-                              int32_t tileX, int32_t tileZ, mnavFlightTile* tileOut)
-{
-    *tileOut = (mnavFlightTile){.tileX = tileX, .tileZ = tileZ, .side = flight->tileVoxels};
-    mnavBakeDef voxels = VoxelDef(def, flight);
+    mnavFlightTile* t = tileOut;
+    *t = (mnavFlightTile){.tileX = tileX,
+                          .tileZ = tileZ,
+                          .side = def->tileVoxels,
+                          .floorVoxel = shape->floorVoxel,
+                          .cubeCount = shape->cubeCount};
+    *spansOut = 0;
+    mnavBakeDef voxels = mnavFlightBakeDef(def);
     mnavBakeCells cells;
     if (mnavValidateBakeDef(&voxels, &cells).result != mnav_success)
     {
         return mnav_errorInvalid;
     }
-    mnavFlightTile* t = tileOut;
-    t->floorVoxel = (int32_t)floorf(flight->floor / flight->voxel);
-    float height = flight->ceiling - (float)t->floorVoxel * flight->voxel;
-    t->cubeCount = (int32_t)ceilf(height / ((float)t->side * flight->voxel));
-    t->cubeCount = t->cubeCount < 1 ? 1 : t->cubeCount;
+    const Build b = {&voxels, &cells, input, tileX, tileZ, t->floorVoxel, def->groundBelow};
     int32_t layers = t->cubeCount * t->side;
-    if (layers > MNAV_MAX_HEIGHT_CELLS)
-    {
-        return mnav_errorLimit;
-    }
     Grid g = {nullptr, t->side + 2 * cells.agentRadius, layers, (layers + 63) / 64};
-    mnavResult r = Voxels(memory, &voxels, &cells, flight, input, tileX, tileZ, t->floorVoxel, &g);
+    mnavResult r = Voxels(memory, &b, &g, spansOut);
     r = r == mnav_success ? mnavAllocate(memory, (size_t)t->cubeCount, 1, 1, (void**)&t->roots) : r;
     r = r == mnav_success ? mnavAllocate(memory, (size_t)t->cubeCount, sizeof(int32_t),
                                          alignof(int32_t), (void**)&t->rootNodes)
                           : r;
-    r = r == mnav_success ? Cubes(memory, &g, cells.agentRadius, t) : r;
+    r = r == mnav_success ? Cubes(memory, &def->limits, &g, cells.agentRadius, t) : r;
     DropGrid(memory, &g);
     if (r != mnav_success)
     {

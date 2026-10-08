@@ -9,8 +9,10 @@
 #define MAUL_NAV_SRC_FLIGHT_H
 
 #include "allocator.h"
+#include "flight_def.h"
 
 #include "maul-nav/bake.h"
+#include "maul-nav/flight.h"
 
 #include <stdint.h>
 
@@ -21,20 +23,6 @@ enum
     MNAV_FLIGHT_SOLID = 1,
     MNAV_FLIGHT_MIXED = 2
 };
-
-// What a flight volume is baked with: a voxel's side in meters, a tile's
-// side in voxels (4 times a power of 2, 16 to 512), the floor and the
-// ceiling in meters from the bake's origin, the flier's radius, and
-// whether each column is solid below its lowest solid voxel.
-typedef struct mnavFlightSettings
-{
-    float voxel;
-    int32_t tileVoxels;
-    float floor;
-    float ceiling;
-    float radius;
-    bool groundBelow;
-} mnavFlightSettings;
 
 // A node of a mixed block: its mixed children in the mask's low byte and
 // its solid ones in the high byte, child o at bit o = x + 2y + 4z; its
@@ -66,18 +54,14 @@ typedef struct mnavFlightTile
     int32_t leafCapacity;
 } mnavFlightTile;
 
-// Checks settings against def: false for a voxel out of the cell size's
-// range, a tile side that is not 4 times a power of 2 from 16 to 512, a
-// ceiling not above the floor, or a radius below 0 or not finite.
-bool mnavCheckFlightSettings(const mnavFlightSettings* flight);
-
-// Bakes tile (tileX, tileZ) of input, which must be valid for def, with
-// the settings, which must pass mnavCheckFlightSettings. Returns the
-// heightfield's errors and mnav_errorLimit or mnav_errorCapacity for
-// memory.
-mnavResult mnavBakeFlightTile(mnavMemory* memory, const mnavBakeDef* def,
-                              const mnavFlightSettings* flight, const mnavBakeInput* input,
-                              int32_t tileX, int32_t tileZ, mnavFlightTile* tileOut);
+// Builds tile (tileX, tileZ) from input, which must be valid, with a
+// valid def and its shape; spansOut receives the heightfield's spans.
+// Returns the heightfield's errors, mnav_errorLimit past the def's node
+// or leaf limit or for memory, and mnav_errorCapacity.
+mnavResult mnavBuildFlightTile(mnavMemory* memory, const mnavFlightDef* def,
+                               const mnavFlightShape* shape, const mnavBakeInput* input,
+                               int32_t tileX, int32_t tileZ, mnavFlightTile* tileOut,
+                               int32_t* spansOut);
 
 // Whether voxel (x, y, z) of a tile is solid: x and z from 0 to its side,
 // y from 0 to its cubes times its side, up from its floor voxel.

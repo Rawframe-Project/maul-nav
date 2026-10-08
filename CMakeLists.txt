@@ -46,6 +46,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/allocator.c
     src/avoidance.c
     src/bake_def.c
+    src/bake_input.c
     src/base.c
     src/baker.c
     src/border_vertices.c
@@ -61,6 +62,10 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/filter.c
     src/fingerprint.c
     src/flight.c
+    src/flight_baker.c
+    src/flight_def.c
+    src/flight_tile.c
+    src/flight_volume.c
     src/hash.c
     src/funnel.c
     src/flow.c
@@ -131,6 +136,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(path_links WHITEBOX)
     maul_add_test(shortest WHITEBOX)
     maul_add_test(flight WHITEBOX)
+    maul_add_test(flight_volume WHITEBOX)
     maul_add_test(sliced WHITEBOX)
     maul_add_test(surface WHITEBOX)
     maul_add_test(corridor WHITEBOX)

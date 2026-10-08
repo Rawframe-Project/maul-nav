@@ -8,6 +8,26 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- Flight volumes (`maul-nav/flight.h`, mnav-0015), where agents that
+  fly or swim may go:
+  - `mnavFlightDef`, with `mnavDefaultFlightDef` and
+    `mnavValidateFlightDef`;
+  - a baker (`mnavCreateFlightBaker`, `mnavBakeFlightTile`,
+    `mnavCopyFlightTile`). It voxelizes the navmesh bake's input at
+    the voxel size, makes the space below the ground solid unless told
+    otherwise, and keeps the flier's radius clear of anything solid.
+    Each tile is a compact sparse voxel octree in a fingerprinted,
+    little-endian format.
+  - a container (`mnavCreateFlightVolume`, `mnavStageFlightTile`,
+    `mnavStageFlightTileRemoval`, `mnavCommitFlight`,
+    `mnavGetFlightTile`) that checks every byte as hostile and commits
+    all or nothing;
+  - `mnavIsFlightOpen`, the first query.
+- `mnavTileSection` names a flight tile's cube classes, nodes and
+  leaves.
+
 ## [0.5.0] - 2026-10-08
 
 The shortest path on the navmesh, exact, beside the A* search.

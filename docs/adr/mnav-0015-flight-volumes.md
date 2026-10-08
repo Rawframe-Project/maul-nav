@@ -61,8 +61,41 @@ spans, a run-length voxelization of the same geometry.
     voxels, against 75.7 KB;
   - 0.8 KB on the benchmark's terrain, against 7.6 KB.
 
-Later slices add the volume's container, its streaming and its queries,
-and amend this record.
+- **The API** (`maul-nav/flight.h`):
+  - **The def:** `mnavFlightDef` holds the cookie, allocator, origin,
+    voxel size, tile side, floor, ceiling, flier radius, the
+    ground-below switch, and limits on input triangles, spans, nodes
+    and leaves per tile, tiles and memory.
+  - **The baker:** `mnavCreateFlightBaker`, `mnavBakeFlightTile` over
+    the navmesh bake's `mnavBakeInput`, and `mnavCopyFlightTile`. Its
+    fingerprint covers the generator, the settings, the place and the
+    input that reaches the tile, as mnav-0003's does.
+  - **The container:** `mnavFlightVolume` stages tiles and removals
+    and commits them all or nothing (`mnavCommitFlight`).
+    `mnavGetFlightTile` reads a committed tile's fingerprint.
+  - **The first query:** `mnavIsFlightOpen` tells whether a point is
+    open to the flier's center.
+- **The format:** magic `MNVF`, its own format version, little-endian.
+  - **The header:** 104 bytes. It holds the generator, flags, the
+    fingerprint, the payload's hash and size, the place, and the
+    settings' bits: side, voxel, radius, floor, ceiling, origin,
+    floor voxel and cubes. It also holds the node and leaf counts.
+  - **The payload:** a class byte per cube, a 16-bit mask per node
+    and a 64-bit word per leaf.
+  - **Not stored:** child and root indices. In level order they are
+    running sums of the masks, and the loader rebuilds them.
+- **Loading:** every byte is read as hostile. The loader checks:
+  - the counts against the def's limits before allocating;
+  - the payload's hash;
+  - the settings against the volume's def;
+  - the canonical form: classes up to mixed, masks with no child both
+    mixed and solid and never all empty or all solid, leaves neither 0
+    nor all ones, and every count used exactly.
+
+  A malformed tile is `mnav_errorInvalid`, naming the section and
+  element. Another format version is `mnav_errorVersion`.
+
+Later slices add the queries and amend this record.
 
 ## Consequences
 

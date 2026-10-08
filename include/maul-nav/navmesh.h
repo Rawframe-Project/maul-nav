@@ -52,6 +52,10 @@ extern "C"
         mnav_tileDetailTriangles = 5,
         // The payload's size or hash.
         mnav_tilePayload = 6,
+        // A flight tile's cube classes, nodes and leaves (mnav-0015).
+        mnav_tileFlightRoots = 7,
+        mnav_tileFlightNodes = 8,
+        mnav_tileFlightLeaves = 9,
     };
 
     // A tile load's outcome: the status, and the section and element

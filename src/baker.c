@@ -5,6 +5,7 @@
 
 #include "allocator.h"
 #include "bake_def.h"
+#include "bake_input.h"
 #include "border_vertices.h"
 #include "bytes.h"
 #include "compact.h"
@@ -191,13 +192,7 @@ static mnavResult CheckInput(const mnavBaker* baker, const Input* in, int32_t ti
     {
         return CheckOutlines(baker, in, tileX, tileZ, report);
     }
-    const mnavTriangleMesh* meshes = in->solid.meshes;
-    int32_t meshCount = in->solid.meshCount;
-    int32_t terrainCount = in->solid.terrainCount;
-    int32_t volumeCount = in->solid.volumeCount;
-    if (meshCount < 0 || (meshCount > 0 && meshes == nullptr) || terrainCount < 0 ||
-        (terrainCount > 0 && in->solid.terrains == nullptr) || volumeCount < 0 ||
-        (volumeCount > 0 && in->solid.volumes == nullptr))
+    if (!mnavCheckInputArrays(&in->solid))
     {
         return mnav_errorInvalid;
     }
@@ -209,43 +204,8 @@ static mnavResult CheckInput(const mnavBaker* baker, const Input* in, int32_t ti
             return result;
         }
     }
-    int64_t total = 0;
-    for (int32_t m = 0; m < meshCount; ++m)
-    {
-        mnavInputResult input = in->solid.index != nullptr
-                                    ? (mnavInputResult){mnav_success, mnav_elementNone, -1}
-                                    : mnavCheckTriangleMesh(&baker->def, &meshes[m]);
-        if (input.result != mnav_success)
-        {
-            report->mesh = m;
-            report->input = input;
-            return input.result;
-        }
-        total += meshes[m].triangleCount;
-    }
-    for (int32_t i = 0; i < terrainCount; ++i)
-    {
-        mnavInputResult input = mnavCheckTerrain(&baker->def, &in->solid.terrains[i]);
-        if (input.result != mnav_success)
-        {
-            report->mesh = meshCount + i;
-            report->input = input;
-            return input.result;
-        }
-        total += mnavTerrainTriangles(&in->solid.terrains[i]);
-    }
-    for (int32_t i = 0; i < volumeCount; ++i)
-    {
-        mnavInputResult input = mnavCheckVolume(&baker->def, &in->solid.volumes[i]);
-        if (input.result != mnav_success)
-        {
-            report->mesh = meshCount + terrainCount + i;
-            report->input = input;
-            return input.result;
-        }
-        total += in->solid.volumes[i].pointCount;
-    }
-    return total > baker->def.limits.inputTriangles ? mnav_errorLimit : mnav_success;
+    return mnavCheckSolidInput(&baker->def, &in->solid, in->solid.index != nullptr, &report->mesh,
+                               &report->input);
 }
 
 // The hash of the generator, the settings that shape the tile and its

@@ -3,10 +3,11 @@
 //
 // Flight volume tiles (mnav-0015): every voxel of a baked tile against a
 // voxel grid made the plain way from the same heightfield, on the test
-// world's floor and boxes and on boxes floating in the air; the settings
-// refused; the bytes the same on every platform; the memory given back.
+// world's floor and boxes and on boxes floating in the air; the octree
+// the same on every platform; the memory given back.
 
 #include "flight.h"
+#include "flight_def.h"
 #include "heightfield.h"
 #include "raster.h"
 #include "test_harness.h"
@@ -14,6 +15,7 @@
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/flight.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -32,22 +34,6 @@ enum
 
 // A voxel grid the plain way: solid voxels of the tile and its border.
 static uint8_t s_raw[MOST_SIDE][MOST_SIDE][MOST_LAYERS];
-
-// The def the bake builds its heightfield with, as the plain grid does.
-static mnavBakeDef VoxelDef(const mnavBakeDef* def, const mnavFlightSettings* f)
-{
-    mnavBakeDef v = *def;
-    v.cellSize = f->voxel;
-    v.cellHeight = f->voxel;
-    v.tileCells = f->tileVoxels;
-    v.agent.radius = f->radius;
-    v.agent.height = f->voxel;
-    v.agent.stepHeight = 0.0f;
-    v.detailSampleDistance = 0.0f;
-    v.detailMaxError = 0.0f;
-    v.maxEdgeLength = 0.0f;
-    return v;
-}
 
 // Marks the heightfield's spans in the plain grid, offset columns in, and
 // below each column's lowest span when asked.
@@ -74,22 +60,35 @@ static void MarkPlain(const mnavHeightfield* hf, int32_t offset, int32_t width, 
     }
 }
 
+// A flight def of the default's limits with these settings.
+static mnavFlightDef Def(float voxel, int32_t side, float floor, float ceiling, float radius,
+                         bool groundBelow)
+{
+    mnavFlightDef f = mnavDefaultFlightDef();
+    f.voxelSize = voxel;
+    f.tileVoxels = side;
+    f.floor = floor;
+    f.ceiling = ceiling;
+    f.radius = radius;
+    f.groundBelow = groundBelow;
+    return f;
+}
+
 // The plain grid of a tile from its heightfield at the voxel size: spans
 // marked, and below each column's lowest span when asked.
-static int32_t Plain(const mnavBakeDef* def, const mnavFlightSettings* f,
-                     const mnavBakeInput* input, int32_t tileX, int32_t tileZ, int32_t* rOut,
-                     int32_t* floorOut, int32_t* layersOut)
+static int32_t Plain(const mnavFlightDef* f, const mnavBakeInput* input, int32_t tileX,
+                     int32_t tileZ, int32_t* rOut, int32_t* floorOut, int32_t* layersOut)
 {
-    mnavBakeDef v = VoxelDef(def, f);
+    mnavBakeDef v = mnavFlightBakeDef(f);
     mnavBakeCells cells;
     CHECK(mnavValidateBakeDef(&v, &cells).result == mnav_success, "voxel def");
-    mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
+    mnavMemory memory = mnavMakeMemory(f->allocator, UINT64_MAX);
     mnavHeightfield hf = {0};
     CHECK(mnavBuildHeightfieldInput(&memory, &v, &cells, input, tileX, tileZ, &hf) == mnav_success,
           "heightfield");
-    int32_t floorVoxel = (int32_t)floorf(f->floor / f->voxel);
-    float height = f->ceiling - (float)floorVoxel * f->voxel;
-    int32_t cubes = (int32_t)ceilf(height / ((float)f->tileVoxels * f->voxel));
+    int32_t floorVoxel = (int32_t)floorf(f->floor / f->voxelSize);
+    float height = f->ceiling - (float)floorVoxel * f->voxelSize;
+    int32_t cubes = (int32_t)ceilf(height / ((float)f->tileVoxels * f->voxelSize));
     int32_t layers = (cubes < 1 ? 1 : cubes) * f->tileVoxels;
     int32_t r = cells.agentRadius;
     int32_t width = f->tileVoxels + 2 * r;
@@ -149,16 +148,21 @@ static int32_t Wrong(const mnavFlightTile* tile, int32_t width, int32_t layers, 
 
 // Bakes a tile and checks every voxel of it against the plain grid;
 // returns the tile's hash.
-static uint64_t Compare(const mnavBakeDef* def, const mnavFlightSettings* f,
-                        const mnavBakeInput* input, int32_t tileX, int32_t tileZ)
+static uint64_t Compare(const mnavFlightDef* f, const mnavBakeInput* input, int32_t tileX,
+                        int32_t tileZ)
 {
     int32_t r = 0;
     int32_t floorVoxel = 0;
     int32_t layers = 0;
-    int32_t width = Plain(def, f, input, tileX, tileZ, &r, &floorVoxel, &layers);
-    mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
+    int32_t width = Plain(f, input, tileX, tileZ, &r, &floorVoxel, &layers);
+    mnavMemory memory = mnavMakeMemory(f->allocator, UINT64_MAX);
+    mnavFlightShape shape;
+    CHECK(mnavCheckFlightDef(f, &shape).result == mnav_success, "the def");
+    int32_t spans = 0;
     mnavFlightTile tile;
-    CHECK(mnavBakeFlightTile(&memory, def, f, input, tileX, tileZ, &tile) == mnav_success, "baked");
+    CHECK(mnavBuildFlightTile(&memory, f, &shape, input, tileX, tileZ, &tile, &spans) ==
+              mnav_success,
+          "baked");
     CHECK(tile.floorVoxel == floorVoxel && tile.cubeCount * tile.side == layers, "its shape");
     int32_t solid = 0;
     int32_t wrong = Wrong(&tile, width, layers, r, &solid);
@@ -181,15 +185,13 @@ static uint64_t Compare(const mnavBakeDef* def, const mnavFlightSettings* f,
 static void TestTheWorldsFloorAndBoxes(void)
 {
     // 0.5 m voxels, 32 m tiles, a flier of 0.5 m: one voxel of clearance.
-    mnavBakeDef def = mnavDefaultBakeDef();
     mnavTriangleMesh world = World();
     mnavBakeInput input = {&world, 1, nullptr, 0, nullptr, 0, nullptr};
-    mnavFlightSettings f = {0.5f, 64, -2.0f, 20.0f, 0.5f, true};
-    CHECK(mnavCheckFlightSettings(&f), "settings");
+    mnavFlightDef f = Def(0.5f, 64, -2.0f, 20.0f, 0.5f, true);
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t t = 0; t < 4; ++t)
     {
-        uint64_t one = Compare(&def, &f, &input, t % 2, t / 2);
+        uint64_t one = Compare(&f, &input, t % 2, t / 2);
         hash = mnavHash64(hash, &one, (int32_t)sizeof(one));
     }
     printf("FLIGHT_HASH=%016llx\n", (unsigned long long)hash);
@@ -236,47 +238,19 @@ static void TestBoxesInTheAir(void)
     // 1 m voxels, 16 m tiles: three cubes from 0 to 48 m; a flier of
     // 1.2 m, two voxels of clearance; then none, with no dilation; the
     // ground off, so nothing fills below the boxes.
-    mnavBakeDef def = mnavDefaultBakeDef();
     mnavTriangleMesh air = Air();
     mnavBakeInput input = {&air, 1, nullptr, 0, nullptr, 0, nullptr};
-    mnavFlightSettings f = {1.0f, 16, 0.0f, 40.0f, 1.2f, false};
+    mnavFlightDef f = Def(1.0f, 16, 0.0f, 40.0f, 1.2f, false);
     for (int32_t t = 0; t < 4; ++t)
     {
-        (void)Compare(&def, &f, &input, t % 2, t / 2);
+        (void)Compare(&f, &input, t % 2, t / 2);
     }
     f.radius = 0.0f;
-    (void)Compare(&def, &f, &input, 0, 0);
-}
-
-static void TestSettingsAreChecked(void)
-{
-    const mnavFlightSettings good = {1.0f, 32, 0.0f, 10.0f, 0.5f, true};
-    CHECK(mnavCheckFlightSettings(&good), "good settings");
-    mnavFlightSettings f = good;
-    const int32_t sides[5] = {8, 48, 1024, 0, -16};
-    for (int32_t k = 0; k < 5; ++k)
-    {
-        f.tileVoxels = sides[k];
-        CHECK(!mnavCheckFlightSettings(&f), "a side not 4 times a power of 2 from 16 to 512");
-    }
-    f = good;
-    f.ceiling = f.floor;
-    CHECK(!mnavCheckFlightSettings(&f), "a ceiling not above the floor");
-    f = good;
-    f.radius = -1.0f;
-    CHECK(!mnavCheckFlightSettings(&f), "a negative radius");
-    f.radius = (float)NAN;
-    CHECK(!mnavCheckFlightSettings(&f), "a radius not a number");
-    f = good;
-    f.voxel = 0.0f;
-    CHECK(!mnavCheckFlightSettings(&f), "a voxel of 0");
-    f.voxel = 20.0f;
-    CHECK(!mnavCheckFlightSettings(&f), "a voxel past the largest cell");
+    (void)Compare(&f, &input, 0, 0);
 }
 
 int main(void)
 {
-    TestSettingsAreChecked();
     TestTheWorldsFloorAndBoxes();
     TestBoxesInTheAir();
     return s_failures == 0 ? 0 : 1;
