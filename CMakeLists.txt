@@ -59,6 +59,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/detail.c
     src/erode.c
     src/filter.c
+    src/flight.c
     src/hash.c
     src/funnel.c
     src/flow.c
@@ -128,6 +129,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(offmesh WHITEBOX)
     maul_add_test(path_links WHITEBOX)
     maul_add_test(shortest WHITEBOX)
+    maul_add_test(flight WHITEBOX)
     maul_add_test(sliced WHITEBOX)
     maul_add_test(surface WHITEBOX)
     maul_add_test(corridor WHITEBOX)
