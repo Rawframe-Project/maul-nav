@@ -688,11 +688,11 @@ static void TestRefusals(const mnavFlightVolume* volume)
 }
 
 // A volume of 2 by 2 tiles of 16 voxels, one cube high, over a floor,
-// with boxes given as their lowest corner and sizes.
+// with up to 8 boxes given as their lowest corner and sizes.
 static mnavFlightVolume* Small(const float boxes[][6], int32_t count, float radius)
 {
-    static mnavVec3 vertices[4 + 4 * 8];
-    static int32_t indices[6 + 4 * 36];
+    static mnavVec3 vertices[4 + 8 * 8];
+    static int32_t indices[6 + 8 * 36];
     const mnavVec3 floor[4] = {{-4, 0, -4}, {-4, 0, 36}, {36, 0, 36}, {36, 0, -4}};
     const int32_t quad[6] = {0, 1, 2, 0, 2, 3};
     static const int32_t faces[36] = {0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1,
@@ -806,6 +806,34 @@ static void TestBendToTheEnd(void)
     mnavDestroyFlightVolume(volume);
 }
 
+// Paths whose points would sit on the far edge of a face but for its
+// inset, where a point counts as in the voxel beyond (found by
+// fuzz_flight).
+static void TestFaceEdges(void)
+{
+    const float boxes[7][6] = {
+        {31.0f, 1.0f, 0.0f, 1.0f, 1.0f, 3.0f}, {12.0f, 1.0f, 21.0f, 5.0f, 2.0f, 3.0f},
+        {3.0f, 0.0f, 3.0f, 8.0f, 5.0f, 5.0f},  {1.0f, 2.0f, 30.0f, 8.0f, 2.0f, 1.0f},
+        {0.0f, 4.0f, 16.0f, 5.0f, 3.0f, 7.0f}, {14.0f, 14.0f, 14.0f, 2.0f, 1.0f, 1.0f},
+        {10.0f, 12.0f, 1.0f, 5.0f, 5.0f, 5.0f}};
+    mnavFlightVolume* volume = Small(boxes, 7, 1.5f);
+    mnavQuery* query = Query(32768, 1000.0f);
+    const mnavPos3 ends[2][2] = {{{24.375, 11.125, 27.125}, {27.125, 11.625, 15.375}},
+                                 {{15.375, 11.625, 12.125}, {8.125, 12.125, 0.125}}};
+    int32_t wrong = 0;
+    for (int32_t k = 0; k < 2; ++k)
+    {
+        mnavFlightPath path;
+        bool right =
+            mnavFindFlightPath(query, volume, ends[k][0], ends[k][1], &path) == mnav_success;
+        right &= path.end != mnav_pathFound || StepsClear(volume, &path);
+        wrong += right ? 0 : 1;
+    }
+    CHECK(wrong == 0, "every step clear by the far edges of faces");
+    mnavDestroyQuery(query);
+    mnavDestroyFlightVolume(volume);
+}
+
 int main(void)
 {
     mnavFlightVolume* volume = Volume(-1, -1);
@@ -820,6 +848,7 @@ int main(void)
     TestHole();
     TestEdge();
     TestBendToTheEnd();
+    TestFaceEdges();
     CHECK(s_held == 0, "every byte given back");
     return s_failures == 0 ? 0 : 1;
 }

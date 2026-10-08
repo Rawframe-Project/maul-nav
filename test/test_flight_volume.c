@@ -29,7 +29,7 @@
 
 // The hash of the test world's four flight tiles' bytes, the same on
 // every platform.
-#define FLIGHT_BYTES_HASH 0xa32cc8d179d38513ull
+#define FLIGHT_BYTES_HASH 0x395ac6b321e20707ull
 
 // Where the header keeps its fields.
 enum
@@ -344,6 +344,18 @@ static void TestPayloadStructure(void)
     Rehash(size);
     got = StageBad(size);
     wrong += got.section == mnav_tileFlightNodes && got.index == 0 ? 0 : 1;
+    // A spare leaf: one more declared and stored than the octree uses.
+    memcpy(s_bad, s_bytes[1], size);
+    mnavByteReader leafCount = {s_bytes[1] + AT_NODES + 4, 4, false};
+    mnavByteWriter w = {s_bad + AT_NODES + 4};
+    mnavPutU32(&w, mnavGetU32(&leafCount) + 1);
+    w.at = s_bad + 32;
+    mnavPutU32(&w, size + 8 - MNAV_FLIGHT_HEADER_BYTES);
+    w.at = s_bad + size;
+    mnavPutU64(&w, 1);
+    Rehash(size + 8);
+    got = StageBad(size + 8);
+    wrong += got.section == mnav_tileFlightLeaves && got.index == -1 ? 0 : 1;
     CHECK(wrong == 0, "every broken structure refused in its section");
 }
 

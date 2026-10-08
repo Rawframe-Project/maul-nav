@@ -198,7 +198,8 @@ static void TestTheWorldsFloorAndBoxes(void)
     CHECK(hash == FLIGHT_HASH, "the pinned hash");
 }
 
-// Boxes in the air, of sides 1 to 6 m, from 2 to 40 m up.
+// Boxes in the air, of sides 1 to 6 m, from 2 to 40 m up, and one
+// across the volume's floor.
 static mnavVec3 s_air[40 * 8];
 static int32_t s_airIndices[40 * 36];
 
@@ -217,7 +218,9 @@ static mnavTriangleMesh Air(void)
         }
         float s = 1.0f + 5.0f * p[3];
         float x0 = p[0] * (32.0f - s);
-        float y0 = 2.0f + p[1] * 36.0f;
+        // The first box straddles the volume's floor: its spans begin
+        // below the volume.
+        float y0 = b == 0 ? -1.5f : 2.0f + p[1] * 36.0f;
         float z0 = p[2] * (32.0f - s);
         for (int32_t c = 0; c < 8; ++c)
         {

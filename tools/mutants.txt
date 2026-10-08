@@ -428,9 +428,17 @@ fs-cache-z | src/flight_space.c | if (!c->cached || tileX != c->tileX || tileZ !
 fs-face-inside | src/flight_space.c | r.lo[axis] = f % 2 != 0 ? r.hi[axis] : r.lo[axis] - 1; | r.lo[axis] = f % 2 != 0 ? r.hi[axis] - 1 : r.lo[axis] - 1;
 fs-corners-off | src/flight_space.c | if ((m & ~tied) != 0 || m == tied) | if (true || (m & ~tied) != 0 || m == tied)
 fs-leaf-solid | src/flight_space.c | if ((leaf >> k & 1u) == 0 && Meets(r, vx, vy, vz, 1)) | if (Meets(r, vx, vy, vz, 1))
+# sr-size-blind survives, equivalent: open blocks are disjoint, so two
+# with one lowest voxel are one block.
 sr-size-blind | src/flight_search.c | return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3]; | return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
+# sr-on-face survives, equivalent under the floor rule: a point on the
+# face between two open blocks counts as in one of them either way.
 sr-on-face | src/flight_search.c | out[k] = b[k] == (int32_t)lo ? lo + INSET : lo - INSET; | out[k] = lo;
+# sr-edge-inset-off survives: a point on a face's low edge counts as in
+# the face's voxels; the inset only keeps a bend's crossing, which may
+# swing by up to 1/1024 voxel, within the face.
 sr-edge-inset-off | src/flight_search.c | lo += EDGE_INSET; | lo += 0.0;
+sr-edge-inset-high | src/flight_search.c | hi -= EDGE_INSET; | hi -= 0.0;
 sr-sight-off | src/flight_search.c | if (n->parent == MNAV_NO_NODE || InSight(s, s->nodes[n->parent].point, n->point)) | if (true)
 sr-via-unseen | src/flight_search.c | if (n->parent != n->via && InSight(s, via->point, n->point)) | if (n->parent != n->via)
 sr-bend-no-face | src/flight_search.c | if (!SameBlock(n->block, s->endBlock)) | if (true)

@@ -8,6 +8,12 @@ format.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-09
+
+Flight volumes, for agents that fly or swim: sparse voxel octree tiles
+baked from the navmesh bake's input, streamed as navmesh tiles are, and
+searched by any-angle paths.
+
 ### Added
 
 - Flight volumes (`maul-nav/flight.h`, mnav-0015), where agents that
@@ -44,6 +50,13 @@ format.
   every voxel.
 - Bench lines for flight volumes: a tile's bake, a path query and a
   raycast over the bench terrain with 300 floating boxes.
+
+### Changed
+
+- A tile records the version that baked it, so tiles baked by 0.6.0
+  differ from 0.5.0's for the same input in their bytes and
+  fingerprint. The tile format is unchanged, and tiles baked by 0.5.0
+  still load.
 
 ## [0.5.0] - 2026-10-08
 
