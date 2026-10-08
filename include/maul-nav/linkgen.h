@@ -70,8 +70,6 @@ extern "C"
     /// Safe from any thread.
     MNAV_API mnavLinkGenDef mnavDefaultLinkGenDef(void);
 
-    // clang-format off: the API reference reads a declaration from the
-    // line that names the function, so its result type stays on it.
     /// Generates links from the edges of the polygons on a range of tile
     /// places that have nothing across them and are not tile sides. Each
     /// edge is sampled every `spacing` meters; a sample tries a drop,
@@ -110,11 +108,10 @@ extern "C"
     /// Safe from any thread; the context is used by one thread at a time,
     /// and no commit runs on the navmesh. The def's clearance test runs on
     /// the calling thread, within the call.
-    MNAV_NODISCARD MNAV_API mnavResult mnavGenerateLinks(
-        mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-        const mnavLinkGenDef* def, int32_t tileX0, int32_t tileZ0, int32_t tileX1, int32_t tileZ1,
-        mnavLinkDef* linksOut, int32_t capacity, int32_t* countOut);
-    // clang-format on
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                      const mnavLinkGenDef* def, int32_t tileX0, int32_t tileZ0, int32_t tileX1,
+                      int32_t tileZ1, mnavLinkDef* linksOut, int32_t capacity, int32_t* countOut);
 
 #ifdef __cplusplus
 }

@@ -148,8 +148,6 @@ extern "C"
                                                            const mnavNavmesh* navmesh,
                                                            mnavHierarchyReport* reportOut);
 
-    // clang-format off: the API reference reads a declaration from the
-    // line that names the function, so its result type stays on it.
     /// Finds a path as mnavFindPath does, with the hierarchy's filter,
     /// through the hierarchy: the start and the end join their clusters'
     /// transitions by searches within those clusters, A* over the
@@ -176,11 +174,10 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the context and the hierarchy are used by one
     /// thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindHierarchicalPath(
-        mnavQuery* query, mnavHierarchy* hierarchy, const mnavNavmesh* navmesh,
-        mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
-        mnavPath* pathOut);
-    // clang-format on
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavFindHierarchicalPath(mnavQuery* query, mnavHierarchy* hierarchy, const mnavNavmesh* navmesh,
+                             mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
+                             mnavPos3 end, mnavPath* pathOut);
 
 #ifdef __cplusplus
 }
