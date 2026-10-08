@@ -373,3 +373,37 @@ run-place-over | src/avoidance.c | while (a->table[slot].first >= 0) | while (a-
 ti-grid-bound | src/tile_index.c | if (columns * rows >= INT32_MAX) | if (columns * rows > INT32_MAX)
 ti-grid-none | src/tile_index.c | if (columns * rows >= INT32_MAX) | if (columns * rows >= INT64_MAX)
 ti-grid-rows | src/tile_index.c | if (columns * rows >= INT32_MAX) | if (columns >= INT32_MAX)
+
+# The exact shortest-path search (Polyanya)
+sh-mirror-none | src/shortest.c | if (length2 > 0.0 && ((side > 0.0 && eSide > 0.0) || (side < 0.0 && eSide < 0.0))) | if (false && length2 > 0.0 && ((side > 0.0 && eSide > 0.0) || (side < 0.0 && eSide < 0.0)))
+sh-cheapest-strict | src/shortest.c | return n == MNAV_NO_NODE || cost <= query->nodes[n].cost + 1e-9 * (1.0 + fabs(cost)); | return n == MNAV_NO_NODE || cost < query->nodes[n].cost;
+sh-cheapest-none | src/shortest.c | return n == MNAV_NO_NODE || cost <= query->nodes[n].cost + 1e-9 * (1.0 + fabs(cost)); | return true;
+sh-repeats-off | src/shortest.c | if (made->tag < 0 || fabs(Cross(made->a, made->b, made->at)) > 1e-9 * (1.0 + span * span) || | if (true || made->tag < 0 || fabs(Cross(made->a, made->b, made->at)) > 1e-9 * (1.0 + span * span) ||
+sh-repeats-points | src/shortest.c | if (made->tag < 0 || fabs(Cross(made->a, made->b, made->at)) > 1e-9 * (1.0 + span * span) || | if (fabs(Cross(made->a, made->b, made->at)) > 1e-9 * (1.0 + span * span) ||
+sh-dup-off | src/shortest.c | (before != MNAV_NO_NODE && | (false && before != MNAV_NO_NODE &&
+sh-limit-ahead | src/shortest.c | if (made.length + ahead > s->limit) | if (made.length > s->limit)
+# sh-cone-exact and sh-snap-off each survive alone: the snap and the slack
+# each cover a cone's side through a vertex; with both gone the rounding
+# test fails (checked by hand, the two lines together).
+sh-cone-exact | src/shortest.c | if (sideA >= -slackA && sideB <= slackB) | if (sideA >= 0.0 && sideB <= 0.0)
+sh-snap-off | src/shortest.c | t = fabs(t - *lo) < 1e-9 ? *lo : (fabs(t - *hi) < 1e-9 ? *hi : t); | t = t + 0.0;
+sh-zero-length | src/shortest.c | return *hi - *lo > 1e-12; | return *hi - *lo >= 0.0;
+sh-turn-b-off | src/shortest.c | if ((node->tag & CORNER_B) != 0 && AtLeastZero(b0, b1, &lo, &hi)) | if (false && (node->tag & CORNER_B) != 0 && AtLeastZero(b0, b1, &lo, &hi))
+sh-turn-a-any | src/shortest.c | if ((node->tag & CORNER_A) != 0 && AtLeastZero(-a0, -a1, &lo, &hi)) | if (AtLeastZero(-a0, -a1, &lo, &hi))
+sh-cone-wide | src/shortest.c | if (AtLeastZero(a0, a1, &lo, &hi) && AtLeastZero(-b0, -b1, &lo, &hi)) | if (AtLeastZero(a0, a1, &lo, &hi))
+# sh-facing-flat survives: no test reaches it. The hand tiles' edges run
+# along the axes, where a point on an edge's line has a side of exactly
+# 0; the slack is for slanted edges of baked tiles, where rounding leaves
+# such a root a few ulps off the line and the cone a sliver.
+sh-facing-flat | src/shortest.c | if (fabs(side) > 1e-9 * (1.0 + span * span)) | if (fabs(side) > 0.0)
+# sh-facing-within survives, equivalent: a root at its interval's end is
+# a corner of it, so turning there is a step of 0.
+sh-facing-within | src/shortest.c | if (toA <= span && toB <= span) | if (toA < span && toB < span)
+# sh-full-start survives, equivalent: a landing node's interval is its
+# root, a point on the line, so Facing sees the polygon whole anyway.
+sh-full-start | src/shortest.c | *full = node->tag == KIND_START || node->tag == KIND_LANDING; | *full = node->tag == KIND_START;
+sh-end-slot | src/shortest.c | if (node->slot == s->endSlot && node->polygon == s->endPolygon) | if (node->polygon == s->endPolygon)
+sh-one-cost | src/shortest.c | if (any && c != cost) | if (false && any && c != cost)
+sh-fallback-off | src/shortest.c | reach != mnav_pathFound && reach != mnav_pathOutOfNodes) | false)
+sh-link-cost | src/shortest.c | *linkCost += (double)s->navmesh->links[node->low / 2].def.cost; | *linkCost += 0.0;
+sh-land-free | src/shortest.c | node->cost + walk * s->cost + (double)link->def.cost, | node->cost + walk * s->cost,

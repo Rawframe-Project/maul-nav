@@ -173,8 +173,7 @@ static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPo
         a,        b,        at,   cost,        length, toEnd * s->cheapest, key->slot, key->polygon,
         key->tag, key->low, from, MNAV_NO_NODE};
     query->table[cell] = n;
-    query->heap[query->heapCount] = EntryOf(query, n);
-    SiftUp(query, query->heapCount++);
+    mnavPushNode(query, n);
 }
 
 // Opens the polygon across an inner edge j of node n's polygon.
