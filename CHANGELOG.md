@@ -8,6 +8,27 @@ format.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-08
+
+The shortest path on the navmesh, exact, beside the A* search.
+
+### Added
+
+- `mnavFindShortestPath`: the shortest way on the ground between two
+  points, by Polyanya (Cui, Harabor and Grastien, 2017) over the
+  navmesh's portals, across tile sides and off-mesh links, with the
+  same arguments and result as `mnavFindPath`. The A* search picks its
+  corridor by costs through portal midpoints; among pillars its paths
+  measured 11% longer than the shortest on average and up to 39%
+  longer. The exact search needs every included area at one cost
+  (`mnav_errorInvalid` otherwise). On the benchmark's 1,000 queries it
+  ends as the A* search does, never longer, 1.9% shorter in all, in
+  fewer nodes and instructions. When its nodes run out, the A* search
+  tells whether the end can be reached at all.
+- `fuzz_shortest`: random squares over two tiles with links, the exact
+  search checked against the A* one; `fuzz_query` runs it on raw input.
+- A benchmark line for the exact search.
+
 ## [0.4.4] - 2026-10-07
 
 A fix found by fuzzing the tile index, and a fuller guide.

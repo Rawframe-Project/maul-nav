@@ -42,7 +42,7 @@ the clock a bake may read for its report.
 
 ## Status
 
-Version 0.4.4. Everything listed above is built and tested on every CI
+Version 0.5.0. Everything listed above is built and tested on every CI
 platform; fuzz targets cover tiles, bake input, queries, avoidance,
 the searches over a whole navmesh, grid flow fields and the exact
 shortest path beside the A* one. Before 1.0.0 a
