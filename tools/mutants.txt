@@ -1,9 +1,8 @@
 # Mutants of maul-nav for tools/mutate.py: name | file | line | mutant line.
-# The sweeps of items 40 to 54 ran these; each survivor was killed by a
-# test added then, or judged equivalent with its reason in the commit
-# that followed. Run on a clean tree:
+# Each is killed by a test (a few only in a sanitizer build) or cannot
+# change a result, its reason in a comment above it. Run on a clean tree:
 #   python3 tools/mutate.py tools/mutants.txt build results.txt
-# 0.2.2 speed-ups: the neighbour ring search and the polygon merge (item 40)
+# 0.2.2 speed-ups: the neighbour ring search and the polygon merge
 ring-stop-early | src/avoidance.c | double near = r > 1 ? (double)(r - 1) * size * (1.0 - 0x1p-20) : 0.0; | double near = r > 1 ? (double)r * size * (1.0 - 0x1p-20) : 0.0;
 ring-last-ring | src/avoidance.c | for (int64_t r = 0; r <= CELL_DIVISIONS + 1; ++r) | for (int64_t r = 0; r <= CELL_DIVISIONS; ++r)
 ring-stop-partial | src/avoidance.c | if (near >= range || (found == limit && near * near > a->neighbors[found - 1].distance)) | if (near >= range || (found > 0 && limit > 0 && near * near > a->neighbors[found - 1].distance))
@@ -14,7 +13,7 @@ merge-overwrite | src/polymesh.c | while (table[slot] >= 0) | while (false && ta
 # and loses the tie-break.
 merge-k-any | src/polymesh.c | if (k > j && other->vertices[edge] == to && | if (k != j && other->vertices[edge] == to &&
 
-# The query core: funnel, raycast, A* open list, corridor merges (item 41)
+# The query core: funnel, raycast, A* open list, corridor merges
 funnel-right-strict | src/funnel.c | if (Area2(f.apex, f.right, p[i].right) >= 0.0) | if (Area2(f.apex, f.right, p[i].right) > 0.0)
 funnel-left-corner-strict | src/funnel.c | if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) >= 0.0) | if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) > 0.0)
 funnel-no-same-apex | src/funnel.c | if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) >= 0.0) | if (Area2(f.apex, f.left, p[i].right) >= 0.0)
@@ -40,7 +39,7 @@ heap-child | src/path.c | if (child + 1 < query->heapCount && Sooner(query->heap
 heap-no-remaining | src/path.c | return (mnavHeapEntry){query->nodes[n].cost + query->nodes[n].remaining, n}; | return (mnavHeapEntry){query->nodes[n].cost, n};
 mergeend-tail | src/corridor.c | int32_t tail = move->polygonCount - at - 1; | int32_t tail = move->polygonCount - at - 2;
 
-# Hierarchy update, navmesh flow field, off-mesh link checks (item 42)
+# Hierarchy update, navmesh flow field, off-mesh link checks
 dirty-from-skip | src/hierarchy.c | h->dirty[tr->from] = now != tr->included ? 1 : h->dirty[tr->from]; | h->dirty[tr->from] = h->dirty[tr->from];
 landing-ignored | src/hierarchy.c | if (h->dirty[h->clusterOf[landing.slot - 1]] != 0) | if (false && h->dirty[h->clusterOf[landing.slot - 1]] != 0)
 sameshape-held | src/hierarchy.c | return held == navmesh->placeCount; | return held >= 0;
@@ -68,7 +67,7 @@ flat-any | src/offmesh.c | return def->width > 0.0f && flat ? mnav_errorInvalid 
 flat-never | src/offmesh.c | return def->width > 0.0f && flat ? mnav_errorInvalid : mnav_success; | return false && flat ? mnav_errorInvalid : mnav_success;
 kind-range | src/offmesh.c | if (!(radius && cost && width && def->kind < MNAV_LINK_KINDS)) | if (!(radius && cost && width && def->kind <= MNAV_LINK_KINDS))
 
-# Avoidance: ORCA programs, pair lines, obstacles (item 47)
+# Avoidance: ORCA programs, pair lines, obstacles
 bound-parallel-sign | src/orca.c | if (numerator < 0.0) | if (numerator > 0.0)
 bound-empty | src/orca.c | if (*left > *right) | if (*left >= *right)
 lp1-tangent | src/orca.c | if (discriminant < 0.0) | if (discriminant <= 0.0)
@@ -99,7 +98,7 @@ obs-cut-choice | src/obstacle.c | if (cut <= left && cut <= right) | if (cut < l
 obs-side-pick | src/obstacle.c | if (left <= right) | if (left < right)
 obs-inside-seg | src/obstacle.c | if (s >= 0.0 && s <= 1.0 && distSqLine <= radiusSq) | if (distSqLine <= radiusSq)
 
-# Tile loading, grid search, grid flow repair (item 49)
+# Tile loading, grid search, grid flow repair
 tile-least | src/tile.c | return least <= (int64_t)counts->payload && counts->detailTriangles >= counts->polygons; | return least < (int64_t)counts->payload && counts->detailTriangles >= counts->polygons;
 tile-triangles-least | src/tile.c | return least <= (int64_t)counts->payload && counts->detailTriangles >= counts->polygons; | return least <= (int64_t)counts->payload && counts->detailTriangles >= 0;
 tile-vertex-edge | src/tile.c | if (r->exhausted || vertex->x > mesh->tileCells || vertex->z > mesh->tileCells) | if (r->exhausted || vertex->x > mesh->tileCells + 1 || vertex->z > mesh->tileCells)
@@ -130,7 +129,7 @@ repair-diagonal | src/flow_repair.c | if (diagonal && ((nx == x && cy == y) || (
 repair-lower | src/flow_repair.c | if (cost < f->costs[cell]) | if (cost <= f->costs[cell])
 repair-best-tie | src/flow_repair.c | (f->costs[n] == f->costs[best] && n < best)) | (f->costs[n] == f->costs[best] && n > best))
 
-# The bake's later stages: contours, detail, welding, merging, ears (item 50)
+# The bake's later stages: contours, detail, welding, merging, ears
 contour-farthest | src/contour.c | if (d > distance) | if (d >= distance)
 # contour-error survives, equivalent: a point exactly maxEdgeError off
 # is kept either way, and both meet the documented may-stray bound.
@@ -166,7 +165,7 @@ ear-shortest | src/triangulate.c | if (best < 0 || length < bestLength) | if (be
 ear-same-ground | src/triangulate.c | if (mnavSameGround(d0, p0) || mnavSameGround(d1, p0) || mnavSameGround(d0, p1) || | if (mnavSameGround(d1, p0) || mnavSameGround(d0, p1) ||
 ear-loose | src/triangulate.c | bool meets = loose ? mnavIntersectProper(d0, d1, p0, p1) : mnavIntersect(d0, d1, p0, p1); | bool meets = loose ? mnavIntersectProper(d0, d1, p0, p1) : mnavIntersectProper(d0, d1, p0, p1);
 
-# The navmesh's state: staging, commit, links, link generation (item 51)
+# The navmesh's state: staging, commit, links, link generation
 nm-tier-dynamic | src/navmesh.c | if (result.result == mnav_success && navmesh->def.tier < mnav_tierDynamic && | if (result.result == mnav_success && navmesh->def.tier < mnav_tierModifiers &&
 nm-generation | src/navmesh.c | if (slot->tile == nullptr || slot->generation != id.generation || | if (slot->tile == nullptr || slot->generation == 0u ||
 nm-overlap-empty | src/navmesh.c | if (lo >= hi || !CloseAt(a, b, lo, step) || !CloseAt(a, b, hi, step)) | if (lo > hi || !CloseAt(a, b, lo, step) || !CloseAt(a, b, hi, step))
@@ -194,7 +193,7 @@ lg-drop-step | src/linkgen.c | if (d->dropMax > 0.0f && (double)d->dropMax > g->
 lg-facing | src/linkgen.c | if (nx * ((a.x + b.x) * 0.5 - c.x) + nz * ((a.z + b.z) * 0.5 - c.z) < 0.0) | if (nx * ((a.x + b.x) * 0.5 - c.x) + nz * ((a.z + b.z) * 0.5 - c.z) > 0.0)
 lg-in-range | src/linkgen.c | if (p->x >= tileX0 && p->x <= tileX1 && p->z >= tileZ0 && p->z <= tileZ1) | if (p->x >= tileX0 && p->x < tileX1 && p->z >= tileZ0 && p->z <= tileZ1)
 
-# Spatial queries and the hierarchical path (items 52, 53)
+# Spatial queries and the hierarchical path
 # near-best survives, equivalent: the nearest point on a convex ring is
 # unique.
 near-best | src/nearest.c | if (d < bestDistance) | if (d <= bestDistance)
@@ -243,7 +242,7 @@ hp-tie | src/hierarchy_path.c | return ta != tb ? ta < tb : a < b; | return ta !
 # paths.
 hp-side | src/hierarchy_path.c | if (t->side == 0 && t->cluster == cluster) | if (t->cluster == cluster)
 
-# The bake's early stages: raster, filters, compact, erosion, regions (item 54)
+# The bake's early stages: raster, filters, compact, erosion, regions
 ras-slope | src/raster.c | if (area == mnav_areaNone || ny < cosMaxSlope * length) | if (area == mnav_areaNone || ny <= cosMaxSlope * length)
 # ras-cross survives, equivalent: a crossing counted at a vertex exactly
 # on the cut adds that vertex again, which changes no cell's height
