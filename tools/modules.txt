@@ -36,6 +36,10 @@ flight: allocator bake_def flight_def heightfield raster
 flight_tile: allocator bytes flight flight_def
 flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def flight_tile raster
 flight_volume: allocator flight flight_def flight_tile
+flight_space: flight flight_volume
+flight_frame: flight_volume
+flight_search: flight_frame flight_space flight_volume query
+flight_probe: flight flight_frame flight_space flight_volume
 fingerprint: bytes outline raster terrain tile_index
 bake_input: input terrain volume
 baker: allocator bake_def bake_input border_vertices bytes compact contour detail erode filter fingerprint heightfield holes input outline polymesh raster region terrain tile tile_index volume

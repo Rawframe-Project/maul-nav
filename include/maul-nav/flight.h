@@ -12,6 +12,7 @@
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
+#include "maul-nav/query.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -137,6 +138,41 @@ extern "C"
         uint64_t tileBytes;
         uint64_t memoryPeak;
     } mnavFlightBakeReport;
+
+    // A flight path search's result (mnav-0015). Short of the end point,
+    // the path runs to the point searched nearest it.
+    typedef struct mnavFlightPath
+    {
+        mnavPathEnd end;
+        // The path's length in meters.
+        double length;
+        // The points from the start point on, each in sight of the next,
+        // in the query context's memory until its next search.
+        const mnavPos3* points;
+        int32_t pointCount;
+    } mnavFlightPath;
+
+    // What stopped a flight raycast.
+    typedef uint8_t mnavFlightStop;
+    enum
+    {
+        // Nothing: the ray reached its end.
+        mnav_flightClear = 0,
+        // A voxel the flier may not enter, or the volume's floor or
+        // ceiling.
+        mnav_flightBlocked = 1,
+        // A place with no tile loaded.
+        mnav_flightNotLoaded = 2,
+    };
+
+    // A flight raycast's result: what stopped it, the fraction of the way
+    // from its start where it stopped (1 when clear), and the point there.
+    typedef struct mnavFlightHit
+    {
+        mnavFlightStop stop;
+        double t;
+        mnavPos3 point;
+    } mnavFlightHit;
 
     // A flight tile baker. Made by mnavCreateFlightBaker.
     typedef struct mnavFlightBaker mnavFlightBaker;
@@ -330,6 +366,72 @@ extern "C"
     /// once between commits; none may while a stage or commit call runs.
     MNAV_NODISCARD MNAV_API mnavResult mnavIsFlightOpen(const mnavFlightVolume* volume,
                                                         mnavPos3 point, bool* openOut);
+
+    /// Finds a flier's path between two points (mnav-0015): Lazy Theta*
+    /// (Nash, Koenig and Tovey, 2010) over the open blocks of the
+    /// committed tiles, linked through shared faces, each block entered at
+    /// the point of its face nearest the point the path comes from. A
+    /// point is in sight of another when the segment between them crosses
+    /// no blocked voxel, nor an edge or corner of one. The search keeps to
+    /// the query context's node budget and path length limit; short of the
+    /// end, the path runs to the point searched nearest it.
+    ///
+    /// @param query    The query context; its last path is dropped.
+    /// @param volume   The flight volume.
+    /// @param start    The start, in world coordinates.
+    /// @param end      The end, in world coordinates.
+    /// @param pathOut  Receives the path. A start or end not open ends the
+    ///                 search at once: `mnav_pathNone` for a blocked voxel,
+    ///                 `mnav_pathNotLoaded` for a place with no tile, with
+    ///                 the start alone as its path.
+    /// @return `mnav_success`; `mnav_errorRange` for a point not finite,
+    /// below or above the volume or past the extent; `mnav_errorInvalid`
+    /// for a NULL argument.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time,
+    /// and the volume is not changed during the search.
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindFlightPath(mnavQuery* query,
+                                                          const mnavFlightVolume* volume,
+                                                          mnavPos3 start, mnavPos3 end,
+                                                          mnavFlightPath* pathOut);
+
+    /// Casts a flier's ray: walks the voxels the segment crosses, and
+    /// where it passes an edge or a corner every voxel it touches, and
+    /// stops at the first one the flier may not enter or with no tile.
+    ///
+    /// @param volume  The flight volume.
+    /// @param from    The ray's start, in world coordinates.
+    /// @param to      Its end.
+    /// @param hitOut  Receives what stopped it, where and at what fraction.
+    /// @return `mnav_success`; `mnav_errorRange` for a point not finite or
+    /// past the extent; `mnav_errorInvalid` for a NULL argument.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read the volume at
+    /// once between commits; none may while a stage or commit call runs.
+    MNAV_NODISCARD MNAV_API mnavResult mnavFlightRaycast(const mnavFlightVolume* volume,
+                                                         mnavPos3 from, mnavPos3 to,
+                                                         mnavFlightHit* hitOut);
+
+    /// Finds the nearest point open to the flier's center within a radius
+    /// of a point: the point itself when it is open, or else a point just
+    /// inside the nearest open voxel, at most a thousandth of a voxel in
+    /// from its face. Tiles not loaded are not searched.
+    ///
+    /// @param volume      The flight volume.
+    /// @param point       The point, in world coordinates.
+    /// @param radius      How far to look, in meters, at least 0.
+    /// @param nearestOut  Receives the nearest open point.
+    /// @param foundOut    Receives whether one lies within the radius.
+    /// @return `mnav_success`; `mnav_errorRange` for a point not finite or
+    /// past the extent, or a radius below 0 or not finite;
+    /// `mnav_errorInvalid` for a NULL argument.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read the volume at
+    /// once between commits; none may while a stage or commit call runs.
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindNearestFlightPoint(const mnavFlightVolume* volume,
+                                                                  mnavPos3 point, float radius,
+                                                                  mnavPos3* nearestOut,
+                                                                  bool* foundOut);
 
 #ifdef __cplusplus
 }

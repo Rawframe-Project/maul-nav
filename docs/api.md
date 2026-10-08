@@ -218,6 +218,21 @@ MNAV_NODISCARD MNAV_API mnavResult mnavIsFlightOpen(const mnavFlightVolume* volu
 ```
 Tells whether the flier's center may be at a point: whether the voxel holding it is neither solid nor within the flier's radius of a solid voxel.  @param volume   The volume. @param point    The point, in world coordinates. @param openOut  Receives whether the point is open; false on failure. @return `mnav_success`; `mnav_errorNotLoaded` when no tile is committed under the point; `mnav_errorRange` for a point not finite or below or above the volume; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread. Any number of threads may read the volume at once between commits; none may while a stage or commit call runs.
 
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavFindFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 start, mnavPos3 end, mnavFlightPath* pathOut);
+```
+Finds a flier's path between two points (mnav-0015): Lazy Theta* (Nash, Koenig and Tovey, 2010) over the open blocks of the committed tiles, linked through shared faces, each block entered at the point of its face nearest the point the path comes from. A point is in sight of another when the segment between them crosses no blocked voxel, nor an edge or corner of one. The search keeps to the query context's node budget and path length limit; short of the end, the path runs to the point searched nearest it.  @param query    The query context; its last path is dropped. @param volume   The flight volume. @param start    The start, in world coordinates. @param end      The end, in world coordinates. @param pathOut  Receives the path. A start or end not open ends the search at once: `mnav_pathNone` for a blocked voxel, `mnav_pathNotLoaded` for a place with no tile, with the start alone as its path. @return `mnav_success`; `mnav_errorRange` for a point not finite, below or above the volume or past the extent; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread; the context is used by one thread at a time, and the volume is not changed during the search.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavFlightRaycast(const mnavFlightVolume* volume, mnavPos3 from, mnavPos3 to, mnavFlightHit* hitOut);
+```
+Casts a flier's ray: walks the voxels the segment crosses, and where it passes an edge or a corner every voxel it touches, and stops at the first one the flier may not enter or with no tile.  @param volume  The flight volume. @param from    The ray's start, in world coordinates. @param to      Its end. @param hitOut  Receives what stopped it, where and at what fraction. @return `mnav_success`; `mnav_errorRange` for a point not finite or past the extent; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread. Any number of threads may read the volume at once between commits; none may while a stage or commit call runs.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavFindNearestFlightPoint(const mnavFlightVolume* volume, mnavPos3 point, float radius, mnavPos3* nearestOut, bool* foundOut);
+```
+Finds the nearest point open to the flier's center within a radius of a point: the point itself when it is open, or else a point just inside the nearest open voxel, at most a thousandth of a voxel in from its face. Tiles not loaded are not searched.  @param volume      The flight volume. @param point       The point, in world coordinates. @param radius      How far to look, in meters, at least 0. @param nearestOut  Receives the nearest open point. @param foundOut    Receives whether one lies within the radius. @return `mnav_success`; `mnav_errorRange` for a point not finite or past the extent, or a radius below 0 or not finite; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread. Any number of threads may read the volume at once between commits; none may while a stage or commit call runs.
+
 ## `flow.h`
 
 Flow fields (mnav-0007): for every cell of a grid, the cost of its cheapest way to the nearest of a set of goals and the next cell on it, so that any number of agents sharing the goals find their way at the cost of one search.
@@ -569,4 +584,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-104 functions across 12 headers.
+107 functions across 12 headers.

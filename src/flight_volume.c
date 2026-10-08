@@ -4,6 +4,8 @@
 // The flight volume (mnav-0015): flight tiles loaded from bytes, staged
 // and committed together, kept sorted by place.
 
+#include "flight_volume.h"
+
 #include "allocator.h"
 #include "flight.h"
 #include "flight_def.h"
@@ -17,31 +19,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
-
-// A committed tile, or a staged change at a place: a tile to install, or
-// a removal.
-typedef struct Entry
-{
-    uint64_t fingerprint;
-    mnavFlightTile tile;
-    int32_t x;
-    int32_t z;
-    bool removal;
-} Entry;
-
-struct mnavFlightVolume
-{
-    mnavFlightDef def;
-    mnavFlightShape shape;
-    mnavMemory memory;
-    // The committed tiles, sorted by x, then z.
-    Entry* tiles;
-    int32_t tileCount;
-    // The staged changes, one per place, in staging order.
-    Entry* staged;
-    int32_t stagedCount;
-    int32_t stagedCapacity;
-};
 
 mnavFlightDefResult mnavCreateFlightVolume(const mnavFlightDef* def, mnavFlightVolume** volumeOut)
 {
@@ -69,7 +46,7 @@ mnavFlightDefResult mnavCreateFlightVolume(const mnavFlightDef* def, mnavFlightV
     return (mnavFlightDefResult){mnav_success, mnav_flightSettingNone};
 }
 
-static void DropEntries(mnavMemory* memory, Entry* entries, int32_t count)
+static void DropEntries(mnavMemory* memory, mnavFlightEntry* entries, int32_t count)
 {
     for (int32_t i = 0; i < count; ++i)
     {
@@ -85,10 +62,10 @@ void mnavDestroyFlightVolume(mnavFlightVolume* volume)
     }
     DropEntries(&volume->memory, volume->tiles, volume->tileCount);
     DropEntries(&volume->memory, volume->staged, volume->stagedCount);
-    mnavRelease(&volume->memory, volume->tiles, (size_t)volume->tileCount, sizeof(Entry),
-                alignof(Entry));
-    mnavRelease(&volume->memory, volume->staged, (size_t)volume->stagedCapacity, sizeof(Entry),
-                alignof(Entry));
+    mnavRelease(&volume->memory, volume->tiles, (size_t)volume->tileCount, sizeof(mnavFlightEntry),
+                alignof(mnavFlightEntry));
+    mnavRelease(&volume->memory, volume->staged, (size_t)volume->stagedCapacity,
+                sizeof(mnavFlightEntry), alignof(mnavFlightEntry));
     mnavMemory memory = volume->memory;
     mnavRelease(&memory, volume, 1, sizeof(mnavFlightVolume), alignof(mnavFlightVolume));
 }
@@ -103,8 +80,8 @@ static int32_t Compare(int32_t ax, int32_t az, int32_t bx, int32_t bz)
     return az < bz ? -1 : (az > bz ? 1 : 0);
 }
 
-// The committed tile at a place, or NULL.
-static const Entry* Find(const mnavFlightVolume* volume, int32_t x, int32_t z)
+// The committed entry at a place, or NULL.
+static const mnavFlightEntry* Find(const mnavFlightVolume* volume, int32_t x, int32_t z)
 {
     int32_t low = 0;
     int32_t high = volume->tileCount;
@@ -124,11 +101,11 @@ static const Entry* Find(const mnavFlightVolume* volume, int32_t x, int32_t z)
 
 // Stages a change in place of anything staged at its place; on failure
 // the change's tile is released.
-static mnavResult Stage(mnavFlightVolume* volume, Entry change)
+static mnavResult Stage(mnavFlightVolume* volume, mnavFlightEntry change)
 {
     for (int32_t i = 0; i < volume->stagedCount; ++i)
     {
-        Entry* e = &volume->staged[i];
+        mnavFlightEntry* e = &volume->staged[i];
         if (e->x == change.x && e->z == change.z)
         {
             mnavReleaseFlightTile(&volume->memory, &e->tile);
@@ -136,9 +113,9 @@ static mnavResult Stage(mnavFlightVolume* volume, Entry change)
             return mnav_success;
         }
     }
-    mnavResult result =
-        mnavReserve(&volume->memory, (void**)&volume->staged, &volume->stagedCapacity,
-                    volume->stagedCount, volume->stagedCount + 1, sizeof(Entry), alignof(Entry));
+    mnavResult result = mnavReserve(
+        &volume->memory, (void**)&volume->staged, &volume->stagedCapacity, volume->stagedCount,
+        volume->stagedCount + 1, sizeof(mnavFlightEntry), alignof(mnavFlightEntry));
     if (result != mnav_success)
     {
         mnavReleaseFlightTile(&volume->memory, &change.tile);
@@ -154,7 +131,7 @@ mnavTileResult mnavStageFlightTile(mnavFlightVolume* volume, const uint8_t* byte
     {
         return (mnavTileResult){mnav_errorInvalid, mnav_tileHeader, -1};
     }
-    Entry change = {0};
+    mnavFlightEntry change = {0};
     mnavTileResult loaded = mnavDecodeFlightTile(&volume->memory, &volume->def, &volume->shape,
                                                  bytes, size, &change.tile, &change.fingerprint);
     if (loaded.result != mnav_success)
@@ -173,13 +150,13 @@ mnavResult mnavStageFlightTileRemoval(mnavFlightVolume* volume, int32_t tileX, i
     {
         return mnav_errorInvalid;
     }
-    return Stage(volume, (Entry){.x = tileX, .z = tileZ, .removal = true});
+    return Stage(volume, (mnavFlightEntry){.x = tileX, .z = tileZ, .removal = true});
 }
 
 static int OrderEntries(const void* a, const void* b)
 {
-    const Entry* ea = a;
-    const Entry* eb = b;
+    const mnavFlightEntry* ea = a;
+    const mnavFlightEntry* eb = b;
     return Compare(ea->x, ea->z, eb->x, eb->z);
 }
 
@@ -190,7 +167,7 @@ static int64_t CountAfter(const mnavFlightVolume* volume)
     int64_t count = volume->tileCount;
     for (int32_t i = 0; i < volume->stagedCount; ++i)
     {
-        const Entry* e = &volume->staged[i];
+        const mnavFlightEntry* e = &volume->staged[i];
         bool held = Find(volume, e->x, e->z) != nullptr;
         count += e->removal ? (held ? -1 : 0) : (held ? 0 : 1);
     }
@@ -199,13 +176,13 @@ static int64_t CountAfter(const mnavFlightVolume* volume)
 
 // Merges the sorted staged changes into the committed tiles, into next,
 // releasing the tiles replaced or removed.
-static void Merge(mnavFlightVolume* volume, Entry* next)
+static void Merge(mnavFlightVolume* volume, mnavFlightEntry* next)
 {
     int32_t n = 0;
     int32_t t = 0;
     for (int32_t s = 0; s < volume->stagedCount; ++s)
     {
-        const Entry* change = &volume->staged[s];
+        const mnavFlightEntry* change = &volume->staged[s];
         while (t < volume->tileCount &&
                Compare(volume->tiles[t].x, volume->tiles[t].z, change->x, change->z) < 0)
         {
@@ -239,11 +216,11 @@ mnavResult mnavCommitFlight(mnavFlightVolume* volume)
     {
         return mnav_errorLimit;
     }
-    Entry* next = nullptr;
+    mnavFlightEntry* next = nullptr;
     if (count > 0)
     {
-        mnavResult result = mnavAllocate(&volume->memory, (size_t)count, sizeof(Entry),
-                                         alignof(Entry), (void**)&next);
+        mnavResult result = mnavAllocate(&volume->memory, (size_t)count, sizeof(mnavFlightEntry),
+                                         alignof(mnavFlightEntry), (void**)&next);
         if (result != mnav_success)
         {
             return result;
@@ -251,7 +228,7 @@ mnavResult mnavCommitFlight(mnavFlightVolume* volume)
     }
     if (volume->stagedCount > 1)
     {
-        qsort(volume->staged, (size_t)volume->stagedCount, sizeof(Entry), OrderEntries);
+        qsort(volume->staged, (size_t)volume->stagedCount, sizeof(mnavFlightEntry), OrderEntries);
     }
     if (next != nullptr)
     {
@@ -263,8 +240,8 @@ mnavResult mnavCommitFlight(mnavFlightVolume* volume)
         // are removals, which hold no tile.
         DropEntries(&volume->memory, volume->tiles, volume->tileCount);
     }
-    mnavRelease(&volume->memory, volume->tiles, (size_t)volume->tileCount, sizeof(Entry),
-                alignof(Entry));
+    mnavRelease(&volume->memory, volume->tiles, (size_t)volume->tileCount, sizeof(mnavFlightEntry),
+                alignof(mnavFlightEntry));
     volume->tiles = next;
     volume->tileCount = (int32_t)count;
     volume->stagedCount = 0;
@@ -278,7 +255,7 @@ mnavResult mnavGetFlightTile(const mnavFlightVolume* volume, int32_t tileX, int3
     {
         return mnav_errorInvalid;
     }
-    const Entry* e = Find(volume, tileX, tileZ);
+    const mnavFlightEntry* e = Find(volume, tileX, tileZ);
     *fingerprintOut = e != nullptr ? e->fingerprint : 0;
     return e != nullptr ? mnav_success : mnav_errorNotLoaded;
 }
@@ -327,7 +304,7 @@ mnavResult mnavIsFlightOpen(const mnavFlightVolume* volume, mnavPos3 point, bool
     }
     int64_t tileX = FloorDiv(v[0], side);
     int64_t tileZ = FloorDiv(v[2], side);
-    const Entry* e = Find(volume, (int32_t)tileX, (int32_t)tileZ);
+    const mnavFlightEntry* e = Find(volume, (int32_t)tileX, (int32_t)tileZ);
     if (e == nullptr)
     {
         return mnav_errorNotLoaded;
@@ -335,4 +312,10 @@ mnavResult mnavIsFlightOpen(const mnavFlightVolume* volume, mnavPos3 point, bool
     *openOut = !mnavFlightSolid(&e->tile, (int32_t)(v[0] - tileX * side), (int32_t)y,
                                 (int32_t)(v[2] - tileZ * side));
     return mnav_success;
+}
+
+const mnavFlightTile* mnavFlightTileAt(const mnavFlightVolume* volume, int32_t tileX, int32_t tileZ)
+{
+    const mnavFlightEntry* e = Find(volume, tileX, tileZ);
+    return e != nullptr ? &e->tile : nullptr;
 }

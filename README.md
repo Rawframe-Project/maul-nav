@@ -52,7 +52,7 @@ minor release may change the API, the ABI and the tile format.
 
 - [The guide](docs/guide.md) walks through baking, the navmesh,
   queries, corridors, flow fields, avoidance and debug output.
-- [The API reference](docs/api.md) lists all 104 public functions,
+- [The API reference](docs/api.md) lists all 107 public functions,
   generated from the headers.
 - [The samples](docs/samples.md) are small complete programs.
 - [The changelog](CHANGELOG.md) records every change.

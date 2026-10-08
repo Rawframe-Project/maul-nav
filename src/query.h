@@ -72,6 +72,24 @@ typedef struct mnavGridNode
     double remaining;
 } mnavGridNode;
 
+// A flight search's node (mnav-0015): an open block of the flight volume,
+// its lowest voxel and side; the point the path passes in it, in voxels
+// of the volume's frame; its length so far and the distance left, in
+// voxels; the way it came, and the neighbor that reached it; whether the
+// way bends through that neighbor's block's center; and its place in the
+// open list, MNAV_NO_NODE before it enters it, or MNAV_CLOSED.
+typedef struct mnavFlightSearchNode
+{
+    int32_t block[4];
+    double point[3];
+    double cost;
+    double remaining;
+    int32_t parent;
+    int32_t via;
+    int32_t bend;
+    int32_t heap;
+} mnavFlightSearchNode;
+
 // A grid node out of the open list, its cost final.
 #define MNAV_CLOSED (-2)
 
@@ -125,12 +143,13 @@ struct mnavQuery
 {
     mnavMemory memory;
     mnavQueryLimits limits;
-    // One block of nodes serves a navmesh or a grid search, whichever ran
-    // last; grid nodes are the smaller.
+    // One block of nodes serves a navmesh, grid or flight search,
+    // whichever ran last; grid and flight nodes are the smaller.
     union
     {
         mnavSearchNode* nodes;
         mnavGridNode* gridNodes;
+        mnavFlightSearchNode* flightNodes;
     };
     int32_t nodeCount;
     // The open list, a binary heap: for a navmesh search, each node with

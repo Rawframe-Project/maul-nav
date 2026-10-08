@@ -95,7 +95,37 @@ spans, a run-length voxelization of the same geometry.
   A malformed tile is `mnav_errorInvalid`, naming the section and
   element. Another format version is `mnav_errorVersion`.
 
-Later slices add the queries and amend this record.
+- **The queries:**
+  - **`mnavFindFlightPath`:** Lazy Theta* over the open blocks of the
+    committed tiles, of any size, and the open voxels of mixed leaves.
+    - **The graph:** blocks are linked through shared faces, found by
+      descending the octrees across cubes and tiles.
+    - **Points:** each block is entered at the point of the shared face
+      nearest the point the path comes from. The point lies 1/1024
+      voxel inside the block and 4/1024 in from the face's edges, so
+      that it never sits on a voxel's face or edge.
+    - **Line of sight:** a point is in sight of another when the
+      segment crosses no blocked voxel. Where it passes an edge or a
+      corner, every voxel it touches counts.
+    - **Repair:** a node out of sight of its assumed parent takes the
+      node that reached it. If even that is out of sight, the path bends
+      through the center of that node's block, which the block holds
+      either way. Another closed neighbor in sight that is cheaper wins
+      instead.
+    - **The search state:** it runs in an `mnavQuery` context: its node
+      budget, path length limit, memory and `mnavPathEnd`. Short of the
+      end, the path runs to the point nearest it.
+  - **`mnavFlightRaycast`:** the same walk, stopping at the first
+    blocked voxel or place with no tile.
+  - **`mnavFindNearestFlightPoint`:** branch and bound over the
+    committed octrees within a radius.
+- **Measured:** on the Warframe 3D benchmark (research in the docs
+  repository), the path searches averaged 0.925 to 0.944 of the
+  26-connected grid's shortest. They expanded 4 to 7 times fewer nodes
+  than A* through block centers on all maps but the densest, C1, where
+  line of sight dominates.
+
+Later slices add fuzzing, benchmarks and the guide.
 
 ## Consequences
 

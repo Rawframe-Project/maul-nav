@@ -64,6 +64,10 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/flight.c
     src/flight_baker.c
     src/flight_def.c
+    src/flight_frame.c
+    src/flight_probe.c
+    src/flight_search.c
+    src/flight_space.c
     src/flight_tile.c
     src/flight_volume.c
     src/hash.c
@@ -137,6 +141,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(shortest WHITEBOX)
     maul_add_test(flight WHITEBOX)
     maul_add_test(flight_volume WHITEBOX)
+    maul_add_test(flight_query)
     maul_add_test(sliced WHITEBOX)
     maul_add_test(surface WHITEBOX)
     maul_add_test(corridor WHITEBOX)
