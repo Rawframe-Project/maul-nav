@@ -191,6 +191,29 @@ static void TestSameBytes(const mnavBakeDef* def, Place place, const char* where
     mnavDestroyBaker(baker);
 }
 
+// A floor of 4 m by 4 m in the middle of tile (2, 1), far from its
+// edges: the index's grid is that one tile, the first it lists.
+static void TestOneTileInside(void)
+{
+    mnavBakeDef def = Def();
+    const mnavVec3 floor[4] = {
+        {18.0f, 0.0f, 10.0f}, {18.0f, 0.0f, 14.0f}, {22.0f, 0.0f, 14.0f}, {22.0f, 0.0f, 10.0f}};
+    const int32_t corners[6] = {0, 1, 2, 0, 2, 3};
+    const mnavTriangleMesh mesh = {floor, 4, corners, 2, nullptr};
+    mnavBaker* baker = nullptr;
+    mnavTileIndex* index = nullptr;
+    mnavBakeReport report;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavCreateTileIndex(&def, &mesh, 1, &index, &report) == mnav_success,
+          "made");
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, index};
+    CHECK(mnavBakeTileInput(baker, &input, 2, 1, &report) == mnav_success && report.polygons > 0 &&
+              BakesAlike(baker, &input, 2, 1),
+          "a tile holding all the input, the index's first, bakes alike");
+    mnavDestroyTileIndex(index);
+    mnavDestroyBaker(baker);
+}
+
 enum
 {
     OUTLINES = 120,
@@ -503,6 +526,7 @@ int main(void)
     def.cellSize = 0.3f;
     TestSameBytes(&def, (Place){131060, 131062, 5, 3}, "near the extent, rounding");
     TestRefusals();
+    TestOneTileInside();
     mnavBakeDef flat = Def();
     TestSameBytes2D(&flat, (Place){-3, -2, 6, 3}, "about the origin");
     flat.cellSize = 0.3f;
