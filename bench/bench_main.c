@@ -395,6 +395,68 @@ static void Sliced(mnavQuery* query, const mnavNavmesh* navmesh, mnavNearest (*e
     Report("sliced path, a slice", best * 1e6 / slices, "us");
 }
 
+// The length of a path's legs on the ground.
+static double Ground(const mnavPath* path)
+{
+    double length = 0.0;
+    for (int32_t i = 1; i < path->pointCount; ++i)
+    {
+        double dx = path->points[i].x - path->points[i - 1].x;
+        double dz = path->points[i].z - path->points[i - 1].z;
+        length += sqrt(dx * dx + dz * dz);
+    }
+    return length;
+}
+
+// The same queries by the exact search (mnav-0005), and the ground the
+// two searches' paths cover.
+static void Shortest(mnavQuery* query, const mnavNavmesh* navmesh, mnavNearest (*ends)[2])
+{
+    double plain = 0.0;
+    double exact = 0.0;
+    for (int32_t i = 0; i < PATHS; ++i)
+    {
+        if (ends[i][0].polygon.slot == 0 || ends[i][1].polygon.slot == 0)
+        {
+            continue;
+        }
+        mnavPath path;
+        Check(mnavFindPath(query, navmesh, NULL, ends[i][0].polygon, ends[i][0].point,
+                           ends[i][1].polygon, ends[i][1].point, &path),
+              "path");
+        plain += path.end == mnav_pathFound ? Ground(&path) : 0.0;
+        Check(mnavFindShortestPath(query, navmesh, NULL, ends[i][0].polygon, ends[i][0].point,
+                                   ends[i][1].polygon, ends[i][1].point, &path),
+              "shortest path");
+        exact += path.end == mnav_pathFound ? Ground(&path) : 0.0;
+    }
+    double best = 1e30;
+    int32_t found = 0;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        found = 0;
+        double start = Seconds();
+        for (int32_t i = 0; i < PATHS; ++i)
+        {
+            if (ends[i][0].polygon.slot == 0 || ends[i][1].polygon.slot == 0)
+            {
+                continue;
+            }
+            mnavPath path;
+            Check(mnavFindShortestPath(query, navmesh, NULL, ends[i][0].polygon, ends[i][0].point,
+                                       ends[i][1].polygon, ends[i][1].point, &path),
+                  "shortest path");
+            found += path.end == mnav_pathFound ? 1 : 0;
+        }
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+    }
+    printf("# shortest paths: %d of %d found, %.1f m on the ground to the A* paths' %.1f m, "
+           "%.1f us per path\n",
+           found, PATHS, exact, plain, best * 1e6 / PATHS);
+    Report("shortest path query", best * 1e6 / PATHS, "us");
+}
+
 static void Paths(void)
 {
     mnavBakeDef def = Def();
@@ -452,6 +514,7 @@ static void Paths(void)
     Report("path query", best * 1e6 / PATHS, "us");
     Report("path queries per second", PATHS / best, "/s");
     Sliced(query, navmesh, ends);
+    Shortest(query, navmesh, ends);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
