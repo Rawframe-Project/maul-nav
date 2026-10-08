@@ -67,8 +67,9 @@ ctest --test-dir build
 
 The suite is checked against hand-picked mutants: `tools/mutants.txt`
 lists 234 one-line changes to the library, each of which a test kills
-or which was judged equivalent when it was written. To run them, on a
-clean tree (hours; not part of CI):
+(a few only in a sanitizer build) or which cannot change a result, the
+file giving the reason above it. To run them, on a clean tree (hours;
+not part of CI):
 
 ```sh
 python3 tools/mutate.py --check tools/mutants.txt

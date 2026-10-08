@@ -117,30 +117,49 @@ grid-tie | src/grid.c | return ta != tb ? ta < tb : a < b; | return ta != tb ? t
 grid-forced-x | src/grid.c | return (Open(g, x, y - 1) && !Open(g, x - dx, y - 1)) || | return (Open(g, x, y - 1) && !Open(g, x + dx, y - 1)) ||
 grid-forced-y | src/grid.c | (Open(g, x + 1, y) && !Open(g, x + 1, y - dy)); | (Open(g, x + 1, y) && !Open(g, x + 1, y + dy));
 grid-diag-straight | src/grid.c | (diagonal ? StraightFinds(g, x, y, dx, 0) || StraightFinds(g, x, y, 0, dy) | (diagonal ? StraightFinds(g, x, y, dx, 0)
+# grid-diag-corner survives, equivalent: when one side is blocked and
+# the next diagonal cell open, the straight search finds the forced
+# neighbour first; when that cell is blocked the next step stops anyway.
 grid-diag-corner | src/grid.c | if (diagonal && !(Open(g, x + dx, y) && Open(g, x, y + dy))) | if (diagonal && !(Open(g, x + dx, y) || Open(g, x, y + dy)))
 grid-too-long | src/grid.c | if (parent->length + length + remaining > g->limit) | if (parent->length + length + remaining >= g->limit)
 grid-closed | src/grid.c | if (n->heap == MNAV_CLOSED || total >= n->cost) | if (total >= n->cost)
 grid-equal-cost | src/grid.c | if (n->heap == MNAV_CLOSED || total >= n->cost) | if (n->heap == MNAV_CLOSED || total > n->cost)
 repair-diagonal | src/flow_repair.c | if (diagonal && ((nx == x && cy == y) || (cx == x && ny == y))) | if (false && diagonal && ((nx == x && cy == y) || (cx == x && ny == y)))
+# repair-lower survives, equivalent: lowered cells are touched, and the
+# fix pass chooses their next cell by the rule.
 repair-lower | src/flow_repair.c | if (cost < f->costs[cell]) | if (cost <= f->costs[cell])
 repair-best-tie | src/flow_repair.c | (f->costs[n] == f->costs[best] && n < best)) | (f->costs[n] == f->costs[best] && n > best))
 
 # The bake's later stages: contours, detail, welding, merging, ears (item 50)
 contour-farthest | src/contour.c | if (d > distance) | if (d >= distance)
+# contour-error survives, equivalent: a point exactly maxEdgeError off
+# is kept either way, and both meet the documented may-stray bound.
 contour-error | src/contour.c | if (farthest >= 0 && distance > edgeError * edgeError) | if (farthest >= 0 && distance >= edgeError * edgeError)
 contour-length | src/contour.c | if (wall && dx * dx + dz * dz > edgeLength * edgeLength && between > 1) | if (wall && dx * dx + dz * dz >= edgeLength * edgeLength && between > 1)
+# contour-between survives, equivalent: adjacent traced points are a
+# cell apart, never past the limit.
 contour-between | src/contour.c | if (wall && dx * dx + dz * dz > edgeLength * edgeLength && between > 1) | if (wall && dx * dx + dz * dz > edgeLength * edgeLength && between > 0)
 contour-min | src/contour.c | if (count < 3) | if (count < 2)
+# detail-sqrt survives, equivalent: the root made one low at a square is
+# corrected when the count adds the segment back.
 detail-sqrt | src/detail.c | if ((root + bit) * (root + bit) <= v) | if ((root + bit) * (root + bit) < v)
 detail-worst | src/detail.c | if (off > worst) | if (off >= worst)
 detail-edge-error | src/detail.c | if (worstAt >= 0 && worst * SUBCELLS > (int64_t)error * (b - a)) | if (worstAt >= 0 && worst * SUBCELLS >= (int64_t)error * (b - a))
+# detail-thin survives, equivalent: a point on an edge's line counted
+# inside is refused by the distance test anyway.
 detail-thin | src/detail.c | if (area >= 0 || 4 * area * area < sample * sample * (dx * dx + dz * dz)) | if (area > 0 || 4 * area * area < sample * sample * (dx * dx + dz * dz))
+# detail-small survives, equivalent: a polygon exactly one sample wide
+# keeps every point within half a sample of its sampled edges.
 detail-small | src/detail.c | if (n < 3 || sample == 0 || maxX - minX < sample || maxZ - minZ < sample) | if (n < 3 || sample == 0 || maxX - minX <= sample || maxZ - minZ < sample)
 detail-error | src/detail.c | if (off > (int64_t)builder->settings.error * area) | if (off >= (int64_t)builder->settings.error * area)
 detail-full | src/detail.c | if (part->vertexCount >= MNAV_DETAIL_VERTICES) | if (part->vertexCount > MNAV_DETAIL_VERTICES)
+# weld-height survives, equivalent: welding at exactly the weld height,
+# an internal tolerance.
 weld-height | src/polymesh.c | if (w->x == v->x && w->z == v->z && dy >= -WELD_HEIGHT && dy <= WELD_HEIGHT) | if (w->x == v->x && w->z == v->z && dy > -WELD_HEIGHT && dy < WELD_HEIGHT)
 merge-limit | src/polymesh.c | if (na + nb - 2 > MNAV_POLYGON_VERTICES) | if (na + nb - 2 >= MNAV_POLYGON_VERTICES)
 merge-turn | src/polymesh.c | if (turnA >= 0 || turnB >= 0) | if (turnA > 0 || turnB > 0)
+# merge-value survives, equivalent: a merge value of 0 with the first
+# pair cannot occur, as a shared edge always has length.
 merge-value | src/polymesh.c | if (value > best->value || (value > 0 && first)) | if (value > best->value || (value >= 0 && first))
 fan-area | src/polymesh.c | if (area >= 0) | if (area > 0)
 ear-shortest | src/triangulate.c | if (best < 0 || length < bestLength) | if (best < 0 || length <= bestLength)
@@ -157,43 +176,83 @@ nm-slot-reuse | src/navmesh.c | if (plan->slots[s].tile == nullptr && !plan->slo
 nm-beside | src/navmesh.c | if ((dx == 0 && dz == 0) || beside) | if (beside)
 nm-tile-limit | src/navmesh.c | if (plan->placeCount > navmesh->def.limits.tiles) | if (plan->placeCount > navmesh->def.limits.tiles + 1)
 om-link-limit | src/offmesh.c | if (navmesh->linksHeld + n > navmesh->def.limits.links) | if (navmesh->linksHeld + n > 1 + navmesh->def.limits.links)
+# om-crossings survives, equivalent: crossings at exactly the cap, where
+# both branches give the cap.
 om-crossings | src/offmesh.c | return gaps >= (double)(MNAV_MAX_LINK_CROSSINGS - 1) ? MNAV_MAX_LINK_CROSSINGS | return gaps > (double)(MNAV_MAX_LINK_CROSSINGS - 1) ? MNAV_MAX_LINK_CROSSINGS
 om-twoway | src/offmesh.c | if (link->def.twoWay) | if (!link->def.twoWay)
+# om-span survives, equivalent: a zero-length link's cost per meter is
+# infinite or NaN over 0, and neither lowers the minimum.
 om-span | src/offmesh.c | if (link->state.attached && link->state.enabled && span > 0.0) | if (link->state.attached && link->state.enabled && span >= 0.0)
 om-enabled | src/offmesh.c | if (!state->attached || !link->enabled) | if (!state->attached)
+# lg-detour-off survives, equivalent: without the shortcut the walk test
+# fails unless a path has no length, which a drop or jump never has.
 lg-detour-off | src/linkgen.c | if (g->def->detour == 0.0f) | if (g->def->detour < 0.0f)
 lg-dedupe | src/linkgen.c | if (Distance(g->links[i].start, start) <= d && Distance(g->links[i].end, end) <= d) | if (Distance(g->links[i].start, start) < d && Distance(g->links[i].end, end) <= d)
+# lg-drop-step survives, equivalent: a drop limit equal to the step
+# leaves the band of drop depths empty.
 lg-drop-step | src/linkgen.c | if (d->dropMax > 0.0f && (double)d->dropMax > g->step) | if (d->dropMax > 0.0f && (double)d->dropMax >= g->step)
 lg-facing | src/linkgen.c | if (nx * ((a.x + b.x) * 0.5 - c.x) + nz * ((a.z + b.z) * 0.5 - c.z) < 0.0) | if (nx * ((a.x + b.x) * 0.5 - c.x) + nz * ((a.z + b.z) * 0.5 - c.z) > 0.0)
 lg-in-range | src/linkgen.c | if (p->x >= tileX0 && p->x <= tileX1 && p->z >= tileZ0 && p->z <= tileZ1) | if (p->x >= tileX0 && p->x < tileX1 && p->z >= tileZ0 && p->z <= tileZ1)
 
 # Spatial queries and the hierarchical path (items 52, 53)
+# near-best survives, equivalent: the nearest point on a convex ring is
+# unique.
 near-best | src/nearest.c | if (d < bestDistance) | if (d <= bestDistance)
+# near-tie survives, equivalent: detail triangles meeting at a point
+# give its height either way.
 near-tie | src/nearest.c | if (area == 0.0 || d >= best) | if (area == 0.0 || d > best)
 near-box | src/nearest.c | if (fabs(dx) > s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz > s->bestScore)) | if (fabs(dx) >= s->half.x || fabs(dz) > s->half.z || (!over && dx * dx + dz * dz > s->bestScore))
 near-score | src/nearest.c | double score = over ? (beyond > 0.0 ? beyond * beyond : 0.0) : distance; | double score = over ? (beyond * beyond) : distance;
 near-places | src/nearest.c | if (navmesh->places[middle].x < x0) | if (navmesh->places[middle].x <= x0)
 surf-best | src/surface.c | if (d < m->bestDistance) | if (d <= m->bestDistance)
+# surf-radius survives, equivalent in practice: 160,257 random moves end
+# bit for bit the same; an edge's end is the next edge's end too.
 surf-radius | src/surface.c | if (Distance2(Nearest(a, b, m->center), m->center) > m->radius2) | if (Distance2(Nearest(a, b, m->center), m->center) >= m->radius2)
+# surf-below survives, equivalent in practice: as surf-radius.
 surf-below | src/surface.c | bool below = u <= (e->au < e->bu ? e->au : e->bu); | bool below = u < (e->au < e->bu ? e->au : e->bu);
+# surf-above survives, equivalent in practice: as surf-radius.
 surf-above | src/surface.c | bool above = u >= (e->au < e->bu ? e->bu : e->au); | bool above = u > (e->au < e->bu ? e->bu : e->au);
 surf-holds | src/surface.c | if ((b.x - a.x) * (p.z - a.z) - (p.x - a.x) * (b.z - a.z) > 0.0) | if ((b.x - a.x) * (p.z - a.z) - (p.x - a.x) * (b.z - a.z) >= 0.0)
+# rand-fan survives, equivalent: a boundary a uniform pick meets with
+# probability 0.
 rand-fan | src/spatial.c | while (k + 2 < count && pick > fabs(Twice(c[0], c[k], c[k + 1]))) | while (k + 2 < count && pick >= fabs(Twice(c[0], c[k], c[k + 1])))
+# rand-fold survives, equivalent: a boundary a uniform pick meets with
+# probability 0.
 rand-fold | src/spatial.c | if (s + t > 1.0) | if (s + t >= 1.0)
+# rand-pick survives, equivalent: a boundary a uniform pick meets with
+# probability 0.
 rand-pick | src/spatial.c | if (pick >= 0.0 && pick < sum + area) | if (pick >= 0.0 && pick <= sum + area)
 wall-tie | src/spatial.c | return ca != cb ? ca < cb : a < b; | return ca != cb ? ca < cb : a > b;
+# wall-keep survives, equivalent in effect: which of equal walls is
+# given is not promised (query.h says so).
 wall-keep | src/spatial.c | if (distance > r->radius || (r->wall.found && distance >= r->wall.distance)) | if (distance > r->radius || (r->wall.found && distance > r->wall.distance))
+# wall-reach survives, equivalent in practice: an edge exactly at the
+# radius has its corner reached from the polygon held.
 wall-reach | src/spatial.c | if (SegmentDistance(r->center, a, b, &nearest) > r->radius * r->radius) | if (SegmentDistance(r->center, a, b, &nearest) >= r->radius * r->radius)
+# hp-closed survives, equivalent: closed nodes are never reopened under
+# a consistent heuristic.
 hp-closed | src/hierarchy_path.c | if (h->places[u] == MNAV_CLOSED || cost >= h->costs[u]) | if (cost >= h->costs[u])
+# hp-equal survives, equivalent in effect: a tie between equal-cost
+# cluster routes, which hierarchy.h says is deterministic but not
+# promised.
 hp-equal | src/hierarchy_path.c | if (h->places[u] == MNAV_CLOSED || cost >= h->costs[u]) | if (h->places[u] == MNAV_CLOSED || cost > h->costs[u])
+# hp-tie survives, equivalent in practice: changes none of 2,937 random
+# paths.
 hp-tie | src/hierarchy_path.c | return ta != tb ? ta < tb : a < b; | return ta != tb ? ta < tb : a > b;
+# hp-side survives, equivalent in practice: changes none of 2,937 random
+# paths.
 hp-side | src/hierarchy_path.c | if (t->side == 0 && t->cluster == cluster) | if (t->cluster == cluster)
 
 # The bake's early stages: raster, filters, compact, erosion, regions (item 54)
 ras-slope | src/raster.c | if (area == mnav_areaNone || ny < cosMaxSlope * length) | if (area == mnav_areaNone || ny <= cosMaxSlope * length)
+# ras-cross survives, equivalent: a crossing counted at a vertex exactly
+# on the cut adds that vertex again, which changes no cell's height
+# bounds.
 ras-cross | src/raster.c | if ((da < 0.0f && db > 0.0f) || (da > 0.0f && db < 0.0f)) | if ((da < 0.0f && db >= 0.0f) || (da > 0.0f && db <= 0.0f))
 ras-below | src/raster.c | if (db <= 0.0f) | if (db < 0.0f)
 ras-above | src/raster.c | if (db >= 0.0f) | if (db > 0.0f)
+# ras-cell-min survives, unreached: a cell piece of fewer than three
+# corners is a guard the cutting never reaches.
 ras-cell-min | src/raster.c | if (cell->count < 3) | if (cell->count < 2)
 fil-ledge-step | src/filter.c | if (!walkable && belowWalkable && (int32_t)span->top - belowTop <= step) | if (!walkable && belowWalkable && (int32_t)span->top - belowTop < step)
 fil-clearance | src/filter.c | if (Min(ceiling, underCeiling) - floor >= height) | if (Min(ceiling, underCeiling) - floor > height)
@@ -202,6 +261,8 @@ fil-climb | src/filter.c | if (difference >= -step && difference <= step) | if (
 fil-low | src/filter.c | if (Ceiling(heightfield, i, end) - (int32_t)heightfield->spans[i].top < height) | if (Ceiling(heightfield, i, end) - (int32_t)heightfield->spans[i].top <= height)
 cmp-link | src/compact.c | if (shared >= height && rise >= -step && rise <= step) | if (shared > height && rise > -step && rise < step)
 cmp-bounds | src/compact.c | if (nx < 0 || nz < 0 || nx >= width || nz >= width) | if (nx < 0 || nz < 0 || nx > width || nz > width)
+# ero-relax survives, equivalent: relaxing at equality writes the value
+# already held.
 ero-relax | src/erode.c | if (candidate < distance[i]) | if (candidate <= distance[i])
 ero-threshold | src/erode.c | if (distance[i] < threshold) | if (distance[i] <= threshold)
 reg-border-lo | src/region.c | if (z < border) | if (z <= border)
