@@ -290,7 +290,9 @@ extern "C"
     /// Polygons of excluded areas other than the start polygon are not
     /// entered. Attached off-mesh links of included kinds are crossed at
     /// their declared cost, from the takeoff point to the landing point.
-    /// Ties go to the node made first. The result is that of mnavFindPath:
+    /// Ties go to the node made first. When the nodes run out, the
+    /// A* search tells whether the end can be reached at all, and an end it
+    /// cannot reach ends the search as no path. The result is that of mnavFindPath:
     /// the polygons crossed, the turning points, which are the path, and
     /// the links crossed; cost and length are those of the points, in three
     /// dimensions. A sliced path search in the same context ends.

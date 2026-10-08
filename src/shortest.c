@@ -58,6 +58,10 @@ typedef struct Shortest
     int32_t found;
     int32_t best;
     double bestAhead;
+    // Nodes by root, interval and polygon, over the funnel's portal memory,
+    // which this search never uses: a node the same as one before it
+    // leads nowhere new. The node table's size, so at most half full.
+    int32_t* made;
     bool outOfNodes;
     bool tooLong;
     bool notLoaded;
@@ -179,6 +183,45 @@ static uint32_t RootCell(const mnavQuery* query, mnavPos3 root)
     }
 }
 
+static uint64_t Mix(uint64_t h, double v)
+{
+    uint64_t bits = 0;
+    memcpy(&bits, &v, sizeof(double));
+    h = (h ^ bits) * 0xBF58476D1CE4E5B9u;
+    return h ^ (h >> 31);
+}
+
+static bool SameNode(const mnavSearchNode* a, const mnavSearchNode* b)
+{
+    return Same(a->at, b->at) && Same(a->a, b->a) && Same(a->b, b->b) && a->slot == b->slot &&
+           a->polygon == b->polygon && a->tag == b->tag && a->low == b->low;
+}
+
+// The cell of s->made for a node: the one holding the same node, or the
+// empty cell where it would go.
+static uint32_t MadeCell(const Shortest* s, const mnavSearchNode* node)
+{
+    const mnavQuery* query = s->query;
+    uint64_t h = 0x9E3779B97F4A7C15u ^ (uint64_t)(uint32_t)node->slot << 32 ^
+                 (uint64_t)(uint32_t)node->polygon;
+    const double values[9] = {node->at.x, node->at.y, node->at.z, node->a.x, node->a.y,
+                              node->a.z,  node->b.x,  node->b.y,  node->b.z};
+    for (int32_t i = 0; i < 9; ++i)
+    {
+        h = Mix(h, values[i]);
+    }
+    uint32_t cell = (uint32_t)h & query->tableMask;
+    for (;;)
+    {
+        int32_t n = s->made[cell];
+        if (n == MNAV_NO_NODE || SameNode(&query->nodes[n], node))
+        {
+            return cell;
+        }
+        cell = (cell + 1) & query->tableMask;
+    }
+}
+
 // Whether a way to a root at a cost is no dearer than the best known.
 static bool Cheapest(const mnavQuery* query, uint32_t cell, double cost)
 {
@@ -186,7 +229,7 @@ static bool Cheapest(const mnavQuery* query, uint32_t cell, double cost)
     return n == MNAV_NO_NODE || cost <= query->nodes[n].cost + 1e-9 * (1.0 + fabs(cost));
 }
 
-// Whether node made, whose root lies on its interval, comes back to a
+// Whether interval node made, whose root lies on its interval, comes back to a
 // polygon an ancestor with the same root already led into: going round a
 // root, the polygons about it form a ring when no wall meets it. A root
 // on the interval's line but beyond the interval turns at its nearer
@@ -194,7 +237,7 @@ static bool Cheapest(const mnavQuery* query, uint32_t cell, double cost)
 static bool Repeats(const mnavQuery* query, int32_t parent, const mnavSearchNode* made)
 {
     double span = Flat(made->a, made->b);
-    if (fabs(Cross(made->a, made->b, made->at)) > 1e-9 * (1.0 + span * span) ||
+    if (made->tag < 0 || fabs(Cross(made->a, made->b, made->at)) > 1e-9 * (1.0 + span * span) ||
         Flat(made->at, made->a) > span || Flat(made->at, made->b) > span)
     {
         return false;
@@ -222,7 +265,11 @@ static void Open(Shortest* s, int32_t parent, mnavSearchNode made, double ahead)
         return;
     }
     uint32_t cell = RootCell(query, made.at);
-    if (!Cheapest(query, cell, made.cost) || Repeats(query, parent, &made))
+    uint32_t again = MadeCell(s, &made);
+    int32_t before = s->made[again];
+    if (!Cheapest(query, cell, made.cost) || Repeats(query, parent, &made) ||
+        (before != MNAV_NO_NODE &&
+         query->nodes[before].cost <= made.cost + 1e-9 * (1.0 + fabs(made.cost))))
     {
         return;
     }
@@ -234,6 +281,7 @@ static void Open(Shortest* s, int32_t parent, mnavSearchNode made, double ahead)
     int32_t n = query->nodeCount++;
     made.parent = parent;
     query->nodes[n] = made;
+    s->made[again] = n;
     int32_t held = query->table[cell];
     if (held == MNAV_NO_NODE || made.cost < query->nodes[held].cost)
     {
@@ -258,9 +306,12 @@ static bool Toward(const Shortest* s, const mnavSearchNode* node, Seen* seen, bo
     {
         return true;
     }
+    // A point on a side of the cone, to within rounding, is in it.
     double sideA = Cross(seen->root, node->a, p);
     double sideB = Cross(seen->root, node->b, p);
-    if (sideA >= 0.0 && sideB <= 0.0)
+    double slackA = 1e-9 * Flat(seen->root, node->a) * (1.0 + Flat(node->a, p));
+    double slackB = 1e-9 * Flat(seen->root, node->b) * (1.0 + Flat(node->b, p));
+    if (sideA >= -slackA && sideB <= slackB)
     {
         return true;
     }
@@ -357,7 +408,9 @@ static void Land(Shortest* s, int32_t n)
 }
 
 // Narrows [lo, hi] to where f, linear from f0 at t = 0 to f1 at t = 1, is
-// at least 0; false when nothing of it remains.
+// at least 0; false when nothing of it remains. A crossing within 1e-9 of
+// either end is that end: a cone's side through a vertex, rounded, would
+// else make the vertex a point of no corner.
 static bool AtLeastZero(double f0, double f1, double* lo, double* hi)
 {
     if (f0 < 0.0 && f1 < 0.0)
@@ -367,6 +420,7 @@ static bool AtLeastZero(double f0, double f1, double* lo, double* hi)
     if (f0 < 0.0 || f1 < 0.0)
     {
         double t = f0 / (f0 - f1);
+        t = fabs(t - *lo) < 1e-9 ? *lo : (fabs(t - *hi) < 1e-9 ? *hi : t);
         *lo = f0 < 0.0 && t > *lo ? t : *lo;
         *hi = f1 < 0.0 && t < *hi ? t : *hi;
     }
@@ -764,6 +818,8 @@ static mnavResult Begin(Shortest* s, const mnavQueryFilter* filter, mnavPolygonI
     s->endPolygon = (int32_t)endPolygon.polygon;
     s->limit = (double)query->limits.pathLength;
     memset(query->table, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
+    s->made = query->madeTable;
+    memset(s->made, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
     double ahead = Flat(start, s->end);
     query->nodes[0] = (mnavSearchNode){start,
                                        start,
@@ -778,6 +834,7 @@ static mnavResult Begin(Shortest* s, const mnavQueryFilter* filter, mnavPolygonI
                                        MNAV_NO_NODE,
                                        MNAV_NO_NODE};
     query->table[RootCell(query, start)] = 0;
+    s->made[MadeCell(s, &query->nodes[0])] = 0;
     query->nodeCount = 1;
     query->heapCount = 0;
     mnavPushNode(query, 0);
@@ -819,5 +876,16 @@ mnavResult mnavFindShortestPath(mnavQuery* query, const mnavNavmesh* navmesh,
                          : s.notLoaded           ? mnav_pathNotLoaded
                                                  : mnav_pathNone;
     Finish(&s, s.found != MNAV_NO_NODE ? s.found : s.best, ending, pathOut);
+    // An end the start cannot reach leaves Polyanya to spend its nodes on
+    // every way there is; the A* search, a node per portal, tells it. It
+    // uses the nodes, never the path written.
+    mnavPathEnd reach = mnav_pathOutOfNodes;
+    if (ending == mnav_pathOutOfNodes &&
+        mnavCheckReachable(query, navmesh, filter, startPolygon, start, endPolygon, end, &reach) ==
+            mnav_success &&
+        reach != mnav_pathFound && reach != mnav_pathOutOfNodes)
+    {
+        pathOut->end = reach;
+    }
     return mnav_success;
 }

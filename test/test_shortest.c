@@ -123,6 +123,20 @@ static void TestTurnsAtTheCorner(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestEndsOnTheStartOrTheCorner(void)
+{
+    mnavNavmesh* navmesh = Make(s_ell, 3, nullptr, 0);
+    mnavQuery* query = MakeQuery(64, 1000.0f);
+    mnavPath path = Shortest(query, navmesh, nullptr, 2.5, 4.5, 2.5, 4.5);
+    CHECK(path.end == mnav_pathFound && path.pointCount == 1 && path.length == 0.0,
+          "to the start itself");
+    path = Shortest(query, navmesh, nullptr, 7.5, 9.5, 5.0, 5.0);
+    CHECK(path.end == mnav_pathFound && path.pointCount == 2 && At(&path, 1, 5.0, 5.0),
+          "to the corner itself");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestTurnsAtATileBorder(void)
 {
     // The L again, its corner on the border between two tiles.
@@ -180,6 +194,29 @@ static void TestStartsOnAVertex(void)
         path = Shortest(query, navmesh, nullptr, x, z, 5.0, 5.0);
         CHECK(path.end == mnav_pathFound && path.pointCount == 2, "and back to the vertex");
     }
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
+static void TestGoesStraightThroughVertices(void)
+{
+    // Nine squares, (0, 0) to (15, 15): the diagonal passes through the
+    // vertices at (5, 5) and (10, 10), where four squares meet and no wall.
+    HandSquare grid[9];
+    for (int32_t k = 0; k < 9; ++k)
+    {
+        int32_t x0 = 20 * (k % 3);
+        int32_t z0 = 20 * (k / 3);
+        grid[k] = (HandSquare){x0, z0, x0 + 20, z0 + 20, {0}, 0};
+    }
+    mnavNavmesh* navmesh = Make(grid, 9, nullptr, 0);
+    mnavQuery* query = MakeQuery(1024, 1000.0f);
+    mnavPath path = Shortest(query, navmesh, nullptr, 2.5, 2.5, 12.5, 12.5);
+    CHECK(path.end == mnav_pathFound && fabs(path.length - sqrt(200.0)) < 1e-12,
+          "the diagonal's length");
+    path = Shortest(query, navmesh, nullptr, 1.0, 14.0, 14.0, 1.0);
+    CHECK(path.end == mnav_pathFound && fabs(path.length - sqrt(338.0)) < 1e-12,
+          "the other diagonal, through (5, 10) and (10, 5)");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
@@ -391,9 +428,11 @@ int main(void)
 {
     BakeWorld();
     TestTurnsAtTheCorner();
+    TestEndsOnTheStartOrTheCorner();
     TestTurnsAtATileBorder();
     TestTakesTheShorterSide();
     TestStartsOnAVertex();
+    TestGoesStraightThroughVertices();
     TestLimitsEndTheSearch();
     TestCostsAndRefusals();
     TestCrossesLinks();

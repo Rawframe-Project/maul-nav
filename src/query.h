@@ -148,8 +148,15 @@ struct mnavQuery
     mnavPolygonId* corridor;
     // The corridor's portals, then the straight path: a node gives one
     // portal, an off-mesh link two, and the end one more, so twice the
-    // nodes plus one bound both. Then the links crossed.
-    mnavPortal* portals;
+    // nodes plus one bound both. Then the links crossed. The exact search,
+    // which pulls no corridor, keeps a table of the nodes it made there:
+    // the node table's size of int32_t, at most four per node, where the
+    // portals hold 56 bytes per node.
+    union
+    {
+        mnavPortal* portals;
+        int32_t* madeTable;
+    };
     // The straight path's points, or a grid path's cells.
     union
     {

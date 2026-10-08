@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Fuzzes query inputs (mnav-0005): a run of queries read from the bytes,
-// on the test world with one tile left unloaded and a link: points, boxes
+// on the test world with one tile left unloaded and a link: paths, A* and
+// exact, points, boxes
 // and radii from a range around the world or raw bits, polygon ids found
 // or made up, filters with costs out of range, seeds, budgets, corridors,
 // and grids with paths and flow fields over them. Each query must end in a
@@ -177,6 +178,7 @@ static void FindPath(Reader* r, const mnavQueryFilter* filter, bool sliced)
     if (!sliced)
     {
         CheckPath(mnavFindPath(s_query, s_navmesh, filter, a, start, b, end, &path), &path);
+        CheckPath(mnavFindShortestPath(s_query, s_navmesh, filter, a, start, b, end, &path), &path);
         return;
     }
     mnavResult result = mnavBeginPath(s_query, s_navmesh, filter, a, start, b, end);

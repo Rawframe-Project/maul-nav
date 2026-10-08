@@ -67,8 +67,14 @@ that are not loaded must say so rather than treat them as walls.
     prunes a dearer way to it, and a node coming back round a root to a
     polygon an ancestor with that root entered is dropped.
   - Every vertex and every end of a link along a tile side counts as a
-    corner. That is a superset of the corners where walls meet, so no
-    shortest way is missed.
+    corner, a superset of the corners where walls meet. A line that
+    passes exactly through a vertex no wall meets, common where tiles and
+    blocks align, is then a turn of no angle there; counting only the
+    corners walls meet would lose it.
+  - An end the start cannot reach would have Polyanya spend its nodes on
+    every way there is. When the nodes run out, the A* reachability
+    search, at most a node per portal, decides between out of nodes and
+    no path.
   - Every included area must have one cost (`mnav_errorInvalid`
     otherwise), since Polyanya is exact only for one cost. Off-mesh
     links are crossed at their declared cost, the takeoff point reached
