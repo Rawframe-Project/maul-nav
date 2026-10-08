@@ -6,11 +6,13 @@
 #include "allocator.h"
 #include "bake_def.h"
 #include "border_vertices.h"
+#include "bytes.h"
 #include "compact.h"
 #include "contour.h"
 #include "detail.h"
 #include "erode.h"
 #include "filter.h"
+#include "fingerprint.h"
 #include "heightfield.h"
 #include "holes.h"
 #include "input.h"
@@ -246,31 +248,13 @@ static mnavResult CheckInput(const mnavBaker* baker, const Input* in, int32_t ti
     return total > baker->def.limits.inputTriangles ? mnav_errorLimit : mnav_success;
 }
 
-static uint64_t HashWords(uint64_t hash, const uint32_t* words, int32_t count)
-{
-    return mnavHash64(hash, words, count * (int32_t)sizeof(uint32_t));
-}
-
-static uint32_t Bits32(float f)
-{
-    uint32_t bits = 0;
-    memcpy(&bits, &f, sizeof(bits));
-    return bits;
-}
-
-static uint64_t Bits64(double d)
-{
-    uint64_t bits = 0;
-    memcpy(&bits, &d, sizeof(bits));
-    return bits;
-}
-
 // The hash of the generator, the settings that shape the tile and its
 // place.
 static uint64_t HashSettings(const mnavBakeDef* def, int32_t tileX, int32_t tileZ)
 {
     mnavVersion version = mnavGetVersion();
-    uint64_t origin[3] = {Bits64(def->origin.x), Bits64(def->origin.y), Bits64(def->origin.z)};
+    uint64_t origin[3] = {mnavDoubleBits(def->origin.x), mnavDoubleBits(def->origin.y),
+                          mnavDoubleBits(def->origin.z)};
     const uint32_t words[] = {
         version.major,
         version.minor,
@@ -281,170 +265,31 @@ static uint64_t HashSettings(const mnavBakeDef* def, int32_t tileX, int32_t tile
         (uint32_t)(origin[1] >> 32),
         (uint32_t)origin[2],
         (uint32_t)(origin[2] >> 32),
-        Bits32(def->cellSize),
-        Bits32(def->cellHeight),
+        mnavFloatBits(def->cellSize),
+        mnavFloatBits(def->cellHeight),
         (uint32_t)def->tileCells,
-        Bits32(def->agent.radius),
-        Bits32(def->agent.height),
-        Bits32(def->agent.stepHeight),
-        Bits32(def->agent.maxSlopeDegrees),
-        Bits32(def->minRegionArea),
-        Bits32(def->maxEdgeError),
-        Bits32(def->maxEdgeLength),
-        Bits32(def->detailSampleDistance),
-        Bits32(def->detailMaxError),
+        mnavFloatBits(def->agent.radius),
+        mnavFloatBits(def->agent.height),
+        mnavFloatBits(def->agent.stepHeight),
+        mnavFloatBits(def->agent.maxSlopeDegrees),
+        mnavFloatBits(def->minRegionArea),
+        mnavFloatBits(def->maxEdgeError),
+        mnavFloatBits(def->maxEdgeLength),
+        mnavFloatBits(def->detailSampleDistance),
+        mnavFloatBits(def->detailMaxError),
         (uint32_t)tileX,
         (uint32_t)tileZ,
     };
-    return HashWords(MNAV_HASH_INIT, words, (int32_t)(sizeof(words) / sizeof(words[0])));
+    return mnavHashWords(MNAV_HASH_INIT, words, (int32_t)(sizeof(words) / sizeof(words[0])));
 }
 
-// Adds a triangle that reaches the tile, as rasterization picks it, to
-// the fingerprint, and counts it.
-static uint64_t HashTriangle(const mnavBaker* baker, const mnavTileFrame* frame,
-                             const mnavVec3 corners[3], mnavAreaType given, uint64_t hash,
-                             int32_t* count)
-{
-    // The cheap test first: most triangles of a large mesh miss the tile.
-    if (!mnavTriangleTouchesTile(frame, corners))
-    {
-        return hash;
-    }
-    int32_t area = mnavTriangleArea(corners, given, baker->cells.cosMaxSlope);
-    if (area < 0)
-    {
-        return hash;
-    }
-    uint32_t words[10];
-    for (int32_t c = 0; c < 3; ++c)
-    {
-        words[c * 3 + 0] = Bits32(corners[c].x);
-        words[c * 3 + 1] = Bits32(corners[c].y);
-        words[c * 3 + 2] = Bits32(corners[c].z);
-    }
-    words[9] = (uint32_t)area;
-    *count += 1;
-    return HashWords(hash, words, 10);
-}
-
-static uint64_t HashTerrain(const mnavBaker* baker, const mnavTileFrame* frame,
-                            const mnavTerrain* terrain, uint64_t hash, int32_t* count)
-{
-    int32_t c0 = 0;
-    int32_t c1 = -1;
-    int32_t r0 = 0;
-    int32_t r1 = -1;
-    if (!mnavTerrainCells(terrain, frame, &c0, &c1, &r0, &r1))
-    {
-        return hash;
-    }
-    for (int32_t r = r0; r <= r1; ++r)
-    {
-        for (int32_t c = c0; c <= c1; ++c)
-        {
-            for (int32_t k = 0; k < 2; ++k)
-            {
-                mnavVec3 corners[3];
-                mnavAreaType given = 0;
-                if (mnavTerrainTriangle(terrain, c, r, k, corners, &given))
-                {
-                    hash = HashTriangle(baker, frame, corners, given, hash, count);
-                }
-            }
-        }
-    }
-    return hash;
-}
-
-// Adds the volumes that reach the tile to the fingerprint, after a word
-// for include volumes, which reach every tile, when there are any; a bake
-// whose volumes all miss the tile, none of them include volumes, has the
-// fingerprint of one without.
-static uint64_t HashVolumes(const mnavTileFrame* frame, const mnavBakeVolume* volumes,
-                            int32_t count, uint64_t hash)
-{
-    if (count == 0)
-    {
-        return hash;
-    }
-    uint32_t includes = 0;
-    for (int32_t i = 0; i < count; ++i)
-    {
-        includes |= volumes[i].kind == mnav_volumeInclude ? 1u : 0u;
-    }
-    hash = includes != 0 ? HashWords(hash, &includes, 1) : hash;
-    for (int32_t i = 0; i < count; ++i)
-    {
-        const mnavBakeVolume* v = &volumes[i];
-        if (!mnavRingTouchesTile(frame, v->points, v->pointCount))
-        {
-            continue;
-        }
-        const uint32_t head[5] = {(uint32_t)v->kind, (uint32_t)v->area, Bits32(v->minY),
-                                  Bits32(v->maxY), (uint32_t)v->pointCount};
-        hash = HashWords(hash, head, 5);
-        for (int32_t p = 0; p < v->pointCount; ++p)
-        {
-            const uint32_t point[2] = {Bits32(v->points[p].x), Bits32(v->points[p].y)};
-            hash = HashWords(hash, point, 2);
-        }
-    }
-    return hash;
-}
-
-// Adds every input triangle that reaches the tile, as rasterization picks
-// them, meshes' then terrains', and the volumes to the fingerprint, and
-// counts the triangles.
-static uint64_t HashMeshTriangle(const mnavBaker* baker, const mnavTileFrame* frame,
-                                 const mnavTriangleMesh* mesh, int32_t t, uint64_t hash,
-                                 int32_t* count)
-{
-    const int32_t* index = mesh->indices + (size_t)t * 3;
-    const mnavVec3 corners[3] = {mesh->vertices[index[0]], mesh->vertices[index[1]],
-                                 mesh->vertices[index[2]]};
-    mnavAreaType given = mesh->areas != nullptr ? mesh->areas[t] : mnav_areaWalkable;
-    return HashTriangle(baker, frame, corners, given, hash, count);
-}
-
-static uint64_t HashInput(const mnavBaker* baker, const mnavTileFrame* frame,
-                          const mnavBakeInput* input, int32_t tileX, int32_t tileZ, uint64_t hash,
-                          int32_t* count)
-{
-    *count = 0;
-    if (input->index != nullptr)
-    {
-        const mnavIndexEntry* list = nullptr;
-        int32_t listed = 0;
-        mnavTileIndexList(input->index, tileX, tileZ, &list, &listed);
-        for (int32_t k = 0; k < listed; ++k)
-        {
-            hash = HashMeshTriangle(baker, frame, &input->meshes[list[k].mesh], list[k].triangle,
-                                    hash, count);
-        }
-    }
-    for (int32_t m = 0; m < input->meshCount && input->index == nullptr; ++m)
-    {
-        for (int32_t t = 0; t < input->meshes[m].triangleCount; ++t)
-        {
-            hash = HashMeshTriangle(baker, frame, &input->meshes[m], t, hash, count);
-        }
-    }
-    for (int32_t i = 0; i < input->terrainCount; ++i)
-    {
-        hash = HashTerrain(baker, frame, &input->terrains[i], hash, count);
-    }
-    return HashVolumes(frame, input->volumes, input->volumeCount, hash);
-}
-
-// The detail lookup's search radius: the wall error rounded up, at least
-// one cell.
 // Adds every outline that reaches the tile to the fingerprint, after a
 // word that keeps 2D input apart from 3D, and counts them.
 static uint64_t HashOutlines(const mnavTileFrame* frame, const Input* in, int32_t tileX,
                              int32_t tileZ, uint64_t hash, int32_t* count)
 {
     const uint32_t tag = 0x32444E41u;
-    hash = HashWords(hash, &tag, 1);
+    hash = mnavHashWords(hash, &tag, 1);
     *count = 0;
     const mnavOutlineSet set =
         mnavOutlinesFor(in->outlines, in->outlineCount, in->outlineIndex, tileX, tileZ);
@@ -457,16 +302,19 @@ static uint64_t HashOutlines(const mnavTileFrame* frame, const Input* in, int32_
         }
         *count += 1;
         uint32_t head[2] = {(uint32_t)outline->pointCount, (uint32_t)outline->area};
-        hash = HashWords(hash, head, 2);
+        hash = mnavHashWords(hash, head, 2);
         for (int32_t i = 0; i < outline->pointCount; ++i)
         {
-            uint32_t words[2] = {Bits32(outline->points[i].x), Bits32(outline->points[i].y)};
-            hash = HashWords(hash, words, 2);
+            uint32_t words[2] = {mnavFloatBits(outline->points[i].x),
+                                 mnavFloatBits(outline->points[i].y)};
+            hash = mnavHashWords(hash, words, 2);
         }
     }
     return hash;
 }
 
+// The detail lookup's search radius: the wall error rounded up, at least
+// one cell.
 static int32_t SearchRadius(float edgeError)
 {
     int32_t radius = (int32_t)ceilf(edgeError);
@@ -653,9 +501,9 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
     {
         uint64_t settings = HashSettings(&baker->def, tileX, tileZ);
         report.fingerprint =
-            in->flat
-                ? HashOutlines(&frame, in, tileX, tileZ, settings, &report.triangles)
-                : HashInput(baker, &frame, &in->solid, tileX, tileZ, settings, &report.triangles);
+            in->flat ? HashOutlines(&frame, in, tileX, tileZ, settings, &report.triangles)
+                     : mnavFingerprintInput(&frame, baker->cells.cosMaxSlope, &in->solid, tileX,
+                                            tileZ, settings, &report.triangles);
         result = RunStages(baker, in, tileX, tileZ, &stages, &report);
     }
     if (result == mnav_success)

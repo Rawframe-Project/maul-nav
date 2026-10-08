@@ -59,6 +59,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/detail.c
     src/erode.c
     src/filter.c
+    src/fingerprint.c
     src/flight.c
     src/hash.c
     src/funnel.c

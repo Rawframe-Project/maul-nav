@@ -1,6 +1,7 @@
 # The internal module graph (docs/conventions.md, section 6): each module
 # and the modules it may use. tools/check_modules.py enforces it.
 allocator:
+bytes:
 base:
 scalar:
 bake_def: scalar
@@ -29,9 +30,10 @@ border_vertices: allocator contour planar polymesh triangulate
 height_patch: allocator compact polymesh region
 detail: allocator compact contour delaunay height_patch polymesh region triangulate
 delaunay: invariant
-tile: allocator detail polymesh
+tile: allocator bytes detail polymesh
 flight: allocator bake_def heightfield raster
-baker: allocator bake_def border_vertices compact contour detail erode filter heightfield holes input outline polymesh raster region tile terrain tile_index volume
+fingerprint: bytes outline raster terrain tile_index
+baker: allocator bake_def border_vertices bytes compact contour detail erode filter fingerprint heightfield holes input outline polymesh raster region terrain tile tile_index volume
 navmesh: allocator bake_def detail polymesh tile
 nearest: detail navmesh polymesh query_filter raster
 path: allocator funnel navmesh offmesh polymesh query query_filter raster
