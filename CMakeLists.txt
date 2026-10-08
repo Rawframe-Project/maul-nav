@@ -88,6 +88,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/raster.c
     src/region.c
     src/scalar.c
+    src/shortest.c
     src/sort.c
     src/spatial.c
     src/surface.c
@@ -126,6 +127,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(query_filter WHITEBOX)
     maul_add_test(offmesh WHITEBOX)
     maul_add_test(path_links WHITEBOX)
+    maul_add_test(shortest WHITEBOX)
     maul_add_test(sliced WHITEBOX)
     maul_add_test(surface WHITEBOX)
     maul_add_test(corridor WHITEBOX)

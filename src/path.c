@@ -81,6 +81,17 @@ static int32_t Pop(mnavQuery* query)
     return top;
 }
 
+void mnavPushNode(mnavQuery* query, int32_t n)
+{
+    query->heap[query->heapCount] = EntryOf(query, n);
+    SiftUp(query, query->heapCount++);
+}
+
+int32_t mnavPopNode(mnavQuery* query)
+{
+    return Pop(query);
+}
+
 // One search: the end it heads for and what stopped ways on.
 
 static double Distance(mnavPos3 a, mnavPos3 b)

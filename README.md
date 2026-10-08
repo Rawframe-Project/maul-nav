@@ -21,6 +21,8 @@ It has:
 - nearest-point, path, raycast, height, wall-distance, surface-move,
   shape, random-point and reachability queries, with named limits on
   every search and typed results when one is hit;
+- exact shortest paths on the navmesh (Polyanya, with off-mesh links)
+  beside the A* and funnel search, for agents with no area preferences;
 - path corridors, sliced and hierarchical searches, grid pathfinding
   (A* and jump point search), and flow fields over grids and navmeshes;
 - off-mesh links point to point or edge to edge, one or two way, of
@@ -49,7 +51,7 @@ minor release may change the API, the ABI and the tile format.
 
 - [The guide](docs/guide.md) walks through baking, the navmesh,
   queries, corridors, flow fields, avoidance and debug output.
-- [The API reference](docs/api.md) lists all 90 public functions,
+- [The API reference](docs/api.md) lists all 91 public functions,
   generated from the headers.
 - [The samples](docs/samples.md) are small complete programs.
 - [The changelog](CHANGELOG.md) records every change.

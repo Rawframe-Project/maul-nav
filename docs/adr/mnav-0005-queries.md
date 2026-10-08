@@ -57,6 +57,27 @@ that are not loaded must say so rather than treat them as walls.
   The points live in the context, sized from the node limit, so a
   straight path is never cut short; short of the end it ends at the
   midpoint of the last portal crossed.
+- **Shortest path:** `mnavFindShortestPath` gives the shortest way on
+  the ground between two points by Polyanya (Cui, Harabor and
+  Grastien, 2017), beside the A* search rather than in place of it.
+  - Its nodes are intervals of portals, each with a root that sees all
+    of it: the start, a corner the way turns at, or an off-mesh link's
+    landing point. Its heuristic is the distance from the root through
+    the interval to the end. The best cost known at each root's position
+    prunes a dearer way to it, and a node coming back round a root to a
+    polygon an ancestor with that root entered is dropped.
+  - Every vertex and every end of a link along a tile side counts as a
+    corner. That is a superset of the corners where walls meet, so no
+    shortest way is missed.
+  - Every included area must have one cost (`mnav_errorInvalid`
+    otherwise), since Polyanya is exact only for one cost. Off-mesh
+    links are crossed at their declared cost, the takeoff point reached
+    like the end point and the landing point a new root. Ties go to
+    the node made first.
+  - The result is that of `mnavFindPath`. On the benchmark's flat world
+    of pillars, `mnavFindPath`'s paths are 11% longer than the shortest
+    on average and up to 39% longer. Over its 1,000 queries on the
+    test world, this search takes 16% fewer instructions.
 - **Raycast:** `mnavRaycast` walks a segment on the ground from a point
   on a polygon, polygon to polygon through the first edge it crosses
   outward, across tile sides where a link's exact cell range holds the

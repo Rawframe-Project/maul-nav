@@ -189,6 +189,13 @@ void mnavAimSearch(mnavQuery* query, mnavPos3 end, int32_t endSlot, int32_t endP
 // nodes on its way, closed, and opens n alone (mnav-0008).
 void mnavRestartSearch(mnavQuery* query, int32_t n);
 
+// Puts node n in the open list, by its cost and heuristic summed; ties
+// go to the node made first.
+void mnavPushNode(mnavQuery* query, int32_t n);
+
+// Takes the first node off the open list.
+int32_t mnavPopNode(mnavQuery* query);
+
 // The search heuristic's scale: the cheapest included area's cost, or less
 // for a kind of link the filter crosses that costs less per meter.
 double mnavHeuristicScale(const mnavNavmesh* navmesh, const mnavQueryFilter* filter);

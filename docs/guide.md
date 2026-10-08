@@ -157,6 +157,14 @@ mnavResult searched =
 - **Filters.** `mnavQueryFilter`, from `mnavDefaultQueryFilter`, sets
   each area's cost, the areas included and the link kinds crossed: an
   agent's capabilities. `NULL` uses every walkable area and kind.
+- **The shortest way.** `mnavFindPath` picks its corridor by costs
+  through portal midpoints, then pulls the path tight within it; among
+  pillars or other clutter that corridor can weave, and the path come
+  out a tenth or more longer than it need be.
+  `mnavFindShortestPath` takes the same arguments and gives the same
+  result, but its path is the shortest the navmesh allows on the
+  ground, and it often costs fewer instructions. It needs every included
+  area at one cost, so use it for agents with no area preferences.
 - **Sliced searches.** `mnavBeginPath`, then `mnavContinuePath` with a
   node budget each tick, then `mnavFinishPath`: a server spreads many
   agents' searches over its ticks. A commit in between makes the search
