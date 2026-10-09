@@ -562,3 +562,11 @@ nr-flat-holds | src/nearest.c | if (inside && area != 0.0) | if (inside)
 # nr-inside-strict survives, equivalent: a point on an edge of the triangle
 # holding it sets near, and the full scan then decides as before.
 nr-inside-strict | src/nearest.c | inside = inside && c <= 0.0; | inside = inside && c < 0.0;
+lw-radius | src/spatial.c | if (distance > r->radius) | if (distance >= r->radius)
+lw-tie | src/spatial.c | while (at > 0 && r->walls[at - 1].distance > distance) | while (at > 0 && r->walls[at - 1].distance >= distance)
+lw-full | src/spatial.c | if (at == r->capacity) | if (false)
+lw-last | src/spatial.c | int32_t last = held < r->capacity ? held : r->capacity - 1; | int32_t last = held;
+lw-normal | src/spatial.c | length > 0.0 ? (mnavPos3){ez / length, 0.0, -ex / length} : (mnavPos3){0.0, 0.0, 0.0}; | length > 0.0 ? (mnavPos3){-ez / length, 0.0, ex / length} : (mnavPos3){0.0, 0.0, 0.0};
+lw-count | src/spatial.c | r->count += 1; | (void)r;
+fw-capacity | src/spatial.c | return r.count > capacity ? mnav_errorCapacity : mnav_success; | return r.count >= capacity ? mnav_errorCapacity : mnav_success;
+fw-listing | src/spatial.c | if (!open && r->listing) | if (!open && false)
