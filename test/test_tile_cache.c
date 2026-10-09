@@ -269,6 +269,18 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
     obstacles[1] = obstacles[0];
     Rebuilt(other, cache, 0, obstacles, 2, mnav_errorLimit);
     mnavDestroyBaker(other);
+    // The cached volumes' points count too.
+    const mnavBakeInput shaped = {&world, 1, nullptr, 0, obstacles, 1, nullptr};
+    CHECK(mnavBakeTileCached(baker, cache, &shaped, 0, 0, &cached) == mnav_success,
+          "cached with a volume");
+    def.limits.inputTriangles = cached.triangles + 4 + 4;
+    CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "a baker at the limit");
+    Rebuilt(other, cache, 0, obstacles, 1, mnav_success);
+    def.limits.inputTriangles -= 1;
+    mnavDestroyBaker(other);
+    CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "a baker past it");
+    Rebuilt(other, cache, 0, obstacles, 1, mnav_errorLimit);
+    mnavDestroyBaker(other);
     // A cached bake that fails leaves nothing cached for the tile.
     const mnavBakeInput missing = {&world, 1, nullptr, 0, nullptr, 1, nullptr};
     CHECK(mnavBakeTileCached(baker, cache, &missing, 0, 0, nullptr) == mnav_errorInvalid,
