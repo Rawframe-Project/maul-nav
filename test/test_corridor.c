@@ -216,6 +216,50 @@ static void TestAreaRuns(mnavQuery* query, const mnavNavmesh* navmesh, mnavCorri
           "a slanting path crosses into area 2 at (10, 7.5)");
 }
 
+// A U round a wall, the bottom middle square of area 2: one run into it
+// where the path leaves the wall's corner at (15, 5), not where it first
+// meets the line of that portal running down the wall's side, and one
+// out of it; the crossings between squares of one area add none.
+static void TestAreaRunsRoundAWall(void)
+{
+    const HandSquare squares[7] = {{20, 40, 40, 60, {0}, 0}, {40, 40, 60, 60, {0}, 0},
+                                   {60, 40, 80, 60, {0}, 0}, {60, 20, 80, 40, {0}, 0},
+                                   {60, 0, 80, 20, {0}, 0},  {40, 0, 60, 20, {0}, 2},
+                                   {20, 0, 40, 20, {0}, 0}};
+    static uint8_t bytes[8192];
+    size_t size = HandTileBytes(bytes, 0, squares, 7);
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "the U loaded");
+    mnavQuery* query = MakeQuery(64);
+    mnavNearest a = On(navmesh, 6.0, 14.0, 0.1f);
+    mnavNearest b = On(navmesh, 6.0, 1.0, 0.1f);
+    mnavPath path;
+    mnavPolygonId buffer[16];
+    mnavCorridor corridor;
+    mnavAreaRun runs[8];
+    int32_t count = -1;
+    mnavCorners corners;
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
+                  mnav_success &&
+              path.polygonCount == 7 &&
+              mnavResetCorridor(&corridor, buffer, 16, a.polygon, a.point) == mnav_success &&
+              mnavSetCorridor(&corridor, &path) == mnav_success &&
+              mnavCorridorAreas(query, navmesh, &corridor, &corners, runs, 8, &count) ==
+                  mnav_success,
+          "round the wall");
+    CHECK(corners.pointCount == 4 && count == 3 && runs[1].area == 2 && runs[1].corner == 2 &&
+              fabs(runs[1].start.x - 15.0) < 1e-9 && fabs(runs[1].start.z - 5.0) < 1e-9 &&
+              runs[2].area == runs[0].area && runs[2].corner == 2 &&
+              fabs(runs[2].start.x - 10.0) < 1e-9 && fabs(runs[2].start.z - 25.0 / 9.0) < 1e-9,
+          "into area 2 at the wall's corner, out of it at x = 10 m");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestFiltersAndLinks(void)
 {
     // A row of squares, the middle one of area 2, and a jump across a gap.
@@ -621,5 +665,6 @@ int main(void)
     TestShortcuts();
     TestReplanning();
     TestStartOnASeam();
+    TestAreaRunsRoundAWall();
     return s_failures == 0 ? 0 : 1;
 }

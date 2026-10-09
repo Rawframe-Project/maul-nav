@@ -541,6 +541,10 @@ fn-on-portal-near | src/funnel.c | return ex * ex + ez * ez < 1e-6; | return ex 
 fn-clamp | src/funnel.c | t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t); | t = t;
 ca-area-change | src/corridor.c | if (next != area) | if (true)
 ca-landing-corner | src/corridor.c | corner = PointAt(&corners, corner, portals[1].left); | corner = 0;
+# ca-crossing-t survives, equivalent in effect: the straight path is taut
+# through convex polygons and the search moves on segment by segment, so
+# no segment meets a later portal's line beyond its ends first.
 ca-crossing-t | src/corridor.c | if (t >= -eps && t <= 1.0 + eps && u >= -eps && u <= 1.0 + eps) | if (t >= -eps && t <= 1.0 + eps)
 ca-capacity | src/corridor.c | return count <= capacity ? mnav_success : mnav_errorCapacity; | return mnav_success;
 ca-run-fits | src/corridor.c | if (*count < capacity) | if (*count <= capacity)
+ca-parallel-within | src/corridor.c | if (side * side <= 1e-6 * reach && w >= -eps && w <= 1.0 + eps) | if (side * side <= 1e-6 * reach)

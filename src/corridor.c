@@ -270,9 +270,10 @@ static mnavPos3 Crossing(const mnavCorners* corners, const mnavPortal* portal, i
         if (fabs(denominator) <= eps * (sx * sx + sz * sz + reach))
         {
             // Along the portal's line: crossed where the segment starts,
-            // when that is on it.
+            // when that is on the portal, within its ends.
             double side = qx * rz - qz * rx;
-            if (side * side <= 1e-6 * reach)
+            double w = reach > 0.0 ? -(qx * rx + qz * rz) / reach : 0.0;
+            if (side * side <= 1e-6 * reach && w >= -eps && w <= 1.0 + eps)
             {
                 *corner = c;
                 return a;
