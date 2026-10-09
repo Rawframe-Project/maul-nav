@@ -135,9 +135,9 @@ static void Corner(mnavQuery* query, int32_t* count, Funnel* f, mnavPos3 p, int3
 // or inside a side of the funnel narrows it; one on or past the other side
 // makes that side's point a corner, and the scan goes on from there. The
 // first portal is a point, always kept: the start or a landing point. A
-// portal the start lies on, as at a seam or a vertex, is crossed already
-// and constrains nothing: before the first corner it is passed over, as
-// Detour passes over the first.
+// portal the apex lies on, as at a seam or a vertex, is crossed already
+// and constrains nothing: it is passed over, as Detour passes over the
+// first when the start lies on it.
 static int32_t Pull(mnavQuery* query, int32_t first, int32_t last, int32_t count)
 {
     const mnavPortal* p = query->portals;
@@ -145,7 +145,7 @@ static int32_t Pull(mnavQuery* query, int32_t first, int32_t last, int32_t count
     Funnel f = {p[first].left, p[first].left, p[first].right, first, first, first};
     for (int32_t i = first + 1; i <= last; ++i)
     {
-        if (f.apexAt == first && OnPortal(f.apex, &p[i]))
+        if (OnPortal(f.apex, &p[i]))
         {
             continue;
         }
