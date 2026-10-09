@@ -16,6 +16,7 @@
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -176,6 +177,89 @@ static void GuideAvoidance(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+// Two agents meeting head on along the world's floor, stepped by the
+// crowd snippet until both pass each other.
+static void GuideCrowd(void)
+{
+    mnavNavmesh* navmesh = Loaded();
+    mnavQueryDef queryDef = mnavDefaultQueryDef();
+    mnavQuery* query = nullptr;
+    mnavAvoidanceDef avoidanceDef = mnavDefaultAvoidanceDef();
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success &&
+              mnavCreateAvoidance(&avoidanceDef, &avoidance) == mnav_success,
+          "a context and an avoidance set");
+    enum
+    {
+        COUNT = 2
+    };
+    int32_t count = COUNT;
+    static mnavPolygonId buffers[COUNT][64];
+    mnavCorridor corridors[COUNT];
+    mnavAgent agents[COUNT];
+    mnavPos2 velocities[COUNT];
+    const mnavObstacle* obstacles = nullptr;
+    int32_t obstacleCount = 0;
+    double dt = 0.1;
+    const double ends[COUNT][2] = {{4.0, 16.0}, {16.0, 16.0}};
+    const mnavVec3 box = {1.0f, 2.0f, 1.0f};
+    for (int32_t i = 0; i < COUNT; ++i)
+    {
+        mnavNearest from;
+        mnavNearest to;
+        mnavPath path;
+        CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){ends[i][0], 0.0, ends[i][1]}, box,
+                              &from) == mnav_success &&
+                  mnavFindNearest(navmesh, nullptr, (mnavPos3){ends[1 - i][0], 0.0, ends[1 - i][1]},
+                                  box, &to) == mnav_success &&
+                  mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon,
+                               to.point, &path) == mnav_success &&
+                  mnavResetCorridor(&corridors[i], buffers[i], 64, from.polygon, from.point) ==
+                      mnav_success &&
+                  mnavSetCorridor(&corridors[i], &path) == mnav_success,
+              "an agent's corridor");
+        agents[i] = (mnavAgent){
+            {from.point.x, from.point.z}, {0.0, 0.0}, {0.0, 0.0}, 0.4, 3.5, 1.0, (uint64_t)i + 1};
+    }
+    double closest = 1e9;
+    for (int32_t step = 0; step < 100; ++step)
+    {
+        // clang-format off
+        mnavSteerDef steer = mnavDefaultSteerDef();   // set maxSpeed to the agents'
+        for (int32_t i = 0; i < count; ++i)
+        {
+            mnavCorners corners;
+            mnavSteering steering;
+            if (mnavCorridorCorners(query, navmesh, &corridors[i], &corners) == mnav_success &&
+                mnavSteer(&corners, &steer, &steering) == mnav_success)
+            {
+                agents[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
+            }
+        }
+        mnavResult avoided = mnavAvoid(avoidance, agents, count, obstacles, obstacleCount, dt, velocities);
+        for (int32_t i = 0; i < count && avoided == mnav_success; ++i)
+        {
+            // Limit the change from agents[i].velocity by the agent's acceleration.
+            mnavPos3 at = corridors[i].position;
+            mnavPos3 wanted = {at.x + velocities[i].x * dt, at.y, at.z + velocities[i].y * dt};
+            if (mnavMoveCorridor(query, navmesh, NULL, &corridors[i], wanted, NULL) == mnav_success)
+            {
+                agents[i].position = (mnavPos2){corridors[i].position.x, corridors[i].position.z};
+                agents[i].velocity = velocities[i];
+            }
+        }
+        // clang-format on
+        double gap = hypot(agents[1].position.x - agents[0].position.x,
+                           agents[1].position.y - agents[0].position.y);
+        closest = gap < closest ? gap : closest;
+    }
+    CHECK(agents[0].position.x > 12.0 && agents[1].position.x < 8.0 && closest > 0.79,
+          "the crowd snippet walks two agents past each other");
+    mnavDestroyAvoidance(avoidance);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     BakeWorld();
@@ -183,5 +267,6 @@ int main(void)
     GuideNavmesh();
     GuideQueryAndCorridor();
     GuideAvoidance();
+    GuideCrowd();
     return s_failures == 0 ? 0 : 1;
 }

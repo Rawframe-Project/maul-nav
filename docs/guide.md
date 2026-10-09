@@ -353,6 +353,59 @@ the axes when a step is blocked (`samples/flight.c`). A held-back
 flier sidesteps to its right, +Y being up, and one rising or falling
 straight sidesteps toward +X or -X, so that two meeting head on pass.
 
+## A crowd on a navmesh
+
+Detour's crowd moves its agents for you; maul-nav gives the parts and
+leaves the agents to you. A step of a crowd, `samples/navcrowd.c` in
+full: each agent's corridor gives its corners, `mnavSteer` the velocity
+it wants, `mnavAvoid` one clear of the others, and you move it along
+the surface.
+
+```c
+mnavSteerDef steer = mnavDefaultSteerDef();   // set maxSpeed to the agents'
+for (int32_t i = 0; i < count; ++i)
+{
+    mnavCorners corners;
+    mnavSteering steering;
+    if (mnavCorridorCorners(query, navmesh, &corridors[i], &corners) == mnav_success &&
+        mnavSteer(&corners, &steer, &steering) == mnav_success)
+    {
+        agents[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
+    }
+}
+mnavResult avoided = mnavAvoid(avoidance, agents, count, obstacles, obstacleCount, dt, velocities);
+for (int32_t i = 0; i < count && avoided == mnav_success; ++i)
+{
+    // Limit the change from agents[i].velocity by the agent's acceleration.
+    mnavPos3 at = corridors[i].position;
+    mnavPos3 wanted = {at.x + velocities[i].x * dt, at.y, at.z + velocities[i].y * dt};
+    if (mnavMoveCorridor(query, navmesh, NULL, &corridors[i], wanted, NULL) == mnav_success)
+    {
+        agents[i].position = (mnavPos2){corridors[i].position.x, corridors[i].position.z};
+        agents[i].velocity = velocities[i];
+    }
+}
+```
+
+- **The avoidance agents** take each agent's position on the ground
+  (x and z of its corridor's position), its last velocity, its radius
+  and its speed; the obstacles are the host's, walls or pillars as
+  polygons, or none: the navmesh keeps agents off the walls already.
+- **Acceleration** is the host's, between avoidance and the move, as in
+  Detour's crowd; `navcrowd` limits each change to 8 m/s² times the
+  step.
+- **Links.** At an off-mesh link's takeoff `mnavSteer` says
+  `mnav_steerAtLink` with the link's index among the corners' links:
+  play the traversal, move the agent to the landing point, and move the
+  corridor on with `mnavMoveCorridor`.
+- **Commits.** After a commit, check each corridor with
+  `mnavCheckCorridor` and replan the ones it breaks with
+  `mnavReplanCorridor` (`samples/obstacles.c`). To give an agent a new
+  target, find its polygon and load a new path with `mnavSetCorridor`,
+  or move the target with `mnavMoveCorridorTarget`: setting
+  `corridor.target` by hand leaves the corridor's last polygon where it
+  was, and a replan goes there.
+
 ## Debug output
 
 The library never draws. It fills an `mnavDebugBuffer` you own with
