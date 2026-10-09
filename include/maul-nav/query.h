@@ -462,6 +462,18 @@ extern "C"
         int32_t linkCount;
     } mnavCorners;
 
+    // A run of a straight path over one area (mnav-0005): from its start
+    // on, the path crosses polygons of that area until the next run's
+    // start.
+    typedef struct mnavAreaRun
+    {
+        mnavPos3 start;
+        // The straight path's point the run starts at or after: start lies
+        // between it and the next point.
+        int32_t corner;
+        mnavAreaType area;
+    } mnavAreaRun;
+
     /// Starts a corridor over a buffer: one polygon, the position and the
     /// target both at a point on it.
     ///
@@ -528,6 +540,34 @@ extern "C"
                                                            const mnavNavmesh* navmesh,
                                                            const mnavCorridor* corridor,
                                                            mnavCorners* cornersOut);
+
+    /// Finds the areas along a corridor's straight path: the corners
+    /// mnavCorridorCorners gives, which replace the context's last ones,
+    /// and a run where the path starts, one wherever it crosses into a
+    /// polygon of another area, and one where it lands from each off-mesh
+    /// link, in order. Hosts change gait or sound at a run's start; a
+    /// path's areas are its corridor's, once loaded with mnavSetCorridor.
+    ///
+    /// @param query      The context; its memory holds the corners.
+    /// @param navmesh    The navmesh.
+    /// @param corridor   The corridor.
+    /// @param cornersOut Receives the straight path, or NULL.
+    /// @param runs       Receives the runs, in order. May be NULL when
+    ///                   capacity is 0.
+    /// @param capacity   How many runs fit, at least 0.
+    /// @param countOut   Receives how many runs there are, also when they
+    ///                   do not all fit.
+    /// @return As mnavCorridorCorners; also `mnav_errorInvalid` for a NULL
+    /// countOut, a negative capacity or NULL runs with a positive one, and
+    /// `mnav_errorCapacity` when the runs do not fit, the first capacity
+    /// of them written.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCorridorAreas(mnavQuery* query,
+                                                         const mnavNavmesh* navmesh,
+                                                         const mnavCorridor* corridor,
+                                                         mnavCorners* cornersOut, mnavAreaRun* runs,
+                                                         int32_t capacity, int32_t* countOut);
 
     /// Moves a corridor's position along the surface toward a wanted point
     /// (mnavMoveAlongSurface from its first polygon) and merges the

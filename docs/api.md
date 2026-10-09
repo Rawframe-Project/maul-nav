@@ -603,6 +603,11 @@ MNAV_NODISCARD MNAV_API mnavResult mnavCorridorCorners(mnavQuery* query, const m
 Finds a corridor's straight path from its position to its target: the funnel over the portals between its polygons.  @param query    The context; its memory holds the corners. @param navmesh  The navmesh. @param corridor The corridor. @param cornersOut Receives the straight path. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or polygons not joined; `mnav_errorStale` for a polygon whose tile has been replaced or removed; `mnav_errorLimit` for a corridor of more polygons than the context's node limit. @par Thread safety Safe from any thread; the context is used by one thread at a time.
 
 ```c
+MNAV_NODISCARD MNAV_API mnavResult mnavCorridorAreas(mnavQuery* query, const mnavNavmesh* navmesh, const mnavCorridor* corridor, mnavCorners* cornersOut, mnavAreaRun* runs, int32_t capacity, int32_t* countOut);
+```
+Finds the areas along a corridor's straight path: the corners mnavCorridorCorners gives, which replace the context's last ones, and a run where the path starts, one wherever it crosses into a polygon of another area, and one where it lands from each off-mesh link, in order. Hosts change gait or sound at a run's start; a path's areas are its corridor's, once loaded with mnavSetCorridor.  @param query      The context; its memory holds the corners. @param navmesh    The navmesh. @param corridor   The corridor. @param cornersOut Receives the straight path, or NULL. @param runs       Receives the runs, in order. May be NULL when capacity is 0. @param capacity   How many runs fit, at least 0. @param countOut   Receives how many runs there are, also when they do not all fit. @return As mnavCorridorCorners; also `mnav_errorInvalid` for a NULL countOut, a negative capacity or NULL runs with a positive one, and `mnav_errorCapacity` when the runs do not fit, the first capacity of them written. @par Thread safety Safe from any thread; the context is used by one thread at a time.
+
+```c
 MNAV_NODISCARD MNAV_API mnavResult mnavMoveCorridor(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter, mnavCorridor* corridor, mnavPos3 wanted, mnavMove* moveOut);
 ```
 Moves a corridor's position along the surface toward a wanted point (mnavMoveAlongSurface from its first polygon) and merges the polygons walked into its start: it keeps its polygons from the farthest one the walk passed, led to by the walk.  @param query    The context, for the walk. @param navmesh  The navmesh. @param filter   The areas usable, or NULL for every walkable one. @param corridor The corridor. @param wanted   Where the agent would be; only its ground position counts. @param moveOut  Receives the walk, or NULL. @return As mnavMoveAlongSurface; also `mnav_errorInvalid` for a corridor with no buffer, and `mnav_errorCapacity` when the merged corridor would outgrow its buffer, which leaves it unchanged. @par Thread safety Safe from any thread; the context is used by one thread at a time. So is the corridor.
@@ -659,4 +664,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-122 functions across 12 headers.
+123 functions across 12 headers.

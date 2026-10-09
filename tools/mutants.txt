@@ -539,3 +539,8 @@ fp-count-check | src/field_pack.c | if (written != spans) | if (false)
 fn-start-skip | src/funnel.c | if (OnPortal(f.apex, &p[i])) | if (false)
 fn-on-portal-near | src/funnel.c | return ex * ex + ez * ez < 1e-6; | return ex * ex + ez * ez < 1.0;
 fn-clamp | src/funnel.c | t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t); | t = t;
+ca-area-change | src/corridor.c | if (next != area) | if (true)
+ca-landing-corner | src/corridor.c | corner = PointAt(&corners, corner, portals[1].left); | corner = 0;
+ca-crossing-t | src/corridor.c | if (t >= -eps && t <= 1.0 + eps && u >= -eps && u <= 1.0 + eps) | if (t >= -eps && t <= 1.0 + eps)
+ca-capacity | src/corridor.c | return count <= capacity ? mnav_success : mnav_errorCapacity; | return mnav_success;
+ca-run-fits | src/corridor.c | if (*count < capacity) | if (*count <= capacity)

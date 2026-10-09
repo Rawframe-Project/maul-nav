@@ -13,6 +13,10 @@ format.
 - Sample `obstacles`: crates dropped onto and lifted from a floor while
   agents cross it, each change rebuilding from a tile cache only the
   tiles the crates reach; run as a test.
+- `mnavCorridorAreas`: a corridor's corners with the runs of area along
+  them, each starting where the straight path starts, enters a polygon
+  of another area or lands from an off-mesh link (as Detour's area
+  crossings), into a buffer the caller gives.
 
 ### Fixed
 

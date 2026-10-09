@@ -165,6 +165,57 @@ static void TestChecksAndLimits(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// The areas along the corridor over the squares: a run at the start, one
+// into the middle square of area 2 and one out of it, and one where the
+// jump lands; then a slanting path, its run starting where it crosses.
+static void TestAreaRuns(mnavQuery* query, const mnavNavmesh* navmesh, mnavCorridor* corridor,
+                         mnavNearest a)
+{
+    mnavAreaRun runs[8];
+    int32_t count = -1;
+    mnavCorners corners;
+    mnavAreaType first = 0;
+    CHECK(mnavCorridorAreas(query, navmesh, corridor, &corners, runs, 8, &count) == mnav_success &&
+              count == 4 && corners.pointCount == 4,
+          "four runs along the corners");
+    first = runs[0].area;
+    CHECK(runs[0].start.x == a.point.x && runs[0].corner == 0 && runs[1].area == 2 &&
+              fabs(runs[1].start.x - 10.0) < 1e-9 && runs[1].corner == 0 && runs[2].area == first &&
+              fabs(runs[2].start.x - 15.0) < 1e-9 && runs[3].start.x == 25.5 &&
+              runs[3].corner == 2 && runs[3].area == first,
+          "into area 2 at 10 m, out at 15 m, and from the landing");
+    runs[2].area = 77;
+    CHECK(mnavCorridorAreas(query, navmesh, corridor, nullptr, runs, 2, &count) ==
+                  mnav_errorCapacity &&
+              count == 4 && runs[1].area == 2 && runs[2].area == 77,
+          "two places for four runs: the first two, nothing past them, and the count");
+    CHECK(mnavCorridorAreas(query, navmesh, corridor, nullptr, nullptr, 0, &count) ==
+                  mnav_errorCapacity &&
+              count == 4,
+          "counted with no places");
+    CHECK(mnavCorridorAreas(query, navmesh, corridor, nullptr, runs, 8, nullptr) ==
+                  mnav_errorInvalid &&
+              mnavCorridorAreas(query, navmesh, corridor, nullptr, nullptr, 1, &count) ==
+                  mnav_errorInvalid &&
+              mnavCorridorAreas(query, navmesh, corridor, nullptr, runs, -1, &count) ==
+                  mnav_errorInvalid,
+          "no count, no runs or a negative capacity refused");
+    // From (6, 5.5) to (14, 9.5): into area 2 at (10, 7.5).
+    mnavNearest from = On(navmesh, 6.0, 5.5, 0.1f);
+    mnavNearest to = On(navmesh, 14.0, 9.5, 0.1f);
+    mnavPath path;
+    mnavPolygonId buffer[8];
+    mnavCorridor slant;
+    CHECK(mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon, to.point,
+                       &path) == mnav_success &&
+              mnavResetCorridor(&slant, buffer, 8, from.polygon, from.point) == mnav_success &&
+              mnavSetCorridor(&slant, &path) == mnav_success &&
+              mnavCorridorAreas(query, navmesh, &slant, nullptr, runs, 8, &count) == mnav_success &&
+              count == 2 && fabs(runs[1].start.x - 10.0) < 1e-9 &&
+              fabs(runs[1].start.z - 7.5) < 1e-9 && runs[1].area == 2,
+          "a slanting path crosses into area 2 at (10, 7.5)");
+}
+
 static void TestFiltersAndLinks(void)
 {
     // A row of squares, the middle one of area 2, and a jump across a gap.
@@ -200,6 +251,7 @@ static void TestFiltersAndLinks(void)
               out.pointCount == 4 && out.linkCount == 1 && out.links[0].point == 1 &&
               out.links[0].kind == mnav_linkJump && out.points[1].x == 19.5,
           "the jump among the corners");
+    TestAreaRuns(query, navmesh, &corridor, a);
     int32_t valid = -1;
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     filter.areas &= ~((uint64_t)1 << 2);

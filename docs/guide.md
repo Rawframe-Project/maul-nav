@@ -244,6 +244,11 @@ mnavResult moved = mnavMoveCorridor(query, navmesh, NULL, &corridor, wanted, NUL
 - The corners carry the off-mesh links ahead with their kinds, so you
   know when the agent reaches a jump or a ladder and can play the
   animation and move it yourself.
+- `mnavCorridorAreas` gives the corners too, with the runs of area
+  along them: where the path starts, where it enters a polygon of
+  another area (mud, water, a road) and where it lands from a link, so
+  you can change gait or sound there. A path's areas are its
+  corridor's.
 
 The library never moves an agent: it returns where to go, and you
 apply it.
