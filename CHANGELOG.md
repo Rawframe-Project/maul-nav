@@ -8,6 +8,22 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- A scenario test of 1,000 agents crossing between two rooms through a
+  doorway on a navmesh, each following its corridor by `mnavSteer` with
+  the walls near it fed to avoidance; all arrive, none pressed against
+  the walls, the final places pinned.
+
+### Fixed
+
+- `mnavSteer` took lengths with `hypot`, which is not exactly rounded
+  and differs between C libraries, so steering, and a crowd steered by
+  it, could differ in its last bits between platforms (glibc against
+  WebAssembly's libc); it takes them with `sqrt`, as the rest of the
+  library does (mnav-0001). Steering velocities may change in their
+  last bits.
+
 ## [0.11.0] - 2026-10-09
 
 Crowds among walls: the walls near a point for avoidance, with the crowd

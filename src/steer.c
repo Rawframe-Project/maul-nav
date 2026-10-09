@@ -29,10 +29,17 @@ static bool Finite(mnavPos3 p)
     return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
 }
 
+// The length of (x, z), by sqrt, which is exactly rounded everywhere, not
+// hypot, which is not and differs between C libraries (mnav-0001).
+static double Length(double x, double z)
+{
+    return sqrt(x * x + z * z);
+}
+
 // The ground distance from a to b.
 static double Ground(mnavPos3 a, mnavPos3 b)
 {
-    return hypot(b.x - a.x, b.z - a.z);
+    return Length(b.x - a.x, b.z - a.z);
 }
 
 // The direction to steer in, of length 1, or 0 when there is none:
@@ -47,17 +54,17 @@ static mnavPos3 Direction(const mnavCorners* corners, int32_t n, bool anticipate
     if (anticipate && n + 1 < corners->pointCount)
     {
         mnavPos3 after = corners->points[n + 1];
-        double length = hypot(x, z);
+        double length = Length(x, z);
         double ax = after.x - p.x;
         double az = after.z - p.z;
-        double away = hypot(ax, az);
+        double away = Length(ax, az);
         if (away > 0.001)
         {
             x -= ax / away * length * 0.5;
             z -= az / away * length * 0.5;
         }
     }
-    double length = hypot(x, z);
+    double length = Length(x, z);
     return length > 0.0 ? (mnavPos3){x / length, 0.0, z / length} : (mnavPos3){0.0, 0.0, 0.0};
 }
 

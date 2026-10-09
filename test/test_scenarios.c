@@ -4,8 +4,10 @@
 // Scenarios from game shapes (requirements section 5): a building of two
 // floors joined by stairs and a ramp, a bridge that collapses under a
 // dynamic navmesh while an agent's corridor runs over it, a large
-// terrain streamed in and out around an agent crossing it, and an RTS
-// group led by a flow field through a gap, steered apart by avoidance.
+// terrain streamed in and out around an agent crossing it, an RTS
+// group led by a flow field through a gap, steered apart by avoidance,
+// and a crowd of 1,000 through a doorway on a navmesh, each agent
+// following its corridor, avoiding the others and the walls near it.
 
 #include "test_harness.h"
 
@@ -29,6 +31,9 @@
 
 // The hash of the group's final places.
 #define GROUP_HASH 0xb16f4123b3485eedull
+
+// The hash of the doorway crowd's final places.
+#define DOORWAY_HASH 0x236419da9ed2faafull
 
 enum
 {
@@ -563,6 +568,223 @@ static void TestGroup(void)
     mnavDestroyFlowField(field);
 }
 
+// The doorway crowd: 1,000 agents of 0.25 m in rows 0.75 m apart, the
+// walls each keeps, and the table that passes each wall to avoidance once.
+enum
+{
+    CROWD = 1000,
+    CROWD_STEPS = 4000,
+    CROWD_CORRIDOR = 128,
+    CROWD_WALLS = 8,
+    WALL_TABLE = 1 << 14
+};
+
+static const double CROWD_RADIUS = 0.25;
+static const double WALL_RANGE = 2.0;
+
+typedef struct Walker
+{
+    mnavPolygonId buffer[CROWD_CORRIDOR];
+    mnavCorridor corridor;
+    mnavWallSegment walls[CROWD_WALLS];
+    int32_t wallCount;
+    mnavPos3 wallsAt;
+} Walker;
+
+static Walker s_walkers[CROWD];
+static mnavAgent s_crowd[CROWD];
+static mnavObstacle s_wallObstacles[CROWD * CROWD_WALLS];
+static mnavPos2 s_wallEnds[CROWD * CROWD_WALLS][2];
+static int32_t s_wallTable[WALL_TABLE];
+
+// Finds again the walls of the agents that have moved a quarter of the
+// range, then passes each agent's walls to avoidance once, moved out by
+// its radius (the navmesh keeps its center that far from the real walls,
+// and avoidance adds the radius again); returns how many.
+static int32_t GatherWalls(mnavQuery* query, const mnavNavmesh* navmesh)
+{
+    for (int32_t i = 0; i < CROWD; ++i)
+    {
+        Walker* w = &s_walkers[i];
+        double dx = w->corridor.position.x - w->wallsAt.x;
+        double dz = w->corridor.position.z - w->wallsAt.z;
+        if (w->wallCount >= 0 && dx * dx + dz * dz < WALL_RANGE * WALL_RANGE / 16.0)
+        {
+            continue;
+        }
+        mnavWallsFound found;
+        mnavResult result =
+            mnavFindWalls(query, navmesh, nullptr, w->corridor.polygons[0], w->corridor.position,
+                          WALL_RANGE, w->walls, CROWD_WALLS, &found);
+        CHECK(result == mnav_success || result == mnav_errorCapacity, "walls");
+        w->wallCount = found.count < CROWD_WALLS ? found.count : CROWD_WALLS;
+        w->wallsAt = w->corridor.position;
+    }
+    memset(s_wallTable, 0xFF, sizeof(s_wallTable));
+    int32_t count = 0;
+    for (int32_t i = 0; i < CROWD; ++i)
+    {
+        for (int32_t k = 0; k < s_walkers[i].wallCount; ++k)
+        {
+            const mnavWallSegment* wall = &s_walkers[i].walls[k];
+            if (wall->normal.x == 0.0 && wall->normal.z == 0.0)
+            {
+                continue;
+            }
+            mnavPos2 ends[2] = {{wall->start.x - wall->normal.x * CROWD_RADIUS,
+                                 wall->start.z - wall->normal.z * CROWD_RADIUS},
+                                {wall->end.x - wall->normal.x * CROWD_RADIUS,
+                                 wall->end.z - wall->normal.z * CROWD_RADIUS}};
+            uint32_t cell = (uint32_t)mnavHash64(MNAV_HASH_INIT, ends, (int32_t)sizeof(ends)) &
+                            (WALL_TABLE - 1);
+            while (s_wallTable[cell] >= 0 &&
+                   memcmp(s_wallEnds[s_wallTable[cell]], ends, sizeof(ends)) != 0)
+            {
+                cell = (cell + 1) & (WALL_TABLE - 1);
+            }
+            if (s_wallTable[cell] >= 0)
+            {
+                continue;
+            }
+            s_wallTable[cell] = count;
+            memcpy(s_wallEnds[count], ends, sizeof(ends));
+            s_wallObstacles[count] =
+                (mnavObstacle){s_wallEnds[count], 2, 0.0, {0.0, 0.0}, (uint64_t)count + 1, 0};
+            count += 1;
+        }
+    }
+    return count;
+}
+
+// The smallest gap between two agents of the crowd.
+static double CrowdClosest(void)
+{
+    double closest = (double)INFINITY;
+    for (int32_t i = 0; i < CROWD; ++i)
+    {
+        for (int32_t j = i + 1; j < CROWD; ++j)
+        {
+            double dx = s_crowd[j].position.x - s_crowd[i].position.x;
+            double dy = s_crowd[j].position.y - s_crowd[i].position.y;
+            if (fabs(dx) < 1.0 && fabs(dy) < 1.0)
+            {
+                double gap = sqrt(dx * dx + dy * dy) - 2.0 * CROWD_RADIUS;
+                closest = gap < closest ? gap : closest;
+            }
+        }
+    }
+    return closest;
+}
+
+static void TestDoorway(mnavQuery* query)
+{
+    // Two rooms of 30 m by 32 m, 4 m apart, joined by a doorway 6 m wide
+    // that crosses the seam of the two tiles; the navmesh's edges are the
+    // walls. A thousand agents in the west room cross to the same places
+    // in the east one.
+    Quads q = {0};
+    AddQuad(&q, 0, 0, 30, 32, 0, 0);
+    AddQuad(&q, 34, 0, 64, 32, 0, 0);
+    AddQuad(&q, 30, 13, 34, 19, 0, 0);
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.agent.radius = (float)CROWD_RADIUS;
+    Bake(&def, &q, 0, 0, 1, 0);
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+              mnavStageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
+              mnavStageTile(navmesh, s_tiles[1], s_sizes[1]).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "loaded");
+    for (int32_t i = 0; i < CROWD; ++i)
+    {
+        double x = 2.0 + 0.75 * (double)(i % 25);
+        double z = 1.5 + 0.75 * (double)(i / 25);
+        mnavNearest from = Nearest(navmesh, x, 0.0, z);
+        mnavNearest to = Nearest(navmesh, 64.0 - x, 0.0, z);
+        mnavPath path = Path(query, navmesh, from, to);
+        Walker* w = &s_walkers[i];
+        CHECK(path.end == mnav_pathFound &&
+                  mnavResetCorridor(&w->corridor, w->buffer, CROWD_CORRIDOR, from.polygon,
+                                    from.point) == mnav_success &&
+                  mnavSetCorridor(&w->corridor, &path) == mnav_success,
+              "a corridor across");
+        w->wallCount = -1;
+        s_crowd[i] = (mnavAgent){.position = {from.point.x, from.point.z},
+                                 .radius = CROWD_RADIUS,
+                                 .maxSpeed = 1.5,
+                                 .priority = 1.0,
+                                 .id = (uint64_t)i + 1};
+    }
+    mnavAvoidanceDef avoidDef = mnavDefaultAvoidanceDef();
+    avoidDef.limits.agents = CROWD;
+    avoidDef.limits.obstacleVertices = CROWD * CROWD_WALLS * 2;
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateAvoidance(&avoidDef, &avoidance) == mnav_success, "avoidance");
+    mnavSteerDef steer = mnavDefaultSteerDef();
+    steer.maxSpeed = 1.5f;
+    static mnavPos2 velocities[CROWD];
+    int32_t arrived = 0;
+    int32_t step = 0;
+    int32_t mostWalls = 0;
+    double pressed = 0.0;
+    double closest = (double)INFINITY;
+    for (; step < CROWD_STEPS && arrived < CROWD; ++step)
+    {
+        arrived = 0;
+        for (int32_t i = 0; i < CROWD; ++i)
+        {
+            mnavCorners corners;
+            mnavSteering steering;
+            CHECK(mnavCorridorCorners(query, navmesh, &s_walkers[i].corridor, &corners) ==
+                          mnav_success &&
+                      mnavSteer(&corners, &steer, &steering) == mnav_success,
+                  "steered");
+            arrived += steering.state == mnav_steerArrived ? 1 : 0;
+            s_crowd[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
+        }
+        int32_t walls = GatherWalls(query, navmesh);
+        mostWalls = walls > mostWalls ? walls : mostWalls;
+        CHECK(mnavAvoid(avoidance, s_crowd, CROWD, s_wallObstacles, walls, 0.1, velocities) ==
+                  mnav_success,
+              "avoided");
+        for (int32_t i = 0; i < CROWD; ++i)
+        {
+            mnavCorridor* c = &s_walkers[i].corridor;
+            mnavPos3 wanted = {c->position.x + velocities[i].x * 0.1, c->position.y,
+                               c->position.z + velocities[i].y * 0.1};
+            CHECK(mnavMoveCorridor(query, navmesh, nullptr, c, wanted, nullptr) == mnav_success,
+                  "moved");
+            pressed += hypot(wanted.x - c->position.x, wanted.z - c->position.z);
+            s_crowd[i].position = (mnavPos2){c->position.x, c->position.z};
+            s_crowd[i].velocity = velocities[i];
+        }
+        if (step % 50 == 0)
+        {
+            double gap = CrowdClosest();
+            closest = gap < closest ? gap : closest;
+        }
+    }
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t i = 0; i < CROWD; ++i)
+    {
+        hash = mnavHash64(hash, &s_crowd[i].position, (int32_t)sizeof(s_crowd[i].position));
+    }
+    printf("doorway: %d of %d arrived in %d steps, moves %.3f m short against walls, closest "
+           "%.3f m, at most %d walls; DOORWAY_HASH=%016llx\n",
+           arrived, CROWD, step, pressed, closest, mostWalls, (unsigned long long)hash);
+    // All through in under five minutes. Packed at the doorway, avoidance
+    // keeps clear of the walls first and gives way between agents, so a
+    // pair overlaps by about 18 cm at worst; without the walls the moves
+    // press 1,430 m into them, pairs overlap by 31 cm, and two agents are
+    // still short after the step budget.
+    CHECK(arrived == CROWD, "every agent through");
+    CHECK(pressed < 1.0, "hardly pressed against the walls");
+    CHECK(closest > -0.2, "no two overlapping by 20 cm");
+    CHECK(hash == DOORWAY_HASH, "the pinned hash");
+    mnavDestroyAvoidance(avoidance);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     mnavQueryDef def = mnavDefaultQueryDef();
@@ -572,6 +794,7 @@ int main(void)
     TestCollapsingBridge(query);
     TestStreamedTerrain(query);
     TestGroup();
+    TestDoorway(query);
     mnavDestroyQuery(query);
     return s_failures == 0 ? 0 : 1;
 }
