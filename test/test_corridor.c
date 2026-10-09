@@ -532,6 +532,32 @@ static void TestReplanning(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// A corridor whose position stands on the seam between two tiles, in the
+// first polygon and on its edge to the second: the portal there is
+// crossed already, so a target on the seam too is reached straight, not
+// round the portal's end.
+static void TestStartOnASeam(void)
+{
+    mnavNavmesh* navmesh = LoadWorld();
+    mnavQuery* query = MakeQuery(8192);
+    mnavPolygonId above = On(navmesh, 6.0, 32.2, 0.1f).polygon;
+    mnavPolygonId below = On(navmesh, 6.0, 31.8, 0.1f).polygon;
+    CHECK(above.slot != below.slot && On(navmesh, 7.0, 31.8, 0.1f).polygon.polygon == below.polygon,
+          "a polygon each side of the seam, the lower one reaching x = 7 m");
+    mnavPolygonId buffer[2] = {above, below};
+    mnavCorridor corridor = {{6.0, 0.0, 32.0}, {6.0, 0.0, 32.0}, buffer, 2, 2};
+    mnavCorners corners;
+    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+              corners.pointCount == 1 && corners.points[0].x == 6.0 && corners.points[0].z == 32.0,
+          "at the target: one corner, the target");
+    corridor.target = (mnavPos3){7.0, 0.0, 32.0};
+    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+              corners.pointCount == 2 && corners.points[1].x == 7.0 && corners.points[1].z == 32.0,
+          "along the seam: straight to the target");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     BakeWorld();
@@ -542,5 +568,6 @@ int main(void)
     TestFollowingCorridors();
     TestShortcuts();
     TestReplanning();
+    TestStartOnASeam();
     return s_failures == 0 ? 0 : 1;
 }

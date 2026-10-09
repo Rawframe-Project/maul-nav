@@ -536,3 +536,7 @@ lz-long-count | src/lz.c | for (length -= 15; length >= 255; length -= 255) | fo
 fp-high-byte | src/field_pack.c | plane[count + i] = (uint8_t)(value >> 8); | plane[count + i] = 0;
 fp-relink | src/field_pack.c | mnavLinkCompactField(field, height, step); | (void)0;
 fp-count-check | src/field_pack.c | if (written != spans) | if (false)
+fn-start-skip | src/funnel.c | starting = starting && f.apexAt == first && OnPortal(f.apex, &p[i]); | starting = false;
+fn-start-only | src/funnel.c | starting = starting && f.apexAt == first && OnPortal(f.apex, &p[i]); | starting = f.apexAt == first && OnPortal(f.apex, &p[i]);
+fn-on-portal-near | src/funnel.c | return ex * ex + ez * ez < 1e-6; | return ex * ex + ez * ez < 1.0;
+fn-clamp | src/funnel.c | t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t); | t = t;

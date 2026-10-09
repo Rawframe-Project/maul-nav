@@ -110,6 +110,20 @@ typedef struct Funnel
     int32_t rightAt;
 } Funnel;
 
+// Whether a point lies on a portal, within a millimeter on the ground.
+static bool OnPortal(mnavPos3 p, const mnavPortal* portal)
+{
+    double dx = portal->right.x - portal->left.x;
+    double dz = portal->right.z - portal->left.z;
+    double length2 = dx * dx + dz * dz;
+    double t =
+        length2 > 0.0 ? ((p.x - portal->left.x) * dx + (p.z - portal->left.z) * dz) / length2 : 0.0;
+    t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+    double ex = portal->left.x + dx * t - p.x;
+    double ez = portal->left.z + dz * t - p.z;
+    return ex * ex + ez * ez < 1e-6;
+}
+
 // Makes a side's point the funnel's new apex, a corner of the path.
 static void Corner(mnavQuery* query, int32_t* count, Funnel* f, mnavPos3 p, int32_t at)
 {
@@ -120,14 +134,22 @@ static void Corner(mnavQuery* query, int32_t* count, Funnel* f, mnavPos3 p, int3
 // Pulls portals first to last tight into a straight path: a portal end on
 // or inside a side of the funnel narrows it; one on or past the other side
 // makes that side's point a corner, and the scan goes on from there. The
-// first portal is a point, always kept: the start or a landing point.
+// first portal is a point, always kept: the start or a landing point. A
+// start on the portals after it, as at a seam or a vertex, has already
+// crossed them: they are passed over, as Detour passes over the first.
 static int32_t Pull(mnavQuery* query, int32_t first, int32_t last, int32_t count)
 {
     const mnavPortal* p = query->portals;
     query->points[count++] = p[first].left;
     Funnel f = {p[first].left, p[first].left, p[first].right, first, first, first};
+    bool starting = true;
     for (int32_t i = first + 1; i <= last; ++i)
     {
+        starting = starting && f.apexAt == first && OnPortal(f.apex, &p[i]);
+        if (starting)
+        {
+            continue;
+        }
         if (Area2(f.apex, f.right, p[i].right) >= 0.0)
         {
             if (!Same(f.apex, f.right) && Area2(f.apex, f.left, p[i].right) >= 0.0)

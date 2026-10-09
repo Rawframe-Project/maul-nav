@@ -196,8 +196,8 @@ static void Start(World* w, mnavQuery* query)
 {
     for (int32_t a = 0; a < AGENTS; ++a)
     {
-        // Rows off the seam between the tiles at z = 32 m.
-        double z = 4.5 + 7.0 * a;
+        // The fifth row walks the seam between the tiles at z = 32 m.
+        double z = 4.0 + 7.0 * a;
         mnavNearest start;
         Check(mnavFindNearest(w->navmesh, NULL, (mnavPos3){4.0, 0.0, z}, BOX, &start), "start");
         Agent* agent = &s_agents[a];

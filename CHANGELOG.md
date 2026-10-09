@@ -14,6 +14,14 @@ format.
   agents cross it, each change rebuilding from a tile cache only the
   tiles the crates reach; run as a test.
 
+### Fixed
+
+- A straight path or a corridor's corners from a point on a portal, as
+  on the seam between two tiles, no longer turn at the portal's end
+  when the next point lies on the same line: the portal is crossed
+  already, so it is passed over. An agent walking a seam to a target on
+  it could go back and forth there for ever.
+
 ## [0.9.0] - 2026-10-09
 
 Obstacles without a full bake: a tile cache keeps each tile's open
