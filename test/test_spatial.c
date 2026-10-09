@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Spatial queries (mnav-0005): heights, the nearest wall, random points
-// and reachability, on a gently sloped floor with a block and a walled
-// ring whose inside no one can reach.
+// Spatial queries (mnav-0005): heights, the nearest wall, the walls near a
+// point, random points and reachability, on a gently sloped floor with a
+// block and a walled ring whose inside no one can reach.
 
 #include "test_harness.h"
 
@@ -256,6 +256,121 @@ static void TestWallAtTheRadius(mnavNavmesh* navmesh)
     mnavDestroyQuery(query);
 }
 
+// Whether a wall is sound: within the radius at the distance it gives
+// from the center, not nearer than the one before it, its normal a unit
+// across it with the navmesh on that side.
+static bool SoundWall(const mnavNavmesh* navmesh, mnavPos3 center, double radius,
+                      const mnavWallSegment* wall, const mnavWallSegment* before)
+{
+    double ex = wall->end.x - wall->start.x;
+    double ez = wall->end.z - wall->start.z;
+    double length = hypot(ex, ez);
+    double t =
+        ((center.x - wall->start.x) * ex + (center.z - wall->start.z) * ez) / (length * length);
+    t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+    double distance =
+        hypot(center.x - (wall->start.x + t * ex), center.z - (wall->start.z + t * ez));
+    mnavPos3 inside = {(wall->start.x + wall->end.x) * 0.5 + wall->normal.x * 0.01,
+                       (wall->start.y + wall->end.y) * 0.5,
+                       (wall->start.z + wall->end.z) * 0.5 + wall->normal.z * 0.01};
+    mnavNearest n;
+    return wall->distance <= radius && fabs(wall->distance - distance) < 1e-9 &&
+           (before == nullptr || before->distance <= wall->distance) &&
+           fabs(hypot(wall->normal.x, wall->normal.z) - 1.0) < 1e-9 && wall->normal.y == 0.0 &&
+           fabs(wall->normal.x * ex + wall->normal.z * ez) < 1e-9 * length &&
+           mnavFindNearest(navmesh, nullptr, inside, (mnavVec3){0.05f, 1.0f, 0.05f}, &n) ==
+               mnav_success &&
+           n.polygon.slot != 0 && hypot(n.point.x - inside.x, n.point.z - inside.z) < 1e-6;
+}
+
+static void TestWallList(const mnavNavmesh* navmesh)
+{
+    // From centers over the world, the walls within 8 m: sound, nearest
+    // first, the first the wall distance's; a buffer of three holds the
+    // first three and counts all, and no buffer counts.
+    mnavQuery* query = Query(4096);
+    static mnavWallSegment walls[256];
+    mnavWallSegment few[3];
+    int32_t tried = 0;
+    int32_t listed = 0;
+    int32_t cut = 0;
+    bool sound = true;
+    for (int32_t i = 0; i < 13; ++i)
+    {
+        for (int32_t k = 0; k < 13; ++k)
+        {
+            double x = 2.0 + 5.0 * i;
+            double z = 2.0 + 5.0 * k;
+            mnavNearest n = {0};
+            if (mnavFindNearest(navmesh, nullptr, (mnavPos3){x, x * (double)SLOPE, z},
+                                (mnavVec3){0.5f, 2.0f, 0.5f}, &n) != mnav_success ||
+                n.polygon.slot == 0)
+            {
+                continue;
+            }
+            mnavWall wall;
+            mnavWallsFound found;
+            CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 8.0, &wall) ==
+                          mnav_success &&
+                      mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 8.0, walls, 256,
+                                    &found) == mnav_success &&
+                      !found.limited,
+                  "listed");
+            tried += 1;
+            listed += found.count;
+            sound = sound && (found.count > 0) == wall.found &&
+                    (found.count == 0 || walls[0].distance == wall.distance);
+            for (int32_t w = 0; w < found.count; ++w)
+            {
+                sound = sound && SoundWall(navmesh, n.point, 8.0, &walls[w],
+                                           w > 0 ? &walls[w - 1] : nullptr);
+            }
+            mnavWallsFound some;
+            mnavResult result =
+                mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 8.0, few, 3, &some);
+            int32_t held = found.count < 3 ? found.count : 3;
+            sound = sound && result == (found.count > 3 ? mnav_errorCapacity : mnav_success) &&
+                    some.count == found.count &&
+                    memcmp(few, walls, (size_t)held * sizeof(mnavWallSegment)) == 0;
+            cut += found.count > 3 ? 1 : 0;
+            result =
+                mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 8.0, nullptr, 0, &some);
+            sound = sound && result == (found.count > 0 ? mnav_errorCapacity : mnav_success) &&
+                    some.count == found.count;
+        }
+    }
+    printf("wall lists: %d centers, %d walls, %d cut to three\n", tried, listed, cut);
+    CHECK(tried > 100 && listed > tried && cut > 0, "walls found");
+    CHECK(sound, "sound, nearest first, the wall distance's first, the nearest kept");
+    // None of the floor's area allowed: the polygon's own edges, six at most.
+    mnavNearest n = On(navmesh, 27.0, 11.0);
+    mnavQueryFilter none = mnavDefaultQueryFilter();
+    none.areas = 0;
+    mnavWallsFound found;
+    CHECK(mnavFindWalls(query, navmesh, &none, n.polygon, n.point, 60.0, walls, 256, &found) ==
+                  mnav_success &&
+              found.count >= 3 && found.count <= 6,
+          "the polygon's own edges");
+    mnavQuery* tiny = Query(2);
+    CHECK(mnavFindWalls(tiny, navmesh, nullptr, n.polygon, n.point, 60.0, walls, 256, &found) ==
+                  mnav_success &&
+              found.limited,
+          "cut short by the node limit");
+    mnavDestroyQuery(tiny);
+    CHECK(mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 6.0, walls, -1, &found) ==
+                  mnav_errorInvalid &&
+              mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 6.0, nullptr, 2, &found) ==
+                  mnav_errorInvalid &&
+              mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 6.0, walls, 256,
+                            nullptr) == mnav_errorInvalid &&
+              mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, (double)NAN, walls, 256,
+                            &found) == mnav_errorInvalid &&
+              mnavFindWalls(nullptr, navmesh, nullptr, n.polygon, n.point, 6.0, walls, 256,
+                            &found) == mnav_errorInvalid,
+          "bad arguments");
+    mnavDestroyQuery(query);
+}
+
 static void TestRandomPoints(const mnavNavmesh* navmesh)
 {
     // Every point lies on its polygon; the same seed gives the same point;
@@ -369,6 +484,7 @@ int main(void)
     TestHeights(navmesh);
     TestWalls(navmesh);
     TestWallAtTheRadius(navmesh);
+    TestWallList(navmesh);
     TestRandomPoints(navmesh);
     TestAroundAndReachable(navmesh);
     mnavDestroyNavmesh(navmesh);

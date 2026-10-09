@@ -166,6 +166,13 @@ that are not loaded must say so rather than treat them as walls.
   unit direction from it to the center; an edge with nothing the filter
   includes across it is a wall, an unloaded tile side included; off-mesh
   links are left aside; the node limit's cut is reported.
+- **Walls near a point:** `mnavFindWalls` lists the walls of that same
+  search within the radius, nearest first, ties in the order met, into
+  a caller buffer that keeps the nearest when it is short, as Detour's
+  crowd keeps a local boundary; each wall with its ends in its polygon's
+  order, its ground distance and the unit normal toward its polygon,
+  for avoidance's segment obstacles. Partly linked tile sides count as
+  open, as for the wall distance.
 - **Random points:** `mnavFindRandomPoint` picks uniformly over the
   ground area of every included polygon from a 64-bit seed through
   SplitMix64, where Detour picks a tile first;

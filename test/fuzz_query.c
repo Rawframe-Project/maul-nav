@@ -3,12 +3,12 @@
 //
 // Fuzzes query inputs (mnav-0005): a run of queries read from the bytes,
 // on the test world with one tile left unloaded and a link: paths, A* and
-// exact, points, boxes
-// and radii from a range around the world or raw bits, polygon ids found
-// or made up, filters with costs out of range, seeds, budgets, corridors,
-// and grids with paths and flow fields over them. Each query must end in a
-// typed status, give finite results when it succeeds, and keep its counts
-// within its limits; the query contexts give back all they took.
+// exact, walls, points, boxes and radii from a range around the world or
+// raw bits, polygon ids found or made up, filters with costs out of range,
+// seeds, budgets, corridors, and grids with paths and flow fields over
+// them. Each query must end in a typed status, give finite results when it
+// succeeds, and keep its counts within its limits; the query contexts give
+// back all they took.
 
 #include "counting_allocator.h"
 #include "world.h"
@@ -211,11 +211,27 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
         result = mnavMoveAlongSurface(s_query, s_navmesh, filter, id, a, b, &move);
         Expect(result != mnav_success || Finite(move.point));
     }
-    else if (op == 2)
+    else if (op == 2 && Byte(r) % 2 == 0)
     {
         mnavWall wall;
         result = mnavFindWallDistance(s_query, s_navmesh, filter, id, a, Length(r), &wall);
         Expect(result != mnav_success || !wall.found || isfinite(wall.distance));
+    }
+    else if (op == 2)
+    {
+        mnavWallSegment walls[16];
+        int32_t capacity = Byte(r) % 17;
+        mnavWallsFound found;
+        result =
+            mnavFindWalls(s_query, s_navmesh, filter, id, a, Length(r), walls, capacity, &found);
+        bool listed = result == mnav_success || result == mnav_errorCapacity;
+        Expect(!listed ||
+               (found.count >= 0 && (result == mnav_errorCapacity) == (found.count > capacity)));
+        for (int32_t k = 0; listed && k < found.count && k < capacity; ++k)
+        {
+            Expect(Finite(walls[k].start) && Finite(walls[k].end) && isfinite(walls[k].distance) &&
+                   (k == 0 || walls[k - 1].distance <= walls[k].distance));
+        }
     }
     else if (op == 3)
     {

@@ -10,6 +10,11 @@ format.
 
 ### Added
 
+- `mnavFindWalls`: the walls within a radius of a point, nearest first,
+  into a buffer the caller gives that keeps the nearest when it is
+  short, each with its ends, its distance and the normal toward the
+  walkable side, for avoidance's segment obstacles.
+
 - `fuzz_query` also takes each corridor's runs of area and steers along
   its corners with fuzzed steering defs.
 - The benchmark times a crowd step of 1,000 agents on the terrain's

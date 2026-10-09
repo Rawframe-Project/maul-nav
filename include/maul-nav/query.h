@@ -868,6 +868,62 @@ extern "C"
                                                             mnavPolygonId polygon, mnavPos3 center,
                                                             double radius, mnavWall* wallOut);
 
+    // A wall within a radius: an edge no polygon the filter includes lies
+    // across.
+    typedef struct mnavWallSegment
+    {
+        // Its ends, in the order of its polygon's corners.
+        mnavPos3 start;
+        mnavPos3 end;
+        // The unit direction on the ground from it toward its polygon, the
+        // walkable side; zero for an edge of no length on the ground.
+        mnavPos3 normal;
+        // The distance on the ground from the center to its nearest point.
+        double distance;
+    } mnavWallSegment;
+
+    // What a search for the walls within a radius found.
+    typedef struct mnavWallsFound
+    {
+        // The walls within the radius, also beyond the buffer's capacity.
+        int32_t count;
+        // Whether the context's node limit cut the search short, so that
+        // more walls may lie unseen.
+        bool limited;
+    } mnavWallsFound;
+
+    /// Lists the walls within a radius of a point on the ground, nearest
+    /// first, for avoidance's segment obstacles: the search and the walls
+    /// of mnavFindWallDistance, whose wall is the first listed. Walls at
+    /// the same distance keep the order the search meets them in, the same
+    /// on every platform.
+    ///
+    /// @param query    The context; its last search ends.
+    /// @param navmesh  The navmesh.
+    /// @param filter   The areas usable, or NULL.
+    /// @param polygon  The polygon the center lies in.
+    /// @param center   The point.
+    /// @param radius   How far to look, in meters, at least 0 and finite.
+    /// @param wallsOut Receives up to capacity walls, the nearest; NULL when
+    ///                 capacity is 0.
+    /// @param capacity The room, at least 0.
+    /// @param foundOut Receives the count and whether the node limit cut
+    ///                 the search short.
+    /// @return `mnav_success`; `mnav_errorCapacity` when more walls lie
+    /// within the radius than the buffer holds: it holds the nearest and
+    /// foundOut counts all; `mnav_errorInvalid` for a NULL argument, a
+    /// negative capacity, a point or radius not finite, a negative radius,
+    /// a polygon id never handed out, or a filter not built from
+    /// mnavDefaultQueryFilter; `mnav_errorStale` for a polygon whose tile
+    /// has gone; `mnav_errorRange` for a filter cost out of its range.
+    /// @par Thread safety
+    /// Safe from any thread; the context is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindWalls(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                     const mnavQueryFilter* filter,
+                                                     mnavPolygonId polygon, mnavPos3 center,
+                                                     double radius, mnavWallSegment* wallsOut,
+                                                     int32_t capacity, mnavWallsFound* foundOut);
+
     // A random point and the polygon it lies on; slot 0 when there was no
     // polygon to pick.
     typedef struct mnavRandomPoint

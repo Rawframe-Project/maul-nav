@@ -252,6 +252,12 @@ typedef struct Ring
     double radius;
     bool limited;
     mnavWall wall;
+    // Whether the walls are listed into a buffer, the nearest kept, rather
+    // than the nearest noted.
+    bool listing;
+    mnavWallSegment* walls;
+    int32_t capacity;
+    int32_t count;
 } Ring;
 
 // The open list, by cost, then by node index.
@@ -334,6 +340,38 @@ static void NoteWall(Ring* r, mnavPos3 a, mnavPos3 b)
     mnavPos3 normal =
         length > 0.0 ? (mnavPos3){dx / length, 0.0, dz / length} : (mnavPos3){0.0, 0.0, 0.0};
     r->wall = (mnavWall){true, r->wall.limited, distance, nearest, normal};
+}
+
+// Lists wall ab when within the radius among the nearest the buffer holds,
+// after those as near, so that ties keep the order the search meets them.
+static void ListWall(Ring* r, mnavPos3 a, mnavPos3 b)
+{
+    mnavPos3 nearest;
+    double distance = sqrt(SegmentDistance(r->center, a, b, &nearest));
+    if (distance > r->radius)
+    {
+        return;
+    }
+    int32_t held = r->count < r->capacity ? r->count : r->capacity;
+    r->count += 1;
+    int32_t at = held;
+    while (at > 0 && r->walls[at - 1].distance > distance)
+    {
+        --at;
+    }
+    if (at == r->capacity)
+    {
+        return;
+    }
+    int32_t last = held < r->capacity ? held : r->capacity - 1;
+    memmove(&r->walls[at + 1], &r->walls[at], (size_t)(last - at) * sizeof(mnavWallSegment));
+    double ex = b.x - a.x;
+    double ez = b.z - a.z;
+    double length = sqrt(ex * ex + ez * ez);
+    // A polygon lies to the negative side of its edges, which is this way.
+    mnavPos3 normal =
+        length > 0.0 ? (mnavPos3){ez / length, 0.0, -ex / length} : (mnavPos3){0.0, 0.0, 0.0};
+    r->walls[at] = (mnavWallSegment){a, b, normal, distance};
 }
 
 // Opens or lowers the node of polygon (slot, polygon) entered through
@@ -445,7 +483,11 @@ static void Visit(Ring* r, int32_t n)
         {
             open = CrossSide(r, n, j, a, b);
         }
-        if (!open)
+        if (!open && r->listing)
+        {
+            ListWall(r, a, b);
+        }
+        else if (!open)
         {
             NoteWall(r, a, b);
         }
@@ -494,7 +536,7 @@ mnavResult mnavFindWallDistance(mnavQuery* query, const mnavNavmesh* navmesh,
     {
         return mnav_errorInvalid;
     }
-    Ring r = {query, navmesh, filter, center, radius, false, {0}};
+    Ring r = {query, navmesh, filter, center, radius, false, {0}, false, nullptr, 0, 0};
     mnavResult result = BeginRing(&r, polygon);
     if (result != mnav_success)
     {
@@ -507,6 +549,30 @@ mnavResult mnavFindWallDistance(mnavQuery* query, const mnavNavmesh* navmesh,
     r.wall.limited = r.limited;
     *wallOut = r.wall;
     return mnav_success;
+}
+
+mnavResult mnavFindWalls(mnavQuery* query, const mnavNavmesh* navmesh,
+                         const mnavQueryFilter* filter, mnavPolygonId polygon, mnavPos3 center,
+                         double radius, mnavWallSegment* wallsOut, int32_t capacity,
+                         mnavWallsFound* foundOut)
+{
+    if (foundOut == nullptr || capacity < 0 || (wallsOut == nullptr && capacity > 0) ||
+        !GoodRing(query, navmesh, center, radius))
+    {
+        return mnav_errorInvalid;
+    }
+    Ring r = {query, navmesh, filter, center, radius, false, {0}, true, wallsOut, capacity, 0};
+    mnavResult result = BeginRing(&r, polygon);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    while (query->heapCount > 0)
+    {
+        Visit(&r, Pop(query));
+    }
+    *foundOut = (mnavWallsFound){r.count, r.limited};
+    return r.count > capacity ? mnav_errorCapacity : mnav_success;
 }
 
 // Clips a convex polygon to the 32-gon of a circle on the ground,
@@ -580,7 +646,7 @@ mnavResult mnavFindRandomPointAround(mnavQuery* query, const mnavNavmesh* navmes
     {
         return mnav_errorInvalid;
     }
-    Ring r = {query, navmesh, filter, center, radius, false, {0}};
+    Ring r = {query, navmesh, filter, center, radius, false, {0}, false, nullptr, 0, 0};
     mnavResult result = BeginRing(&r, polygon);
     if (result != mnav_success)
     {
