@@ -17,6 +17,12 @@ format.
   following its flight path with avoidance in space, a raycast keeping
   every step in open space; run as a test.
 
+### Changed
+
+- `mnavAvoid3D` finds the spheres near each flier through a grid
+  rather than looking at every one, with the same velocities: a step of
+  1,000 fliers among 4,096 spheres takes a third of the time.
+
 ## [0.7.0] - 2026-10-09
 
 Avoidance among fliers: agents sharing a flight volume steer round each

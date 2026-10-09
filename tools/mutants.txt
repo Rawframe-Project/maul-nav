@@ -481,8 +481,9 @@ o3-pair-no-square | src/orca3.c | plane.normal = length > 0.0 ? mnavScale3(ww, 1
 o3-pair-no-share | src/orca3.c | plane.point = mnavAdd3(selfVelocity, mnavScale3(u, share)); | plane.point = mnavAdd3(selfVelocity, mnavScale3(u, share * 0.0 + 1.0));
 o3-pair-lower-id | src/orca3.c | plane.normal = (mnavPos3){lowerId ? -1.0 : 1.0, 0.0, 0.0}; | plane.normal = (mnavPos3){lowerId ? 1.0 : -1.0, 0.0, 0.0};
 o3-pair-away | src/orca3.c | plane.normal = mnavNormalize3(mnavScale3(position, -1.0)); | plane.normal = mnavNormalize3(position);
-a3-sphere-range | src/avoidance3.c | if (gap >= range) | if (gap >= range * 0.25)
-a3-sphere-tie | src/avoidance3.c | return ia != ib ? ia < ib : a.vertex < b.vertex; | return a.vertex < b.vertex;
+a3-sphere-range | src/avoidance3.c | return gap < range ? gap * gap : -1.0; | return gap < range * 0.25 ? gap * gap : -1.0;
+a3-sphere-tie | src/avoidance3.c | .id = sphere->id, | .id = 0,
+a3-grid-fastest | src/avoidance3.c | a->grid.fastest = fastest; | a->grid.fastest = a->grid.fastest;
 a3-sphere-leave | src/avoidance3.c | double offset = leave < agent->maxSpeed ? leave : agent->maxSpeed; | double offset = leave;
 a3-sphere-share | src/avoidance3.c | combined, 1.0, horizon, step, agent->id < sphere->id); | combined, 0.5, horizon, step, agent->id < sphere->id);
 a3-right-vertical | src/avoidance3.c | right = (mnavPos3){preferred.y > 0.0 ? 1.0 : -1.0, 0.0, 0.0}; | right = (mnavPos3){1.0, 0.0, 0.0};

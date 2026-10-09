@@ -97,8 +97,12 @@ symmetry face to face.
     head on along Y turn apart rather than stall in line;
   - obstacles are spheres, still or moving, that never give way, as
     circles on the ground; they count against the set's obstacle points,
-    and each agent looks at every sphere, which suits the few moving
-    things among fliers. Static geometry is the flight volume's.
+    and are found through the ground obstacles' grid by their bounds on
+    the ground (X and Z), its reach counting their fastest speed in
+    space, padded so that rounding at a cell's side drops none: the
+    same spheres in the same order as a look at every one, which took a
+    step of 1,000 fliers from 5.3 ms with no spheres to 27 ms with 4,096,
+    where the grid takes 9 ms. Static geometry is the flight volume's.
   - `mnavDebugAvoidance3D` draws fliers as three 16-gons each, one in
     each axis plane, the fewest lines that show a sphere's size from any
     view, with the neighbor lines of the ground call, and spheres as
