@@ -8,6 +8,14 @@ format.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-09
+
+Crowds among walls: the walls near a point for avoidance, with the crowd
+sample feeding them so that agents meeting in a corridor no longer
+press into its sides, avoidance layers for groups that pass through
+each other, and a crowd step about a third faster. Tiles baked by
+0.10.0 still load; tiles baked now record 0.11.0 as their generator.
+
 ### Added
 
 - Avoidance layers: `layers` on `mnavAgent`, `mnavAgent3D`,
