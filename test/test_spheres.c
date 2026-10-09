@@ -84,8 +84,10 @@ static int32_t Every(const mnavAgent3D* agent, double horizon, mnavObstacleNear*
 }
 
 // Spheres and agents in a box, on a coarse lattice so that many share a
-// spot or a distance, ids repeating, a few spheres fast.
-static void Scatter(double extent)
+// spot or a distance, ids repeating, a few spheres fast: across, or
+// with vertical set, only up or down, so that their speed on the ground
+// says nothing of it.
+static void Scatter(double extent, bool vertical)
 {
     for (int32_t s = 0; s < SPHERES; ++s)
     {
@@ -93,9 +95,11 @@ static void Scatter(double extent)
         double y = (double)(int32_t)(Random() * 8.0) * extent / 24.0;
         double z = (double)(int32_t)(Random() * 24.0) * extent / 24.0;
         double fast = Random() < 0.05 ? 20.0 : 1.0;
+        double vx = (Random() - 0.5) * (vertical ? 1.0 : fast);
+        double vy = (Random() - 0.5) * fast;
         s_spheres[s] = (mnavSphere){{x, y, z},
                                     0.25 + (double)(int32_t)(Random() * 4.0) * 0.5,
-                                    {(Random() - 0.5) * fast, (Random() - 0.5) * fast, 0.0},
+                                    {vx, vy, 0.0},
                                     (uint64_t)(Random() * 400.0)};
     }
     for (int32_t i = 0; i < AGENTS; ++i)
@@ -107,9 +111,9 @@ static void Scatter(double extent)
     }
 }
 
-static void Compare(double extent, double cell)
+static void Compare(double extent, double cell, bool vertical)
 {
-    Scatter(extent);
+    Scatter(extent, vertical);
     mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
     def.limits.obstacleVertices = SPHERES;
     def.limits.obstacleNeighbors = LIMIT;
@@ -139,9 +143,10 @@ static void Compare(double extent, double cell)
 
 int main(void)
 {
-    Compare(60.0, 10.0);
-    Compare(60.0, 0.5);
-    Compare(400.0, 3.0);
-    Compare(8.0, 1.0);
+    Compare(60.0, 10.0, false);
+    Compare(60.0, 0.5, false);
+    Compare(400.0, 3.0, false);
+    Compare(8.0, 1.0, false);
+    Compare(60.0, 1.0, true);
     return s_failures == 0 ? 0 : 1;
 }
