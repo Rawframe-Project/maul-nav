@@ -289,7 +289,9 @@ Fliers sharing a flight volume avoid each other in space with
 `mnavAgent` in three dimensions, and its obstacles are spheres
 (`mnavSphere`), still or moving, which count against the set's
 obstacle points. Walls and terrain are the flight volume's to keep
-clear of: a flier follows its path and avoids what moves. A held-back
+clear of: a flier follows its path and avoids what moves, and the host
+keeps each step in open space with `mnavFlightRaycast`, sliding along
+the axes when a step is blocked (`samples/flight.c`). A held-back
 flier sidesteps to its right, +Y being up, and one rising or falling
 straight sidesteps toward +X or -X, so that two meeting head on pass.
 
