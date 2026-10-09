@@ -492,10 +492,10 @@ a3-right-vertical | src/avoidance3.c | right = (mnavPos3){preferred.y > 0.0 ? 1.
 a3-right-side | src/avoidance3.c | mnavPos3 right = {-preferred.z, 0.0, preferred.x}; | mnavPos3 right = {preferred.z, 0.0, -preferred.x};
 a3-no-keep-right | src/avoidance3.c | failed = mnavPlaneProgram3(a->planes, count, self->maxSpeed, KeepRight(self->preferred), | failed = mnavPlaneProgram3(a->planes, count, self->maxSpeed, self->preferred,
 a3-no-fixed | src/avoidance3.c | int32_t fixed = count; | int32_t fixed = 0;
-a3-priority | src/avoidance3.c | other->priority / (self->priority + other->priority), | 0.5,
+a3-priority | src/avoidance3.c | : other->priority / (self->priority + other->priority); | : 0.5;
 a3-speed-cap | src/avoidance3.c | if (speedSq > self->maxSpeed * self->maxSpeed) | if (false && speedSq > self->maxSpeed * self->maxSpeed)
 a3-sphere-limit | src/avoidance3.c | sphereCount > avoidance->def.limits.obstacleVertices) | sphereCount > avoidance->def.limits.obstacleVertices + 1)
-a3-draw-no-neighbors | src/avoidance3.c | int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i); | int32_t count = 0;
+a3-draw-no-neighbors | src/avoidance3.c | int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i, a->ignores); | int32_t count = 0;
 a3-draw-sphere-kind | src/avoidance3.c | Rings(buffer, spheres[s].center, spheres[s].radius, mnav_debugObstacle); | Rings(buffer, spheres[s].center, spheres[s].radius, mnav_debugAgent);
 a3-draw-agent-radius | src/avoidance3.c | Rings(buffer, a->position, a->radius, mnav_debugAgent); | Rings(buffer, a->position, 1.0, mnav_debugAgent);
 sl-stale-commits | src/flight_search.c | return f->volume == volume && f->commits == volume->commits ? mnav_success : mnav_errorStale; | return f->volume == volume ? mnav_success : mnav_errorStale;
@@ -570,3 +570,15 @@ lw-normal | src/spatial.c | length > 0.0 ? (mnavPos3){ez / length, 0.0, -ex / le
 lw-count | src/spatial.c | r->count += 1; | (void)r;
 fw-capacity | src/spatial.c | return r.count > capacity ? mnav_errorCapacity : mnav_success; | return r.count >= capacity ? mnav_errorCapacity : mnav_success;
 fw-listing | src/spatial.c | if (!open && r->listing) | if (!open && false)
+ly-crowd-skip | src/crowd.c | if (key->index != s->index && distance < s->rangeSq && (key->layers & s->ignores) == 0) | if (key->index != s->index && distance < s->rangeSq)
+ly-keys | src/avoidance.c | a->crowd.keys[i].layers = agents[i].layers; | (void)agents;
+ly-ignores | src/avoidance.c | &a->crowd, (mnavPos3){self->position.x, self->position.y, 0.0}, i, self->ignores); | &a->crowd, (mnavPos3){self->position.x, self->position.y, 0.0}, i, 0);
+ly-share | src/avoidance.c | double share = (other->ignores & self->layers) != 0 | double share = false
+ly-debug | src/avoidance.c | &avoidance->crowd, (mnavPos3){a->position.x, a->position.y, 0.0}, i, a->ignores); | &avoidance->crowd, (mnavPos3){a->position.x, a->position.y, 0.0}, i, 0);
+ly-obstacle-skip | src/obstacle.c | if ((seen->vertices[v].layers & seen->agent->ignores) != 0) | if (false)
+ly-obstacle-layers | src/obstacle.c | i,    n + (i + 1) % c, n + (i + c - 1) % c, convex,    o->layers}; | i,    n + (i + 1) % c, n + (i + c - 1) % c, convex,    0};
+ly3-sphere-skip | src/avoidance3.c | if ((seen->spheres[s].layers & seen->agent->ignores) != 0) | if (false)
+ly3-ignores | src/avoidance3.c | int32_t neighbors = mnavCrowdNeighbors(&a->crowd, self->position, i, self->ignores); | int32_t neighbors = mnavCrowdNeighbors(&a->crowd, self->position, i, 0);
+ly3-share | src/avoidance3.c | double share = (other->ignores & self->layers) != 0 | double share = false
+ly3-keys | src/avoidance3.c | crowd->keys[i].layers = agents[i].layers; | (void)agents;
+ly3-debug | src/avoidance3.c | int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i, a->ignores); | int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i, 0);

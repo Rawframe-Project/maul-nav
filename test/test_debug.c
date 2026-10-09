@@ -245,6 +245,14 @@ static void TestFlowAndAvoidance(void)
               Count(&b, mnav_debugAgent, -1) == 3 * 16 * 2 &&
               Count(&b, mnav_debugNeighbor, -1) == 2 * 2,
           "outlines and the near pair's lines");
+    // The first ignoring the second's layer: only the second sees it.
+    agents[1].layers = 2;
+    agents[0].ignores = 2;
+    b = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    CHECK(mnavDebugAvoidance(avoidance, agents, 3, 0.1, &b) == mnav_success &&
+              Count(&b, mnav_debugNeighbor, -1) == 2,
+          "one line, the one that sees");
+    agents[0].ignores = 0;
     CHECK(mnavDebugAvoidance(avoidance, agents, 9, 0.1, &b) == mnav_errorLimit &&
               mnavDebugAvoidance(avoidance, agents, 3, (double)INFINITY, &b) == mnav_errorInvalid,
           "the limit; a bad height");
@@ -297,6 +305,13 @@ static void TestFliers(void)
     CHECK(mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 1, &small) == mnav_errorCapacity &&
               small.lineCount == b.lineCount,
           "a full buffer counts what the whole needs");
+    // The first ignoring the second's layer: only the second sees it.
+    agents[1].layers = 2;
+    agents[0].ignores = 2;
+    b = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    CHECK(mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 1, &b) == mnav_success &&
+              Count(&b, mnav_debugNeighbor, -1) == 2,
+          "one line, the one that sees");
     mnavDestroyAvoidance(avoidance);
 }
 

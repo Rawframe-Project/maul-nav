@@ -70,7 +70,6 @@ void mnavBuildSphereGrid(mnavAvoidance* a, const mnavSphere* spheres, int32_t co
             .index = s,
             .next = s,
             .previous = s,
-            .layers = sphere->layers,
         };
         double speed = sqrt(mnavDot3(sphere->velocity, sphere->velocity));
         fastest = speed > fastest ? speed : fastest;
