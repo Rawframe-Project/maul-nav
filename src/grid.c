@@ -455,6 +455,7 @@ mnavResult mnavFindGridPath(mnavQuery* query, const mnavGrid* grid, const mnavQu
     // The filter is copied: the caller's may change before the next query.
     query->filter = *usable;
     query->search.active = false;
+    query->flight.active = false;
     Grid g = {query,
               query->gridNodes,
               grid,

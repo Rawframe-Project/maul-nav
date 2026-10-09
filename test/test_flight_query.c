@@ -405,6 +405,105 @@ static void TestPaths(const mnavFlightVolume* volume)
     mnavDestroyQuery(query);
 }
 
+static void FarEnds(int32_t a[3], int32_t b[3]);
+
+// A path run in slices of a number of nodes: begun, continued until it
+// ends, finished.
+static mnavResult Sliced(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 a, mnavPos3 b,
+                         int32_t nodes, mnavFlightPath* path)
+{
+    mnavResult result = mnavBeginFlightPath(query, volume, a, b);
+    bool ended = false;
+    while (result == mnav_success && !ended)
+    {
+        result = mnavContinueFlightPath(query, volume, nodes, &ended);
+    }
+    return result == mnav_success ? mnavFinishFlightPath(query, volume, path) : result;
+}
+
+// Paths run in slices of any size are the paths found in one call, to
+// the bit; a search finished early ends unfinished; a search on a volume
+// committed to since, or on another, is stale.
+static void TestSlices(const mnavFlightVolume* volume)
+{
+    mnavQuery* query = Query(16384, 1000.0f);
+    static mnavPos3 whole[2 * 16384 + 2];
+    const int32_t sizes[4] = {1, 3, 17, 100000};
+    int32_t wrong = 0;
+    for (int32_t k = 0; k < 40; ++k)
+    {
+        int32_t a[3];
+        int32_t b[3];
+        RandomOpen(a);
+        RandomOpen(b);
+        mnavPos3 from = At(a[0] + 0.5, a[1] + 0.5, a[2] + 0.5);
+        mnavPos3 to = At(b[0] + 0.5, b[1] + 0.5, b[2] + 0.5);
+        mnavFlightPath once;
+        CHECK(mnavFindFlightPath(query, volume, from, to, &once) == mnav_success, "a path");
+        memcpy(whole, once.points, (size_t)once.pointCount * sizeof(mnavPos3));
+        for (int32_t z = 0; z < 4; ++z)
+        {
+            mnavFlightPath sliced;
+            bool same =
+                Sliced(query, volume, from, to, sizes[z], &sliced) == mnav_success &&
+                sliced.end == once.end && sliced.length == once.length &&
+                sliced.pointCount == once.pointCount &&
+                memcmp(sliced.points, whole, (size_t)once.pointCount * sizeof(mnavPos3)) == 0;
+            wrong += same ? 0 : 1;
+        }
+    }
+    CHECK(wrong == 0, "the same path whatever the slices");
+    // Finished after one node: toward the point searched nearest.
+    int32_t a[3];
+    int32_t b[3];
+    FarEnds(a, b);
+    mnavPos3 from = At(a[0] + 0.5, a[1] + 0.5, a[2] + 0.5);
+    mnavPos3 to = At(b[0] + 0.5, b[1] + 0.5, b[2] + 0.5);
+    bool ended = true;
+    mnavFlightPath early;
+    CHECK(mnavBeginFlightPath(query, volume, from, to) == mnav_success &&
+              mnavContinueFlightPath(query, volume, 1, &ended) == mnav_success && !ended &&
+              mnavFinishFlightPath(query, volume, &early) == mnav_success &&
+              early.end == mnav_pathUnfinished && early.pointCount >= 1 &&
+              early.points[0].x == from.x && early.points[0].y == from.y &&
+              early.points[0].z == from.z,
+          "unfinished, from the start");
+    CHECK(mnavContinueFlightPath(query, volume, 1, &ended) == mnav_errorInvalid &&
+              mnavFinishFlightPath(query, volume, &early) == mnav_errorInvalid,
+          "finished: no search left");
+    CHECK(mnavBeginFlightPath(query, volume, from, to) == mnav_success &&
+              mnavContinueFlightPath(query, volume, 0, &ended) == mnav_errorInvalid &&
+              mnavContinueFlightPath(query, volume, 1, nullptr) == mnav_errorInvalid &&
+              mnavContinueFlightPath(nullptr, volume, 1, &ended) == mnav_errorInvalid &&
+              mnavFinishFlightPath(query, volume, nullptr) == mnav_errorInvalid &&
+              mnavBeginFlightPath(query, nullptr, from, to) == mnav_errorInvalid,
+          "bad arguments");
+    // A search of another kind uses the context's nodes: the flight
+    // search is over.
+    static const mnavAreaType areas[4] = {mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable,
+                                          mnav_areaWalkable};
+    const mnavGrid grid = {areas, 2, 2, 1.0f};
+    mnavGridPath gridPath;
+    CHECK(mnavBeginFlightPath(query, volume, from, to) == mnav_success &&
+              mnavFindGridPath(query, &grid, nullptr, (mnavCell){0, 0}, (mnavCell){1, 1},
+                               &gridPath) == mnav_success &&
+              mnavContinueFlightPath(query, volume, 1, &ended) == mnav_errorInvalid,
+          "another search ends it");
+    // Another volume, then the same one committed to.
+    mnavFlightVolume* other = Volume(0, 0);
+    CHECK(mnavBeginFlightPath(query, volume, from, to) == mnav_success &&
+              mnavContinueFlightPath(query, other, 1, &ended) == mnav_errorStale &&
+              mnavFinishFlightPath(query, other, &early) == mnav_errorStale,
+          "another volume: stale");
+    CHECK(mnavBeginFlightPath(query, other, from, to) == mnav_success &&
+              mnavStageFlightTileRemoval(other, 3, 3) == mnav_success &&
+              mnavCommitFlight(other) == mnav_success &&
+              mnavContinueFlightPath(query, other, 1, &ended) == mnav_errorStale,
+          "committed to since: stale");
+    mnavDestroyFlightVolume(other);
+    mnavDestroyQuery(query);
+}
+
 // What a sample point holds: 0 open, 1 blocked (a solid voxel, or past
 // the floor or ceiling), 2 no tile.
 static int32_t Sample(double x, double y, double z)
@@ -839,6 +938,7 @@ int main(void)
     mnavFlightVolume* volume = Volume(-1, -1);
     ReadOpen(volume);
     TestPaths(volume);
+    TestSlices(volume);
     TestRaycasts(volume);
     TestNearest(volume);
     TestEnds(volume);

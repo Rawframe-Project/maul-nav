@@ -256,6 +256,11 @@ may occupy.
   - `mnavFindFlightPath` finds a path in an `mnavQuery` context, with
     its node budget and path length limit. Its points are each in sight
     of the next.
+  - `mnavBeginFlightPath`, `mnavContinueFlightPath` and
+    `mnavFinishFlightPath` run the same search in slices of a number of
+    nodes, so that a long search spreads over frames; the path is the
+    one `mnavFindFlightPath` gives. A commit to the volume between
+    slices makes the search stale: begin again.
   - `mnavFlightRaycast` stops at the first blocked voxel or place with
     no tile.
 

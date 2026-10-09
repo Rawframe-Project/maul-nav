@@ -414,6 +414,7 @@ mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
     }
     // The search keeps its own copy: the caller's filter may change.
     query->filter = *usable;
+    query->flight.active = false;
     memset(query->table, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
     mnavSearch* s = &query->search;
     *s = (mnavSearch){query,

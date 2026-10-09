@@ -140,6 +140,35 @@ typedef struct mnavSearch
     int32_t goal[4];
 } mnavSearch;
 
+// A flight search in progress (mnav-0015), in plain data so that the
+// context keeps it between slices: the volume and its commits when it
+// began, the end, what stopped ways on, and the nodes found. A search
+// that needed no nodes (refused, or the start's block holding the end)
+// is ready from its beginning.
+typedef struct mnavFlightSliced
+{
+    const struct mnavFlightVolume* volume;
+    uint64_t commits;
+    mnavPos3 start;
+    mnavPos3 endPoint;
+    double end[3];
+    int32_t endBlock[4];
+    double limit;
+    int32_t current;
+    int32_t from;
+    int32_t found;
+    int32_t best;
+    // For a search ready from its beginning: its end, or the length of
+    // the straight way.
+    mnavPathEnd ready;
+    bool straight;
+    double straightLength;
+    bool outOfNodes;
+    bool tooLong;
+    bool notLoaded;
+    bool active;
+} mnavFlightSliced;
+
 struct mnavQuery
 {
     mnavMemory memory;
@@ -187,6 +216,7 @@ struct mnavQuery
     // The search, and its own copy of the filter it began with.
     mnavSearch search;
     mnavQueryFilter filter;
+    mnavFlightSliced flight;
 };
 
 // The table cell holding the node with a key, or the empty cell where it

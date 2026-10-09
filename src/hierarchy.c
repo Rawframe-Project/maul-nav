@@ -489,6 +489,7 @@ mnavResult mnavSearchCluster(mnavHierarchy* h, mnavQuery* query, const mnavNavme
     mnavMarkCluster(h, cluster, 0);
     bool out = query->search.outOfNodes;
     query->search.active = false;
+    query->flight.active = false;
     return result != mnav_success ? result : (out ? mnav_errorLimit : mnav_success);
 }
 

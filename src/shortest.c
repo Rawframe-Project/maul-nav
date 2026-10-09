@@ -811,6 +811,7 @@ static mnavResult Begin(Shortest* s, const mnavQueryFilter* filter, mnavPolygonI
     }
     // A sliced path search in this context ends here: its memory is reused.
     query->search.active = false;
+    query->flight.active = false;
     query->filter = *s->filter;
     s->filter = &query->filter;
     s->scale = mnavHeuristicScale(s->navmesh, s->filter);

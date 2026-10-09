@@ -13,6 +13,10 @@ format.
 - `mnavDebugAvoidance3D`: fliers drawn as three rings each, one in each
   axis plane, with a line to each neighbor `mnavAvoid3D` gives them, and
   the spheres they avoid as rings of a new kind, `mnav_debugObstacle`.
+- Flight searches in slices: `mnavBeginFlightPath`,
+  `mnavContinueFlightPath` and `mnavFinishFlightPath`, as the
+  navmesh's, with the same path as `mnavFindFlightPath` however the
+  work is sliced.
 - Sample `flight`: two streams of fliers cross among pillars, each
   following its flight path with avoidance in space, a raycast keeping
   every step in open space; run as a test.

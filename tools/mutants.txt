@@ -498,3 +498,8 @@ a3-sphere-limit | src/avoidance3.c | sphereCount > avoidance->def.limits.obstacl
 a3-draw-no-neighbors | src/avoidance3.c | int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i); | int32_t count = 0;
 a3-draw-sphere-kind | src/avoidance3.c | Rings(buffer, spheres[s].center, spheres[s].radius, mnav_debugObstacle); | Rings(buffer, spheres[s].center, spheres[s].radius, mnav_debugAgent);
 a3-draw-agent-radius | src/avoidance3.c | Rings(buffer, a->position, a->radius, mnav_debugAgent); | Rings(buffer, a->position, 1.0, mnav_debugAgent);
+sl-stale-commits | src/flight_search.c | return f->volume == volume && f->commits == volume->commits ? mnav_success : mnav_errorStale; | return f->volume == volume ? mnav_success : mnav_errorStale;
+sl-ended-early | src/flight_search.c | bool ended = s.found != MNAV_NO_NODE || query->heapCount == 0; | bool ended = true;
+sl-finish-keeps | src/flight_search.c | f->active = false; | f->active = f->active;
+sl-grid-clears | src/grid.c | query->flight.active = false; | query->flight.active = query->flight.active;
+sl-commits-count | src/flight_volume.c | volume->commits += 1; | volume->commits += 0;

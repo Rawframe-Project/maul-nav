@@ -234,6 +234,21 @@ MNAV_NODISCARD MNAV_API mnavResult mnavFindFlightPath(mnavQuery* query, const mn
 Finds a flier's path between two points (mnav-0015): Lazy Theta* (Nash, Koenig and Tovey, 2010) over the open blocks of the committed tiles, linked through shared faces, each block entered at the point of its face nearest the point the path comes from. A point is in sight of another when the segment between them crosses no blocked voxel, nor an edge or corner of one. The search keeps to the query context's node budget and path length limit; short of the end, the path runs to the point searched nearest it.  @param query    The query context; its last path is dropped. @param volume   The flight volume. @param start    The start, in world coordinates. @param end      The end, in world coordinates. @param pathOut  Receives the path. A start or end not open ends the search at once: `mnav_pathNone` for a blocked voxel, `mnav_pathNotLoaded` for a place with no tile, with the start alone as its path. @return `mnav_success`; `mnav_errorRange` for a point not finite, below or above the volume or past the extent; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread; the context is used by one thread at a time, and the volume is not changed during the search.
 
 ```c
+MNAV_NODISCARD MNAV_API mnavResult mnavBeginFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 start, mnavPos3 end);
+```
+Begins a flier's path search to run in slices: the same search as mnavFindFlightPath, continued by mnavContinueFlightPath and ended by mnavFinishFlightPath. Whatever the slices, the path is the one mnavFindFlightPath gives.  @param query   The query context; it holds the search until the next search of any kind begins. @param volume  The flight volume. @param start   The start, in world coordinates. @param end     The end, in world coordinates. @return `mnav_success`; `mnav_errorRange` for a point not finite, below or above the volume or past the extent; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread; the context is used by one thread at a time.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavContinueFlightPath(mnavQuery* query, const mnavFlightVolume* volume, int32_t nodes, bool* endedOut);
+```
+Continues a search begun by mnavBeginFlightPath: closes up to a number of nodes, fewer when the search ends first.  @param query    The query context. @param volume   The volume the search began on. @param nodes    The most nodes to close, at least 1. @param endedOut Receives whether the search has ended. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, no flight search begun, or fewer than 1 node; `mnav_errorStale` for another volume, or one committed to since the search began: begin again. @par Thread safety Safe from any thread; the context is used by one thread at a time, and the volume is not changed during the call.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavFinishFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavFlightPath* pathOut);
+```
+Ends a search begun by mnavBeginFlightPath and writes its path: as mnavFindFlightPath's when it has ended; otherwise to the point searched nearest the end, its end mnav_pathUnfinished.  @param query    The query context; its memory holds the path. @param volume   The volume the search began on. @param pathOut  Receives the path. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or no flight search begun; `mnav_errorStale` for another volume, or one committed to since the search began. @par Thread safety Safe from any thread; the context is used by one thread at a time, and the volume is not changed during the call.
+
+```c
 MNAV_NODISCARD MNAV_API mnavResult mnavFlightRaycast(const mnavFlightVolume* volume, mnavPos3 from, mnavPos3 to, mnavFlightHit* hitOut);
 ```
 Casts a flier's ray: walks the voxels the segment crosses, and where it passes an edge or a corner every voxel it touches, and stops at the first one the flier may not enter or with no tile.  @param volume  The flight volume. @param from    The ray's start, in world coordinates. @param to      Its end. @param hitOut  Receives what stopped it, where and at what fraction. @return `mnav_success`; `mnav_errorRange` for a point not finite or past the extent; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread. Any number of threads may read the volume at once between commits; none may while a stage or commit call runs.
@@ -594,4 +609,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-109 functions across 12 headers.
+112 functions across 12 headers.

@@ -307,9 +307,31 @@ static void Voxel(mnavPos3 p, int32_t v[3])
     v[2] = (int32_t)floor(p.z);
 }
 
-static void CheckPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 a, mnavPos3 b)
+// The path again in slices of a number of nodes: the same to the bit.
+static void CheckSlices(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 a, mnavPos3 b,
+                        const mnavFlightPath* once, int32_t nodes)
+{
+    static mnavPos3 whole[2 * 32768 + 2];
+    memcpy(whole, once->points, (size_t)once->pointCount * sizeof(mnavPos3));
+    mnavFlightPath sliced;
+    bool ended = false;
+    Expect(mnavBeginFlightPath(query, volume, a, b) == mnav_success);
+    while (!ended)
+    {
+        Expect(mnavContinueFlightPath(query, volume, nodes, &ended) == mnav_success);
+    }
+    Expect(mnavFinishFlightPath(query, volume, &sliced) == mnav_success);
+    Expect(sliced.end == once->end && sliced.length == once->length &&
+           sliced.pointCount == once->pointCount &&
+           memcmp(sliced.points, whole, (size_t)once->pointCount * sizeof(mnavPos3)) == 0);
+}
+
+static void CheckPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 a, mnavPos3 b,
+                      int32_t slice)
 {
     mnavFlightPath path;
+    Expect(mnavFindFlightPath(query, volume, a, b, &path) == mnav_success);
+    CheckSlices(query, volume, a, b, &path, slice);
     Expect(mnavFindFlightPath(query, volume, a, b, &path) == mnav_success);
     int32_t va[3];
     int32_t vb[3];
@@ -414,7 +436,8 @@ static void Query(const uint8_t* data, size_t size)
     {
         mnavPos3 a = Point(&in);
         mnavPos3 b = Point(&in);
-        CheckPath(query, volume, a, b);
+        static const int32_t slices[4] = {1, 2, 5, 64};
+        CheckPath(query, volume, a, b, slices[k]);
         CheckRaycast(volume, a, b);
         CheckNearest(volume, a, (float)(Next(&in) % 16) * 0.5f);
     }

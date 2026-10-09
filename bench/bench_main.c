@@ -1162,10 +1162,36 @@ static void FlightPaths(const mnavFlightVolume* volume)
         double took = Seconds() - start;
         best = took < best ? took : best;
     }
+    // The same paths in slices of 64 nodes, as a host spreading them
+    // over frames runs them; the paths are the same.
+    double slicedBest = 1e30;
+    int64_t slices = 0;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        slices = 0;
+        double start = Seconds();
+        for (int32_t k = 0; k < FLIGHT_PATHS; ++k)
+        {
+            bool ended = false;
+            mnavFlightPath path;
+            Check(mnavBeginFlightPath(query, volume, ends[k][0], ends[k][1]), "begin");
+            while (!ended)
+            {
+                Check(mnavContinueFlightPath(query, volume, 64, &ended), "continue");
+                slices += 1;
+            }
+            Check(mnavFinishFlightPath(query, volume, &path), "finish");
+        }
+        double took = Seconds() - start;
+        slicedBest = took < slicedBest ? took : slicedBest;
+    }
     mnavDestroyQuery(query);
-    printf("# flight paths: %d of %d found, %.1f m in all, %lld points, %.1f us per path\n", found,
-           FLIGHT_PATHS, length, (long long)points, best * 1e6 / FLIGHT_PATHS);
+    printf("# flight paths: %d of %d found, %.1f m in all, %lld points, %.1f us per path; in "
+           "slices of 64 nodes, %lld slices, %.1f us per path\n",
+           found, FLIGHT_PATHS, length, (long long)points, best * 1e6 / FLIGHT_PATHS,
+           (long long)slices, slicedBest * 1e6 / FLIGHT_PATHS);
     Report("flight path query", best * 1e6 / FLIGHT_PATHS, "us");
+    Report("flight path in slices of 64 nodes", slicedBest * 1e6 / FLIGHT_PATHS, "us");
 }
 
 static void FlightRays(const mnavFlightVolume* volume)

@@ -115,6 +115,15 @@ spans, a run-length voxelization of the same geometry.
     - **The search state:** it runs in an `mnavQuery` context: its node
       budget, path length limit, memory and `mnavPathEnd`. Short of the
       end, the path runs to the point nearest it.
+    - **Slices (amended 2026-10-09):** `mnavBeginFlightPath`,
+      `mnavContinueFlightPath` and `mnavFinishFlightPath` run the
+      search a number of nodes at a time, as the navmesh's searches do
+      (mnav-0005), for hosts that bound the work per frame; every engine
+      surveyed runs flight searches off the frame. The context keeps
+      the search in plain data between slices, and the path is the one
+      `mnavFindFlightPath` gives, which itself now runs as one slice.
+      The volume counts its commits: a search continued or finished
+      after a commit, or on another volume, is refused as stale.
   - **`mnavFlightRaycast`:** the same walk, stopping at the first
     blocked voxel or place with no tile.
   - **`mnavFindNearestFlightPoint`:** branch and bound over the
