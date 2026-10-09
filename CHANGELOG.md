@@ -17,9 +17,12 @@ format.
   `mnavContinueFlightPath` and `mnavFinishFlightPath`, as the
   navmesh's, with the same path as `mnavFindFlightPath` however the
   work is sliced.
+- `mnavCheckFlightPath`: a path's steps cast in order, naming the first
+  blocked or with no tile, for replanning after a commit.
 - Sample `flight`: two streams of fliers cross among pillars, each
   following its flight path with avoidance in space, a raycast keeping
-  every step in open space; run as a test.
+  every step in open space; midway a pillar rises, its tile is baked
+  again, and the fliers it blocks replan; run as a test.
 
 ### Changed
 

@@ -6,9 +6,12 @@
 // twelve fliers cross it at right angles at different heights. Each
 // flier gets a path through the volume and follows it, a point at a
 // time, while avoidance in space keeps the fliers apart and a raycast
-// each step keeps them in open space. Prints the paths' lengths and how
-// close any two fliers came; returns 0 when every flier arrives without
-// overlapping another or leaving open space.
+// each step keeps them in open space. Three seconds in, a fifth pillar
+// rises: its tile is baked again and committed, and the fliers whose
+// paths it blocks, by a check of what is left of them, search again.
+// Prints the paths' lengths, the fliers that replanned and how close any
+// two came; returns 0 when every flier arrives without overlapping
+// another or leaving open space.
 
 #include "maul-nav/flight.h"
 
@@ -26,16 +29,18 @@ enum
     FLIERS = 24,
     MOST_POINTS = 64,
     STEPS = 1200,
-    TILE_ROOM = 1 << 18
+    TILE_ROOM = 1 << 18,
+    // The step at which a fifth pillar rises, before any flier is near it.
+    RAISE_STEP = 30
 };
 
 static const double STEP = 0.1;
 static const double RADIUS = 0.4;
 static const double SPEED = 2.0;
 
-// The ground, then four pillars of 2 m by 2 m.
-static mnavVec3 s_vertices[4 + 4 * 8];
-static int32_t s_indices[6 + 4 * 36];
+// The ground, then up to five pillars of 2 m by 2 m.
+static mnavVec3 s_vertices[4 + 5 * 8];
+static int32_t s_indices[6 + 5 * 36];
 
 static void Check(mnavResult result, const char* what)
 {
@@ -46,17 +51,20 @@ static void Check(mnavResult result, const char* what)
     }
 }
 
-static mnavTriangleMesh World(void)
+// The ground and four pillars, and with raised a fifth that rises
+// later in the tile at (1, 1).
+static mnavTriangleMesh World(bool raised)
 {
-    static const float pillars[4][2] = {
-        {11.0f, 11.0f}, {19.0f, 11.0f}, {11.0f, 19.0f}, {19.0f, 19.0f}};
+    static const float pillars[5][2] = {
+        {11.0f, 11.0f}, {19.0f, 11.0f}, {11.0f, 19.0f}, {19.0f, 19.0f}, {21.0f, 21.0f}};
+    int32_t count = raised ? 5 : 4;
     static const int32_t faces[36] = {0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1,
                                       2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3};
     const mnavVec3 ground[4] = {{0, 0, 0}, {0, 0, 32}, {32, 0, 32}, {32, 0, 0}};
     const int32_t quad[6] = {0, 1, 2, 0, 2, 3};
     memcpy(s_vertices, ground, sizeof(ground));
     memcpy(s_indices, quad, sizeof(quad));
-    for (int32_t p = 0; p < 4; ++p)
+    for (int32_t p = 0; p < count; ++p)
     {
         for (int32_t c = 0; c < 8; ++c)
         {
@@ -69,34 +77,52 @@ static mnavTriangleMesh World(void)
             s_indices[6 + p * 36 + k] = 4 + p * 8 + faces[k];
         }
     }
-    return (mnavTriangleMesh){s_vertices, 4 + 4 * 8, s_indices, 2 + 4 * 12, NULL};
+    return (mnavTriangleMesh){s_vertices, 4 + count * 8, s_indices, 2 + count * 12, NULL};
 }
 
-// Bakes the four tiles of 16 m, half-meter voxels up to 16 m, and loads
-// them into a volume.
-static mnavFlightVolume* BakeAndLoad(void)
+// The volume's def: tiles of 16 m, half-meter voxels up to 16 m, for a
+// flier a little wider than the avoidance radius.
+static mnavFlightDef Def(void)
 {
     mnavFlightDef def = mnavDefaultFlightDef();
     def.voxelSize = 0.5f;
     def.ceiling = 16.0f;
     def.radius = (float)RADIUS + 0.1f;
+    return def;
+}
+
+// Bakes tiles of the world, the first count of tiles[] given as x then
+// z, and stages them.
+static void BakeTiles(mnavFlightVolume* volume, bool raised, const int32_t tiles[][2],
+                      int32_t count)
+{
+    mnavFlightDef def = Def();
     mnavFlightBaker* baker = NULL;
-    mnavFlightVolume* volume = NULL;
     Check(mnavCreateFlightBaker(&def, &baker).result, "baker");
-    Check(mnavCreateFlightVolume(&def, &volume).result, "volume");
-    mnavTriangleMesh mesh = World();
+    mnavTriangleMesh mesh = World(raised);
     mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};
     uint8_t* bytes = malloc(TILE_ROOM);
-    for (int32_t t = 0; t < 4 && bytes != NULL; ++t)
+    Check(bytes != NULL ? mnav_success : mnav_errorCapacity, "memory");
+    for (int32_t t = 0; t < count; ++t)
     {
         size_t size = 0;
-        Check(mnavBakeFlightTile(baker, &input, t % 2, t / 2, NULL), "bake");
+        Check(mnavBakeFlightTile(baker, &input, tiles[t][0], tiles[t][1], NULL), "bake");
         Check(mnavCopyFlightTile(baker, bytes, TILE_ROOM, &size), "copy");
         Check(mnavStageFlightTile(volume, bytes, size).result, "stage");
     }
-    Check(bytes != NULL ? mnavCommitFlight(volume) : mnav_errorCapacity, "commit");
     free(bytes);
     mnavDestroyFlightBaker(baker);
+}
+
+// Bakes the four tiles and loads them into a volume.
+static mnavFlightVolume* BakeAndLoad(void)
+{
+    mnavFlightDef def = Def();
+    mnavFlightVolume* volume = NULL;
+    Check(mnavCreateFlightVolume(&def, &volume).result, "volume");
+    static const int32_t all[4][2] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
+    BakeTiles(volume, false, all, 4);
+    Check(mnavCommitFlight(volume), "commit");
     return volume;
 }
 
@@ -190,6 +216,37 @@ static void Move(const mnavFlightVolume* volume, mnavAgent3D* flier, mnavPos3 ve
     flier->position = to;
 }
 
+// A fifth pillar rises in the tile at (1, 1): that tile alone is baked
+// again and committed. Each flier checks what is left of its path, from
+// where it is, and searches again from there when a step is blocked.
+// Returns how many searched again.
+static int32_t Raise(mnavQuery* query, mnavFlightVolume* volume, mnavAgent3D* fliers, Route* routes)
+{
+    static const int32_t changed[1][2] = {{1, 1}};
+    BakeTiles(volume, true, changed, 1);
+    Check(mnavCommitFlight(volume), "commit");
+    int32_t replanned = 0;
+    for (int32_t i = 0; i < FLIERS; ++i)
+    {
+        Route* r = &routes[i];
+        mnavPos3 left[MOST_POINTS + 1];
+        left[0] = fliers[i].position;
+        int32_t count = 1;
+        for (int32_t k = r->next; k < r->count; ++k)
+        {
+            left[count++] = r->points[k];
+        }
+        int32_t step = -1;
+        Check(mnavCheckFlightPath(volume, left, count, &step, NULL), "check");
+        if (step >= 0)
+        {
+            (void)FindRoute(query, volume, fliers[i].position, r->points[r->count - 1], r);
+            replanned += 1;
+        }
+    }
+    return replanned;
+}
+
 int main(void)
 {
     mnavFlightVolume* volume = BakeAndLoad();
@@ -216,11 +273,16 @@ int main(void)
                           (uint64_t)i + 1};
     }
     printf("%d paths found, %.1f m in all\n", FLIERS, length);
+    int32_t replanned = 0;
     double closest = (double)INFINITY;
     int32_t arrived = 0;
     int32_t blocked = 0;
     for (int32_t step = 0; step < STEPS && arrived < FLIERS; ++step)
     {
+        if (step == RAISE_STEP)
+        {
+            replanned = Raise(query, volume, fliers, routes);
+        }
         Prefer(fliers, routes);
         mnavPos3 velocities[FLIERS];
         Check(mnavAvoid3D(avoidance, fliers, FLIERS, NULL, 0, STEP, velocities), "avoid");
@@ -242,11 +304,13 @@ int main(void)
             }
         }
     }
+    printf("a pillar rose at step %d; %d fliers found their way blocked and replanned\n",
+           RAISE_STEP, replanned);
     printf("%d of %d fliers arrived; the closest two came %.3f m apart; %d steps in blocked "
            "space\n",
            arrived, FLIERS, closest, blocked);
     mnavDestroyAvoidance(avoidance);
     mnavDestroyQuery(query);
     mnavDestroyFlightVolume(volume);
-    return arrived == FLIERS && closest > -0.01 && blocked == 0 ? 0 : 1;
+    return arrived == FLIERS && closest > -0.01 && blocked == 0 && replanned > 0 ? 0 : 1;
 }

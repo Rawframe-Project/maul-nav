@@ -466,6 +466,34 @@ extern "C"
                                                          mnavPos3 from, mnavPos3 to,
                                                          mnavFlightHit* hitOut);
 
+    /// Checks a flier's path against the volume as it is now: casts each
+    /// step's ray in order, as mnavFlightRaycast does, and stops at the
+    /// first step that meets a voxel the flier may not enter or a place
+    /// with no tile. A host that follows a path checks what is left of it
+    /// after a commit, and searches again from where it is when a step
+    /// fails.
+    ///
+    /// @param volume      The flight volume.
+    /// @param points      The path's points, in world coordinates; may be
+    ///                    NULL when pointCount is 0.
+    /// @param pointCount  How many, at least 0.
+    /// @param stepOut     Receives the first step not clear, i for the
+    ///                    one from point i to point i + 1, or -1 when every
+    ///                    step is clear.
+    /// @param hitOut      Receives what stopped that step, as
+    ///                    mnavFlightRaycast gives it; may be NULL, and is
+    ///                    left alone when every step is clear.
+    /// @return `mnav_success`; `mnav_errorRange` for a point not finite or
+    /// past the extent, before any step is cast; `mnav_errorInvalid` for a
+    /// NULL argument or a negative count.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read the volume at
+    /// once between commits; none may while a stage or commit call runs.
+    MNAV_NODISCARD MNAV_API mnavResult mnavCheckFlightPath(const mnavFlightVolume* volume,
+                                                           const mnavPos3* points,
+                                                           int32_t pointCount, int32_t* stepOut,
+                                                           mnavFlightHit* hitOut);
+
     /// Finds the nearest point open to the flier's center within a radius
     /// of a point: the point itself when it is open, or else a point just
     /// inside the nearest open voxel, at most a thousandth of a voxel in

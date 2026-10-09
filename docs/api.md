@@ -254,6 +254,11 @@ MNAV_NODISCARD MNAV_API mnavResult mnavFlightRaycast(const mnavFlightVolume* vol
 Casts a flier's ray: walks the voxels the segment crosses, and where it passes an edge or a corner every voxel it touches, and stops at the first one the flier may not enter or with no tile.  @param volume  The flight volume. @param from    The ray's start, in world coordinates. @param to      Its end. @param hitOut  Receives what stopped it, where and at what fraction. @return `mnav_success`; `mnav_errorRange` for a point not finite or past the extent; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread. Any number of threads may read the volume at once between commits; none may while a stage or commit call runs.
 
 ```c
+MNAV_NODISCARD MNAV_API mnavResult mnavCheckFlightPath(const mnavFlightVolume* volume, const mnavPos3* points, int32_t pointCount, int32_t* stepOut, mnavFlightHit* hitOut);
+```
+Checks a flier's path against the volume as it is now: casts each step's ray in order, as mnavFlightRaycast does, and stops at the first step that meets a voxel the flier may not enter or a place with no tile. A host that follows a path checks what is left of it after a commit, and searches again from where it is when a step fails.  @param volume      The flight volume. @param points      The path's points, in world coordinates; may be NULL when pointCount is 0. @param pointCount  How many, at least 0. @param stepOut     Receives the first step not clear, i for the one from point i to point i + 1, or -1 when every step is clear. @param hitOut      Receives what stopped that step, as mnavFlightRaycast gives it; may be NULL, and is left alone when every step is clear. @return `mnav_success`; `mnav_errorRange` for a point not finite or past the extent, before any step is cast; `mnav_errorInvalid` for a NULL argument or a negative count. @par Thread safety Safe from any thread. Any number of threads may read the volume at once between commits; none may while a stage or commit call runs.
+
+```c
 MNAV_NODISCARD MNAV_API mnavResult mnavFindNearestFlightPoint(const mnavFlightVolume* volume, mnavPos3 point, float radius, mnavPos3* nearestOut, bool* foundOut);
 ```
 Finds the nearest point open to the flier's center within a radius of a point: the point itself when it is open, or else a point just inside the nearest open voxel, at most a thousandth of a voxel in from its face. Tiles not loaded are not searched.  @param volume      The flight volume. @param point       The point, in world coordinates. @param radius      How far to look, in meters, at least 0. @param nearestOut  Receives the nearest open point. @param foundOut    Receives whether one lies within the radius. @return `mnav_success`; `mnav_errorRange` for a point not finite or past the extent, or a radius below 0 or not finite; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread. Any number of threads may read the volume at once between commits; none may while a stage or commit call runs.
@@ -609,4 +614,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-112 functions across 12 headers.
+113 functions across 12 headers.

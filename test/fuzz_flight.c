@@ -361,6 +361,11 @@ static void CheckPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3
         sum += Length(path.points[i], path.points[i + 1]);
     }
     Expect(fabs(sum - path.length) < 1e-6);
+    // A path found is clear by the path check too.
+    int32_t step = 0;
+    Expect(mnavCheckFlightPath(volume, path.points, path.pointCount, &step, nullptr) ==
+               mnav_success &&
+           step == -1);
 }
 
 static void CheckRaycast(const mnavFlightVolume* volume, mnavPos3 a, mnavPos3 b)

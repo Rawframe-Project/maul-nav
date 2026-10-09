@@ -503,3 +503,7 @@ sl-ended-early | src/flight_search.c | bool ended = s.found != MNAV_NO_NODE || q
 sl-finish-keeps | src/flight_search.c | f->active = false; | f->active = f->active;
 sl-grid-clears | src/grid.c | query->flight.active = false; | query->flight.active = query->flight.active;
 sl-commits-count | src/flight_volume.c | volume->commits += 1; | volume->commits += 0;
+ck-last-step | src/flight_probe.c | for (int32_t i = 0; i + 1 < pointCount; ++i) | for (int32_t i = 0; i + 2 < pointCount; ++i)
+ck-step-index | src/flight_probe.c | *stepOut = i; | *stepOut = i + 1;
+ck-no-precheck | src/flight_probe.c | if (!mnavFlightToVoxels(&frame, points[i], v, cell)) | if (false && !mnavFlightToVoxels(&frame, points[i], v, cell))
+ck-stop-kind | src/flight_probe.c | hitOut->stop = held == MNAV_SPACE_SOLID ? mnav_flightBlocked : mnav_flightNotLoaded; | hitOut->stop = mnav_flightBlocked;

@@ -126,6 +126,13 @@ spans, a run-length voxelization of the same geometry.
       after a commit, or on another volume, is refused as stale.
   - **`mnavFlightRaycast`:** the same walk, stopping at the first
     blocked voxel or place with no tile.
+  - **`mnavCheckFlightPath` (amended 2026-10-09):** the same walk over a
+    path's steps in order, with one cursor, naming the first step
+    blocked or with no tile and its hit. Every point is checked before
+    any step is cast, so that a refusal changes nothing. A host checks
+    what is left of a path after a commit and searches again from where
+    its agent is; smoothing, local octree updates and a 3D funnel are
+    left out (research 50 in the docs repository).
   - **`mnavFindNearestFlightPoint`:** branch and bound over the
     committed octrees within a radius.
 - **Measured:** on the Warframe 3D benchmark (research in the docs

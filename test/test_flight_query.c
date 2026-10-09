@@ -504,6 +504,114 @@ static void TestSlices(const mnavFlightVolume* volume)
     mnavDestroyQuery(query);
 }
 
+// The path check stops where casting each step's ray in turn first
+// stops, with the same hit; found paths check clear; after a tile under a
+// path is removed, the check stops at the step into the hole.
+static void TestCheck(const mnavFlightVolume* volume)
+{
+    int32_t wrong = 0;
+    int32_t stopped = 0;
+    for (int32_t k = 0; k < 200; ++k)
+    {
+        mnavPos3 points[6];
+        for (int32_t i = 0; i < 6; ++i)
+        {
+            int32_t v[3];
+            RandomOpen(v);
+            // One draw a statement: their order is the same everywhere.
+            double dx = 0.25 + 0.5 * (double)Random();
+            double dz = 0.25 + 0.5 * (double)Random();
+            points[i] = At(v[0] + dx, v[1] + 0.5, v[2] + dz);
+        }
+        int32_t expected = -1;
+        mnavFlightHit first = {0};
+        for (int32_t i = 0; i < 5 && expected < 0; ++i)
+        {
+            mnavFlightHit hit;
+            CHECK(mnavFlightRaycast(volume, points[i], points[i + 1], &hit) == mnav_success, "ray");
+            if (hit.stop != mnav_flightClear)
+            {
+                expected = i;
+                first = hit;
+            }
+        }
+        int32_t step = 7;
+        mnavFlightHit hit = {0};
+        CHECK(mnavCheckFlightPath(volume, points, 6, &step, &hit) == mnav_success, "checked");
+        bool same = step == expected &&
+                    (step < 0 || (hit.stop == first.stop && hit.t == first.t &&
+                                  memcmp(&hit.point, &first.point, sizeof(mnavPos3)) == 0));
+        wrong += same ? 0 : 1;
+        stopped += step >= 0 ? 1 : 0;
+    }
+    CHECK(wrong == 0 && stopped > 20, "where the rays stop, with their hits");
+    // Paths found are clear.
+    mnavQuery* query = Query(16384, 1000.0f);
+    int32_t blocked = 0;
+    for (int32_t k = 0; k < 30; ++k)
+    {
+        int32_t a[3];
+        int32_t b[3];
+        RandomOpen(a);
+        RandomOpen(b);
+        mnavFlightPath found;
+        int32_t step = 7;
+        CHECK(mnavFindFlightPath(query, volume, At(a[0] + 0.5, a[1] + 0.5, a[2] + 0.5),
+                                 At(b[0] + 0.5, b[1] + 0.5, b[2] + 0.5), &found) == mnav_success &&
+                  mnavCheckFlightPath(volume, found.points, found.pointCount, &step, nullptr) ==
+                      mnav_success,
+              "found and checked");
+        blocked += step == -1 ? 0 : 1;
+    }
+    CHECK(blocked == 0, "paths found are clear");
+    // A path found clears; with its middle tile gone, it stops there.
+    mnavFlightVolume* changed = Volume(-1, -1);
+    int32_t ya = 1;
+    int32_t yb = 1;
+    while (ya < LAYERS - 1 && !Open(4, ya, 20))
+    {
+        ++ya;
+    }
+    while (yb < LAYERS - 1 && !Open(59, yb, 20))
+    {
+        ++yb;
+    }
+    mnavPos3 from = At(4.5, ya + 0.5, 20.5);
+    mnavPos3 to = At(59.5, yb + 0.5, 20.5);
+    mnavFlightPath path;
+    int32_t step = 7;
+    CHECK(mnavFindFlightPath(query, changed, from, to, &path) == mnav_success &&
+              path.end == mnav_pathFound &&
+              mnavCheckFlightPath(changed, path.points, path.pointCount, &step, nullptr) ==
+                  mnav_success &&
+              step == -1,
+          "a path found is clear");
+    static mnavPos3 kept[2 * 16384 + 2];
+    int32_t count = path.pointCount;
+    memcpy(kept, path.points, (size_t)count * sizeof(mnavPos3));
+    CHECK(mnavStageFlightTileRemoval(changed, 2, 1) == mnav_success &&
+              mnavCommitFlight(changed) == mnav_success,
+          "a tile removed");
+    mnavFlightHit hit;
+    CHECK(mnavCheckFlightPath(changed, kept, count, &step, &hit) == mnav_success && step >= 0 &&
+              hit.stop == mnav_flightNotLoaded && hit.point.x >= 32.0 && hit.point.x <= 48.0,
+          "stopped where the tile is gone");
+    mnavDestroyQuery(query);
+    mnavDestroyFlightVolume(changed);
+    // Refusals change nothing; no steps is clear.
+    mnavPos3 bad[2] = {from, {(double)NAN, 0.0, 0.0}};
+    step = 7;
+    CHECK(mnavCheckFlightPath(volume, bad, 2, &step, nullptr) == mnav_errorRange && step == 7 &&
+              mnavCheckFlightPath(nullptr, bad, 1, &step, nullptr) == mnav_errorInvalid &&
+              mnavCheckFlightPath(volume, nullptr, 2, &step, nullptr) == mnav_errorInvalid &&
+              mnavCheckFlightPath(volume, bad, -1, &step, nullptr) == mnav_errorInvalid &&
+              mnavCheckFlightPath(volume, bad, 1, nullptr, nullptr) == mnav_errorInvalid,
+          "refusals");
+    CHECK(mnavCheckFlightPath(volume, nullptr, 0, &step, nullptr) == mnav_success && step == -1 &&
+              mnavCheckFlightPath(volume, &from, 1, &step, nullptr) == mnav_success && step == -1,
+          "no steps: clear");
+}
+
 // What a sample point holds: 0 open, 1 blocked (a solid voxel, or past
 // the floor or ceiling), 2 no tile.
 static int32_t Sample(double x, double y, double z)
@@ -939,6 +1047,7 @@ int main(void)
     ReadOpen(volume);
     TestPaths(volume);
     TestSlices(volume);
+    TestCheck(volume);
     TestRaycasts(volume);
     TestNearest(volume);
     TestEnds(volume);

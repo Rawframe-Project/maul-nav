@@ -263,6 +263,10 @@ may occupy.
     slices makes the search stale: begin again.
   - `mnavFlightRaycast` stops at the first blocked voxel or place with
     no tile.
+  - `mnavCheckFlightPath` casts a path's steps in order and names the
+    first one blocked or with no tile. After a commit, a host checks
+    what is left of each path it follows, from where the agent is, and
+    searches again when a step fails.
 
 ## Avoidance
 
