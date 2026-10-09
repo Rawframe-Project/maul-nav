@@ -126,6 +126,42 @@ static void TestTouchingTheSpeed(void)
           "a finite velocity within the speed");
 }
 
+static void TestTangentLine(void)
+{
+    // x at least 3, then y at least 4, within speed 5: the line where they
+    // meet touches the speed sphere at (3, 4, 0), the one velocity left.
+    const mnavPlane planes[2] = {Plane(3, 0, 0, 1, 0, 0), Plane(0, 4, 0, 0, 1, 0)};
+    mnavPos3 result = {0.0, 0.0, 0.0};
+    CHECK(mnavPlaneProgram3(planes, 2, 5.0, (mnavPos3){0.0, 0.0, 0.0}, false, &result) == 2 &&
+              result.x == 3.0 && result.y == 4.0 && result.z == 0.0,
+          "the touching point");
+}
+
+static void TestParallelOutside(void)
+{
+    // x + y at least 3, x at most 1 and y at most 1: nothing allowed. The
+    // last plane's program meets the line x = y = 1, which runs along the
+    // first plane and outside it, and must not take it.
+    const double h = 0x1.6a09e667f3bcdp-1;
+    const mnavPlane planes[3] = {Plane(1.5, 1.5, 0, h, h, 0), Plane(1, 0, 0, -1, 0, 0),
+                                 Plane(0, 1, 0, 0, -1, 0)};
+    mnavPos3 result = {0.0, 0.0, 0.0};
+    CHECK(mnavPlaneProgram3(planes, 3, 5.0, (mnavPos3){0.0, 0.0, 0.0}, false, &result) == 2,
+          "the parallel plane leaves nothing of the line");
+}
+
+static void TestFixedKept(void)
+{
+    // A fixed plane, x at least 1, against x at most 0: the 4D program
+    // keeps the fixed one and goes as far toward the other as it allows.
+    const mnavPlane planes[2] = {Plane(1, 0, 0, 1, 0, 0), Plane(0, 0, 0, -1, 0, 0)};
+    mnavPlane scratch[2];
+    mnavPos3 result = {0.0, 0.0, 0.0};
+    int32_t failed = mnavPlaneProgram3(planes, 2, 5.0, (mnavPos3){0.0, 0.0, 0.0}, false, &result);
+    mnavPlaneProgram4(planes, 2, 1, failed, 5.0, scratch, &result);
+    CHECK(failed == 1 && result.x == 1.0, "the fixed plane kept");
+}
+
 static double Violation(const mnavPlane* planes, int32_t count, mnavPos3 v)
 {
     double worst = -(double)INFINITY;
@@ -252,6 +288,9 @@ int main(void)
     TestPastTheSpeed();
     TestWantedPastTheSpeed();
     TestTouchingTheSpeed();
+    TestTangentLine();
+    TestParallelOutside();
+    TestFixedKept();
     TestAgainstSamples();
     TestHeadOnPair();
     TestOnOneSpot();

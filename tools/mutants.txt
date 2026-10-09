@@ -464,6 +464,9 @@ o3-lp1-direction | src/orca3.c | t = mnavDot3(wanted, line->direction) > 0.0 ? r
 o3-lp1-no-clamp | src/orca3.c | t = t < left ? left : (t > right ? right : t); | t = t > right ? right : t;
 o3-plane-miss | src/orca3.c | if (distanceSq > radiusSq) | if (false && distanceSq > radiusSq)
 o3-plane-rim | src/orca3.c | if (mnavDot3(projected, projected) > radiusSq) | if (false && mnavDot3(projected, projected) > radiusSq)
+# o3-lp2-kept survives, equivalent: a plane's best point lying exactly
+# on an earlier plane is also the best point of the line they share, and
+# it keeps the planes before, so the line's program returns it again.
 o3-lp2-kept | src/orca3.c | if (mnavDot3(planes[i].normal, mnavSub3(planes[i].point, *result)) <= 0.0) | if (mnavDot3(planes[i].normal, mnavSub3(planes[i].point, *result)) < 0.0)
 o3-lp2-parallel | src/orca3.c | // Parallel, and plane i leaves nothing of plane n. | continue;
 o3-lp3-speed | src/orca3.c | else if (mnavDot3(wanted, wanted) > radius * radius) | else if (false && mnavDot3(wanted, wanted) > radius * radius)

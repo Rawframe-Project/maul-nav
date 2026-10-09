@@ -367,6 +367,65 @@ static void TestSpheres(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+static void TestSphereKept(void)
+{
+    // Inside a sphere's edge with a neighbour of far higher priority
+    // overlapping on the other side: the planes leave nothing, and the
+    // sphere's is kept while the neighbour's gives.
+    mnavAvoidance* avoidance = Make(16, 10, 2.0);
+    mnavAgent3D agents[2] = {Agent(0.0, 0.0, 0.0, 1), Agent(-0.6, 0.0, 0.0, 2)};
+    agents[1].priority = 1e6;
+    mnavSphere sphere = {{1.0, 0.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 9};
+    mnavPos3 velocities[2];
+    CHECK(mnavAvoid3D(avoidance, agents, 2, &sphere, 1, 0.1, velocities) == mnav_success,
+          "stepped");
+    CHECK(velocities[0].x <= -1.5 + 1e-9, "out of the sphere at full speed");
+    mnavDestroyAvoidance(avoidance);
+}
+
+static void TestFastSphere(void)
+{
+    // A sphere coming at 3 m/s, 5 m away: the flier moves off at once,
+    // taking the whole avoidance, and is never touched.
+    mnavAvoidance* avoidance = Make(16, 10, 2.0);
+    mnavAgent3D agents[1] = {Agent(0.0, 0.0, 0.0, 1)};
+    const mnavPos3 goals[1] = {{0.0, 0.0, 0.0}};
+    mnavSphere spheres[1] = {{{6.0, 0.3, 0.0}, 1.0, {-3.0, 0.0, 0.0}, 9}};
+    mnavPos3 velocities[1];
+    CHECK(mnavAvoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
+          "stepped");
+    CHECK(Length(velocities[0]) > 0.1, "it moves off at once");
+    Scene s = {avoidance, agents, goals, 1, spheres, 1, 0.0, 0.0, 0.0};
+    Run(&s, 40);
+    CHECK(s.closestSphere > -1e-6, "it is never touched");
+    mnavDestroyAvoidance(avoidance);
+}
+
+static void TestSphereTie(void)
+{
+    // Room for one sphere and two at the same distance, the lower id
+    // closing in and the other still: the lower id is kept, given in
+    // either order, and the flier turns from it.
+    mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
+    def.limits.obstacleNeighbors = 1;
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
+    mnavAgent3D agent = Agent(0.0, 0.0, 0.0, 1);
+    agent.preferred = (mnavPos3){1.0, 0.0, 0.0};
+    mnavSphere spheres[2] = {{{0.0, 3.0, 0.0}, 1.0, {0.0, -2.0, 0.0}, 5},
+                             {{0.0, -3.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 6}};
+    mnavSphere swapped[2] = {spheres[1], spheres[0]};
+    mnavPos3 first;
+    mnavPos3 second;
+    CHECK(mnavAvoid3D(avoidance, &agent, 1, spheres, 2, 0.1, &first) == mnav_success &&
+              mnavAvoid3D(avoidance, &agent, 1, swapped, 2, 0.1, &second) == mnav_success,
+          "stepped");
+    CHECK(memcmp(&first, &agent.preferred, sizeof(mnavPos3)) != 0 &&
+              memcmp(&first, &second, sizeof(mnavPos3)) == 0,
+          "the lower id kept in either order");
+    mnavDestroyAvoidance(avoidance);
+}
+
 static void TestChecks(void)
 {
     mnavAvoidance* avoidance = Make(2, 4, 2.0);
@@ -454,6 +513,9 @@ int main(void)
     TestPriority();
     TestOneSpot();
     TestSpheres();
+    TestSphereKept();
+    TestFastSphere();
+    TestSphereTie();
     TestChecks();
     return s_failures == 0 ? 0 : 1;
 }
