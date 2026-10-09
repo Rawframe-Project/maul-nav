@@ -317,9 +317,9 @@ static int32_t PointAt(const mnavCorners* corners, int32_t first, mnavPos3 p)
 
 mnavResult mnavCorridorAreas(mnavQuery* query, const mnavNavmesh* navmesh,
                              const mnavCorridor* corridor, mnavCorners* cornersOut,
-                             mnavAreaRun* runs, int32_t capacity, int32_t* countOut)
+                             mnavAreaRun* runsOut, int32_t capacity, int32_t* countOut)
 {
-    if (countOut == nullptr || capacity < 0 || (capacity > 0 && runs == nullptr))
+    if (countOut == nullptr || capacity < 0 || (capacity > 0 && runsOut == nullptr))
     {
         return mnav_errorInvalid;
     }
@@ -338,7 +338,7 @@ mnavResult mnavCorridorAreas(mnavQuery* query, const mnavNavmesh* navmesh,
     int32_t count = 0;
     int32_t corner = 0;
     mnavAreaType area = AreaOf(navmesh, corridor->polygons[0]);
-    Run(runs, capacity, &count, (mnavAreaRun){corridor->position, 0, area});
+    Run(runsOut, capacity, &count, (mnavAreaRun){corridor->position, 0, area});
     for (int32_t i = 1; i < corridor->count; ++i)
     {
         // Validated above: the polygons join, and the portals are written.
@@ -350,14 +350,14 @@ mnavResult mnavCorridorAreas(mnavQuery* query, const mnavNavmesh* navmesh,
         {
             // Landed from an off-mesh link: a run from the landing point.
             corner = PointAt(&corners, corner, portals[1].left);
-            Run(runs, capacity, &count, (mnavAreaRun){portals[1].left, corner, next});
+            Run(runsOut, capacity, &count, (mnavAreaRun){portals[1].left, corner, next});
             area = next;
             continue;
         }
         mnavPos3 at = Crossing(&corners, &portals[0], &corner);
         if (next != area)
         {
-            Run(runs, capacity, &count, (mnavAreaRun){at, corner, next});
+            Run(runsOut, capacity, &count, (mnavAreaRun){at, corner, next});
             area = next;
         }
     }

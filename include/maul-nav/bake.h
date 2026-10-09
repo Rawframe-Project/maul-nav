@@ -728,8 +728,8 @@ extern "C"
     /// Copies the last baked tile's bytes into caller memory.
     ///
     /// @param baker     The baker.
-    /// @param buffer    The memory, at least capacity bytes; may be NULL
-    ///                  when capacity is 0.
+    /// @param bufferOut Receives the bytes: at least capacity bytes; may be
+    ///                  NULL when capacity is 0.
     /// @param capacity  The buffer's size in bytes.
     /// @param sizeOut   Receives the tile's size in bytes. May be NULL.
     /// @return `mnav_success`; `mnav_errorCapacity` when the buffer is
@@ -738,7 +738,7 @@ extern "C"
     /// positive capacity, or a baker holding no tile.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* buffer,
+    MNAV_NODISCARD MNAV_API mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* bufferOut,
                                                          size_t capacity, size_t* sizeOut);
 
     // The limits of a tile cache.

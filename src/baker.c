@@ -681,10 +681,10 @@ mnavResult mnavRebuildTile(mnavBaker* baker, mnavTileCache* cache, int32_t tileX
     return Finish(baker, tileX, tileZ, &stages, result, &report, reportOut);
 }
 
-mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* buffer, size_t capacity,
+mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* bufferOut, size_t capacity,
                              size_t* sizeOut)
 {
-    if (baker == nullptr || (buffer == nullptr && capacity > 0) || baker->tile == nullptr)
+    if (baker == nullptr || (bufferOut == nullptr && capacity > 0) || baker->tile == nullptr)
     {
         return mnav_errorInvalid;
     }
@@ -696,9 +696,9 @@ mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* buffer, size_t cap
     {
         return mnav_errorCapacity;
     }
-    if (buffer != nullptr)
+    if (bufferOut != nullptr)
     {
-        memcpy(buffer, baker->tile, baker->tileSize);
+        memcpy(bufferOut, baker->tile, baker->tileSize);
     }
     return mnav_success;
 }

@@ -82,7 +82,8 @@ extern "C"
     ///                    one including mnav_areaNone finds blocked polygons.
     /// @param center      The box's center.
     /// @param halfExtents The box's half sizes, in meters, at least 0.
-    /// @param polygons    Room for capacity ids, or NULL when capacity is 0.
+    /// @param polygonsOut Receives up to capacity ids; NULL when capacity
+    ///                    is 0.
     /// @param capacity    The room, at least 0.
     /// @param foundOut    Receives the count and whether the box was all
     ///                    loaded.
@@ -98,8 +99,8 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavFindPolygons(const mnavNavmesh* navmesh,
                                                         const mnavQueryFilter* filter,
                                                         mnavPos3 center, mnavVec3 halfExtents,
-                                                        mnavPolygonId* polygons, int32_t capacity,
-                                                        mnavFound* foundOut);
+                                                        mnavPolygonId* polygonsOut,
+                                                        int32_t capacity, mnavFound* foundOut);
 
     /// Finds the polygon, among those the filter includes, nearest a point
     /// whose nearest point lies within a box round it, and that point. A
@@ -552,7 +553,7 @@ extern "C"
     /// @param navmesh    The navmesh.
     /// @param corridor   The corridor.
     /// @param cornersOut Receives the straight path, or NULL.
-    /// @param runs       Receives the runs, in order. May be NULL when
+    /// @param runsOut    Receives the runs, in order. May be NULL when
     ///                   capacity is 0.
     /// @param capacity   How many runs fit, at least 0.
     /// @param countOut   Receives how many runs there are, also when they
@@ -563,11 +564,9 @@ extern "C"
     /// of them written.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavCorridorAreas(mnavQuery* query,
-                                                         const mnavNavmesh* navmesh,
-                                                         const mnavCorridor* corridor,
-                                                         mnavCorners* cornersOut, mnavAreaRun* runs,
-                                                         int32_t capacity, int32_t* countOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavCorridorAreas(
+        mnavQuery* query, const mnavNavmesh* navmesh, const mnavCorridor* corridor,
+        mnavCorners* cornersOut, mnavAreaRun* runsOut, int32_t capacity, int32_t* countOut);
 
     // The fastest mnavSteer may steer, and the longest distance it slows
     // or stops within, in meters per second and meters.

@@ -293,11 +293,11 @@ mnavCover mnavCoverOf(const mnavNavmesh* navmesh, mnavPos3 point, mnavPos3 half)
 }
 
 mnavResult mnavFindPolygons(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                            mnavPos3 center, mnavVec3 halfExtents, mnavPolygonId* polygons,
+                            mnavPos3 center, mnavVec3 halfExtents, mnavPolygonId* polygonsOut,
                             int32_t capacity, mnavFound* foundOut)
 {
     if (navmesh == nullptr || foundOut == nullptr || capacity < 0 ||
-        (polygons == nullptr && capacity > 0) || !GoodBox(center, halfExtents))
+        (polygonsOut == nullptr && capacity > 0) || !GoodBox(center, halfExtents))
     {
         return mnav_errorInvalid;
     }
@@ -331,7 +331,7 @@ mnavResult mnavFindPolygons(const mnavNavmesh* navmesh, const mnavQueryFilter* f
             }
             if (count < capacity)
             {
-                polygons[count] = (mnavPolygonId){
+                polygonsOut[count] = (mnavPolygonId){
                     (uint32_t)place->slot + 1, navmesh->slots[place->slot].generation, (uint32_t)p};
             }
             count += 1;

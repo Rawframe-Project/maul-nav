@@ -13,6 +13,13 @@ format.
 - `fuzz_query` also takes each corridor's runs of area and steers along
   its corners with fuzzed steering defs.
 
+### Changed
+
+- The caller buffers `mnavFindPolygons`, `mnavCorridorAreas`,
+  `mnavCopyBakedTile` and `mnavCopyFlightTile` write are named
+  `polygonsOut`, `runsOut` and `bufferOut`, as out-parameters are
+  everywhere else; callers are unaffected.
+
 ## [0.10.0] - 2026-10-09
 
 Following a path: agents steered along their corridors by a stateless
