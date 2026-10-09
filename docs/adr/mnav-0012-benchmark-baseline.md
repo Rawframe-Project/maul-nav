@@ -22,7 +22,9 @@ benchmark printed its timings only.
   2026-10-09): flight volumes' bakes, searches and rays, a tile rebuilt
   from the tile cache with a crate on it, and a crowd step of 1,000
   agents on the terrain's navmesh (corners, steering, avoidance and
-  surface moves, each part's share printed).
+  surface moves, each part's share printed), then the same crowd step
+  with the walls near each agent fed to avoidance, the walls' share
+  printed too.
 - **Baseline:** `bench/baseline.txt` holds those lines as the benchmark
   wrote them, pinned to one core, with the machine, compiler and date
   in its comments. Given the file, the benchmark prints each result's

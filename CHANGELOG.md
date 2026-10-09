@@ -14,15 +14,19 @@ format.
   into a buffer the caller gives that keeps the nearest when it is
   short, each with its ends, its distance and the normal toward the
   walkable side, for avoidance's segment obstacles.
-
 - `fuzz_query` also takes each corridor's runs of area and steers along
   its corners with fuzzed steering defs.
 - The benchmark times a crowd step of 1,000 agents on the terrain's
   navmesh, corners and steering, avoidance and surface moves, with each
-  part's share.
+  part's share, and again with each agent's walls fed to avoidance.
 
 ### Changed
 
+- Sample `navcrowd`: its two groups meet head on in a corridor 4 m wide,
+  and avoidance keeps them clear of the walls `mnavFindWalls` finds near
+  each agent, moved out by the agent's radius, where before it saw four
+  pillars placed by hand; without the walls the agents press over 20 m
+  into them.
 - The caller buffers `mnavFindPolygons`, `mnavCorridorAreas`,
   `mnavCopyBakedTile` and `mnavCopyFlightTile` write are named
   `polygonsOut`, `runsOut` and `bufferOut`, as out-parameters are

@@ -389,8 +389,18 @@ for (int32_t i = 0; i < count && avoided == mnav_success; ++i)
 
 - **The avoidance agents** take each agent's position on the ground
   (x and z of its corridor's position), its last velocity, its radius
-  and its speed; the obstacles are the host's, walls or pillars as
-  polygons, or none: the navmesh keeps agents off the walls already.
+  and its speed; the obstacles are the walls near them, and any of the
+  host's own.
+- **Walls.** Avoidance knows nothing of the navmesh: in a packed
+  corridor it pushes agents into the walls, and the surface move holds
+  them back short of where avoidance planned. `mnavFindWalls` gives the
+  walls within a range of an agent, nearest first, into a buffer of the
+  few you keep. Find them again when the agent has moved a quarter of
+  the range; move each out by the agent's radius against its normal,
+  since the navmesh keeps an agent's center a radius from the real
+  walls already and avoidance adds the radius again; skip those of no
+  length (normal zero); and pass each wall once, as a two-point
+  obstacle (`samples/navcrowd.c`).
 - **Acceleration** is the host's, between avoidance and the move, as in
   Detour's crowd; `navcrowd` limits each change to 8 m/s² times the
   step.

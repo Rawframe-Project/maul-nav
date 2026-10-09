@@ -642,17 +642,30 @@ static void Doorway(void)
 // A crowd on the terrain's navmesh: 1,000 agents in two groups of 500 cross
 // a square of 60 m from opposite sides, each step every corridor giving
 // its corners, mnavSteer its velocity, mnavAvoid one clear of the others
-// and mnavMoveCorridor the move along the surface, in steps of 0.1 s.
+// and mnavMoveCorridor the move along the surface, in steps of 0.1 s; then
+// again with the walls near each agent, found by mnavFindWalls within
+// 2 m when it has moved half a meter, each once, as avoidance's segments.
 enum
 {
     CROWD = 1000,
     CROWD_STEPS = 600,
-    CROWD_CORRIDOR = 128
+    CROWD_CORRIDOR = 128,
+    CROWD_WALLS = 8,
+    // A power of two over twice the walls the agents may hold.
+    CROWD_WALL_TABLE = 1 << 14
 };
+
+static const double CROWD_WALL_RANGE = 2.0;
 
 static mnavPolygonId s_crowdBuffers[CROWD][CROWD_CORRIDOR];
 static mnavCorridor s_crowd[CROWD];
 static mnavAgent s_crowdAgents[CROWD];
+static mnavWallSegment s_crowdWalls[CROWD][CROWD_WALLS];
+static int32_t s_crowdWallCounts[CROWD];
+static mnavPos3 s_crowdWallsAt[CROWD];
+static mnavObstacle s_crowdObstacles[CROWD * CROWD_WALLS];
+static mnavPos2 s_crowdEnds[CROWD * CROWD_WALLS][2];
+static int32_t s_crowdWallTable[CROWD_WALL_TABLE];
 
 // Plans every agent's corridor across the square; returns how many found
 // their way.
@@ -680,16 +693,75 @@ static int32_t PlanCrowd(mnavQuery* query, const mnavNavmesh* navmesh)
         Check(mnavResetCorridor(&s_crowd[i], s_crowdBuffers[i], CROWD_CORRIDOR, a.polygon, a.point),
               "crowd corridor");
         planned += mnavSetCorridor(&s_crowd[i], &path) == mnav_success ? 1 : 0;
+        s_crowdWallCounts[i] = -1;
         s_crowdAgents[i] =
             (mnavAgent){{a.point.x, a.point.z}, {0.0, 0.0}, {0.0, 0.0}, 0.3, 1.5, 1.0, (uint64_t)i};
     }
     return planned;
 }
 
-// Runs the crowd's steps, adding each part's seconds; returns how many
-// arrived.
+// Finds the walls again of the agents that have moved a quarter of the
+// range, then gathers every agent's walls, each once, moved out by the
+// agent's radius; returns how many.
+static int32_t CrowdWalls(mnavQuery* query, const mnavNavmesh* navmesh)
+{
+    for (int32_t i = 0; i < CROWD; ++i)
+    {
+        double dx = s_crowd[i].position.x - s_crowdWallsAt[i].x;
+        double dz = s_crowd[i].position.z - s_crowdWallsAt[i].z;
+        double quarter = CROWD_WALL_RANGE * 0.25;
+        if (s_crowdWallCounts[i] >= 0 && dx * dx + dz * dz < quarter * quarter)
+        {
+            continue;
+        }
+        mnavWallsFound found;
+        mnavResult result =
+            mnavFindWalls(query, navmesh, NULL, s_crowd[i].polygons[0], s_crowd[i].position,
+                          CROWD_WALL_RANGE, s_crowdWalls[i], CROWD_WALLS, &found);
+        Check(result == mnav_errorCapacity ? mnav_success : result, "crowd walls");
+        s_crowdWallCounts[i] = found.count < CROWD_WALLS ? found.count : CROWD_WALLS;
+        s_crowdWallsAt[i] = s_crowd[i].position;
+    }
+    memset(s_crowdWallTable, 0xFF, sizeof(s_crowdWallTable));
+    int32_t count = 0;
+    for (int32_t i = 0; i < CROWD; ++i)
+    {
+        double radius = s_crowdAgents[i].radius;
+        for (int32_t k = 0; k < s_crowdWallCounts[i]; ++k)
+        {
+            const mnavWallSegment* wall = &s_crowdWalls[i][k];
+            if (wall->normal.x == 0.0 && wall->normal.z == 0.0)
+            {
+                continue;
+            }
+            mnavPos2 ends[2] = {
+                {wall->start.x - wall->normal.x * radius, wall->start.z - wall->normal.z * radius},
+                {wall->end.x - wall->normal.x * radius, wall->end.z - wall->normal.z * radius}};
+            uint32_t cell = (uint32_t)mnavHash64(MNAV_HASH_INIT, ends, (int32_t)sizeof(ends)) &
+                            (CROWD_WALL_TABLE - 1);
+            while (s_crowdWallTable[cell] >= 0 &&
+                   memcmp(s_crowdEnds[s_crowdWallTable[cell]], ends, sizeof(ends)) != 0)
+            {
+                cell = (cell + 1) & (CROWD_WALL_TABLE - 1);
+            }
+            if (s_crowdWallTable[cell] >= 0)
+            {
+                continue;
+            }
+            s_crowdWallTable[cell] = count;
+            memcpy(s_crowdEnds[count], ends, sizeof(ends));
+            s_crowdObstacles[count] =
+                (mnavObstacle){s_crowdEnds[count], 2, 0.0, {0.0, 0.0}, (uint64_t)count + 1};
+            count += 1;
+        }
+    }
+    return count;
+}
+
+// Runs the crowd's steps, with the walls or without, adding each part's
+// seconds; returns how many arrived.
 static int32_t RunCrowd(mnavQuery* query, const mnavNavmesh* navmesh, mnavAvoidance* avoidance,
-                        double parts[3])
+                        bool walls, double parts[4])
 {
     static mnavPos2 velocities[CROWD];
     mnavSteerDef steer = mnavDefaultSteerDef();
@@ -709,7 +781,11 @@ static int32_t RunCrowd(mnavQuery* query, const mnavNavmesh* navmesh, mnavAvoida
             s_crowdAgents[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
         }
         double t1 = Seconds();
-        Check(mnavAvoid(avoidance, s_crowdAgents, CROWD, NULL, 0, 0.1, velocities), "crowd avoid");
+        int32_t wallCount = walls ? CrowdWalls(query, navmesh) : 0;
+        double tw = Seconds();
+        Check(mnavAvoid(avoidance, s_crowdAgents, CROWD, s_crowdObstacles, wallCount, 0.1,
+                        velocities),
+              "crowd avoid");
         double t2 = Seconds();
         for (int32_t i = 0; i < CROWD; ++i)
         {
@@ -721,8 +797,9 @@ static int32_t RunCrowd(mnavQuery* query, const mnavNavmesh* navmesh, mnavAvoida
         }
         double t3 = Seconds();
         parts[0] += t1 - t0;
-        parts[1] += t2 - t1;
+        parts[1] += t2 - tw;
         parts[2] += t3 - t2;
+        parts[3] += tw - t1;
     }
     return arrived;
 }
@@ -743,31 +820,35 @@ static void Crowd(void)
     mnavAvoidanceDef avoidanceDef = mnavDefaultAvoidanceDef();
     avoidanceDef.allocator = (mnavAllocator){Alloc, Free, NULL};
     avoidanceDef.limits.agents = CROWD;
+    avoidanceDef.limits.obstacleVertices = CROWD * CROWD_WALLS * 2;
     mnavAvoidance* avoidance = NULL;
     Check(mnavCreateAvoidance(&avoidanceDef, &avoidance), "avoidance");
-    double best = 1e30;
-    double bestParts[3] = {0.0, 0.0, 0.0};
-    int32_t planned = 0;
-    int32_t arrived = 0;
-    for (int32_t run = 0; run < RUNS; ++run)
+    for (int32_t walls = 0; walls < 2; ++walls)
     {
-        planned = PlanCrowd(query, navmesh);
-        double parts[3] = {0.0, 0.0, 0.0};
-        arrived = RunCrowd(query, navmesh, avoidance, parts);
-        double took = parts[0] + parts[1] + parts[2];
-        if (took < best)
+        double best = 1e30;
+        double bestParts[4] = {0.0, 0.0, 0.0, 0.0};
+        int32_t planned = 0;
+        int32_t arrived = 0;
+        for (int32_t run = 0; run < RUNS; ++run)
         {
-            best = took;
-            bestParts[0] = parts[0];
-            bestParts[1] = parts[1];
-            bestParts[2] = parts[2];
+            planned = PlanCrowd(query, navmesh);
+            double parts[4] = {0.0, 0.0, 0.0, 0.0};
+            arrived = RunCrowd(query, navmesh, avoidance, walls == 1, parts);
+            double took = parts[0] + parts[1] + parts[2] + parts[3];
+            if (took < best)
+            {
+                best = took;
+                memcpy(bestParts, parts, sizeof(parts));
+            }
         }
+        printf("# crowd%s: %d agents, %d planned, %d arrived after %d steps, %.0f us per step: "
+               "corners and steering %.0f%%, walls %.0f%%, avoidance %.0f%%, moves %.0f%%\n",
+               walls == 1 ? " with walls" : "", CROWD, planned, arrived, CROWD_STEPS,
+               best * 1e6 / CROWD_STEPS, 100.0 * bestParts[0] / best, 100.0 * bestParts[3] / best,
+               100.0 * bestParts[1] / best, 100.0 * bestParts[2] / best);
+        Report(walls == 1 ? "crowd step with walls, 1000" : "crowd step, 1000 agents",
+               best * 1e6 / CROWD_STEPS, "us");
     }
-    printf("# crowd: %d agents, %d planned, %d arrived after %d steps, %.0f us per step: "
-           "corners and steering %.0f%%, avoidance %.0f%%, moves %.0f%%\n",
-           CROWD, planned, arrived, CROWD_STEPS, best * 1e6 / CROWD_STEPS,
-           100.0 * bestParts[0] / best, 100.0 * bestParts[1] / best, 100.0 * bestParts[2] / best);
-    Report("crowd step, 1000 agents", best * 1e6 / CROWD_STEPS, "us");
     mnavDestroyAvoidance(avoidance);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
