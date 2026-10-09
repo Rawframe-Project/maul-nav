@@ -89,9 +89,11 @@ static inline void HandLink(mnavPolygon* polygons, int32_t count)
     }
 }
 
-// Encodes the squares as the tile at (place, 0) into out; returns its size.
-static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare* squares,
-                                   int32_t count)
+// Encodes the squares as the tile at (place, 0) into out, the first detail
+// triangle of square degenerate (none when -1) the degenerate (0, 2, 2), as
+// a tile from elsewhere may hold; returns its size.
+static inline size_t HandTileBytesWith(uint8_t* out, int32_t place, const HandSquare* squares,
+                                       int32_t count, int32_t degenerate)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBakeCells cells;
@@ -122,7 +124,8 @@ static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare
                 HandSide(xs[k], zs[k], xs[(k + 1) % 4], zs[(k + 1) % 4], def.tileCells);
         }
         parts[s] = (mnavDetailPart){s * 4, s * 2, 4, 2};
-        triangles[s * 2] = (mnavDetailTriangle){{0, 1, 2}, 3};
+        triangles[s * 2] = s == degenerate ? (mnavDetailTriangle){{0, 2, 2}, 0}
+                                           : (mnavDetailTriangle){{0, 1, 2}, 3};
         triangles[s * 2 + 1] = (mnavDetailTriangle){{0, 2, 3}, 6};
     }
     HandLink(polygons, count);
@@ -150,6 +153,13 @@ static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare
     memcpy(out, bytes, size);
     mnavReleaseTileBytes(&memory, bytes, size);
     return size;
+}
+
+// Encodes the squares as the tile at (place, 0) into out; returns its size.
+static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare* squares,
+                                   int32_t count)
+{
+    return HandTileBytesWith(out, place, squares, count, -1);
 }
 
 #endif // MAUL_NAV_TEST_HAND_TILE_H

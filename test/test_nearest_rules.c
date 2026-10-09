@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The nearest point's score on hand-built tiles (mnav-0005): the height beyond
-// the agent's step over a polygon, the distance beside one.
+// the agent's step over a polygon, the distance beside one; and the detail
+// surface's height where its triangles meet or one is degenerate.
 
 #include "hand_tile.h"
 #include "test_harness.h"
@@ -12,7 +13,12 @@
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
+#include <math.h>
 #include <stdint.h>
+
+// The hash of the heights along a square's diagonal, the same on every
+// platform.
+#define DIAGONAL_HASH 0x940dc166358b0af7ull
 
 // A navmesh of one hand tile at (0, 0): a low floor from x = 0 to 40 and a
 // high one from 41 to 80, both from z = 0 to 40, the high one high cell
@@ -73,8 +79,74 @@ static void TestStepDecidesOverAgainstBeside(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// A navmesh of one hand tile holding one square, and its polygon.
+static mnavNavmesh* OneSquare(HandSquare square, bool degenerate, mnavPolygonId* polygonOut)
+{
+    static uint8_t bytes[2048];
+    size_t size = HandTileBytesWith(bytes, 0, &square, 1, degenerate ? 0 : -1);
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    CHECK(mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "committed");
+    mnavNearest n;
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){1.0, 0.0, 1.0}, (mnavVec3){1.0f, 4.0f, 1.0f},
+                          &n) == mnav_success &&
+              n.polygon.slot != 0,
+          "found");
+    *polygonOut = n.polygon;
+    return navmesh;
+}
+
+static void TestHeightsOnADiagonal(void)
+{
+    // A square's two detail triangles meet on its diagonal, where their
+    // heights differ by rounding only. A point there takes the first
+    // triangle's, also where rounding puts it a hair inside the second:
+    // the same heights, bit for bit, as scanning every triangle gives.
+    mnavPolygonId polygon;
+    mnavNavmesh* navmesh = OneSquare((HandSquare){0, 0, 80, 48, {3, 9, 1, 7}, 0}, false, &polygon);
+    uint64_t hash = MNAV_HASH_INIT;
+    int32_t off = 0;
+    for (int32_t i = 0; i <= 1000; ++i)
+    {
+        double t = (double)i / 1000.0;
+        double height = 0.0;
+        CHECK(mnavGetHeight(navmesh, polygon, t * 20.0, t * 12.0, &height) == mnav_success,
+              "a height");
+        off += fabs(height - (3.0 + t * (1.0 - 3.0)) * 0.125) < 1e-9 ? 0 : 1;
+        hash = mnavHash64(hash, &height, (int32_t)sizeof(height));
+    }
+    printf("DIAGONAL_HASH=%016llx\n", (unsigned long long)hash);
+    CHECK(off == 0, "on the diagonal's line");
+    CHECK(hash == DIAGONAL_HASH, "the pinned hash");
+    mnavDestroyNavmesh(navmesh);
+}
+
+static void TestDegenerateTriangle(void)
+{
+    // A detail triangle of no area, as a tile from elsewhere may hold,
+    // gives no height: a point on its line takes the next triangle's.
+    mnavPolygonId polygon;
+    mnavNavmesh* navmesh = OneSquare((HandSquare){0, 0, 40, 40, {0, 4, 8, 16}, 0}, true, &polygon);
+    int32_t off = 0;
+    for (int32_t i = 0; i <= 100; ++i)
+    {
+        double t = (double)i / 100.0;
+        double height = 0.0;
+        CHECK(mnavGetHeight(navmesh, polygon, t * 10.0, t * 10.0, &height) == mnav_success,
+              "a height");
+        off += fabs(height - t * 8.0 * 0.125) < 1e-9 ? 0 : 1;
+    }
+    CHECK(off == 0, "the next triangle's");
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     TestStepDecidesOverAgainstBeside();
+    TestHeightsOnADiagonal();
+    TestDegenerateTriangle();
     return s_failures == 0 ? 0 : 1;
 }

@@ -554,3 +554,11 @@ st-takeoff-straight | src/steer.c | mnavPos3 direction = Direction(corners, n, d
 st-slow | src/steer.c | if (left < (double)def->slowDistance) | if (false)
 st-arrive | src/steer.c | if (left <= (double)def->arriveDistance) | if (left < (double)def->arriveDistance)
 st-link-point | src/steer.c | bool takeoff = corners->linkCount > 0 && corners->links[0].point == 1; | bool takeoff = corners->linkCount > 0;
+qt-stay-clean | src/query.c | query->tableClean = false; | query->tableClean = true;
+sf-keep-entries | src/surface.c | query->table[mnavFindNode(query, visited->slot, visited->polygon, 0, 0)] = MNAV_NO_NODE; | (void)visited;
+sf-forward | src/surface.c | for (int32_t k = query->nodeCount - 1; k >= 0; --k) | for (int32_t k = 0; k < query->nodeCount; ++k)
+nr-no-near | src/nearest.c | if (near) | if (false)
+nr-flat-holds | src/nearest.c | if (inside && area != 0.0) | if (inside)
+# nr-inside-strict survives, equivalent: a point on an edge of the triangle
+# holding it sets near, and the full scan then decides as before.
+nr-inside-strict | src/nearest.c | inside = inside && c <= 0.0; | inside = inside && c < 0.0;
