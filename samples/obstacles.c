@@ -201,14 +201,18 @@ static void Start(World* w, mnavQuery* query)
         // The fifth row walks the seam between the tiles at z = 32 m.
         double z = 4.0 + 7.0 * a;
         mnavNearest start;
+        mnavNearest end;
         Check(mnavFindNearest(w->navmesh, NULL, (mnavPos3){4.0, 0.0, z}, BOX, &start), "start");
+        Check(mnavFindNearest(w->navmesh, NULL, (mnavPos3){60.0, 0.0, z}, BOX, &end), "end");
         Agent* agent = &s_agents[a];
+        mnavPath path;
+        Check(mnavFindPath(query, w->navmesh, NULL, start.polygon, start.point, end.polygon,
+                           end.point, &path),
+              "path");
         Check(mnavResetCorridor(&agent->corridor, agent->buffer, CORRIDOR, start.polygon,
                                 start.point),
               "reset");
-        agent->corridor.target = (mnavPos3){60.0, 0.0, z};
-        mnavPath path;
-        Check(mnavReplanCorridor(query, w->navmesh, NULL, &agent->corridor, BOX, &path), "plan");
+        Check(mnavSetCorridor(&agent->corridor, &path), "corridor");
     }
 }
 

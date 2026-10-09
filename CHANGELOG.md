@@ -23,6 +23,9 @@ format.
   target and stopping on arriving or at an off-mesh link's takeoff;
   stateless, for avoidance's preferred velocity. The `walk` and
   `obstacles` samples steer with it.
+- Sample `navcrowd`: two groups cross a room with pillars, each agent
+  following its corridor by `mnavSteer` through `mnavAvoid`, with an
+  acceleration the host limits; run as a test.
 
 ### Fixed
 
