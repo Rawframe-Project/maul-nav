@@ -627,15 +627,26 @@ static void TestDebugBlocks(const mnavFlightVolume* volume, const int32_t lo[3],
                             const int32_t hi[3])
 {
     mnavDebugBuffer b = DebugBuffer();
-    CHECK(mnavDebugFlight(volume, At(lo[0] + 0.5, lo[1] + 0.5, lo[2] + 0.5),
-                          At(hi[0] + 0.5, hi[1] + 0.5, hi[2] + 0.5), &b) == mnav_success &&
-              b.vertexCount % 24 == 0 && b.lineCount == b.vertexCount,
-          "blocks drawn");
+    bool drawn = mnavDebugFlight(volume, At(lo[0] + 0.5, lo[1] + 0.5, lo[2] + 0.5),
+                                 At(hi[0] + 0.5, hi[1] + 0.5, hi[2] + 0.5), &b) == mnav_success &&
+                 b.vertexCount % 24 == 0 && b.lineCount == b.vertexCount;
+    CHECK(drawn, "blocks drawn");
     int64_t filled = 0;
     int32_t overSolid = 0;
-    for (int32_t k = 0; k < b.vertexCount; k += 24)
+    int32_t badEdges = 0;
+    for (int32_t k = 0; drawn && k < b.vertexCount; k += 24)
     {
         const mnavDebugVertex* v = &b.vertices[k];
+        // Each line is an edge: its ends apart by the side along one axis.
+        for (int32_t e = 0; e < 24; e += 2)
+        {
+            double d[3] = {fabs((double)v[e + 1].x - (double)v[e].x),
+                           fabs((double)v[e + 1].y - (double)v[e].y),
+                           fabs((double)v[e + 1].z - (double)v[e].z)};
+            int32_t along = (d[0] > 0.0) + (d[1] > 0.0) + (d[2] > 0.0);
+            double length = d[0] + d[1] + d[2];
+            badEdges += along == 1 && length == (double)v[0].value ? 0 : 1;
+        }
         double low[3] = {(double)v[0].x, (double)v[0].y + 1.0, (double)v[0].z};
         for (int32_t i = 1; i < 24; ++i)
         {
@@ -677,7 +688,8 @@ static void TestDebugBlocks(const mnavFlightVolume* volume, const int32_t lo[3],
             }
         }
     }
-    CHECK(overSolid == 0 && filled == open && open > 0, "the box's open voxels, once each");
+    CHECK(overSolid == 0 && filled == open && open > 0 && badEdges == 0,
+          "the box's open voxels, once each, by their edges");
 }
 
 // Drawing: open blocks in boxes, a path's steps, and refusals.
@@ -715,6 +727,11 @@ static void TestDebug(const mnavFlightVolume* volume)
                               (mnavPos3){4000.0, 100.0, 4000.0}, &b) == mnav_errorRange &&
               mnavDebugFlightPath(nullptr, &b) == mnav_errorInvalid,
           "refusals");
+    // A box's voxels count within the floor and ceiling: a column to far
+    // above the ceiling is a few voxels.
+    b = DebugBuffer();
+    CHECK(mnavDebugFlight(volume, At(3.5, 0.5, 3.5), At(3.5, 2.0e7, 3.5), &b) == mnav_success,
+          "a column to far above the ceiling");
     // A box under the floor holds nothing.
     b = DebugBuffer();
     CHECK(mnavDebugFlight(volume, (mnavPos3){0.0, -9.0, 0.0}, (mnavPos3){8.0, -5.0, 8.0}, &b) ==
