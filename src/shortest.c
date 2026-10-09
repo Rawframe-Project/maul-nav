@@ -818,7 +818,7 @@ static mnavResult Begin(Shortest* s, const mnavQueryFilter* filter, mnavPolygonI
     s->endSlot = (int32_t)endPolygon.slot - 1;
     s->endPolygon = (int32_t)endPolygon.polygon;
     s->limit = (double)query->limits.pathLength;
-    memset(query->table, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
+    mnavClearTable(query);
     s->made = query->madeTable;
     memset(s->made, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
     double ahead = Flat(start, s->end);

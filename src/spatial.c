@@ -466,7 +466,7 @@ static mnavResult BeginRing(Ring* r, mnavPolygonId polygon)
     r->filter = &q->filter;
     q->search.active = false;
     q->flight.active = false;
-    memset(q->table, 0xFF, ((size_t)q->tableMask + 1) * sizeof(int32_t));
+    mnavClearTable(q);
     int32_t slot = (int32_t)polygon.slot - 1;
     q->nodes[0] = (mnavSearchNode){r->center, r->center, r->center,    0.0,
                                    0.0,       0.0,       slot,         (int32_t)polygon.polygon,

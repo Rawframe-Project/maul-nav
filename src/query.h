@@ -194,6 +194,9 @@ struct mnavQuery
     // Open addressing over node keys: node indices, MNAV_NO_NODE for empty.
     int32_t* table;
     uint32_t tableMask;
+    // Whether every cell is empty: a search that takes its own entries
+    // out again leaves the next one nothing to clear.
+    bool tableClean;
     mnavPolygonId* corridor;
     // The corridor's portals, then the straight path: a node gives one
     // portal, an off-mesh link two, and the end one more, so twice the
@@ -218,6 +221,9 @@ struct mnavQuery
     mnavQueryFilter filter;
     mnavFlightSliced flight;
 };
+
+// Empties the node table for a search, unless it is empty already.
+void mnavClearTable(mnavQuery* query);
 
 // The table cell holding the node with a key, or the empty cell where it
 // would go.

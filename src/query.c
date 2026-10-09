@@ -12,6 +12,7 @@
 #include "maul-nav/query.h"
 
 #include <stdint.h>
+#include <string.h>
 
 // Marks a def built by mnavDefaultQueryDef.
 #define QUERY_DEF_COOKIE 0x4E415651u
@@ -129,6 +130,15 @@ static uint32_t Hash(int32_t slot, int32_t polygon, int32_t tag, int32_t low)
     h ^= ((uint64_t)(uint32_t)tag << 32 | (uint32_t)low) * 0x165667B19E3779F9ull;
     h ^= h >> 29;
     return (uint32_t)(h ^ (h >> 32));
+}
+
+void mnavClearTable(mnavQuery* query)
+{
+    if (!query->tableClean)
+    {
+        memset(query->table, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
+    }
+    query->tableClean = false;
 }
 
 // The table cell holding the node with a key, or the empty cell where it

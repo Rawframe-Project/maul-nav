@@ -403,7 +403,7 @@ static mnavPathEnd Refused(int32_t held)
 static void Begin(Search* s, const mnavFlightBlock* block, const double start[3])
 {
     mnavQuery* q = s->query;
-    memset(q->table, 0xFF, ((size_t)q->tableMask + 1) * sizeof(int32_t));
+    mnavClearTable(q);
     q->heapCount = 0;
     q->nodeCount = 0;
     const int32_t b[4] = {block->x, block->y, block->z, block->size};
