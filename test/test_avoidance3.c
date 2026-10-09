@@ -395,6 +395,16 @@ static void TestFastSphere(void)
     CHECK(mnavAvoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
           "stepped");
     CHECK(Length(velocities[0]) > 0.1, "it moves off at once");
+    // Kept to the new velocity, it stays clear of the sphere for the whole
+    // horizon: the avoidance is all its own, not half.
+    mnavPos3 rel = Sub(spheres[0].center, agents[0].position);
+    mnavPos3 closing = Sub(velocities[0], spheres[0].velocity);
+    double along = (rel.x * closing.x + rel.y * closing.y + rel.z * closing.z) /
+                   (closing.x * closing.x + closing.y * closing.y + closing.z * closing.z);
+    along = along < 0.0 ? 0.0 : (along > 2.0 ? 2.0 : along);
+    mnavPos3 apart = {rel.x - closing.x * along, rel.y - closing.y * along,
+                      rel.z - closing.z * along};
+    CHECK(Length(apart) >= 1.5 - 1e-6, "clear for the whole horizon");
     Scene s = {avoidance, agents, goals, 1, spheres, 1, 0.0, 0.0, 0.0};
     Run(&s, 40);
     CHECK(s.closestSphere > -1e-6, "it is never touched");
