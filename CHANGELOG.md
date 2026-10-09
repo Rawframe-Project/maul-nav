@@ -8,6 +8,14 @@ format.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-09
+
+Obstacles without a full bake: a tile cache keeps each tile's open
+space compressed, about 10 KB a tile, and rebuilds the tile with
+obstacles in about a third of a bake's time, to the byte the tile a
+full bake gives. Flight volumes gain debug drawing. Tiles baked by 0.8.0
+still load; tiles baked now record 0.9.0 as their generator.
+
 ### Added
 
 - `mnavDebugFlight` draws a flight volume's open blocks in a box as
