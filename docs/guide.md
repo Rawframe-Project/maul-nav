@@ -92,6 +92,43 @@ them as they are written.
   system, one baker per worker; the bytes are the same at any worker
   count.
 
+### Obstacles
+
+A crate or a barricade that stands still changes the tiles it stands
+on (mnav-0016). Bake those tiles through a tile cache, which keeps
+each tile's open space as it stands before bake volumes apply; then
+rebuild a tile with obstacles, given as bake volumes, without its
+triangles:
+
+```c
+mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();   // 1024 tiles in 256 MiB
+mnavTileCache* cache = NULL;
+mnavResult cached = mnavCreateTileCache(&cacheDef, &cache);
+mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};
+if (cached == mnav_success)
+{
+    cached = mnavBakeTileCached(baker, cache, &input, tileX, tileZ, &report);
+}
+
+// A crate on the tile: a ring on the ground and a height range.
+const mnavVec2 ring[4] = {{36, 4}, {38, 4}, {38, 6}, {36, 6}};
+const mnavBakeVolume crate = {ring, 4, -1.0f, 2.0f, mnav_volumeExclude, 0};
+mnavResult rebuilt = mnavRebuildTile(baker, cache, tileX, tileZ, &crate, 1, &report);
+```
+
+- **The same bytes.** A rebuilt tile is, to the byte, the tile
+  `mnavBakeTileInput` bakes from the same input with the obstacles
+  appended to its volumes, in about a third of the time. Copy it out
+  with `mnavCopyBakedTile` and replace the tile in the navmesh.
+- **Every obstacle, each time.** A rebuild applies the cached volumes
+  and the obstacles it is given, so pass every obstacle on the tile;
+  rebuild with none to clear them. An obstacle reaches the tiles its
+  ring touches, widened by the agent's radius.
+- **Memory.** A cached tile of the default cells takes about 300 KB.
+  Cache the tiles where obstacles may stand, and drop tiles
+  (`mnavDropCachedTile`) as they stream out. `mnavGetTileCacheBytes`
+  gives what the cache holds. Moving obstacles are for avoidance.
+
 ## The navmesh
 
 A navmesh holds committed tiles and off-mesh links. Changes are staged,

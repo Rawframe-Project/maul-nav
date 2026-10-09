@@ -13,6 +13,13 @@ format.
 - `mnavDebugFlight` draws a flight volume's open blocks in a box as
   wire boxes of a new kind, `mnav_debugFlightBlock`, each block once;
   `mnavDebugFlightPath` draws a flight path's steps.
+- A tile cache for obstacles (mnav-0016): `mnavBakeTileCached` keeps a
+  tile's open space before bake volumes apply, and `mnavRebuildTile`
+  rebuilds the tile from it with obstacles given as bake volumes, to
+  the byte the tile a full bake gives with them appended, in about a
+  third of the time. `mnavCreateTileCache`, `mnavDestroyTileCache`,
+  `mnavDefaultTileCacheDef`, `mnavDropCachedTile` and
+  `mnavGetTileCacheBytes` manage the cache.
 
 ## [0.8.0] - 2026-10-09
 

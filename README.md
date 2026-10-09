@@ -29,7 +29,8 @@ It has:
 - off-mesh links point to point or edge to edge, one or two way, of
   host-declared kinds, toggled at runtime and generated automatically;
 - runtime changes by declared tier (static, modifiers only, dynamic),
-  committed at a point the host chooses;
+  committed at a point the host chooses, and obstacles carved into
+  cached tiles, rebuilt to the same bytes as a full bake;
 - flight volumes for agents that fly or swim: sparse voxel octree
   tiles baked from the same input, streamed as navmesh tiles are, with
   any-angle paths (Lazy Theta*), raycasts and nearest open points;
@@ -58,7 +59,7 @@ minor release may change the API, the ABI and the tile format.
 - [The guide](docs/guide.md) walks through baking, the navmesh,
   queries, corridors, flow fields, flight volumes, avoidance and debug
   output.
-- [The API reference](docs/api.md) lists all 115 public functions,
+- [The API reference](docs/api.md) lists all 122 public functions,
   generated from the headers.
 - [The samples](docs/samples.md) are small complete programs.
 - [The changelog](CHANGELOG.md) records every change.

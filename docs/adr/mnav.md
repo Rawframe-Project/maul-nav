@@ -20,3 +20,4 @@ are listed in [README.md](README.md).
 | [mnav-0013](mnav-0013-navmesh-flow-fields.md) | Flow fields over the navmesh | Accepted |
 | [mnav-0014](mnav-0014-tile-index.md) | A tile index for bakes from large meshes | Accepted |
 | [mnav-0015](mnav-0015-flight-volumes.md) | Flight volumes | Accepted |
+| [mnav-0016](mnav-0016-tile-cache.md) | A tile cache for obstacles | Accepted |

@@ -21,6 +21,31 @@
 
 static uint8_t s_bytes[TILE_CAPACITY];
 
+static void GuideObstacles(mnavBaker* baker, const mnavTriangleMesh* world, int32_t tileX,
+                           int32_t tileZ)
+{
+    mnavTriangleMesh mesh = *world;
+    mnavBakeReport report;
+    // clang-format off
+    mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();   // 1024 tiles in 256 MiB
+    mnavTileCache* cache = NULL;
+    mnavResult cached = mnavCreateTileCache(&cacheDef, &cache);
+    mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};
+    if (cached == mnav_success)
+    {
+        cached = mnavBakeTileCached(baker, cache, &input, tileX, tileZ, &report);
+    }
+
+    // A crate on the tile: a ring on the ground and a height range.
+    const mnavVec2 ring[4] = {{36, 4}, {38, 4}, {38, 6}, {36, 6}};
+    const mnavBakeVolume crate = {ring, 4, -1.0f, 2.0f, mnav_volumeExclude, 0};
+    mnavResult rebuilt = mnavRebuildTile(baker, cache, tileX, tileZ, &crate, 1, &report);
+    // clang-format on
+    CHECK(cached == mnav_success && rebuilt == mnav_success && report.polygons > 0,
+          "the obstacle snippet rebuilds a tile");
+    mnavDestroyTileCache(cache);
+}
+
 static void GuideBake(void)
 {
     mnavTriangleMesh world = World();
@@ -49,6 +74,7 @@ static void GuideBake(void)
     // clang-format on
     CHECK(made.result == mnav_success && baked == mnav_success && size > 0 && report.polygons > 0,
           "the bake snippet bakes a tile");
+    GuideObstacles(baker, &mesh, tileX, tileZ);
     mnavDestroyBaker(baker);
 }
 

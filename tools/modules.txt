@@ -43,7 +43,8 @@ flight_search: flight_frame flight_space flight_volume query
 flight_probe: flight flight_frame flight_space flight_volume
 fingerprint: bytes outline raster terrain tile_index
 bake_input: input terrain volume
-baker: allocator bake_def bake_input border_vertices bytes compact contour detail erode filter fingerprint heightfield holes input outline polymesh raster region terrain tile tile_index volume
+baker: allocator bake_def bake_input border_vertices bytes compact contour detail erode filter fingerprint heightfield holes input outline polymesh raster region terrain tile tile_cache tile_index volume
+tile_cache: allocator compact outline raster
 navmesh: allocator bake_def detail polymesh tile
 nearest: detail navmesh polymesh query_filter raster
 path: allocator funnel navmesh offmesh polymesh query query_filter raster

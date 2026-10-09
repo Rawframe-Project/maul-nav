@@ -54,6 +54,7 @@ static void FailAfter(int32_t k)
 static uint8_t s_expected[4][TILE_CAPACITY];
 static size_t s_expectedSizes[4];
 static uint8_t s_bytes[TILE_CAPACITY];
+static uint8_t s_rebuilt[TILE_CAPACITY];
 
 // A terrain under the world's floor and a volume marking an area, so that
 // every bake stage and input path allocates.
@@ -146,6 +147,78 @@ static void TestBakes(void)
         mnavDestroyBaker(b);
     }
     CHECK(made && s_held == 0, "a baker refused whole");
+}
+
+// A tile cache's bakes and rebuilds, the baker and the cache each on the
+// failing allocator: a failed cached bake keeps nothing for the tile, a
+// failed rebuild leaves the cache as it was.
+static void TestCache(void)
+{
+    mnavTriangleMesh world = World();
+    mnavBakeInput input = Input(&world);
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.allocator = Allocator();
+    mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();
+    cacheDef.allocator = Allocator();
+    FailAfter(-1);
+    mnavBaker* baker = nullptr;
+    mnavTileCache* cache = nullptr;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavCreateTileCache(&cacheDef, &cache) == mnav_success,
+          "a baker and a cache");
+    uint64_t empty = mnavGetTileCacheBytes(cache);
+    FailAfter(-1);
+    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success, "counted");
+    int32_t calls = s_calls;
+    bool cached = true;
+    for (int32_t k = 0; k < calls; ++k)
+    {
+        FailAfter(k);
+        cached = cached &&
+                 mnavBakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_errorCapacity &&
+                 mnavGetTileCacheBytes(cache) == empty;
+    }
+    CHECK(cached, "cached bakes refused, nothing kept");
+    FailAfter(-1);
+    const mnavBakeVolume crate = {s_strip, 4, -1.0f, 1.0f, mnav_volumeExclude, 0};
+    size_t size = 0;
+    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success, "cached");
+    FailAfter(-1);
+    CHECK(mnavRebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_success &&
+              mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_success,
+          "a rebuild, counted");
+    calls = s_calls;
+    uint64_t held = mnavGetTileCacheBytes(cache);
+    bool rebuilt = true;
+    for (int32_t k = 0; k < calls; ++k)
+    {
+        FailAfter(k);
+        rebuilt = rebuilt &&
+                  mnavRebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_errorCapacity;
+        FailAfter(-1);
+        size_t again = 0;
+        rebuilt = rebuilt && mnavGetTileCacheBytes(cache) == held &&
+                  mnavRebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_success &&
+                  mnavCopyBakedTile(baker, s_bytes, TILE_CAPACITY, &again) == mnav_success &&
+                  again == size && memcmp(s_bytes, s_rebuilt, size) == 0;
+    }
+    printf("cache: %d rebuild allocations each refused\n", calls);
+    CHECK(calls > 10 && rebuilt, "rebuilds refused, then the same bytes");
+    mnavDestroyTileCache(cache);
+    mnavDestroyBaker(baker);
+    CHECK(s_held == 0, "every byte given back");
+}
+
+static mnavResult MakeTileCache(void** out)
+{
+    mnavTileCacheDef def = mnavDefaultTileCacheDef();
+    def.allocator = Allocator();
+    return mnavCreateTileCache(&def, (mnavTileCache**)out);
+}
+
+static void DestroyTileCache(void* object)
+{
+    mnavDestroyTileCache(object);
 }
 
 // A floor over one tile with a pillar in its middle, which leaves a hole
@@ -360,11 +433,13 @@ static void TestObjects(void)
     CHECK(EachRefused(MakeAvoidance, DestroyAvoidance), "avoidance sets");
     CHECK(EachRefused(MakeTileIndex, DestroyTileIndex), "tile indexes");
     CHECK(EachRefused(MakeTileIndex2D, DestroyTileIndex), "tile indexes of outlines");
+    CHECK(EachRefused(MakeTileCache, DestroyTileCache), "tile caches");
 }
 
 int main(void)
 {
     TestBakes();
+    TestCache();
     TestHoles();
     TestCommits();
     TestObjects();

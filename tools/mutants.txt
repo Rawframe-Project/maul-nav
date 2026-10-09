@@ -512,3 +512,18 @@ fg-skip-width | src/flight_debug.c | x = b.x + b.size; | x += 1;
 fg-limit | src/flight_debug.c | if (lo[1] <= hi[1] && voxels > (double)MNAV_MAX_FLIGHT_DEBUG_VOXELS) | if (lo[1] <= hi[1] && voxels > 1e30)
 fg-edges | src/flight_debug.c | if ((c & bit) == 0) | if ((c & bit) != 0)
 fg-ceiling | src/flight_debug.c | hi[1] = hi[1] < frame.layers - 1 ? hi[1] : frame.layers - 1; | hi[1] = hi[1];
+tc-first-include | src/tile_cache.c | keep[firstInclude] = true; | keep[firstInclude] = false;
+tc-kept-include | src/tile_cache.c | keptInclude = keptInclude || (keep[i] && include); | keptInclude = keptInclude || keep[i];
+tc-drop-swap | src/tile_cache.c | cache->tiles[i] = cache->tiles[cache->count - 1]; | (void)0;
+tc-tile-limit | src/tile_cache.c | if (cache->count == cache->def.limits.tiles) | if (cache->count > cache->def.limits.tiles)
+tc-bytes-range | src/tile_cache.c | def->limits.memoryBytes < 1) | def->limits.memoryBytes < 0)
+tc-points | src/tile_cache.c | p += volumes[i].pointCount; | p += 0;
+cp-areas | src/compact.c | memcpy(to->areas, from->areas, count * sizeof(mnavAreaType)); | (void)0;
+bk-settings | src/baker.c | : tile->settings != HashSettings(&baker->def, tileX, tileZ) | : false
+bk-obstacle-index | src/baker.c | report->mesh = i; | report->mesh = i + 1;
+bk-cached-points | src/baker.c | int64_t total = (int64_t)tile->triangles + tile->pointCount; | int64_t total = (int64_t)tile->triangles;
+bk-tile-triangles | src/baker.c | int64_t total = (int64_t)tile->triangles + tile->pointCount; | int64_t total = tile->pointCount;
+bk-obstacle-points | src/baker.c | total += obstacles[i].pointCount; | total += 0;
+bk-triangles | src/baker.c | report.triangles = tile->triangles; | report.triangles = 0;
+bk-cache-fail-drop | src/baker.c | mnavDropCachedTile(cache, tileX, tileZ); | (void)0;
+bk-fingerprint | src/baker.c | mnavFingerprintVolumes(&tile->field.frame, volumes, count, tile->geometry); | tile->geometry;

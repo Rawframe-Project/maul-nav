@@ -11,6 +11,7 @@
 #include "maul-nav/bake.h"
 
 #include <stdint.h>
+#include <string.h>
 
 // The top of the open space above a column's highest span.
 #define OPEN_TOP 65535
@@ -154,4 +155,38 @@ void mnavReleaseCompactField(mnavMemory* memory, mnavCompactField* field)
     mnavRelease(memory, field->areas, (size_t)field->spanCount, sizeof(mnavAreaType),
                 alignof(mnavAreaType));
     *field = (mnavCompactField){0};
+}
+
+mnavResult mnavCopyCompactField(mnavMemory* memory, const mnavCompactField* from,
+                                mnavCompactField* to)
+{
+    *to = (mnavCompactField){0};
+    size_t columnCount = (size_t)from->frame.width * (size_t)from->frame.width + 1;
+    size_t count = (size_t)from->spanCount;
+    mnavResult result = mnavAllocate(memory, columnCount, sizeof(uint32_t), alignof(uint32_t),
+                                     (void**)&to->columns);
+    if (result == mnav_success)
+    {
+        result = mnavAllocate(memory, count, sizeof(mnavOpenSpan), alignof(mnavOpenSpan),
+                              (void**)&to->spans);
+    }
+    if (result == mnav_success)
+    {
+        result = mnavAllocate(memory, count, sizeof(mnavAreaType), alignof(mnavAreaType),
+                              (void**)&to->areas);
+    }
+    to->frame = from->frame;
+    to->spanCount = from->spanCount;
+    if (result != mnav_success)
+    {
+        mnavReleaseCompactField(memory, to);
+        return result;
+    }
+    memcpy(to->columns, from->columns, columnCount * sizeof(uint32_t));
+    if (count > 0)
+    {
+        memcpy(to->spans, from->spans, count * sizeof(mnavOpenSpan));
+        memcpy(to->areas, from->areas, count * sizeof(mnavAreaType));
+    }
+    return mnav_success;
 }

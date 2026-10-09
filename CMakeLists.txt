@@ -108,6 +108,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/spatial.c
     src/surface.c
     src/terrain.c
+    src/tile_cache.c
     src/tile_index.c
     src/tile.c
     src/volume.c
@@ -171,6 +172,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(edge_links)
     maul_add_test(scenarios)
     maul_add_test(terrain)
+    maul_add_test(tile_cache)
     maul_add_test(tile_index)
     maul_add_test(volume WHITEBOX)
     maul_add_test(avoidance)

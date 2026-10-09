@@ -59,6 +59,10 @@ mnavResult mnavBuildCompactField(mnavMemory* memory, const mnavHeightfield* heig
 
 void mnavReleaseCompactField(mnavMemory* memory, mnavCompactField* field);
 
+// Copies a field into new memory; on failure to holds nothing.
+mnavResult mnavCopyCompactField(mnavMemory* memory, const mnavCompactField* from,
+                                mnavCompactField* to);
+
 // The index of the span linked from span i of column (x, z) in a
 // direction; the link must exist.
 static inline uint32_t mnavLinkedSpan(const mnavCompactField* field, int32_t x, int32_t z,

@@ -135,6 +135,41 @@ MNAV_NODISCARD MNAV_API mnavResult mnavCopyBakedTile(const mnavBaker* baker, uin
 ```
 Copies the last baked tile's bytes into caller memory.  @param baker     The baker. @param buffer    The memory, at least capacity bytes; may be NULL when capacity is 0. @param capacity  The buffer's size in bytes. @param sizeOut   Receives the tile's size in bytes. May be NULL. @return `mnav_success`; `mnav_errorCapacity` when the buffer is smaller than the tile, with the size still written; `mnav_errorInvalid` for a NULL baker, a NULL buffer with a positive capacity, or a baker holding no tile. @par Thread safety Safe from any thread; the baker is used by one thread at a time.
 
+```c
+mnavTileCacheDef mnavDefaultTileCacheDef(void);
+```
+Returns the default tile cache def: up to 1024 tiles in 256 MiB.  @return The def. @par Thread safety Safe from any thread.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileCache(const mnavTileCacheDef* def, mnavTileCache** cacheOut);
+```
+Makes an empty tile cache.  @param def       The def, from mnavDefaultTileCacheDef. @param cacheOut  Receives the cache, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultTileCacheDef; `mnav_errorRange` for a limit out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+
+```c
+void mnavDestroyTileCache(mnavTileCache* cache);
+```
+Destroys a tile cache and everything it holds.  @param cache The cache, or NULL. @par Thread safety Safe from any thread; the cache is used by one thread at a time.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavBakeTileCached(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput* input, int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut);
+```
+Bakes a tile as mnavBakeTileInput does and keeps what a rebuild needs in the cache, replacing what it held for the tile.  @param baker     The baker. @param cache     The cache. @param input     The input, as mnavBakeTileInput takes it. @param tileX     The tile's column. @param tileZ     The tile's row. @param reportOut Receives the report. May be NULL. @return As mnavBakeTileInput; `mnav_errorInvalid` for a NULL cache; `mnav_errorLimit` when the cache holds its most tiles or bytes, with no tile baked and the tile's old entry dropped. @par Thread safety Safe from any thread; the baker and the cache are used by one thread at a time.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavRebuildTile(mnavBaker* baker, mnavTileCache* cache, int32_t tileX, int32_t tileZ, const mnavBakeVolume* obstacles, int32_t obstacleCount, mnavBakeReport* reportOut);
+```
+Rebuilds a cached tile with obstacles, without its triangles: the cached field, the cached volumes and then the obstacles, run from the volumes on. The bytes are those mnavBakeTileInput gives the same input with the obstacles appended to its volumes. An exclude obstacle carves, an area obstacle changes the area within it.  @param baker         The baker, made from the def the tile was cached with. @param cache         The cache. @param tileX         The tile's column. @param tileZ         The tile's row. @param obstacles     The obstacles, as bake volumes. May be NULL when obstacleCount is 0. @param obstacleCount How many, at least 0. @param reportOut     Receives the report. May be NULL. @return `mnav_success`; `mnav_errorNotLoaded` for a tile the cache does not hold; `mnav_errorInvalid` for a NULL argument, a negative count, a baker of another def, or an obstacle as a bake refuses a volume, named in the report; otherwise as mnavBakeTileInput. @par Thread safety Safe from any thread; the baker and the cache are used by one thread at a time.
+
+```c
+void mnavDropCachedTile(mnavTileCache* cache, int32_t tileX, int32_t tileZ);
+```
+Drops what the cache holds for a tile, if anything.  @param cache The cache, or NULL. @param tileX The tile's column. @param tileZ The tile's row. @par Thread safety Safe from any thread; the cache is used by one thread at a time.
+
+```c
+uint64_t mnavGetTileCacheBytes(const mnavTileCache* cache);
+```
+Returns the bytes a tile cache holds, its tiles' and its own.  @param cache The cache. @return The bytes; 0 for NULL. @par Thread safety Safe from any thread; the cache is used by one thread at a time.
+
 ## `debug.h`
 
 Debug geometry of navmeshes, links, paths and corridors (mnav-0010), as plain vertex and index data in a caller's buffer.
@@ -624,4 +659,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-115 functions across 12 headers.
+122 functions across 12 headers.
