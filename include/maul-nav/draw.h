@@ -45,6 +45,8 @@ extern "C"
         // An avoidance agent's outline, and the line to a neighbour.
         mnav_debugAgent = 10,
         mnav_debugNeighbor = 11,
+        // An avoidance obstacle's outline: a sphere's three rings.
+        mnav_debugObstacle = 12,
     };
 
     // A vertex: its place relative to the buffer's origin, what it shows

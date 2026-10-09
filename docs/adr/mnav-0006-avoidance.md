@@ -99,6 +99,11 @@ symmetry face to face.
     circles on the ground; they count against the set's obstacle points,
     and each agent looks at every sphere, which suits the few moving
     things among fliers. Static geometry is the flight volume's.
+  - `mnavDebugAvoidance3D` draws fliers as three 16-gons each, one in
+    each axis plane, the fewest lines that show a sphere's size from any
+    view, with the neighbor lines of the ground call, and spheres as
+    rings of `mnav_debugObstacle`. It refuses what `mnavAvoid3D`
+    refuses, through the same checks.
 
 ## Consequences
 

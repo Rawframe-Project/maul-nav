@@ -251,12 +251,62 @@ static void TestFlowAndAvoidance(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+static void TestFliers(void)
+{
+    // Three fliers, two near one above the other, and a sphere: three
+    // rings each, the near pair's lines, the sphere's rings.
+    mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
+    def.limits.agents = 8;
+    def.limits.obstacleVertices = 1;
+    def.neighborDistance = 3.0;
+    mnavAvoidance* avoidance = nullptr;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "a set");
+    mnavAgent3D agents[3] = {{{0.0, 0.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 1},
+                             {{0.0, 2.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 2},
+                             {{0.0, 20.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 3}};
+    mnavSphere sphere = {{5.0, 0.0, 0.0}, 2.0, {0.0, 0.0, 0.0}, 9};
+    mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    CHECK(mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 1, &b) == mnav_success &&
+              Count(&b, mnav_debugAgent, -1) == 3 * 48 * 2 &&
+              Count(&b, mnav_debugNeighbor, -1) == 2 * 2 &&
+              Count(&b, mnav_debugObstacle, -1) == 48 * 2 && b.lineCount == b.vertexCount,
+          "rings, the near pair's lines and the sphere's rings");
+    // The first ring of the first flier starts at +X on its radius; the
+    // sphere's at +X on its own.
+    CHECK(b.vertices[0].x == 0.5f && b.vertices[0].y == 0.0f && b.vertices[0].z == 0.0f,
+          "a ring on the radius");
+    int32_t first = b.vertexCount - 48 * 2;
+    CHECK(b.vertices[first].x == 7.0f && b.vertices[first].kind == mnav_debugObstacle,
+          "the sphere's ring on its radius");
+    CHECK(mnavDebugAvoidance3D(avoidance, agents, 9, nullptr, 0, &b) == mnav_errorLimit &&
+              mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 2, &b) == mnav_errorLimit,
+          "the limits");
+    mnavAgent3D bad = agents[0];
+    bad.radius = 0.0;
+    mnavSphere wrong = sphere;
+    wrong.center.z = (double)NAN;
+    CHECK(mnavDebugAvoidance3D(avoidance, &bad, 1, nullptr, 0, &b) == mnav_errorInvalid &&
+              mnavDebugAvoidance3D(avoidance, agents, 3, &wrong, 1, &b) == mnav_errorInvalid &&
+              mnavDebugAvoidance3D(avoidance, agents, 3, nullptr, 1, &b) == mnav_errorInvalid &&
+              mnavDebugAvoidance3D(avoidance, agents, 3, nullptr, 0, nullptr) ==
+                  mnav_errorInvalid &&
+              mnavDebugAvoidance3D(nullptr, agents, 3, nullptr, 0, &b) == mnav_errorInvalid,
+          "refused as mnavAvoid3D refuses");
+    mnavDebugBuffer small = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    small.lineCapacity = 10;
+    CHECK(mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 1, &small) == mnav_errorCapacity &&
+              small.lineCount == b.lineCount,
+          "a full buffer counts what the whole needs");
+    mnavDestroyAvoidance(avoidance);
+}
+
 int main(void)
 {
     mnavNavmesh* navmesh = Load();
     TestNavmesh(navmesh);
     TestLinksPathsCorridors(navmesh);
     TestFlowAndAvoidance();
+    TestFliers();
     mnavDestroyNavmesh(navmesh);
     return s_failures == 0 ? 0 : 1;
 }

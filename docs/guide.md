@@ -302,7 +302,9 @@ value) and triangle and line indices, which any renderer can draw:
 - `mnavDebugNavmesh`: polygons by area, edges, tile bounds;
 - `mnavDebugLinks`, `mnavDebugPath`, `mnavDebugCorridor`;
 - `mnavDebugFlowField` and `mnavDebugNavFlow`: arrows;
-- `mnavDebugAvoidance`: agents and the neighbours each one sees.
+- `mnavDebugAvoidance`: agents and the neighbours each one sees;
+  `mnavDebugAvoidance3D` the same for fliers, each as three rings, with
+  the spheres they avoid.
 
 A full buffer returns `mnav_errorCapacity` with the counts the whole
 needs, so you can grow it and draw again.

@@ -41,6 +41,10 @@ struct mnavAvoidance
     mnavPlane* projectedPlanes;
 };
 
+// The corners of a 16-gon on the unit circle, written out so that every
+// platform has the same: the outline debug drawing gives an agent.
+extern const double mnavOutline[16][2];
+
 static inline bool mnavAvoidPositive(double v)
 {
     return isfinite(v) && v > 0.0;

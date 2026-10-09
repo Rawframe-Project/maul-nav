@@ -8,11 +8,13 @@
 
 #include "avoidance.h"
 #include "crowd.h"
+#include "draw.h"
 #include "obstacle.h"
 #include "orca3.h"
 
 #include "maul-nav/avoidance.h"
 #include "maul-nav/base.h"
+#include "maul-nav/draw.h"
 
 #include <math.h>
 #include <stdbool.h>
@@ -184,16 +186,12 @@ static mnavPos3 Solve(mnavAvoidance* a, const mnavAgent3D* agents, const Spheres
     return velocity;
 }
 
-mnavResult mnavAvoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
-                       const mnavSphere* spheres, int32_t sphereCount, double step,
-                       mnavPos3* velocitiesOut)
+// Checks a call's limits and its agents and spheres as hostile input,
+// then fills and sorts the grid in cubes; the arguments' presence is the
+// caller's to check.
+static mnavResult Prepare(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
+                          const mnavSphere* spheres, int32_t sphereCount)
 {
-    if (avoidance == nullptr || agentCount < 0 || sphereCount < 0 ||
-        (agentCount > 0 && (agents == nullptr || velocitiesOut == nullptr)) ||
-        (sphereCount > 0 && spheres == nullptr) || !mnavAvoidTime(step))
-    {
-        return mnav_errorInvalid;
-    }
     if (agentCount > avoidance->def.limits.agents ||
         sphereCount > avoidance->def.limits.obstacleVertices)
     {
@@ -217,10 +215,79 @@ mnavResult mnavAvoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int3
         crowd->keys[i] = mnavCrowdKeyOf(crowd, agents[i].position, agents[i].id, i);
     }
     mnavSortCrowd(crowd, agentCount);
+    return mnav_success;
+}
+
+mnavResult mnavAvoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
+                       const mnavSphere* spheres, int32_t sphereCount, double step,
+                       mnavPos3* velocitiesOut)
+{
+    if (avoidance == nullptr || agentCount < 0 || sphereCount < 0 ||
+        (agentCount > 0 && (agents == nullptr || velocitiesOut == nullptr)) ||
+        (sphereCount > 0 && spheres == nullptr) || !mnavAvoidTime(step))
+    {
+        return mnav_errorInvalid;
+    }
+    mnavResult result = Prepare(avoidance, agents, agentCount, spheres, sphereCount);
+    if (result != mnav_success)
+    {
+        return result;
+    }
     Spheres given = {spheres, sphereCount};
     for (int32_t i = 0; i < agentCount; ++i)
     {
         velocitiesOut[i] = Solve(avoidance, agents, &given, step, i);
     }
     return mnav_success;
+}
+
+// Draws three 16-gons of a radius round a center, one in each axis plane.
+static void Rings(mnavDebugBuffer* buffer, mnavPos3 c, double radius, mnavDebugKind kind)
+{
+    for (int32_t k = 0; k < 16; ++k)
+    {
+        double u0 = radius * mnavOutline[k][0];
+        double u1 = radius * mnavOutline[k][1];
+        double w0 = radius * mnavOutline[(k + 1) % 16][0];
+        double w1 = radius * mnavOutline[(k + 1) % 16][1];
+        mnavDrawLine(buffer, (mnavPos3){c.x + u0, c.y + u1, c.z},
+                     (mnavPos3){c.x + w0, c.y + w1, c.z}, kind, 0);
+        mnavDrawLine(buffer, (mnavPos3){c.x, c.y + u0, c.z + u1},
+                     (mnavPos3){c.x, c.y + w0, c.z + w1}, kind, 0);
+        mnavDrawLine(buffer, (mnavPos3){c.x + u0, c.y, c.z + u1},
+                     (mnavPos3){c.x + w0, c.y, c.z + w1}, kind, 0);
+    }
+}
+
+mnavResult mnavDebugAvoidance3D(mnavAvoidance* avoidance, const mnavAgent3D* agents,
+                                int32_t agentCount, const mnavSphere* spheres, int32_t sphereCount,
+                                mnavDebugBuffer* buffer)
+{
+    if (avoidance == nullptr || agentCount < 0 || sphereCount < 0 ||
+        (agentCount > 0 && agents == nullptr) || (sphereCount > 0 && spheres == nullptr) ||
+        !mnavGoodBuffer(buffer))
+    {
+        return mnav_errorInvalid;
+    }
+    mnavResult result = Prepare(avoidance, agents, agentCount, spheres, sphereCount);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    for (int32_t i = 0; i < agentCount; ++i)
+    {
+        const mnavAgent3D* a = &agents[i];
+        Rings(buffer, a->position, a->radius, mnav_debugAgent);
+        int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i);
+        for (int32_t n = 0; n < count; ++n)
+        {
+            const mnavAgent3D* b = &agents[avoidance->crowd.neighbors[n].index];
+            mnavDrawLine(buffer, a->position, b->position, mnav_debugNeighbor, 0);
+        }
+    }
+    for (int32_t s = 0; s < sphereCount; ++s)
+    {
+        Rings(buffer, spheres[s].center, spheres[s].radius, mnav_debugObstacle);
+    }
+    return mnavDrawResult(buffer);
 }

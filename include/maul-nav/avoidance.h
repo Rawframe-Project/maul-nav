@@ -275,6 +275,30 @@ extern "C"
                                                           int32_t agentCount, double height,
                                                           mnavDebugBuffer* buffer);
 
+    /// Appends each flier's outline, three 16-gons on its radius, one in
+    /// each axis plane (mnav_debugAgent), a line to each neighbour
+    /// mnavAvoid3D would give it (mnav_debugNeighbor), and each sphere's
+    /// three rings (mnav_debugObstacle).
+    ///
+    /// @param avoidance   The set; its scratch is used.
+    /// @param agents      The agents.
+    /// @param agentCount  How many, at least 0.
+    /// @param spheres     The spheres.
+    /// @param sphereCount How many, at least 0.
+    /// @param buffer      The buffer appended to.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
+    /// agents or spheres, a negative count, an agent or sphere as
+    /// mnavAvoid3D refuses it, or a buffer with a count out of range, an
+    /// array missing or an origin not finite; `mnav_errorLimit` for more
+    /// agents or spheres than mnavAvoid3D takes; `mnav_errorCapacity` when
+    /// the buffer filled, its counts saying what the whole needs.
+    /// @par Thread safety
+    /// Safe from any thread; the set and the buffer are used by one thread
+    /// at a time.
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavDebugAvoidance3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
+                         const mnavSphere* spheres, int32_t sphereCount, mnavDebugBuffer* buffer);
+
 #ifdef __cplusplus
 }
 #endif

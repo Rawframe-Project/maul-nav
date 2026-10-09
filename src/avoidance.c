@@ -330,9 +330,7 @@ mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t 
     return mnav_success;
 }
 
-// The corners of a 16-gon on the unit circle, written out so that every
-// platform has the same.
-static const double s_outline[16][2] = {
+const double mnavOutline[16][2] = {
     {1.0, 0.0},
     {0.9238795325112867, 0.3826834323650898},
     {0.7071067811865476, 0.7071067811865475},
@@ -374,10 +372,10 @@ mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance, const mnavAgent* agents,
         const mnavAgent* a = &agents[i];
         for (int32_t k = 0; k < 16; ++k)
         {
-            mnavPos3 p = {a->position.x + a->radius * s_outline[k][0], height,
-                          a->position.y + a->radius * s_outline[k][1]};
-            mnavPos3 q = {a->position.x + a->radius * s_outline[(k + 1) % 16][0], height,
-                          a->position.y + a->radius * s_outline[(k + 1) % 16][1]};
+            mnavPos3 p = {a->position.x + a->radius * mnavOutline[k][0], height,
+                          a->position.y + a->radius * mnavOutline[k][1]};
+            mnavPos3 q = {a->position.x + a->radius * mnavOutline[(k + 1) % 16][0], height,
+                          a->position.y + a->radius * mnavOutline[(k + 1) % 16][1]};
             mnavDrawLine(buffer, p, q, mnav_debugAgent, 0);
         }
         int32_t count =

@@ -56,6 +56,11 @@ MNAV_NODISCARD MNAV_API mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance, 
 ```
 Appends each agent's outline, a 16-gon (mnav_debugAgent), and a line to each neighbour mnavAvoid would give it (mnav_debugNeighbor), at a height, agent X and Y lying at ground X and Z.  @param avoidance  The set; its scratch is used. @param agents     The agents. @param agentCount How many, at least 0. @param height     The lines' height. @param buffer     The buffer appended to. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with agents, an agent as mnavAvoid refuses it, a height not finite, or a buffer with a count out of range, an array missing or an origin not finite; `mnav_errorLimit` for more agents than the set's limit; `mnav_errorCapacity` when the buffer filled, its counts saying what the whole needs. @par Thread safety Safe from any thread; the set and the buffer are used by one thread at a time.
 
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavDebugAvoidance3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount, const mnavSphere* spheres, int32_t sphereCount, mnavDebugBuffer* buffer);
+```
+Appends each flier's outline, three 16-gons on its radius, one in each axis plane (mnav_debugAgent), a line to each neighbour mnavAvoid3D would give it (mnav_debugNeighbor), and each sphere's three rings (mnav_debugObstacle).  @param avoidance   The set; its scratch is used. @param agents      The agents. @param agentCount  How many, at least 0. @param spheres     The spheres. @param sphereCount How many, at least 0. @param buffer      The buffer appended to. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with agents or spheres, a negative count, an agent or sphere as mnavAvoid3D refuses it, or a buffer with a count out of range, an array missing or an origin not finite; `mnav_errorLimit` for more agents or spheres than mnavAvoid3D takes; `mnav_errorCapacity` when the buffer filled, its counts saying what the whole needs. @par Thread safety Safe from any thread; the set and the buffer are used by one thread at a time.
+
 ## `bake.h`
 
 The bake's settings and its input surface: the def a bake runs with, the agent profile it bakes for, the named limits that bound its work, and the triangle meshes a host hands it, each checked before any work (mnav-0002).
@@ -589,4 +594,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-108 functions across 12 headers.
+109 functions across 12 headers.

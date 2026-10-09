@@ -8,6 +8,12 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- `mnavDebugAvoidance3D`: fliers drawn as three rings each, one in each
+  axis plane, with a line to each neighbor `mnavAvoid3D` gives them, and
+  the spheres they avoid as rings of a new kind, `mnav_debugObstacle`.
+
 ## [0.7.0] - 2026-10-09
 
 Avoidance among fliers: agents sharing a flight volume steer round each

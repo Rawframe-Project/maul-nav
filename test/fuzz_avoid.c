@@ -9,7 +9,8 @@
 // than each agent's limit; the same agents give the same velocities
 // again and in the reverse order when their ids differ; drawing them
 // ends in a typed status; the set gives back all it took. Bytes left
-// over feed the same checks to fliers and spheres in space.
+// over feed the same checks to fliers and spheres in space, and drawing
+// them refuses what the call refuses.
 
 #include "counting_allocator.h"
 
@@ -137,6 +138,12 @@ static int32_t ReadObstacles(Reader* r)
     return count;
 }
 
+// Whether a step is one mnavAvoid3D takes.
+static bool GoodStep(double step)
+{
+    return isfinite(step) && step >= MNAV_MIN_AVOIDANCE_TIME;
+}
+
 static mnavPos3 Pos3(Reader* r)
 {
     return (mnavPos3){Value(r), Value(r), Value(r)};
@@ -178,6 +185,14 @@ static void Space(Reader* r, mnavAvoidance* avoidance)
     mnavResult result =
         mnavAvoid3D(avoidance, s_fliers, agents, s_spheres, spheres, step, s_first3);
     Expect(Typed(result));
+    // Drawing refuses what the call refuses, given a good step.
+    mnavDebugBuffer buffer = {{0.0, 0.0, 0.0}, s_vertices, 1 << 14, 0, nullptr, 0, 0,
+                              s_lines,         1 << 14,    0};
+    mnavResult drawn =
+        mnavDebugAvoidance3D(avoidance, s_fliers, agents, s_spheres, spheres, &buffer);
+    Expect(Typed(drawn) || drawn == mnav_errorCapacity);
+    Expect(!GoodStep(step) ||
+           (drawn == mnav_errorCapacity ? result == mnav_success : drawn == result));
     if (result != mnav_success)
     {
         return;
