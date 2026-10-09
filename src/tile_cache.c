@@ -2,13 +2,14 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The tile cache (mnav-0016): entries in a table of the def's tiles, each
-// with its own copies of a field and of volumes, all in the cache's
+// with a packed field and its own copies of volumes, all in the cache's
 // memory and within its limits.
 
 #include "tile_cache.h"
 
 #include "allocator.h"
 #include "compact.h"
+#include "field_pack.h"
 #include "outline.h"
 
 #include "maul-nav/bake.h"
@@ -32,7 +33,7 @@ struct mnavTileCache
 
 mnavTileCacheDef mnavDefaultTileCacheDef(void)
 {
-    return (mnavTileCacheDef){TILE_CACHE_DEF_COOKIE, {0}, {1024, 268435456ull}};
+    return (mnavTileCacheDef){TILE_CACHE_DEF_COOKIE, {0}, {4096, 67108864ull}};
 }
 
 mnavResult mnavCreateTileCache(const mnavTileCacheDef* def, mnavTileCache** cacheOut)
@@ -75,7 +76,7 @@ mnavResult mnavCreateTileCache(const mnavTileCacheDef* def, mnavTileCache** cach
 // Releases what an entry holds.
 static void Release(mnavMemory* memory, mnavCachedTile* tile)
 {
-    mnavReleaseCompactField(memory, &tile->field);
+    mnavReleasePackedField(memory, &tile->field);
     mnavRelease(memory, tile->volumes, (size_t)tile->volumeCount, sizeof(mnavBakeVolume),
                 alignof(mnavBakeVolume));
     mnavRelease(memory, tile->points, (size_t)tile->pointCount, sizeof(mnavVec2),
@@ -197,8 +198,9 @@ static mnavResult CopyVolumes(mnavMemory* memory, const mnavBakeVolume* volumes,
     return mnav_success;
 }
 
-mnavResult mnavCacheTile(mnavTileCache* cache, const mnavCachedTile* tile,
-                         const mnavBakeVolume* volumes, int32_t volumeCount)
+mnavResult mnavCacheTile(mnavTileCache* cache, mnavMemory* scratch, const mnavCachedTile* tile,
+                         const mnavCompactField* field, const mnavBakeVolume* volumes,
+                         int32_t volumeCount)
 {
     mnavDropCachedTile(cache, tile->tileX, tile->tileZ);
     if (cache->count == cache->def.limits.tiles)
@@ -218,12 +220,12 @@ mnavResult mnavCacheTile(mnavTileCache* cache, const mnavCachedTile* tile,
                             .settings = tile->settings,
                             .geometry = tile->geometry,
                             .triangles = tile->triangles};
-    entry.volumeCount = Kept(&tile->field.frame, volumes, volumeCount, keep, &entry.pointCount);
+    entry.volumeCount = Kept(&field->frame, volumes, volumeCount, keep, &entry.pointCount);
     result = CopyVolumes(&cache->memory, volumes, volumeCount, keep, &entry);
     mnavRelease(&cache->memory, keep, (size_t)volumeCount, sizeof(bool), alignof(bool));
     if (result == mnav_success)
     {
-        result = mnavCopyCompactField(&cache->memory, &tile->field, &entry.field);
+        result = mnavPackField(scratch, &cache->memory, field, &entry.field);
     }
     if (result != mnav_success)
     {

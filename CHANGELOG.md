@@ -17,9 +17,13 @@ format.
   tile's open space before bake volumes apply, and `mnavRebuildTile`
   rebuilds the tile from it with obstacles given as bake volumes, to
   the byte the tile a full bake gives with them appended, in about a
-  third of the time. `mnavCreateTileCache`, `mnavDestroyTileCache`,
+  third of the time. Cached tiles are kept compressed, about 10 KB for
+  a 32 m tile of terrain. `mnavCreateTileCache`, `mnavDestroyTileCache`,
   `mnavDefaultTileCacheDef`, `mnavDropCachedTile` and
   `mnavGetTileCacheBytes` manage the cache.
+- `fuzz_lz`, a fuzz target over the tile cache's coder; `fuzz_bake`
+  also rebuilds each 3D tile from a cache with its last volumes as
+  obstacles and checks the bytes against the full bake.
 
 ## [0.8.0] - 2026-10-09
 

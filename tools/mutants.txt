@@ -518,7 +518,7 @@ tc-drop-swap | src/tile_cache.c | cache->tiles[i] = cache->tiles[cache->count - 
 tc-tile-limit | src/tile_cache.c | if (cache->count == cache->def.limits.tiles) | if (cache->count > cache->def.limits.tiles)
 tc-bytes-range | src/tile_cache.c | def->limits.memoryBytes < 1) | def->limits.memoryBytes < 0)
 tc-points | src/tile_cache.c | p += volumes[i].pointCount; | p += 0;
-cp-areas | src/compact.c | memcpy(to->areas, from->areas, count * sizeof(mnavAreaType)); | (void)0;
+fp-areas | src/field_pack.c | areas[i] = field->areas[i]; | areas[i] = 0;
 bk-settings | src/baker.c | : tile->settings != HashSettings(&baker->def, tileX, tileZ) | : false
 bk-obstacle-index | src/baker.c | report->mesh = i; | report->mesh = i + 1;
 bk-cached-points | src/baker.c | int64_t total = (int64_t)tile->triangles + tile->pointCount; | int64_t total = (int64_t)tile->triangles;
@@ -527,3 +527,12 @@ bk-obstacle-points | src/baker.c | total += obstacles[i].pointCount; | total += 
 bk-triangles | src/baker.c | report.triangles = tile->triangles; | report.triangles = 0;
 bk-cache-fail-drop | src/baker.c | mnavDropCachedTile(cache, tileX, tileZ); | (void)0;
 bk-fingerprint | src/baker.c | mnavFingerprintVolumes(&tile->field.frame, volumes, count, tile->geometry); | tile->geometry;
+lz-offset-max | src/lz.c | if (place == NO_PLACE || i - place > MAX_OFFSET || Read32(&in[place]) != v) | if (place == NO_PLACE || i - place > MAX_OFFSET + 1 || Read32(&in[place]) != v)
+lz-extend | src/lz.c | while (i + length < size && in[place + length] == in[i + length]) | while (false)
+lz-zero-offset | src/lz.c | if ((length == 15 && !GetLength(in, size, &at, &length, outSize)) || offset == 0 || | if ((length == 15 && !GetLength(in, size, &at, &length, outSize)) ||
+lz-last-token | src/lz.c | return (token & 15) == 0 && written == outSize; | return written == outSize;
+lz-count-room | src/lz.c | if ((count == 15 && !GetLength(in, size, &at, &count, outSize)) || count > size - at || | if ((count == 15 && !GetLength(in, size, &at, &count, outSize)) ||
+lz-long-count | src/lz.c | for (length -= 15; length >= 255; length -= 255) | for (length -= 15; length > 255; length -= 255)
+fp-high-byte | src/field_pack.c | plane[count + i] = (uint8_t)(value >> 8); | plane[count + i] = 0;
+fp-relink | src/field_pack.c | mnavLinkCompactField(field, height, step); | (void)0;
+fp-count-check | src/field_pack.c | if (written != spans) | if (false)

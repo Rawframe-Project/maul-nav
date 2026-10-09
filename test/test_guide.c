@@ -27,7 +27,7 @@ static void GuideObstacles(mnavBaker* baker, const mnavTriangleMesh* world, int3
     mnavTriangleMesh mesh = *world;
     mnavBakeReport report;
     // clang-format off
-    mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();   // 1024 tiles in 256 MiB
+    mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();   // 4096 tiles in 64 MiB
     mnavTileCache* cache = NULL;
     mnavResult cached = mnavCreateTileCache(&cacheDef, &cache);
     mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};

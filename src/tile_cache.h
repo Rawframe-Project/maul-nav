@@ -10,6 +10,7 @@
 
 #include "allocator.h"
 #include "compact.h"
+#include "field_pack.h"
 #include "raster.h"
 
 #include "maul-nav/bake.h"
@@ -28,7 +29,8 @@ typedef struct mnavCachedTile
     // The fingerprint after the triangles, before the volumes.
     uint64_t geometry;
     int32_t triangles;
-    mnavCompactField field;
+    // The field before volumes apply, packed.
+    mnavPackedField field;
     // The input's volumes that reach the tile, in input order, then, when
     // the input has an include volume and none of them is one, the
     // input's first include: so that including still applies and still
@@ -39,11 +41,13 @@ typedef struct mnavCachedTile
     int32_t pointCount;
 } mnavCachedTile;
 
-// Keeps a tile's field and volumes, replacing what the cache held for it:
-// mnav_errorLimit when it holds its most tiles or bytes, the tile's old
-// entry then dropped.
-mnavResult mnavCacheTile(mnavTileCache* cache, const mnavCachedTile* tile,
-                         const mnavBakeVolume* volumes, int32_t volumeCount);
+// Keeps a tile's field, packed, and its volumes, replacing what the
+// cache held for it; tile gives the tile's place and hashes, scratch the
+// memory packing works in. mnav_errorLimit when the cache holds its most
+// tiles or bytes, the tile's old entry then dropped.
+mnavResult mnavCacheTile(mnavTileCache* cache, mnavMemory* scratch, const mnavCachedTile* tile,
+                         const mnavCompactField* field, const mnavBakeVolume* volumes,
+                         int32_t volumeCount);
 
 // What the cache holds for a tile, or NULL.
 const mnavCachedTile* mnavFindCachedTile(const mnavTileCache* cache, int32_t tileX, int32_t tileZ);

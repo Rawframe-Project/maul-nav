@@ -101,7 +101,7 @@ rebuild a tile with obstacles, given as bake volumes, without its
 triangles:
 
 ```c
-mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();   // 1024 tiles in 256 MiB
+mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();   // 4096 tiles in 64 MiB
 mnavTileCache* cache = NULL;
 mnavResult cached = mnavCreateTileCache(&cacheDef, &cache);
 mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};
@@ -124,9 +124,9 @@ mnavResult rebuilt = mnavRebuildTile(baker, cache, tileX, tileZ, &crate, 1, &rep
   and the obstacles it is given, so pass every obstacle on the tile;
   rebuild with none to clear them. An obstacle reaches the tiles its
   ring touches, widened by the agent's radius.
-- **Memory.** A cached tile of the default cells takes about 300 KB.
-  Cache the tiles where obstacles may stand, and drop tiles
-  (`mnavDropCachedTile`) as they stream out. `mnavGetTileCacheBytes`
+- **Memory.** A cached tile is kept compressed: about 10 KB for a 32 m
+  tile of hilly terrain at the default cells. Drop tiles
+  (`mnavDropCachedTile`) as they stream out; `mnavGetTileCacheBytes`
   gives what the cache holds. Moving obstacles are for avoidance.
 
 ## The navmesh

@@ -761,11 +761,11 @@ extern "C"
 
     // What a baker keeps of baked tiles to rebuild them with obstacles
     // (mnav-0016): each tile's open-space field as it stands before
-    // volumes apply, the volumes that reach the tile, and the hash of its
-    // triangles. Made by mnavCreateTileCache.
+    // volumes apply, compressed, the volumes that reach the tile, and the
+    // hash of its triangles. Made by mnavCreateTileCache.
     typedef struct mnavTileCache mnavTileCache;
 
-    /// Returns the default tile cache def: up to 1024 tiles in 256 MiB.
+    /// Returns the default tile cache def: up to 4096 tiles in 64 MiB.
     ///
     /// @return The def.
     /// @par Thread safety

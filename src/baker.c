@@ -12,6 +12,7 @@
 #include "contour.h"
 #include "detail.h"
 #include "erode.h"
+#include "field_pack.h"
 #include "filter.h"
 #include "fingerprint.h"
 #include "heightfield.h"
@@ -531,9 +532,9 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
                                      .tileZ = tileZ,
                                      .settings = settings,
                                      .geometry = geometry,
-                                     .triangles = report.triangles,
-                                     .field = stages.compact};
-        result = mnavCacheTile(cache, &tile, in->solid.volumes, in->solid.volumeCount);
+                                     .triangles = report.triangles};
+        result = mnavCacheTile(cache, &baker->memory, &tile, &stages.compact, in->solid.volumes,
+                               in->solid.volumeCount);
     }
     if (result == mnav_success)
     {
@@ -668,7 +669,8 @@ mnavResult mnavRebuildTile(mnavBaker* baker, mnavTileCache* cache, int32_t tileX
         report.fingerprint =
             mnavFingerprintVolumes(&tile->field.frame, volumes, count, tile->geometry);
         Enter(baker, &report, mnav_stageCompact);
-        result = mnavCopyCompactField(&baker->memory, &tile->field, &stages.compact);
+        result = mnavUnpackField(&baker->memory, &tile->field, baker->cells.agentHeight,
+                                 baker->cells.agentStep, &stages.compact);
     }
     if (result == mnav_success)
     {

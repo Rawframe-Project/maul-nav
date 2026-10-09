@@ -11,7 +11,6 @@
 #include "maul-nav/bake.h"
 
 #include <stdint.h>
-#include <string.h>
 
 // The top of the open space above a column's highest span.
 #define OPEN_TOP 65535
@@ -87,7 +86,7 @@ static uint16_t FindLink(const mnavCompactField* field, const mnavOpenSpan* span
     return MNAV_NO_LINK;
 }
 
-static void Link(mnavCompactField* field, int32_t height, int32_t step)
+void mnavLinkCompactField(mnavCompactField* field, int32_t height, int32_t step)
 {
     int32_t width = field->frame.width;
     for (int32_t z = 0; z < width; ++z)
@@ -113,33 +112,43 @@ static void Link(mnavCompactField* field, int32_t height, int32_t step)
     }
 }
 
-mnavResult mnavBuildCompactField(mnavMemory* memory, const mnavHeightfield* heightfield,
-                                 int32_t height, int32_t step, mnavCompactField* field)
+mnavResult mnavAllocateCompactField(mnavMemory* memory, const mnavTileFrame* frame,
+                                    int32_t spanCount, mnavCompactField* field)
 {
     *field = (mnavCompactField){0};
-    field->frame = heightfield->frame;
-    int32_t count = CountWalkable(heightfield);
-    field->spanCount = count;
-    size_t columnCount = (size_t)field->frame.width * (size_t)field->frame.width + 1;
+    field->frame = *frame;
+    field->spanCount = spanCount;
+    size_t columnCount = (size_t)frame->width * (size_t)frame->width + 1;
     mnavResult result = mnavAllocate(memory, columnCount, sizeof(uint32_t), alignof(uint32_t),
                                      (void**)&field->columns);
     if (result == mnav_success)
     {
-        result = mnavAllocate(memory, (size_t)count, sizeof(mnavOpenSpan), alignof(mnavOpenSpan),
-                              (void**)&field->spans);
+        result = mnavAllocate(memory, (size_t)spanCount, sizeof(mnavOpenSpan),
+                              alignof(mnavOpenSpan), (void**)&field->spans);
     }
     if (result == mnav_success)
     {
-        result = mnavAllocate(memory, (size_t)count, sizeof(mnavAreaType), alignof(mnavAreaType),
-                              (void**)&field->areas);
+        result = mnavAllocate(memory, (size_t)spanCount, sizeof(mnavAreaType),
+                              alignof(mnavAreaType), (void**)&field->areas);
     }
     if (result != mnav_success)
     {
         mnavReleaseCompactField(memory, field);
+    }
+    return result;
+}
+
+mnavResult mnavBuildCompactField(mnavMemory* memory, const mnavHeightfield* heightfield,
+                                 int32_t height, int32_t step, mnavCompactField* field)
+{
+    mnavResult result =
+        mnavAllocateCompactField(memory, &heightfield->frame, CountWalkable(heightfield), field);
+    if (result != mnav_success)
+    {
         return result;
     }
     FillSpans(heightfield, field);
-    Link(field, height, step);
+    mnavLinkCompactField(field, height, step);
     return mnav_success;
 }
 
@@ -155,38 +164,4 @@ void mnavReleaseCompactField(mnavMemory* memory, mnavCompactField* field)
     mnavRelease(memory, field->areas, (size_t)field->spanCount, sizeof(mnavAreaType),
                 alignof(mnavAreaType));
     *field = (mnavCompactField){0};
-}
-
-mnavResult mnavCopyCompactField(mnavMemory* memory, const mnavCompactField* from,
-                                mnavCompactField* to)
-{
-    *to = (mnavCompactField){0};
-    size_t columnCount = (size_t)from->frame.width * (size_t)from->frame.width + 1;
-    size_t count = (size_t)from->spanCount;
-    mnavResult result = mnavAllocate(memory, columnCount, sizeof(uint32_t), alignof(uint32_t),
-                                     (void**)&to->columns);
-    if (result == mnav_success)
-    {
-        result = mnavAllocate(memory, count, sizeof(mnavOpenSpan), alignof(mnavOpenSpan),
-                              (void**)&to->spans);
-    }
-    if (result == mnav_success)
-    {
-        result = mnavAllocate(memory, count, sizeof(mnavAreaType), alignof(mnavAreaType),
-                              (void**)&to->areas);
-    }
-    to->frame = from->frame;
-    to->spanCount = from->spanCount;
-    if (result != mnav_success)
-    {
-        mnavReleaseCompactField(memory, to);
-        return result;
-    }
-    memcpy(to->columns, from->columns, columnCount * sizeof(uint32_t));
-    if (count > 0)
-    {
-        memcpy(to->spans, from->spans, count * sizeof(mnavOpenSpan));
-        memcpy(to->areas, from->areas, count * sizeof(mnavAreaType));
-    }
-    return mnav_success;
 }

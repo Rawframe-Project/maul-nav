@@ -138,7 +138,7 @@ Copies the last baked tile's bytes into caller memory.  @param baker     The bak
 ```c
 mnavTileCacheDef mnavDefaultTileCacheDef(void);
 ```
-Returns the default tile cache def: up to 1024 tiles in 256 MiB.  @return The def. @par Thread safety Safe from any thread.
+Returns the default tile cache def: up to 4096 tiles in 64 MiB.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileCache(const mnavTileCacheDef* def, mnavTileCache** cacheOut);

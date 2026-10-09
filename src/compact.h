@@ -59,9 +59,14 @@ mnavResult mnavBuildCompactField(mnavMemory* memory, const mnavHeightfield* heig
 
 void mnavReleaseCompactField(mnavMemory* memory, mnavCompactField* field);
 
-// Copies a field into new memory; on failure to holds nothing.
-mnavResult mnavCopyCompactField(mnavMemory* memory, const mnavCompactField* from,
-                                mnavCompactField* to);
+// Allocates a field of spanCount spans over a frame, its contents unset;
+// on failure it holds nothing.
+mnavResult mnavAllocateCompactField(mnavMemory* memory, const mnavTileFrame* frame,
+                                    int32_t spanCount, mnavCompactField* field);
+
+// Links each span to the span it reaches in each neighboring column: one
+// sharing at least height cells of space, its floor within step.
+void mnavLinkCompactField(mnavCompactField* field, int32_t height, int32_t step);
 
 // The index of the span linked from span i of column (x, z) in a
 // direction; the link must exist.
