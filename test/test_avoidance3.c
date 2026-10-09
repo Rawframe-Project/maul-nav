@@ -2,8 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Avoidance in space (mnav-0006): fliers steering round each other and
-// round spheres by ORCA, in any order, by priority, within the set's
-// limits.
+// round spheres by ORCA, in any order, by priority, by layers, within the
+// set's limits.
 
 #include "test_harness.h"
 
@@ -36,7 +36,7 @@ static mnavAvoidance* Make(int32_t agents, int32_t neighbors, double horizon)
 
 static mnavAgent3D Agent(double x, double y, double z, uint64_t id)
 {
-    return (mnavAgent3D){{x, y, z}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, 0.5, 1.5, 1.0, id};
+    return (mnavAgent3D){{x, y, z}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, 0.5, 1.5, 1.0, id, 0, 0};
 }
 
 static double Length(mnavPos3 v)
@@ -281,8 +281,8 @@ static void TestAnyOrder(void)
         agents[i].priority = Random(0.5, 2.0);
         reversed[MOST - 1 - i] = agents[i];
     }
-    mnavSphere spheres[2] = {{{0.0, 0.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 7},
-                             {{2.0, 1.0, -1.0}, 0.5, {0.5, 0.0, 0.0}, 8}};
+    mnavSphere spheres[2] = {{{0.0, 0.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 7, 0},
+                             {{2.0, 1.0, -1.0}, 0.5, {0.5, 0.0, 0.0}, 8, 0}};
     mnavPos3 forward[MOST];
     mnavPos3 backward[MOST];
     CHECK(mnavAvoid3D(avoidance, agents, MOST, spheres, 2, 0.1, forward) == mnav_success,
@@ -350,8 +350,8 @@ static void TestSpheres(void)
     mnavAvoidance* avoidance = Make(16, 10, 2.0);
     mnavAgent3D agents[1] = {Agent(-10.0, 0.0, 0.0, 1)};
     const mnavPos3 goals[1] = {{10.0, 0.0, 0.0}};
-    mnavSphere spheres[2] = {{{-4.0, 0.0, 0.0}, 1.5, {0.0, 0.0, 0.0}, 5},
-                             {{3.0, 0.0, 8.0}, 1.0, {0.0, 0.0, -1.0}, 6}};
+    mnavSphere spheres[2] = {{{-4.0, 0.0, 0.0}, 1.5, {0.0, 0.0, 0.0}, 5, 0},
+                             {{3.0, 0.0, 8.0}, 1.0, {0.0, 0.0, -1.0}, 6, 0}};
     Scene s = {avoidance, agents, goals, 1, spheres, 2, 0.0, 0.0, 0.0};
     Run(&s, 400);
     printf("spheres: closest=%.6f arrived=%d\n", s.closestSphere, Arrived(&s, 0.1));
@@ -359,11 +359,55 @@ static void TestSpheres(void)
     CHECK(Arrived(&s, 0.1) == 1, "it arrives");
     // Started inside one, it leaves within a few steps and stays out.
     agents[0] = Agent(0.5, 0.0, 0.0, 1);
-    spheres[0] = (mnavSphere){{0.0, 0.0, 0.0}, 2.0, {0.0, 0.0, 0.0}, 5};
+    spheres[0] = (mnavSphere){{0.0, 0.0, 0.0}, 2.0, {0.0, 0.0, 0.0}, 5, 0};
     const mnavPos3 stay[1] = {{0.5, 0.0, 0.0}};
     s = (Scene){avoidance, agents, stay, 1, spheres, 1, 0.0, 0.0, 0.0};
     Run(&s, 30);
     CHECK(ClosestSphere(agents, 1, spheres, 1) > -1e-9, "it leaves");
+    mnavDestroyAvoidance(avoidance);
+}
+
+static void TestLayers(void)
+{
+    // A sphere of layer 4 in the way: a flier ignoring it flies straight
+    // through and arrives.
+    mnavAvoidance* avoidance = Make(16, 10, 2.0);
+    mnavAgent3D agents[2] = {Agent(-10.0, 0.0, 0.0, 1)};
+    agents[0].ignores = 4;
+    const mnavPos3 goals[1] = {{10.0, 0.0, 0.0}};
+    mnavSphere sphere = {{-4.0, 0.0, 0.0}, 1.5, {0.0, 0.0, 0.0}, 5, 4};
+    Scene s = {avoidance, agents, goals, 1, &sphere, 1, 0.0, 0.0, 0.0};
+    Run(&s, 400);
+    CHECK(Arrived(&s, 0.1) == 1 && agents[0].position.y == 0.0 && agents[0].position.z == 0.0,
+          "through the sphere it ignores");
+    // One step, head on: the flier moves off its preferred velocity across
+    // the pair's plane by its share, twice as far for a ghost that ignores
+    // it as for a flier that shares the avoidance.
+    agents[0] = Agent(-1.5, 0.0, 0.0, 1);
+    agents[1] = Agent(1.5, 0.3, 0.1, 2);
+    agents[0].velocity = agents[0].preferred = (mnavPos3){1.5, 0.0, 0.0};
+    agents[1].velocity = agents[1].preferred = (mnavPos3){-1.5, 0.0, 0.0};
+    agents[0].maxSpeed = 3.0;
+    agents[1].maxSpeed = 3.0;
+    mnavPos3 shared[2];
+    mnavPos3 alone[2];
+    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, shared) == mnav_success, "stepped");
+    agents[0].layers = 1;
+    agents[1].ignores = 1;
+    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, alone) == mnav_success, "stepped");
+    mnavPos3 n = Sub(alone[0], shared[0]);
+    mnavPos3 off = Sub(shared[0], (mnavPos3){1.5, 0.0, 0.0});
+    double across = off.x * n.x + off.y * n.y + off.z * n.z;
+    double between = n.x * n.x + n.y * n.y + n.z * n.z;
+    CHECK(between > 1e-4 && fabs(across - between) < 1e-9 * between && alone[1].x == -1.5 &&
+              alone[1].y == 0.0 && alone[1].z == 0.0,
+          "the whole avoidance, twice the half");
+    // Each ignoring the other, they fly through each other.
+    agents[0].ignores = 2;
+    agents[1].layers = 2;
+    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, alone) == mnav_success &&
+              alone[0].x == 1.5 && alone[0].y == 0.0 && alone[1].x == -1.5 && alone[1].y == 0.0,
+          "ghosts pass through each other");
     mnavDestroyAvoidance(avoidance);
 }
 
@@ -375,7 +419,7 @@ static void TestSphereKept(void)
     mnavAvoidance* avoidance = Make(16, 10, 2.0);
     mnavAgent3D agents[2] = {Agent(0.0, 0.0, 0.0, 1), Agent(-0.6, 0.0, 0.0, 2)};
     agents[1].priority = 1e6;
-    mnavSphere sphere = {{1.0, 0.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 9};
+    mnavSphere sphere = {{1.0, 0.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 9, 0};
     mnavPos3 velocities[2];
     CHECK(mnavAvoid3D(avoidance, agents, 2, &sphere, 1, 0.1, velocities) == mnav_success,
           "stepped");
@@ -390,7 +434,7 @@ static void TestFastSphere(void)
     mnavAvoidance* avoidance = Make(16, 10, 2.0);
     mnavAgent3D agents[1] = {Agent(0.0, 0.0, 0.0, 1)};
     const mnavPos3 goals[1] = {{0.0, 0.0, 0.0}};
-    mnavSphere spheres[1] = {{{6.0, 0.3, 0.0}, 1.0, {-3.0, 0.0, 0.0}, 9}};
+    mnavSphere spheres[1] = {{{6.0, 0.3, 0.0}, 1.0, {-3.0, 0.0, 0.0}, 9, 0}};
     mnavPos3 velocities[1];
     CHECK(mnavAvoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
           "stepped");
@@ -422,8 +466,8 @@ static void TestSphereTie(void)
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
     mnavAgent3D agent = Agent(0.0, 0.0, 0.0, 1);
     agent.preferred = (mnavPos3){1.0, 0.0, 0.0};
-    mnavSphere spheres[2] = {{{0.0, 3.0, 0.0}, 1.0, {0.0, -2.0, 0.0}, 5},
-                             {{0.0, -3.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 6}};
+    mnavSphere spheres[2] = {{{0.0, 3.0, 0.0}, 1.0, {0.0, -2.0, 0.0}, 5, 0},
+                             {{0.0, -3.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 6, 0}};
     mnavSphere swapped[2] = {spheres[1], spheres[0]};
     mnavPos3 first;
     mnavPos3 second;
@@ -441,7 +485,7 @@ static void TestChecks(void)
     mnavAvoidance* avoidance = Make(2, 4, 2.0);
     mnavAgent3D agents[3] = {Agent(0.0, 0.0, 0.0, 1), Agent(3.0, 0.0, 0.0, 2),
                              Agent(6.0, 0.0, 0.0, 3)};
-    mnavSphere sphere = {{0.0, 5.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 9};
+    mnavSphere sphere = {{0.0, 5.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 9, 0};
     mnavPos3 out[3];
     CHECK(mnavAvoid3D(nullptr, agents, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid, "no set");
     CHECK(mnavAvoid3D(avoidance, nullptr, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
@@ -516,6 +560,7 @@ static void TestChecks(void)
 
 int main(void)
 {
+    TestLayers();
     TestHeadOn();
     TestSwap();
     TestCrossing();

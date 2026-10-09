@@ -25,6 +25,8 @@ typedef struct mnavCrowdKey
     int32_t index;
     // The agent's position, read in key order by the neighbour search.
     mnavPos3 position;
+    // The agent's layers, which a search ignoring them passes over.
+    uint32_t layers;
 } mnavCrowdKey;
 
 // An occupied cell's keys, first to end; first is -1 in a free slot.
@@ -71,8 +73,8 @@ mnavCrowdKey mnavCrowdKeyOf(const mnavCrowd* crowd, mnavPos3 position, uint64_t 
 void mnavSortCrowd(mnavCrowd* crowd, int32_t count);
 
 // The neighbours of agent index at position into crowd->neighbors,
-// nearest first, those at equal distances by id and index; returns how
-// many.
-int32_t mnavCrowdNeighbors(mnavCrowd* crowd, mnavPos3 position, int32_t index);
+// nearest first, those at equal distances by id and index, passing over
+// those whose layers share a bit with ignores; returns how many.
+int32_t mnavCrowdNeighbors(mnavCrowd* crowd, mnavPos3 position, int32_t index, uint32_t ignores);
 
 #endif // MAUL_NAV_SRC_CROWD_H

@@ -10,6 +10,11 @@ format.
 
 ### Added
 
+- Avoidance layers: `layers` on `mnavAgent`, `mnavAgent3D`,
+  `mnavObstacle` and `mnavSphere`, and `ignores` on the agents; an agent
+  avoids every agent and obstacle unless its `ignores` shares a bit with
+  the other's `layers`, and takes the whole avoidance of an agent that
+  ignores it. Zero for both avoids everything, as before.
 - `mnavFindWalls`: the walls within a radius of a point, nearest first,
   into a buffer the caller gives that keeps the nearest when it is
   short, each with its ends, its distance and the normal toward the
@@ -22,6 +27,10 @@ format.
 
 ### Changed
 
+- `mnavAgent`, `mnavAgent3D`, `mnavObstacle` and `mnavSphere` end with
+  the new layer fields: initializers that list every field in order
+  need them added (zero keeps the old behaviour), as compilers warn of
+  missing fields; designated initializers need nothing.
 - Sample `navcrowd`: its two groups meet head on in a corridor 4 m wide,
   and avoidance keeps them clear of the walls `mnavFindWalls` finds near
   each agent, moved out by the agent's radius, where before it saw four

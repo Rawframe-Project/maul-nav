@@ -3,14 +3,14 @@
 //
 // Fuzzes avoidance input (mnav-0006), which a host passes every step:
 // agents and obstacles read from the bytes, with NaNs, infinities, huge
-// coordinates, radii and speeds of no size, ids alike, polygons wound
-// either way and segments of no length, and a step of any value. A call
-// must refuse with a typed status or give finite velocities no faster
-// than each agent's limit; the same agents give the same velocities
-// again and in the reverse order when their ids differ; drawing them
-// ends in a typed status; the set gives back all it took. Bytes left
-// over feed the same checks to fliers and spheres in space, and drawing
-// them refuses what the call refuses.
+// coordinates, radii and speeds of no size, ids alike, layers and ignores
+// that meet, polygons wound either way and segments of no length, and a
+// step of any value. A call must refuse with a typed status or give
+// finite velocities no faster than each agent's limit; the same agents
+// give the same velocities again and in the reverse order when their ids
+// differ; drawing them ends in a typed status; the set gives back all it
+// took. Bytes left over feed the same checks to fliers and spheres in
+// space, and drawing them refuses what the call refuses.
 
 #include "counting_allocator.h"
 
@@ -81,6 +81,12 @@ static double Size(Reader* r)
     return Byte(r) % 6 != 0 ? 0.1 + (double)(Byte(r) % 20) * 0.1 : Value(r);
 }
 
+// Layers or ignores of two bits, so that groups often meet.
+static uint32_t Layers(Reader* r)
+{
+    return Byte(r) % 4u;
+}
+
 static mnavPos2 Pos(Reader* r)
 {
     return (mnavPos2){Value(r), Value(r)};
@@ -113,7 +119,8 @@ static int32_t ReadAgents(Reader* r, bool* distinct)
     for (int32_t i = 0; i < count; ++i)
     {
         uint64_t id = Byte(r) % 4 == 0 ? (uint64_t)(Byte(r) % 4) : 100u + (uint64_t)i;
-        s_agents[i] = (mnavAgent){Pos(r), Pos(r), Pos(r), Size(r), Size(r), Size(r), id};
+        s_agents[i] = (mnavAgent){Pos(r),  Pos(r), Pos(r),    Size(r),  Size(r),
+                                  Size(r), id,     Layers(r), Layers(r)};
         for (int32_t j = 0; j < i; ++j)
         {
             *distinct = *distinct && s_agents[j].id != id;
@@ -133,7 +140,8 @@ static int32_t ReadObstacles(Reader* r)
             s_points[o][k] = Pos(r);
         }
         double radius = points == 1 ? Size(r) : (Byte(r) % 8 == 0 ? Size(r) : 0.0);
-        s_obstacles[o] = (mnavObstacle){s_points[o], points, radius, Pos(r), (uint64_t)o + 1};
+        s_obstacles[o] =
+            (mnavObstacle){s_points[o], points, radius, Pos(r), (uint64_t)o + 1, Layers(r)};
     }
     return count;
 }
@@ -156,7 +164,8 @@ static int32_t ReadFliers(Reader* r, bool* distinct)
     for (int32_t i = 0; i < count; ++i)
     {
         uint64_t id = Byte(r) % 4 == 0 ? (uint64_t)(Byte(r) % 4) : 100u + (uint64_t)i;
-        s_fliers[i] = (mnavAgent3D){Pos3(r), Pos3(r), Pos3(r), Size(r), Size(r), Size(r), id};
+        s_fliers[i] = (mnavAgent3D){Pos3(r), Pos3(r), Pos3(r),   Size(r),  Size(r),
+                                    Size(r), id,      Layers(r), Layers(r)};
         for (int32_t j = 0; j < i; ++j)
         {
             *distinct = *distinct && s_fliers[j].id != id;
@@ -170,7 +179,7 @@ static int32_t ReadSpheres(Reader* r)
     int32_t count = Byte(r) % (MOST_OBSTACLES + 1);
     for (int32_t o = 0; o < count; ++o)
     {
-        s_spheres[o] = (mnavSphere){Pos3(r), Size(r), Pos3(r), (uint64_t)o + 1};
+        s_spheres[o] = (mnavSphere){Pos3(r), Size(r), Pos3(r), (uint64_t)o + 1, Layers(r)};
     }
     return count;
 }

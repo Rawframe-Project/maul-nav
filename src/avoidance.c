@@ -243,6 +243,7 @@ static mnavResult FillKeys(mnavAvoidance* a, const mnavAgent* agents, int32_t co
         }
         mnavPos3 position = {agents[i].position.x, agents[i].position.y, 0.0};
         a->crowd.keys[i] = mnavCrowdKeyOf(&a->crowd, position, agents[i].id, i);
+        a->crowd.keys[i].layers = agents[i].layers;
     }
     return mnav_success;
 }
@@ -257,14 +258,17 @@ static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, double step, in
     int32_t fixed = mnavObstacleLines(self, a->vertices, a->near, near, a->def.obstacleTimeHorizon,
                                       step, a->lines);
     int32_t count = fixed;
-    int32_t neighbors =
-        mnavCrowdNeighbors(&a->crowd, (mnavPos3){self->position.x, self->position.y, 0.0}, i);
+    int32_t neighbors = mnavCrowdNeighbors(
+        &a->crowd, (mnavPos3){self->position.x, self->position.y, 0.0}, i, self->ignores);
     for (int32_t n = 0; n < neighbors; ++n)
     {
         const mnavAgent* other = &agents[a->crowd.neighbors[n].index];
+        // An agent that ignores this one leaves it the whole avoidance.
+        double share = (other->ignores & self->layers) != 0
+                           ? 1.0
+                           : other->priority / (self->priority + other->priority);
         a->lines[count++] = mnavPairLine(self->position, self->velocity, other->position,
-                                         other->velocity, self->radius + other->radius,
-                                         other->priority / (self->priority + other->priority),
+                                         other->velocity, self->radius + other->radius, share,
                                          a->def.timeHorizon, step, self->id < other->id);
     }
     mnavPos2 velocity = {0.0, 0.0};
@@ -378,8 +382,8 @@ mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance, const mnavAgent* agents,
                           a->position.y + a->radius * mnavOutline[(k + 1) % 16][1]};
             mnavDrawLine(buffer, p, q, mnav_debugAgent, 0);
         }
-        int32_t count =
-            mnavCrowdNeighbors(&avoidance->crowd, (mnavPos3){a->position.x, a->position.y, 0.0}, i);
+        int32_t count = mnavCrowdNeighbors(
+            &avoidance->crowd, (mnavPos3){a->position.x, a->position.y, 0.0}, i, a->ignores);
         for (int32_t n = 0; n < count; ++n)
         {
             const mnavAgent* b = &agents[avoidance->crowd.neighbors[n].index];

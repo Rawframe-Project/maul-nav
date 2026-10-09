@@ -100,14 +100,16 @@ static void Scatter(double extent, bool vertical)
         s_spheres[s] = (mnavSphere){{x, y, z},
                                     0.25 + (double)(int32_t)(Random() * 4.0) * 0.5,
                                     {vx, vy, 0.0},
-                                    (uint64_t)(Random() * 400.0)};
+                                    (uint64_t)(Random() * 400.0),
+                                    0};
     }
     for (int32_t i = 0; i < AGENTS; ++i)
     {
         double x = Random() * extent;
         double y = Random() * extent / 3.0;
         double z = Random() * extent;
-        s_agents[i] = (mnavAgent3D){{x, y, z}, {0, 0, 0}, {0, 0, 0}, 0.3, 1.5, 1.0, (uint64_t)i};
+        s_agents[i] =
+            (mnavAgent3D){{x, y, z}, {0, 0, 0}, {0, 0, 0}, 0.3, 1.5, 1.0, (uint64_t)i, 0, 0};
     }
 }
 

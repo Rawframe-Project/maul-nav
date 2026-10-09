@@ -197,7 +197,7 @@ static void TestAvoidance(void)
     mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "a set");
-    const mnavAgent agent = {{(double)NAN, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 1};
+    const mnavAgent agent = {{(double)NAN, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 1, 0, 0};
     mnavPos2 velocity;
     mnavDebugBuffer buffer = {{0, 0, 0}, s_vertices2, 4096, 0, nullptr, 0, 0, s_lines, 4096, 0};
     CHECK(mnavAvoid(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) == mnav_errorInvalid &&

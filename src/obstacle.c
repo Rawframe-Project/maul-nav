@@ -93,9 +93,9 @@ mnavResult mnavBuildObstacles(const mnavObstacle* obstacles, int32_t count,
             mnavPos2 direction =
                 c > 1 ? mnavNormalize2(mnavSub2(next, here)) : (mnavPos2){0.0, 0.0};
             bool convex = c < 3 || LeftOf(previous, here, next) >= 0.0;
-            vertices[n + i] =
-                (mnavObstacleVertex){here, direction,       o->velocity,         o->radius, o->id,
-                                     i,    n + (i + 1) % c, n + (i + c - 1) % c, convex};
+            vertices[n + i] = (mnavObstacleVertex){
+                here, direction,       o->velocity,         o->radius, o->id,
+                i,    n + (i + 1) % c, n + (i + c - 1) % c, convex,    o->layers};
         }
         n += c;
     }
@@ -341,6 +341,10 @@ typedef struct Seen
 static double MeasureSeen(const void* context, int32_t v)
 {
     const Seen* seen = context;
+    if ((seen->vertices[v].layers & seen->agent->ignores) != 0)
+    {
+        return -1.0;
+    }
     return Reach(seen->agent, seen->vertices, v, seen->horizon);
 }
 

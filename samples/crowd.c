@@ -39,12 +39,12 @@ int main(void)
         double x = (double)(i % 8) * 1.5 - 5.25;
         double z = i < 8 ? -10.0 : 10.0;
         agents[i] =
-            (mnavAgent){{x, z}, {0.0, 0.0}, {0.0, 0.0}, RADIUS, SPEED, 1.0, (uint64_t)i + 1};
+            (mnavAgent){{x, z}, {0.0, 0.0}, {0.0, 0.0}, RADIUS, SPEED, 1.0, (uint64_t)i + 1, 0, 0};
         goals[i] = (mnavPos2){x, -z};
     }
     // A pillar of 1 m radius at the center.
     const mnavPos2 center = {0.0, 0.0};
-    const mnavObstacle pillar = {&center, 1, 1.0, {0.0, 0.0}, 1};
+    const mnavObstacle pillar = {&center, 1, 1.0, {0.0, 0.0}, 1, 0};
     double closest = (double)INFINITY;
     int32_t arrived = 0;
     for (int32_t step = 0; step < STEPS && arrived < AGENTS; ++step)

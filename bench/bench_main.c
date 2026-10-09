@@ -582,7 +582,8 @@ static void Doorway(void)
     static mnavPos2 velocities[AGENTS];
     const mnavPos2 below[4] = {{-1.0, -60.0}, {1.0, -60.0}, {1.0, -2.0}, {-1.0, -2.0}};
     const mnavPos2 above[4] = {{-1.0, 2.0}, {1.0, 2.0}, {1.0, 60.0}, {-1.0, 60.0}};
-    const mnavObstacle wall[2] = {{below, 4, 0.0, {0.0, 0.0}, 1}, {above, 4, 0.0, {0.0, 0.0}, 2}};
+    const mnavObstacle wall[2] = {{below, 4, 0.0, {0.0, 0.0}, 1, 0},
+                                  {above, 4, 0.0, {0.0, 0.0}, 2, 0}};
     mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
     def.allocator = (mnavAllocator){Alloc, Free, NULL};
     def.limits.agents = AGENTS;
@@ -599,7 +600,8 @@ static void Doorway(void)
         {
             double x = -45.0 + (double)(i % 25) * 1.6;
             double y = -20.0 + (double)(i / 25) * 1.0 + (double)(i % 3) * 0.1;
-            agents[i] = (mnavAgent){{x, y}, {0.0, 0.0}, {0.0, 0.0}, 0.3, 1.5, 1.0, (uint64_t)i};
+            agents[i] =
+                (mnavAgent){{x, y}, {0.0, 0.0}, {0.0, 0.0}, 0.3, 1.5, 1.0, (uint64_t)i, 0, 0};
             goals[i] = (mnavPos2){-x, y};
         }
         double start = Seconds();
@@ -694,8 +696,8 @@ static int32_t PlanCrowd(mnavQuery* query, const mnavNavmesh* navmesh)
               "crowd corridor");
         planned += mnavSetCorridor(&s_crowd[i], &path) == mnav_success ? 1 : 0;
         s_crowdWallCounts[i] = -1;
-        s_crowdAgents[i] =
-            (mnavAgent){{a.point.x, a.point.z}, {0.0, 0.0}, {0.0, 0.0}, 0.3, 1.5, 1.0, (uint64_t)i};
+        s_crowdAgents[i] = (mnavAgent){
+            {a.point.x, a.point.z}, {0.0, 0.0}, {0.0, 0.0}, 0.3, 1.5, 1.0, (uint64_t)i, 0, 0};
     }
     return planned;
 }
@@ -751,7 +753,7 @@ static int32_t CrowdWalls(mnavQuery* query, const mnavNavmesh* navmesh)
             s_crowdWallTable[cell] = count;
             memcpy(s_crowdEnds[count], ends, sizeof(ends));
             s_crowdObstacles[count] =
-                (mnavObstacle){s_crowdEnds[count], 2, 0.0, {0.0, 0.0}, (uint64_t)count + 1};
+                (mnavObstacle){s_crowdEnds[count], 2, 0.0, {0.0, 0.0}, (uint64_t)count + 1, 0};
             count += 1;
         }
     }
@@ -879,7 +881,7 @@ static void Gap(void)
             {
                 continue;
             }
-            wall[spheres] = (mnavSphere){{0.0, y, z}, 1.5, {0.0, 0.0, 0.0}, (uint64_t)spheres};
+            wall[spheres] = (mnavSphere){{0.0, y, z}, 1.5, {0.0, 0.0, 0.0}, (uint64_t)spheres, 0};
             spheres += 1;
         }
     }
@@ -900,8 +902,8 @@ static void Gap(void)
             double x = -30.0 + (double)(i % 10) * 1.6;
             double y = -7.2 + (double)(i / 10 % 10) * 1.6;
             double z = -7.2 + (double)(i / 100) * 1.6;
-            fliers[i] = (mnavAgent3D){{x, y, z}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, 0.3, 1.5,
-                                      1.0,       (uint64_t)i};
+            fliers[i] = (mnavAgent3D){
+                {x, y, z}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, 0.3, 1.5, 1.0, (uint64_t)i, 0, 0};
             goals[i] = (mnavPos3){-x, y, z};
         }
         double start = Seconds();

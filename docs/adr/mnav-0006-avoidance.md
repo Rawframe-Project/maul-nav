@@ -37,6 +37,16 @@ symmetry face to face.
   with this, the velocities unchanged.)
 - **Priority:** an agent takes the other's priority over the sum of
   both of each avoidance; equal priorities are plain ORCA.
+- **Layers (amended 2026-10-09):** agents, obstacles and spheres carry
+  `layers`, agents `ignores`, 32 bits each; an agent avoids another
+  agent or an obstacle unless its `ignores` shares a bit with the
+  other's `layers`, as Unreal's groups to ignore. Zero for both avoids
+  everything, as before, so zero-initialized input keeps its meaning,
+  where a mask of what to avoid (Godot's) would avoid nothing. Ignored
+  agents are passed over in the neighbour search, not counted against
+  the limit. An agent that avoids one ignoring it takes the whole
+  avoidance instead of the priority's share, since ORCA's split assumes
+  the other side does its part.
 - **Symmetry:** an agent held back from its preferred velocity aims 1%
   of its speed to its right; an agent left free keeps it exactly.
 - **Obstacles:** `mnavObstacle` is a circle (one point and a radius),

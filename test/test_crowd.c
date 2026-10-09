@@ -3,7 +3,8 @@
 //
 // The neighbour grid of avoidance (mnav-0006): on the ground plane and in
 // space, its neighbours are those a search of every agent finds, ties and
-// shared spots included.
+// shared spots included, and agents an agent ignores neither found nor
+// counted against the limit.
 
 #include "crowd.h"
 #include "test_harness.h"
@@ -37,6 +38,8 @@ static mnavCrowdRun s_table[2048];
 static mnavCrowdNeighbor s_neighbors[LIMIT];
 static mnavPos3 s_positions[AGENTS];
 static uint64_t s_ids[AGENTS];
+static uint32_t s_layers[AGENTS];
+static uint32_t s_ignores[AGENTS];
 
 static bool Before(const mnavCrowdNeighbor* a, const mnavCrowdNeighbor* b)
 {
@@ -58,7 +61,7 @@ static int32_t Brute(int32_t i, double range, bool space, mnavCrowdNeighbor* lis
         double dy = s_positions[j].y - s_positions[i].y;
         double dz = space ? s_positions[j].z - s_positions[i].z : 0.0;
         double distance = dx * dx + dy * dy + dz * dz;
-        if (j == i || distance >= range * range)
+        if (j == i || distance >= range * range || (s_layers[j] & s_ignores[i]) != 0)
         {
             continue;
         }
@@ -79,8 +82,9 @@ static int32_t Brute(int32_t i, double range, bool space, mnavCrowdNeighbor* lis
 }
 
 // Agents in a box, on a coarse lattice so that many share a distance or a
-// spot, and ids that repeat.
-static void Scatter(bool space, double extent)
+// spot, and ids that repeat; with layers, each in one of three and
+// ignoring any of the first two.
+static void Scatter(bool space, double extent, bool layers)
 {
     for (int32_t i = 0; i < AGENTS; ++i)
     {
@@ -89,16 +93,19 @@ static void Scatter(bool space, double extent)
         double z = space ? (double)(int32_t)(Random() * 16.0) * extent / 16.0 : 0.0;
         s_positions[i] = (mnavPos3){x - extent / 2.0, y - extent / 2.0, z};
         s_ids[i] = (uint64_t)(Random() * 200.0);
+        s_layers[i] = layers ? 1u << (uint32_t)(Random() * 3.0) : 0u;
+        s_ignores[i] = layers ? (uint32_t)(Random() * 4.0) : 0u;
     }
 }
 
-static void Compare(bool space, double extent, double range)
+static void Compare(bool space, double extent, double range, bool layers)
 {
-    Scatter(space, extent);
+    Scatter(space, extent, layers);
     mnavCrowd crowd = {s_keys, s_scratch, s_table, 0, s_neighbors, LIMIT, range, space};
     for (int32_t i = 0; i < AGENTS; ++i)
     {
         s_keys[i] = mnavCrowdKeyOf(&crowd, s_positions[i], s_ids[i], i);
+        s_keys[i].layers = s_layers[i];
     }
     mnavSortCrowd(&crowd, AGENTS);
     int32_t mismatches = 0;
@@ -106,7 +113,7 @@ static void Compare(bool space, double extent, double range)
     {
         mnavCrowdNeighbor expected[LIMIT];
         int32_t want = Brute(i, range, space, expected);
-        int32_t got = mnavCrowdNeighbors(&crowd, s_positions[i], i);
+        int32_t got = mnavCrowdNeighbors(&crowd, s_positions[i], i, s_ignores[i]);
         bool same = got == want;
         for (int32_t k = 0; same && k < got; ++k)
         {
@@ -121,10 +128,12 @@ static void Compare(bool space, double extent, double range)
 int main(void)
 {
     CHECK(mnavCrowdTableSize(AGENTS) <= 2048, "the table fits");
-    Compare(false, 20.0, 3.0);
-    Compare(false, 200.0, 10.0);
-    Compare(true, 20.0, 3.0);
-    Compare(true, 60.0, 10.0);
-    Compare(true, 6.0, 1.0);
+    Compare(false, 20.0, 3.0, false);
+    Compare(false, 200.0, 10.0, false);
+    Compare(true, 20.0, 3.0, false);
+    Compare(true, 60.0, 10.0, false);
+    Compare(true, 6.0, 1.0, false);
+    Compare(false, 20.0, 3.0, true);
+    Compare(true, 20.0, 3.0, true);
     return s_failures == 0 ? 0 : 1;
 }

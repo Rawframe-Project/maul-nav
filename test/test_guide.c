@@ -157,8 +157,8 @@ static void GuideQueryAndCorridor(void)
 
 static void GuideAvoidance(void)
 {
-    const mnavAgent agents[2] = {{{-5.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, 0.5, 1.5, 1.0, 1},
-                                 {{5.0, 0.0}, {-1.0, 0.0}, {-1.0, 0.0}, 0.5, 1.5, 1.0, 2}};
+    const mnavAgent agents[2] = {{{-5.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, 0.5, 1.5, 1.0, 1, 0, 0},
+                                 {{5.0, 0.0}, {-1.0, 0.0}, {-1.0, 0.0}, 0.5, 1.5, 1.0, 2, 0, 0}};
     int32_t agentCount = 2;
     const mnavObstacle* obstacles = nullptr;
     int32_t obstacleCount = 0;
@@ -218,8 +218,11 @@ static void GuideCrowd(void)
                       mnav_success &&
                   mnavSetCorridor(&corridors[i], &path) == mnav_success,
               "an agent's corridor");
-        agents[i] = (mnavAgent){
-            {from.point.x, from.point.z}, {0.0, 0.0}, {0.0, 0.0}, 0.4, 3.5, 1.0, (uint64_t)i + 1};
+        agents[i] = (mnavAgent){.position = {from.point.x, from.point.z},
+                                .radius = 0.4,
+                                .maxSpeed = 3.5,
+                                .priority = 1.0,
+                                .id = (uint64_t)i + 1};
     }
     double closest = 1e9;
     for (int32_t step = 0; step < 100; ++step)

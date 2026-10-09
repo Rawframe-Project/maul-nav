@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Avoidance (mnav-0006): agents steering round each other by ORCA, in any
-// order, by priority, within the set's limits.
+// order, by priority, by layers, within the set's limits.
 
 #include "test_harness.h"
 
@@ -82,7 +82,7 @@ static double Run(mnavAvoidance* avoidance, mnavAgent* agents, const mnavPos2* g
 
 static mnavAgent Agent(double x, double y, uint64_t id)
 {
-    return (mnavAgent){{x, y}, {0.0, 0.0}, {0.0, 0.0}, 0.5, 1.5, 1.0, id};
+    return (mnavAgent){{x, y}, {0.0, 0.0}, {0.0, 0.0}, 0.5, 1.5, 1.0, id, 0, 0};
 }
 
 static double Miss(const mnavAgent* agent, mnavPos2 goal)
@@ -197,6 +197,72 @@ static void TestPriority(void)
         }
     }
     CHECK(straying[0] < 0.1 * straying[1] && straying[1] > 0.5, "the low priority gives way");
+    mnavDestroyAvoidance(avoidance);
+}
+
+static void TestLayers(void)
+{
+    // A ghost ignores the walker's layer and walks straight through its
+    // path; the walker avoids the ghost and, left the whole avoidance,
+    // never touches it.
+    mnavAvoidance* avoidance = Make(16, 10, 2.0);
+    const mnavPos2 goals[2] = {{5.0, 0.0}, {-5.0, 0.0}};
+    mnavAgent agents[2] = {Agent(-5.0, 0.0, 1), Agent(5.0, 0.0, 2)};
+    agents[0].layers = 1;
+    agents[1].layers = 2;
+    agents[1].ignores = 1;
+    double closest = Run(avoidance, agents, goals, 2, 200);
+    CHECK(closest > -1e-9 && agents[1].position.y == 0.0 && Miss(&agents[0], goals[0]) < 0.05 &&
+              Miss(&agents[1], goals[1]) < 0.05,
+          "the walker takes the whole avoidance");
+    // One step, head on 3 m apart and a little off: alone in one
+    // constraint, the walker moves off its preferred velocity across the
+    // constraint's line by its share of the avoidance, twice as far for a
+    // ghost as for an agent that shares it. The step between the two
+    // results lies along the line's normal, as long as the shared one's.
+    mnavAgent pair[2] = {Agent(-1.5, 0.0, 1), Agent(1.5, 0.3, 2)};
+    pair[0].velocity = pair[0].preferred = (mnavPos2){1.5, 0.0};
+    pair[1].velocity = pair[1].preferred = (mnavPos2){-1.5, 0.0};
+    // Room enough that the speed limit cuts neither.
+    pair[0].maxSpeed = 3.0;
+    pair[1].maxSpeed = 3.0;
+    mnavPos2 shared[2];
+    mnavPos2 alone[2];
+    CHECK(mnavAvoid(avoidance, pair, 2, nullptr, 0, 0.1, shared) == mnav_success, "stepped");
+    pair[1].ignores = 1;
+    pair[0].layers = 1;
+    CHECK(mnavAvoid(avoidance, pair, 2, nullptr, 0, 0.1, alone) == mnav_success, "stepped");
+    double nx = alone[0].x - shared[0].x;
+    double ny = alone[0].y - shared[0].y;
+    double across = (shared[0].x - 1.5) * nx + shared[0].y * ny;
+    double between = nx * nx + ny * ny;
+    CHECK(between > 1e-4 && fabs(across - between) < 1e-9 * between && alone[1].x == -1.5 &&
+              alone[1].y == 0.0,
+          "the whole avoidance, twice the half");
+    // Each ignoring the other, they walk through each other.
+    agents[0] = Agent(-5.0, 0.0, 1);
+    agents[1] = Agent(5.0, 0.0, 2);
+    agents[0].layers = 1;
+    agents[0].ignores = 2;
+    agents[1].layers = 2;
+    agents[1].ignores = 1;
+    closest = Run(avoidance, agents, goals, 2, 200);
+    CHECK(closest < -0.9 && agents[0].position.y == 0.0 && agents[1].position.y == 0.0,
+          "ghosts pass through each other");
+    // Layers that nobody ignores change nothing.
+    agents[0] = Agent(-5.0, 0.0, 1);
+    agents[1] = Agent(5.0, 0.0, 2);
+    agents[0].layers = 1;
+    agents[1].layers = 2;
+    agents[1].ignores = 4;
+    mnavAgent plain[2] = {Agent(-5.0, 0.0, 1), Agent(5.0, 0.0, 2)};
+    Run(avoidance, agents, goals, 2, 60);
+    Run(avoidance, plain, goals, 2, 60);
+    CHECK(agents[0].position.x == plain[0].position.x &&
+              agents[0].position.y == plain[0].position.y &&
+              agents[1].position.x == plain[1].position.x &&
+              agents[1].position.y == plain[1].position.y,
+          "as with no layers");
     mnavDestroyAvoidance(avoidance);
 }
 
@@ -320,7 +386,7 @@ static void TestWallsAndBlocks(void)
     mnavAvoidance* avoidance = Make(16, 10, 2.0);
     // A wall segment across the way: the agent stops short of it.
     const mnavPos2 wall[2] = {{0.0, -10.0}, {0.0, 10.0}};
-    mnavObstacle obstacles[1] = {{wall, 2, 0.0, {0.0, 0.0}, 1}};
+    mnavObstacle obstacles[1] = {{wall, 2, 0.0, {0.0, 0.0}, 1, 0}};
     mnavAgent agent = Agent(-5.0, 0.0, 1);
     double closest = RunPast(avoidance, &agent, (mnavPos2){5.0, 0.0}, obstacles, 1, 150);
     CHECK(closest > -1e-9 && agent.position.x < 0.0, "held short of the wall");
@@ -329,7 +395,7 @@ static void TestWallsAndBlocks(void)
     // a path's work; with the goal off to one side it slides along the
     // face and round the corner.
     const mnavPos2 block[4] = {{-1.0, -1.0}, {1.0, -1.0}, {1.0, 1.0}, {-1.0, 1.0}};
-    obstacles[0] = (mnavObstacle){block, 4, 0.0, {0.0, 0.0}, 2};
+    obstacles[0] = (mnavObstacle){block, 4, 0.0, {0.0, 0.0}, 2, 0};
     agent = Agent(-6.0, 0.0, 1);
     closest = RunPast(avoidance, &agent, (mnavPos2){6.0, 0.0}, obstacles, 1, 200);
     CHECK(closest > -1e-9 && agent.position.x < -1.4, "held at the face");
@@ -346,13 +412,32 @@ static void TestWallsAndBlocks(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+static void TestObstacleLayers(void)
+{
+    // A wall of layer 4: an agent ignoring it walks through, one that
+    // does not is held short.
+    mnavAvoidance* avoidance = Make(16, 10, 2.0);
+    const mnavPos2 wall[2] = {{0.0, -10.0}, {0.0, 10.0}};
+    mnavObstacle obstacles[1] = {{wall, 2, 0.0, {0.0, 0.0}, 1, 4}};
+    mnavAgent agent = Agent(-5.0, 0.0, 1);
+    agent.ignores = 4;
+    RunPast(avoidance, &agent, (mnavPos2){5.0, 0.0}, obstacles, 1, 150);
+    CHECK(Miss(&agent, (mnavPos2){5.0, 0.0}) < 0.05, "through the wall it ignores");
+    agent = Agent(-5.0, 0.0, 1);
+    agent.ignores = 3;
+    double closest = RunPast(avoidance, &agent, (mnavPos2){5.0, 0.0}, obstacles, 1, 150);
+    CHECK(closest > -1e-9 && agent.position.x < 0.0, "held short of one it does not");
+    mnavDestroyAvoidance(avoidance);
+}
+
 static void TestMovingObstacles(void)
 {
     mnavAvoidance* avoidance = Make(16, 10, 2.0);
     // A circle crossing the agent's way at 1 m/s, and a sliding door.
     mnavPos2 center = {0.0, -6.0};
     mnavPos2 door[2] = {{4.0, -3.0}, {4.0, -1.0}};
-    mnavObstacle obstacles[2] = {{&center, 1, 0.5, {0.0, 1.0}, 7}, {door, 2, 0.0, {0.0, 0.5}, 8}};
+    mnavObstacle obstacles[2] = {{&center, 1, 0.5, {0.0, 1.0}, 7, 0},
+                                 {door, 2, 0.0, {0.0, 0.5}, 8, 0}};
     mnavAgent agent = Agent(-6.0, 0.0, 1);
     mnavPos2 goal = {8.0, 0.0};
     double closest = (double)INFINITY;
@@ -393,9 +478,9 @@ static void TestObstaclesInAnyOrder(void)
     const mnavPos2 left[2] = {{-2.0, 2.0}, {-2.0, -2.0}};
     const mnavPos2 right[2] = {{2.0, -2.0}, {2.0, 2.0}};
     const mnavPos2 top = {0.0, 2.5};
-    mnavObstacle forward[3] = {{left, 2, 0.0, {0.0, 0.0}, 5},
-                               {right, 2, 0.0, {0.0, 0.0}, 3},
-                               {&top, 1, 0.5, {0.0, 0.0}, 9}};
+    mnavObstacle forward[3] = {{left, 2, 0.0, {0.0, 0.0}, 5, 0},
+                               {right, 2, 0.0, {0.0, 0.0}, 3, 0},
+                               {&top, 1, 0.5, {0.0, 0.0}, 9, 0}};
     mnavObstacle backward[3] = {forward[2], forward[1], forward[0]};
     mnavAgent agent = Agent(0.0, 0.0, 1);
     agent.preferred = (mnavPos2){0.3, 1.2};
@@ -435,14 +520,14 @@ static void TestMixedScene(void)
     static const mnavPos2 still = {11, -11};
     mnavPos2 rolling = {-12, 0};
     mnavPos2 gate[2] = {{0, 10}, {3, 10}};
-    mnavObstacle obstacles[8] = {{l, 6, 0.0, {0, 0}, 0},
-                                 {u, 8, 0.0, {0, 0}, 1},
-                                 {triangle, 3, 0.0, {0, 0}, 2},
-                                 {slope, 2, 0.0, {0, 0}, 3},
-                                 {bar, 2, 0.0, {0, 0}, 4},
-                                 {&still, 1, 1.0, {0, 0}, 5},
-                                 {&rolling, 1, 0.8, {0.8, 0.1}, 6},
-                                 {gate, 2, 0.0, {0.4, -0.6}, 7}};
+    mnavObstacle obstacles[8] = {{l, 6, 0.0, {0, 0}, 0, 0},
+                                 {u, 8, 0.0, {0, 0}, 1, 0},
+                                 {triangle, 3, 0.0, {0, 0}, 2, 0},
+                                 {slope, 2, 0.0, {0, 0}, 3, 0},
+                                 {bar, 2, 0.0, {0, 0}, 4, 0},
+                                 {&still, 1, 1.0, {0, 0}, 5, 0},
+                                 {&rolling, 1, 0.8, {0.8, 0.1}, 6, 0},
+                                 {gate, 2, 0.0, {0.4, -0.6}, 7, 0}};
     mnavAgent agents[AGENTS];
     mnavPos2 goals[AGENTS];
     uint32_t state = 12345;
@@ -500,16 +585,17 @@ static void TestObstacleChecks(void)
     const double fast = MNAV_MAX_AVOIDANCE_SPEED * 1.5;
     const double wide = MNAV_MAX_AVOIDANCE_RADIUS * 1.5;
     const mnavObstacle bad[7] = {
-        {clockwise, 3, 0.0, {0.0, 0.0}, 1}, {repeated, 3, 0.0, {0.0, 0.0}, 1},
-        {&point, 1, 0.0, {0.0, 0.0}, 1},    {square, 4, 1.0, {0.0, 0.0}, 1},
-        {nullptr, 3, 0.0, {0.0, 0.0}, 1},   {&point, 1, wide, {0.0, 0.0}, 1},
-        {square, 4, 0.0, {0.0, -fast}, 1}};
+        {clockwise, 3, 0.0, {0.0, 0.0}, 1, 0}, {repeated, 3, 0.0, {0.0, 0.0}, 1, 0},
+        {&point, 1, 0.0, {0.0, 0.0}, 1, 0},    {square, 4, 1.0, {0.0, 0.0}, 1, 0},
+        {nullptr, 3, 0.0, {0.0, 0.0}, 1, 0},   {&point, 1, wide, {0.0, 0.0}, 1, 0},
+        {square, 4, 0.0, {0.0, -fast}, 1, 0}};
     for (int32_t k = 0; k < 7; ++k)
     {
         CHECK(mnavAvoid(avoidance, &agent, 1, &bad[k], 1, 0.1, &velocity) == mnav_errorInvalid,
               "a bad obstacle");
     }
-    const mnavObstacle two[2] = {{square, 4, 0.0, {0.0, 0.0}, 1}, {&point, 1, 0.5, {0.0, 0.0}, 2}};
+    const mnavObstacle two[2] = {{square, 4, 0.0, {0.0, 0.0}, 1, 0},
+                                 {&point, 1, 0.5, {0.0, 0.0}, 2, 0}};
     CHECK(mnavAvoid(avoidance, &agent, 1, two, 1, 0.1, &velocity) == mnav_success &&
               mnavAvoid(avoidance, &agent, 1, two, 2, 0.1, &velocity) == mnav_errorLimit,
           "four points, then five past the limit");
@@ -548,13 +634,17 @@ static void TestOnACorner(void)
                                   0x1.4p+1,
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
-                                  1},
+                                  1,
+                                  0,
+                                  0},
                                  {{0x0.0000000e2p-1022, 0.0},
                                   {0.0, 0x0.00000000001p-1022},
                                   {-0x1.4949494949494p-694, 0x1.fcp+3},
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
+                                  0,
+                                  0,
                                   0},
                                  {{0x1.c8p+3, -0x1p+4},
                                   {-0x1.494949494940ap-694, 0x1.4p+1},
@@ -562,10 +652,12 @@ static void TestOnACorner(void)
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
-                                  1}};
+                                  1,
+                                  0,
+                                  0}};
     const mnavPos2 corners[3] = {
         {-0x1p+4, 0x0.000000000e2p-1022}, {0.0, 0x0.001p-1022}, {-0x1.49494p-694, 0x1.4p+1}};
-    const mnavObstacle block = {corners, 3, 0.0, {0x1.fcp+3, -0x1.fcp+3}, 1};
+    const mnavObstacle block = {corners, 3, 0.0, {0x1.fcp+3, -0x1.fcp+3}, 1, 0};
     mnavPos2 velocities[3];
     CHECK(mnavAvoid(avoidance, agents, 3, &block, 1, 0x1.ccccccccccccdp-2, velocities) ==
               mnav_success,
@@ -594,9 +686,9 @@ static void TestSpeedKept(void)
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
     const mnavAgent agents[3] = {
-        {{12.5, 12.5}, {14.75, 14.75}, {14.75, 14.75}, 12.5, 12.5, 12.5, 0},
-        {{12.5, 14.75}, {14.75, 14.75}, {14.75, 14.75}, 12.5, 12.5, 12.5, 0},
-        {{12.5, 14.5}, {14.5, 14.5}, {12.5, 12.5}, 14.625, 0.6, 1.8000000000000003, 0}};
+        {{12.5, 12.5}, {14.75, 14.75}, {14.75, 14.75}, 12.5, 12.5, 12.5, 0, 0, 0},
+        {{12.5, 14.75}, {14.75, 14.75}, {14.75, 14.75}, 12.5, 12.5, 12.5, 0, 0, 0},
+        {{12.5, 14.5}, {14.5, 14.5}, {12.5, 12.5}, 14.625, 0.6, 1.8000000000000003, 0, 0, 0}};
     mnavPos2 velocities[3];
     CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.05, velocities) == mnav_success, "stepped");
     for (int32_t i = 0; i < 3; ++i)
@@ -619,8 +711,8 @@ static void TestNeighbourThreeCellsOut(void)
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
     mnavAgent agents[2] = {
-        {{0x1.3d896d6036906p+7, 0.0}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 1},
-        {{0x1.479e0b42c2747p+7, 0.0}, {-3.0, 0.0}, {-3.0, 0.0}, 0.5, 4.0, 1.0, 2}};
+        {{0x1.3d896d6036906p+7, 0.0}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 1, 0, 0},
+        {{0x1.479e0b42c2747p+7, 0.0}, {-3.0, 0.0}, {-3.0, 0.0}, 0.5, 4.0, 1.0, 2, 0, 0}};
     mnavPos2 velocities[2];
     CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_success &&
               (velocities[0].x != 3.0 || velocities[0].y != 0.0) &&
@@ -635,9 +727,9 @@ static void TestFarNeighbourPastANearOne(void)
     // walks with it; C, two cells on, comes head on. A list not yet full
     // must not stop the search at B's distance: C turns A from its way.
     mnavAvoidance* avoidance = Make(16, 10, 2.0);
-    mnavAgent agents[3] = {{{4.9, 0.1}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 1},
-                           {{4.9, 1.6}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 2},
-                           {{10.5, 0.1}, {-3.0, 0.0}, {-3.0, 0.0}, 0.5, 4.0, 1.0, 3}};
+    mnavAgent agents[3] = {{{4.9, 0.1}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 1, 0, 0},
+                           {{4.9, 1.6}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 2, 0, 0},
+                           {{10.5, 0.1}, {-3.0, 0.0}, {-3.0, 0.0}, 0.5, 4.0, 1.0, 3, 0, 0}};
     mnavPos2 with[3];
     mnavPos2 without[2];
     CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.1, with) == mnav_success &&
@@ -656,10 +748,10 @@ static void TestOverlappedObstacleFirst(void)
     def.limits.obstacleNeighbors = 1;
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
-    const mnavAgent agent = {{0.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, 0.5, 1.5, 1.0, 1};
+    const mnavAgent agent = {{0.0, 0.0}, {1.0, 0.0}, {1.0, 0.0}, 0.5, 1.5, 1.0, 1, 0, 0};
     const mnavPos2 a = {0.3, 0.0};
     const mnavPos2 b = {0.0, 2.0};
-    const mnavObstacle both[2] = {{&a, 1, 1.0, {0.0, 0.0}, 1}, {&b, 1, 1.4, {0.0, 0.0}, 2}};
+    const mnavObstacle both[2] = {{&a, 1, 1.0, {0.0, 0.0}, 1, 0}, {&b, 1, 1.4, {0.0, 0.0}, 2, 0}};
     mnavPos2 withBoth;
     mnavPos2 withA;
     mnavPos2 withB;
@@ -673,7 +765,7 @@ static void TestOverlappedObstacleFirst(void)
     CHECK(withA.x < 0.0, "out of a circle it stands in, not on into it");
     // A circle coming on at 4 m/s, faster than the agent can leave: away
     // at its full speed, the most the agent can do.
-    const mnavObstacle fast = {&a, 1, 1.0, {-4.0, 0.0}, 3};
+    const mnavObstacle fast = {&a, 1, 1.0, {-4.0, 0.0}, 3, 0};
     mnavPos2 fleeing;
     CHECK(mnavAvoid(avoidance, &agent, 1, &fast, 1, 0.1, &fleeing) == mnav_success &&
               fleeing.x == -1.5 && fleeing.y == 0.0,
@@ -683,6 +775,8 @@ static void TestOverlappedObstacleFirst(void)
 
 int main(void)
 {
+    TestLayers();
+    TestObstacleLayers();
     TestHeadOn();
     TestCircle();
     TestAnyOrder();

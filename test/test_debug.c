@@ -237,9 +237,9 @@ static void TestFlowAndAvoidance(void)
     avoidDef.neighborDistance = 3.0;
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&avoidDef, &avoidance) == mnav_success, "a set");
-    mnavAgent agents[3] = {{{0.0, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 1},
-                           {{2.0, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 2},
-                           {{20.0, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 3}};
+    mnavAgent agents[3] = {{{0.0, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 1, 0, 0},
+                           {{2.0, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 2, 0, 0},
+                           {{20.0, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 3, 0, 0}};
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
     CHECK(mnavDebugAvoidance(avoidance, agents, 3, 0.1, &b) == mnav_success &&
               Count(&b, mnav_debugAgent, -1) == 3 * 16 * 2 &&
@@ -261,10 +261,10 @@ static void TestFliers(void)
     def.neighborDistance = 3.0;
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "a set");
-    mnavAgent3D agents[3] = {{{0.0, 0.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 1},
-                             {{0.0, 2.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 2},
-                             {{0.0, 20.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 3}};
-    mnavSphere sphere = {{5.0, 0.0, 0.0}, 2.0, {0.0, 0.0, 0.0}, 9};
+    mnavAgent3D agents[3] = {{{0.0, 0.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 1, 0, 0},
+                             {{0.0, 2.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 2, 0, 0},
+                             {{0.0, 20.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 3, 0, 0}};
+    mnavSphere sphere = {{5.0, 0.0, 0.0}, 2.0, {0.0, 0.0, 0.0}, 9, 0};
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
     CHECK(mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 1, &b) == mnav_success &&
               Count(&b, mnav_debugAgent, -1) == 3 * 48 * 2 &&

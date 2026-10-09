@@ -495,7 +495,7 @@ static void TestGroup(void)
           "a field to the goal");
     static const mnavPos2 lower[4] = {{32, 0}, {33, 0}, {33, 28}, {32, 28}};
     static const mnavPos2 upper[4] = {{32, 36}, {33, 36}, {33, 64}, {32, 64}};
-    const mnavObstacle walls[2] = {{lower, 4, 0.0, {0, 0}, 1}, {upper, 4, 0.0, {0, 0}, 2}};
+    const mnavObstacle walls[2] = {{lower, 4, 0.0, {0, 0}, 1, 0}, {upper, 4, 0.0, {0, 0}, 2, 0}};
     mnavAvoidanceDef avoidDef = mnavDefaultAvoidanceDef();
     avoidDef.limits.agents = GROUP;
     avoidDef.neighborDistance = 3.0;
@@ -510,7 +510,9 @@ static void TestGroup(void)
                                 0.4,
                                 1.5,
                                 1.0,
-                                (uint64_t)i + 1};
+                                (uint64_t)i + 1,
+                                0,
+                                0};
     }
     static mnavPos2 velocities[GROUP];
     double closest = 1e9;

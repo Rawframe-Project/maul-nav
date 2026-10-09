@@ -55,7 +55,9 @@ static uint64_t LinesWith(const mnavObstacleVertex* vertices, int32_t count, dou
                                0.5,
                                1.5,
                                1.0,
-                               99};
+                               99,
+                               0,
+                               0};
             int32_t n = mnavNearObstacles(&agent, vertices, grid, 2.0, near, 16);
             int32_t made = mnavObstacleLines(&agent, vertices, near, n, 2.0, 0.1, lines);
             for (int32_t k = 0; k < made; ++k)
@@ -72,8 +74,9 @@ static uint64_t LinesWith(const mnavObstacleVertex* vertices, int32_t count, dou
 
 static void TestLinesAroundShapes(void)
 {
-    const mnavObstacle obstacles[3] = {
-        {s_l, 6, 0.0, {0, 0}, 1}, {s_u, 8, 0.0, {0, 0}, 2}, {s_bar, 2, 0.0, {0.3, -0.2}, 3}};
+    const mnavObstacle obstacles[3] = {{s_l, 6, 0.0, {0, 0}, 1, 0},
+                                       {s_u, 8, 0.0, {0, 0}, 2, 0},
+                                       {s_bar, 2, 0.0, {0.3, -0.2}, 3, 0}};
     static mnavObstacleVertex vertices[16];
     int32_t count = 0;
     CHECK(mnavBuildObstacles(obstacles, 3, vertices, 16, &count) == mnav_success && count == 16,
@@ -100,11 +103,11 @@ static void TestNearestAndTies(void)
     // Two circles at equal distances: with room for one, the lower id.
     const mnavPos2 a = {3.0, 0.0};
     const mnavPos2 b = {-3.0, 0.0};
-    const mnavObstacle obstacles[2] = {{&a, 1, 1.0, {0, 0}, 9}, {&b, 1, 1.0, {0, 0}, 4}};
+    const mnavObstacle obstacles[2] = {{&a, 1, 1.0, {0, 0}, 9, 0}, {&b, 1, 1.0, {0, 0}, 4, 0}};
     mnavObstacleVertex vertices[2];
     int32_t count = 0;
     mnavObstacleNear near[2];
-    mnavAgent agent = {{0.0, 0.0}, {0.0, 0.0}, {0.0, 0.0}, 0.5, 1.5, 1.0, 1};
+    mnavAgent agent = {{0.0, 0.0}, {0.0, 0.0}, {0.0, 0.0}, 0.5, 1.5, 1.0, 1, 0, 0};
     CHECK(mnavBuildObstacles(obstacles, 2, vertices, 2, &count) == mnav_success &&
               mnavNearObstacles(&agent, vertices, Grid(vertices, count, 3.0), 2.0, near, 1) == 1 &&
               vertices[near[0].vertex].id == 4,
@@ -117,14 +120,14 @@ static void TestNearestAndTies(void)
     // A great circle's edge near the agent, its center far beyond the
     // agent's reach: found through the circle's bounds.
     const mnavPos2 far = {25.0, 0.0};
-    const mnavObstacle big = {&far, 1, 20.0, {0, 0}, 5};
+    const mnavObstacle big = {&far, 1, 20.0, {0, 0}, 5, 0};
     agent.position = (mnavPos2){4.6, 0.0};
     CHECK(mnavBuildObstacles(&big, 1, vertices, 2, &count) == mnav_success &&
               mnavNearObstacles(&agent, vertices, Grid(vertices, count, 3.0), 2.0, near, 1) == 1,
           "a great circle's near edge");
     // A segment of one point twice is no segment.
     const mnavPos2 same[2] = {{1.0, 1.0}, {1.0, 1.0}};
-    const mnavObstacle bad = {same, 2, 0.0, {0, 0}, 1};
+    const mnavObstacle bad = {same, 2, 0.0, {0, 0}, 1, 0};
     CHECK(mnavBuildObstacles(&bad, 1, vertices, 2, &count) == mnav_errorInvalid,
           "a zero-length segment");
 }

@@ -268,9 +268,11 @@ int main(void)
         mnavPos3 from = i < 12 ? (mnavPos3){1.5, 3.0, lane} : (mnavPos3){lane, 4.0, 1.5};
         mnavPos3 to = i < 12 ? (mnavPos3){30.5, 3.0, lane} : (mnavPos3){lane, 4.0, 30.5};
         length += FindRoute(query, volume, from, to, &routes[i]);
-        fliers[i] =
-            (mnavAgent3D){routes[i].points[0], {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, RADIUS, SPEED, 1.0,
-                          (uint64_t)i + 1};
+        fliers[i] = (mnavAgent3D){.position = routes[i].points[0],
+                                  .radius = RADIUS,
+                                  .maxSpeed = SPEED,
+                                  .priority = 1.0,
+                                  .id = (uint64_t)i + 1};
     }
     printf("%d paths found, %.1f m in all\n", FLIERS, length);
     int32_t replanned = 0;

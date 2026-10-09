@@ -30,6 +30,8 @@ typedef struct mnavObstacleVertex
     int32_t next;
     int32_t previous;
     bool convex;
+    // The obstacle's layers, which an agent ignoring them passes over.
+    uint32_t layers;
 } mnavObstacleVertex;
 
 // An obstacle near an agent: its squared distance, then its vertex.

@@ -46,7 +46,7 @@ mnavCrowdKey mnavCrowdKeyOf(const mnavCrowd* crowd, mnavPos3 position, uint64_t 
     double size = crowd->range / CELL_DIVISIONS;
     int64_t z = crowd->space ? CellOf(position.z, size) : 0;
     return (mnavCrowdKey){
-        CellOf(position.x, size), CellOf(position.y, size), z, id, index, position};
+        CellOf(position.x, size), CellOf(position.y, size), z, id, index, position, 0};
 }
 
 static bool SameColumn(const mnavCrowdKey* a, const mnavCrowdKey* b)
@@ -186,6 +186,7 @@ typedef struct Search
     mnavPos3 position;
     int32_t index;
     double rangeSq;
+    uint32_t ignores;
     int32_t found;
 } Search;
 
@@ -206,7 +207,7 @@ static void Scan(Search* s, int64_t x, int64_t y, int64_t z0, int64_t z1, bool e
         double dy = key->position.y - s->position.y;
         double dz = key->position.z - s->position.z;
         double distance = dx * dx + dy * dy + dz * dz;
-        if (key->index != s->index && distance < s->rangeSq)
+        if (key->index != s->index && distance < s->rangeSq && (key->layers & s->ignores) == 0)
         {
             s->found = Insert(crowd->neighbors, s->found, crowd->limit,
                               (mnavCrowdNeighbor){distance, key->id, key->index});
@@ -238,12 +239,12 @@ static void Ring(Search* s, const mnavCrowdKey* c, int64_t r)
 // agent it would keep (ties at the worst distance are still looked at),
 // and the search stops. The neighbours are those a search of every cell
 // in range finds.
-int32_t mnavCrowdNeighbors(mnavCrowd* crowd, mnavPos3 position, int32_t index)
+int32_t mnavCrowdNeighbors(mnavCrowd* crowd, mnavPos3 position, int32_t index, uint32_t ignores)
 {
     double range = crowd->range;
     double size = range / CELL_DIVISIONS;
     mnavCrowdKey center = mnavCrowdKeyOf(crowd, position, 0, index);
-    Search s = {crowd, position, index, range * range, 0};
+    Search s = {crowd, position, index, range * range, ignores, 0};
     for (int64_t r = 0; r <= CELL_DIVISIONS + 1; ++r)
     {
         double near = r > 1 ? (double)(r - 1) * size * (1.0 - 0x1p-20) : 0.0;

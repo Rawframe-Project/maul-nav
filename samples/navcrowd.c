@@ -145,8 +145,11 @@ static void Start(mnavQuery* query, const mnavNavmesh* navmesh)
               "reset");
         Check(mnavSetCorridor(&w->corridor, &path), "corridor");
         w->wallCount = -1;
-        s_agents[i] = (mnavAgent){
-            {start.point.x, start.point.z}, {0, 0}, {0, 0}, RADIUS, SPEED, 1.0, (uint64_t)i + 1};
+        s_agents[i] = (mnavAgent){.position = {start.point.x, start.point.z},
+                                  .radius = RADIUS,
+                                  .maxSpeed = SPEED,
+                                  .priority = 1.0,
+                                  .id = (uint64_t)i + 1};
     }
 }
 
@@ -226,7 +229,8 @@ static int32_t GatherWalls(mnavObstacle* obstacles, mnavPos2 (*ends)[2])
             {
                 ends[count][0] = a;
                 ends[count][1] = b;
-                obstacles[count] = (mnavObstacle){ends[count], 2, 0.0, {0, 0}, (uint64_t)count + 1};
+                obstacles[count] =
+                    (mnavObstacle){ends[count], 2, 0.0, {0, 0}, (uint64_t)count + 1, 0};
                 count += 1;
             }
         }

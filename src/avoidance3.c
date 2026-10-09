@@ -70,6 +70,7 @@ void mnavBuildSphereGrid(mnavAvoidance* a, const mnavSphere* spheres, int32_t co
             .index = s,
             .next = s,
             .previous = s,
+            .layers = sphere->layers,
         };
         double speed = sqrt(mnavDot3(sphere->velocity, sphere->velocity));
         fastest = speed > fastest ? speed : fastest;
@@ -90,6 +91,10 @@ typedef struct Seen
 static double MeasureSphere(const void* context, int32_t s)
 {
     const Seen* seen = context;
+    if ((seen->spheres[s].layers & seen->agent->ignores) != 0)
+    {
+        return -1.0;
+    }
     return SphereReach(seen->agent, &seen->spheres[s], seen->horizon);
 }
 
@@ -166,13 +171,16 @@ static mnavPos3 Solve(mnavAvoidance* a, const mnavAgent3D* agents, const mnavSph
             SpherePlane(self, &spheres[a->near[k].vertex], a->def.obstacleTimeHorizon, step);
     }
     int32_t fixed = count;
-    int32_t neighbors = mnavCrowdNeighbors(&a->crowd, self->position, i);
+    int32_t neighbors = mnavCrowdNeighbors(&a->crowd, self->position, i, self->ignores);
     for (int32_t n = 0; n < neighbors; ++n)
     {
         const mnavAgent3D* other = &agents[a->crowd.neighbors[n].index];
+        // An agent that ignores this one leaves it the whole avoidance.
+        double share = (other->ignores & self->layers) != 0
+                           ? 1.0
+                           : other->priority / (self->priority + other->priority);
         a->planes[count++] = mnavPairPlane(self->position, self->velocity, other->position,
-                                           other->velocity, self->radius + other->radius,
-                                           other->priority / (self->priority + other->priority),
+                                           other->velocity, self->radius + other->radius, share,
                                            a->def.timeHorizon, step, self->id < other->id);
     }
     mnavPos3 velocity = {0.0, 0.0, 0.0};
@@ -227,6 +235,7 @@ static mnavResult Prepare(mnavAvoidance* avoidance, const mnavAgent3D* agents, i
             return mnav_errorInvalid;
         }
         crowd->keys[i] = mnavCrowdKeyOf(crowd, agents[i].position, agents[i].id, i);
+        crowd->keys[i].layers = agents[i].layers;
     }
     mnavSortCrowd(crowd, agentCount);
     return mnav_success;
@@ -292,7 +301,7 @@ mnavResult mnavDebugAvoidance3D(mnavAvoidance* avoidance, const mnavAgent3D* age
     {
         const mnavAgent3D* a = &agents[i];
         Rings(buffer, a->position, a->radius, mnav_debugAgent);
-        int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i);
+        int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i, a->ignores);
         for (int32_t n = 0; n < count; ++n)
         {
             const mnavAgent3D* b = &agents[avoidance->crowd.neighbors[n].index];

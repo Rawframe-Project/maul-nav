@@ -342,6 +342,12 @@ Input has named ranges (`MNAV_MAX_AVOIDANCE_COORDINATE`,
 `MNAV_MIN_AVOIDANCE_TIME`), wide enough for any scene, and an agent's
 new velocity is never faster than its maximum speed.
 
+Groups that should pass through each other, ghosts, or units flying
+over ground ones, use layers: an agent avoids every agent and obstacle
+unless its `ignores` shares a bit with the other's `layers`. Leave both
+zero and everything is avoided; an agent that avoids one ignoring it
+takes the whole avoidance, so the two still never touch.
+
 Fliers sharing a flight volume avoid each other in space with
 `mnavAvoid3D`, on the same set: `mnavAgent3D` has the same fields as
 `mnavAgent` in three dimensions, and its obstacles are spheres

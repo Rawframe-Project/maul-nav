@@ -60,6 +60,12 @@ extern "C"
         // The host's id for the agent, which orders neighbours at equal
         // distances; ids should differ, or the input's order counts.
         uint64_t id;
+        // The groups the agent belongs to, as bits; 0 for none.
+        uint32_t layers;
+        // The groups the agent passes through: it does not avoid an agent
+        // or obstacle whose layers share a bit with these, and takes the
+        // whole avoidance of an agent that ignores it. 0 avoids all.
+        uint32_t ignores;
     } mnavAgent;
 
     // An obstacle agents steer round, taking the whole avoidance: one point
@@ -80,6 +86,8 @@ extern "C"
         // The host's id for the obstacle, which orders obstacles at equal
         // distances; ids should differ, or the input's order counts.
         uint64_t id;
+        // The groups the obstacle belongs to, as an agent's layers.
+        uint32_t layers;
     } mnavObstacle;
 
     // An agent in space, for mnavAvoid3D, its values in the ranges above.
@@ -97,6 +105,10 @@ extern "C"
         double priority;
         // The host's id for the agent, as mnavAgent's.
         uint64_t id;
+        // The groups the agent belongs to and passes through, as
+        // mnavAgent's.
+        uint32_t layers;
+        uint32_t ignores;
     } mnavAgent3D;
 
     // A sphere fliers steer round, taking the whole avoidance, as a circle
@@ -111,6 +123,8 @@ extern "C"
         // The host's id for the sphere, which orders spheres at equal
         // distances; ids should differ, or the input's order counts.
         uint64_t id;
+        // The groups the sphere belongs to, as an agent's layers.
+        uint32_t layers;
     } mnavSphere;
 
     // The limits of an avoidance set.
