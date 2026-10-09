@@ -1,31 +1,41 @@
 # The reference numbers for bench/bench_main.c, written by the benchmark
 # itself: GCC 14, Release, AMD Ryzen 9 5900X pinned to one core
-# (taskset -c 0), Linux 6.8, 2026-10-07, version 0.3.0, on a quiet
-# machine (load averages 7.43 60.58 108.21 at the start, the minute's
-# under 8 at each run's start and end), the better of two runs. Wall
-# time differs between runs by a few percent, and between days by more
-# (parts no change touched ran a fifth to a third faster than the first
-# baseline's, and 4 to 7% slower than the last): compare runs on one
-# core of one machine, as information, never as a gate, and compare
-# code by instruction counts. Compare with:
+# (taskset -c 0), Linux 6.8, 2026-10-10, version 0.11.0, on a quiet
+# machine (load averages 0.39 7.15 44.91 at the start, the minute's
+# under 8 at each run's start and end), the better of two runs, line by
+# line. Wall time differs between runs by a few percent, and between
+# days by more (parts no change touched ran a fifth to a third faster
+# than the first baseline's, and 4 to 7% slower than another's): compare
+# runs on one core of one machine, as information, never as a gate, and
+# compare code by instruction counts. Compare with:
 # taskset -c 0 maul-nav_bench bench/baseline.txt
-bake, a tile                           3431.8 us
-stream step, no links                    19.2 us
-stream step, 512 links                  153.3 us
-path query                               27.6 us
-path queries per second               36202.7 /s
-sliced path query                        27.6 us
-sliced path, a slice                     10.5 us
-avoidance step, 1000 agents             864.9 us
-avoidance, agents per ms               1156.3 /ms
-flow build, 1 goal                    26276.8 us
-flow build, 4 goals                   29442.1 us
-flow repair, a cell                       4.3 us
-flow repair, a goal moved              2506.7 us
-flow repair, a gap                     3109.9 us
-hierarchy build                       80421.4 us
-long path, plain                      10808.5 us
-long path, hierarchical                1424.3 us
-hierarchy update, one tile             1987.2 us
-navmesh flow field                     3890.3 us
-navmesh flow field, stepped            3886.7 us
+bake, a tile                           3101.2 us
+rebuild, a tile                        1343.1 us
+stream step, no links                    17.3 us
+stream step, 512 links                   92.4 us
+path query                               22.6 us
+path queries per second               44282.0 /s
+sliced path query                        22.5 us
+sliced path, a slice                      8.6 us
+shortest path query                      16.5 us
+avoidance step, 1000 agents             825.1 us
+avoidance, agents per ms               1212.0 /ms
+crowd step, 1000 agents                1166.3 us
+crowd step with walls, 1000            1336.7 us
+avoidance in space step, 1000 fliers       1489.2 us
+avoidance in space, fliers per ms        671.5 /ms
+flow build, 1 goal                    20194.5 us
+flow build, 4 goals                   23076.3 us
+flow repair, a cell                       3.3 us
+flow repair, a goal moved              1985.1 us
+flow repair, a gap                     2442.6 us
+hierarchy build                       61812.2 us
+long path, plain                       8053.8 us
+long path, hierarchical                1141.2 us
+hierarchy update, one tile             1548.8 us
+navmesh flow field                     3545.3 us
+navmesh flow field, stepped            3548.9 us
+flight bake, a tile                    1001.7 us
+flight path query                      8679.4 us
+flight path in slices of 64 nodes       8672.4 us
+flight raycast                            0.6 us

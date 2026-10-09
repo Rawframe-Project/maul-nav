@@ -38,3 +38,7 @@ benchmark printed its timings only.
 - The first baseline was recorded with other work on the machine; it
   was recorded again on a quiet machine (load average about 4), the
   better of two runs, with the navmesh flow fields (mnav-0013) added.
+- It is recorded again at each release worth comparing against, on a
+  quiet machine by the same rules: last at 0.11.0 (2026-10-10), with
+  every section the benchmark has grown since 0.3.0, the better of two
+  runs line by line.
