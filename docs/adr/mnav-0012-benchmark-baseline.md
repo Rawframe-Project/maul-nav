@@ -18,7 +18,11 @@ benchmark printed its timings only.
   one slice, an avoidance step of 1,000 agents and agents per
   millisecond, flow builds with one and four goals, flow repairs of a
   cell, a moved goal and a wall's gap, a hierarchy's build, and long
-  paths with and without it.
+  paths with and without it. Later sections add their own lines (amended
+  2026-10-09): flight volumes' bakes, searches and rays, a tile rebuilt
+  from the tile cache with a crate on it, and a crowd step of 1,000
+  agents on the terrain's navmesh (corners, steering, avoidance and
+  surface moves, each part's share printed).
 - **Baseline:** `bench/baseline.txt` holds those lines as the benchmark
   wrote them, pinned to one core, with the machine, compiler and date
   in its comments. Given the file, the benchmark prints each result's

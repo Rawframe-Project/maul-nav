@@ -12,6 +12,9 @@ format.
 
 - `fuzz_query` also takes each corridor's runs of area and steers along
   its corners with fuzzed steering defs.
+- The benchmark times a crowd step of 1,000 agents on the terrain's
+  navmesh, corners and steering, avoidance and surface moves, with each
+  part's share.
 
 ### Changed
 

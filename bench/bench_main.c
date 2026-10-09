@@ -8,7 +8,9 @@
 // tiles that enter and leave and committing each step, for ten laps;
 // then finds paths
 // on the whole terrain; then steers 1,000 agents through a doorway 4 m wide
-// with avoidance, and 1,000 fliers through a gap in a wall of spheres;
+// with avoidance, 1,000 agents across the terrain along their corridors,
+// steered and avoiding each other, and 1,000 fliers through a gap in a
+// wall of spheres;
 // then builds flow fields over a grid of 512 by 512 cells;
 // then, on a flat world of 24 by 24 tiles with pillars and walls baked
 // from outlines, builds a hierarchy and finds long paths with and without
@@ -635,6 +637,140 @@ static void Doorway(void)
     Report("avoidance step, 1000 agents", best * 1e6 / STEPS, "us");
     Report("avoidance, agents per ms", AGENTS * STEPS / (best * 1e3), "/ms");
     mnavDestroyAvoidance(avoidance);
+}
+
+// A crowd on the terrain's navmesh: 1,000 agents in two groups of 500 cross
+// a square of 60 m from opposite sides, each step every corridor giving
+// its corners, mnavSteer its velocity, mnavAvoid one clear of the others
+// and mnavMoveCorridor the move along the surface, in steps of 0.1 s.
+enum
+{
+    CROWD = 1000,
+    CROWD_STEPS = 600,
+    CROWD_CORRIDOR = 128
+};
+
+static mnavPolygonId s_crowdBuffers[CROWD][CROWD_CORRIDOR];
+static mnavCorridor s_crowd[CROWD];
+static mnavAgent s_crowdAgents[CROWD];
+
+// Plans every agent's corridor across the square; returns how many found
+// their way.
+static int32_t PlanCrowd(mnavQuery* query, const mnavNavmesh* navmesh)
+{
+    int32_t planned = 0;
+    const mnavVec3 box = {2.0f, 4.0f, 2.0f};
+    for (int32_t i = 0; i < CROWD; ++i)
+    {
+        double z = 64.0 + 1.2 * (double)(i % 500 / 10) + 0.05 * (double)(i % 7);
+        double x = 66.0 + 1.2 * (double)(i % 10);
+        double from = i < 500 ? x : 192.0 - x;
+        double to = 192.0 - from;
+        mnavNearest a;
+        mnavNearest b;
+        mnavPath path;
+        Check(mnavFindNearest(navmesh, NULL,
+                              (mnavPos3){from, (double)Height((float)from, (float)z), z}, box, &a),
+              "crowd start");
+        Check(mnavFindNearest(navmesh, NULL, (mnavPos3){to, (double)Height((float)to, (float)z), z},
+                              box, &b),
+              "crowd end");
+        Check(mnavFindPath(query, navmesh, NULL, a.polygon, a.point, b.polygon, b.point, &path),
+              "crowd path");
+        Check(mnavResetCorridor(&s_crowd[i], s_crowdBuffers[i], CROWD_CORRIDOR, a.polygon, a.point),
+              "crowd corridor");
+        planned += mnavSetCorridor(&s_crowd[i], &path) == mnav_success ? 1 : 0;
+        s_crowdAgents[i] =
+            (mnavAgent){{a.point.x, a.point.z}, {0.0, 0.0}, {0.0, 0.0}, 0.3, 1.5, 1.0, (uint64_t)i};
+    }
+    return planned;
+}
+
+// Runs the crowd's steps, adding each part's seconds; returns how many
+// arrived.
+static int32_t RunCrowd(mnavQuery* query, const mnavNavmesh* navmesh, mnavAvoidance* avoidance,
+                        double parts[3])
+{
+    static mnavPos2 velocities[CROWD];
+    mnavSteerDef steer = mnavDefaultSteerDef();
+    steer.maxSpeed = 1.5f;
+    int32_t arrived = 0;
+    for (int32_t s = 0; s < CROWD_STEPS; ++s)
+    {
+        double t0 = Seconds();
+        arrived = 0;
+        for (int32_t i = 0; i < CROWD; ++i)
+        {
+            mnavCorners corners;
+            mnavSteering steering;
+            Check(mnavCorridorCorners(query, navmesh, &s_crowd[i], &corners), "crowd corners");
+            Check(mnavSteer(&corners, &steer, &steering), "crowd steer");
+            arrived += steering.state == mnav_steerArrived ? 1 : 0;
+            s_crowdAgents[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
+        }
+        double t1 = Seconds();
+        Check(mnavAvoid(avoidance, s_crowdAgents, CROWD, NULL, 0, 0.1, velocities), "crowd avoid");
+        double t2 = Seconds();
+        for (int32_t i = 0; i < CROWD; ++i)
+        {
+            mnavPos3 at = s_crowd[i].position;
+            mnavPos3 wanted = {at.x + velocities[i].x * 0.1, at.y, at.z + velocities[i].y * 0.1};
+            Check(mnavMoveCorridor(query, navmesh, NULL, &s_crowd[i], wanted, NULL), "crowd move");
+            s_crowdAgents[i].position = (mnavPos2){s_crowd[i].position.x, s_crowd[i].position.z};
+            s_crowdAgents[i].velocity = velocities[i];
+        }
+        double t3 = Seconds();
+        parts[0] += t1 - t0;
+        parts[1] += t2 - t1;
+        parts[2] += t3 - t2;
+    }
+    return arrived;
+}
+
+static void Crowd(void)
+{
+    mnavBakeDef def = Def();
+    mnavNavmesh* navmesh = NULL;
+    Check(mnavCreateNavmesh(&def, &navmesh).result, "navmesh");
+    for (int32_t t = 0; t < TILES * TILES; ++t)
+    {
+        Check(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result, "stage");
+    }
+    Check(mnavCommit(navmesh), "commit");
+    mnavQueryDef queryDef = mnavDefaultQueryDef();
+    mnavQuery* query = NULL;
+    Check(mnavCreateQuery(&queryDef, &query), "query");
+    mnavAvoidanceDef avoidanceDef = mnavDefaultAvoidanceDef();
+    avoidanceDef.allocator = (mnavAllocator){Alloc, Free, NULL};
+    avoidanceDef.limits.agents = CROWD;
+    mnavAvoidance* avoidance = NULL;
+    Check(mnavCreateAvoidance(&avoidanceDef, &avoidance), "avoidance");
+    double best = 1e30;
+    double bestParts[3] = {0.0, 0.0, 0.0};
+    int32_t planned = 0;
+    int32_t arrived = 0;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        planned = PlanCrowd(query, navmesh);
+        double parts[3] = {0.0, 0.0, 0.0};
+        arrived = RunCrowd(query, navmesh, avoidance, parts);
+        double took = parts[0] + parts[1] + parts[2];
+        if (took < best)
+        {
+            best = took;
+            bestParts[0] = parts[0];
+            bestParts[1] = parts[1];
+            bestParts[2] = parts[2];
+        }
+    }
+    printf("# crowd: %d agents, %d planned, %d arrived after %d steps, %.0f us per step: "
+           "corners and steering %.0f%%, avoidance %.0f%%, moves %.0f%%\n",
+           CROWD, planned, arrived, CROWD_STEPS, best * 1e6 / CROWD_STEPS,
+           100.0 * bestParts[0] / best, 100.0 * bestParts[1] / best, 100.0 * bestParts[2] / best);
+    Report("crowd step, 1000 agents", best * 1e6 / CROWD_STEPS, "us");
+    mnavDestroyAvoidance(avoidance);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
 }
 
 // 1,000 fliers in a cube 16 m wide cross a wall of spheres through a gap
@@ -1296,6 +1432,7 @@ int main(int argc, char** argv)
     Stream(LINKS);
     Paths();
     Doorway();
+    Crowd();
     Gap();
     Flow();
     Hierarchy();
