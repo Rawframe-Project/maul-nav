@@ -261,6 +261,88 @@ static void Boxes(Reader* r, const mnavQueryFilter* filter)
     Expect(Typed(result) && (result != mnav_success || found.count <= capacity));
 }
 
+// The ground distance from p to the segment from a to b.
+static double ToSegment(mnavPos3 p, mnavPos3 a, mnavPos3 b)
+{
+    double dx = b.x - a.x;
+    double dz = b.z - a.z;
+    double length2 = dx * dx + dz * dz;
+    double t = length2 > 0.0 ? ((p.x - a.x) * dx + (p.z - a.z) * dz) / length2 : 0.0;
+    t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+    return hypot(a.x + dx * t - p.x, a.z + dz * t - p.z);
+}
+
+// The runs of area along a corridor: from its position, in order along
+// its corners, each on its segment; the count alike at every capacity.
+static mnavResult Areas(Reader* r, const mnavCorridor* corridor)
+{
+    mnavAreaRun runs[16];
+    int32_t capacity = Byte(r) % 17;
+    int32_t count = -1;
+    mnavCorners corners;
+    mnavResult result =
+        mnavCorridorAreas(s_query, s_navmesh, corridor, &corners, runs, capacity, &count);
+    if (result != mnav_success && result != mnav_errorCapacity)
+    {
+        return result;
+    }
+    Expect(count >= 1 && (result == mnav_success) == (count <= capacity));
+    int32_t again = -1;
+    Expect(mnavCorridorAreas(s_query, s_navmesh, corridor, &corners, runs, 16, &again) ==
+               (again <= 16 ? mnav_success : mnav_errorCapacity) &&
+           again == count);
+    int32_t written = count < 16 ? count : 16;
+    Expect(runs[0].corner == 0 && runs[0].start.x == corridor->position.x &&
+           runs[0].start.z == corridor->position.z);
+    for (int32_t k = 0; k < written; ++k)
+    {
+        const mnavAreaRun* run = &runs[k];
+        Expect(Finite(run->start) && run->area < MNAV_AREA_TYPES && run->corner >= 0 &&
+               run->corner < corners.pointCount && (k == 0 || run->corner >= runs[k - 1].corner));
+        mnavPos3 a = corners.points[run->corner];
+        mnavPos3 b =
+            corners.points[run->corner + 1 < corners.pointCount ? run->corner + 1 : run->corner];
+        double scale = 1.0 + fabs(a.x) + fabs(a.z) + fabs(b.x) + fabs(b.z);
+        Expect(ToSegment(run->start, a, b) <= 1e-6 * scale);
+    }
+    return result;
+}
+
+// Steering along a corridor's corners with a def from the bytes: a
+// finite velocity on the ground no faster than the def's speed, stopped
+// on arriving or at a link; a def out of range refused.
+static mnavResult Steer(Reader* r, const mnavCorridor* corridor)
+{
+    mnavCorners corners;
+    mnavResult result = mnavCorridorCorners(s_query, s_navmesh, corridor, &corners);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    mnavSteerDef def = mnavDefaultSteerDef();
+    def.maxSpeed = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.25);
+    def.slowDistance = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.1);
+    def.arriveDistance = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.01);
+    def.anticipateTurns = Byte(r) % 2 == 0;
+    bool good = def.maxSpeed >= 0.0f && def.maxSpeed <= MNAV_MAX_STEER_SPEED &&
+                def.slowDistance >= 0.0f && def.slowDistance <= MNAV_MAX_STEER_DISTANCE &&
+                def.arriveDistance >= 0.0f && def.arriveDistance <= MNAV_MAX_STEER_DISTANCE;
+    mnavSteering steering;
+    result = mnavSteer(&corners, &def, &steering);
+    Expect(result == (good ? mnav_success : mnav_errorRange));
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    double speed = hypot(steering.velocity.x, steering.velocity.z);
+    Expect(Finite(steering.velocity) && steering.velocity.y == 0.0 &&
+           speed <= (double)def.maxSpeed * (1.0 + 1e-9) + 1e-12);
+    Expect(steering.state == mnav_steerMoving || speed == 0.0);
+    Expect((steering.state == mnav_steerAtLink) == (steering.link >= 0) &&
+           steering.link < (corners.linkCount > 0 ? corners.linkCount : 1));
+    return result;
+}
+
 static void Corridor(Reader* r, const mnavQueryFilter* filter)
 {
     mnavPolygonId buffer[64];
@@ -281,7 +363,7 @@ static void Corridor(Reader* r, const mnavQueryFilter* filter)
     }
     for (int32_t k = 0; k < 4; ++k)
     {
-        uint8_t op = Byte(r) % 6;
+        uint8_t op = Byte(r) % 8;
         mnavMove move;
         mnavCorners corners;
         int32_t valid = 0;
@@ -294,8 +376,10 @@ static void Corridor(Reader* r, const mnavQueryFilter* filter)
             : op == 3 ? mnavCheckCorridor(s_navmesh, filter, &corridor, &valid)
             : op == 4
                 ? mnavShortcutCorridor(s_query, s_navmesh, filter, &corridor, Point(r), &shortened)
-                : mnavReplanCorridor(s_query, s_navmesh, filter, &corridor, (mnavVec3){1, 1, 1},
-                                     &path);
+            : op == 5 ? mnavReplanCorridor(s_query, s_navmesh, filter, &corridor,
+                                           (mnavVec3){1, 1, 1}, &path)
+            : op == 6 ? Areas(r, &corridor)
+                      : Steer(r, &corridor);
         Expect(Typed(result) && corridor.count >= 1 && corridor.count <= corridor.capacity);
     }
 }

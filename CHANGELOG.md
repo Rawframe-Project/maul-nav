@@ -8,6 +8,11 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- `fuzz_query` also takes each corridor's runs of area and steers along
+  its corners with fuzzed steering defs.
+
 ## [0.10.0] - 2026-10-09
 
 Following a path: agents steered along their corridors by a stateless
