@@ -569,6 +569,82 @@ extern "C"
                                                          mnavCorners* cornersOut, mnavAreaRun* runs,
                                                          int32_t capacity, int32_t* countOut);
 
+    // The fastest mnavSteer may steer, and the longest distance it slows
+    // or stops within, in meters per second and meters.
+#define MNAV_MAX_STEER_SPEED    1000.0f
+#define MNAV_MAX_STEER_DISTANCE 1000.0f
+
+    // How mnavSteer steers (mnav-0005). Build it with mnavDefaultSteerDef.
+    typedef struct mnavSteerDef
+    {
+        uint32_t cookie;
+        // The speed on the way, 0 to MNAV_MAX_STEER_SPEED.
+        float maxSpeed;
+        // Within this distance of the target along the corners, the speed
+        // falls with the distance left; 0 to MNAV_MAX_STEER_DISTANCE.
+        float slowDistance;
+        // Within this distance of the target the agent has arrived, and
+        // of an off-mesh link's takeoff it is at the link; 0 to
+        // MNAV_MAX_STEER_DISTANCE.
+        float arriveDistance;
+        // Whether to swing wide of the next corner so as to meet the turn
+        // already heading out of it, as Detour's crowd does.
+        bool anticipateTurns;
+    } mnavSteerDef;
+
+    // What mnavSteer found.
+    typedef uint8_t mnavSteerState;
+
+    enum
+    {
+        mnav_steerMoving = 0,
+        // Within the arrival distance of the target; the velocity is 0.
+        mnav_steerArrived = 1,
+        // Within the arrival distance of the next off-mesh link's takeoff;
+        // the velocity is 0, and the host crosses the link.
+        mnav_steerAtLink = 2,
+    };
+
+    // A velocity mnavSteer gives.
+    typedef struct mnavSteering
+    {
+        // On the ground (y is 0), in meters per second: the agent's
+        // preferred velocity for avoidance, x and z.
+        mnavPos3 velocity;
+        mnavSteerState state;
+        // At a link: its index among the corners' links; otherwise -1.
+        int32_t link;
+    } mnavSteering;
+
+    /// Returns a steering def of 3.5 m/s, slowing within 1 m of the
+    /// target, arriving within 0.1 m, anticipating turns.
+    ///
+    /// @return The def.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MNAV_API mnavSteerDef mnavDefaultSteerDef(void);
+
+    /// Steers along a corridor's corners (mnav-0005): toward the next
+    /// corner, or swinging wide of it, at the def's speed, slowing within
+    /// its slowing distance of the target by the distance left along the
+    /// corners over it; stopped within the arrival distance of the target
+    /// or of the next link's takeoff. Keeps no state: call it each step
+    /// with the corners mnavCorridorCorners gives, feed the velocity to
+    /// avoidance, and limit acceleration and move the agent yourself.
+    ///
+    /// @param corners     The corners, the agent's position first.
+    /// @param def         The def, from mnavDefaultSteerDef.
+    /// @param steeringOut Receives the velocity and state.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument,
+    /// corners with no points or a def not from mnavDefaultSteerDef;
+    /// `mnav_errorRange` for a def value out of its range or a corner not
+    /// finite.
+    /// @par Thread safety
+    /// Safe from any thread.
+    MNAV_NODISCARD MNAV_API mnavResult mnavSteer(const mnavCorners* corners,
+                                                 const mnavSteerDef* def,
+                                                 mnavSteering* steeringOut);
+
     /// Moves a corridor's position along the surface toward a wanted point
     /// (mnavMoveAlongSurface from its first polygon) and merges the
     /// polygons walked into its start: it keeps its polygons from the

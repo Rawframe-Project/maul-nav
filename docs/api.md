@@ -608,6 +608,16 @@ MNAV_NODISCARD MNAV_API mnavResult mnavCorridorAreas(mnavQuery* query, const mna
 Finds the areas along a corridor's straight path: the corners mnavCorridorCorners gives, which replace the context's last ones, and a run where the path starts, one wherever it crosses into a polygon of another area, and one where it lands from each off-mesh link, in order. Hosts change gait or sound at a run's start; a path's areas are its corridor's, once loaded with mnavSetCorridor.  @param query      The context; its memory holds the corners. @param navmesh    The navmesh. @param corridor   The corridor. @param cornersOut Receives the straight path, or NULL. @param runs       Receives the runs, in order. May be NULL when capacity is 0. @param capacity   How many runs fit, at least 0. @param countOut   Receives how many runs there are, also when they do not all fit. @return As mnavCorridorCorners; also `mnav_errorInvalid` for a NULL countOut, a negative capacity or NULL runs with a positive one, and `mnav_errorCapacity` when the runs do not fit, the first capacity of them written. @par Thread safety Safe from any thread; the context is used by one thread at a time.
 
 ```c
+mnavSteerDef mnavDefaultSteerDef(void);
+```
+Returns a steering def of 3.5 m/s, slowing within 1 m of the target, arriving within 0.1 m, anticipating turns.  @return The def. @par Thread safety Safe from any thread.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavSteer(const mnavCorners* corners, const mnavSteerDef* def, mnavSteering* steeringOut);
+```
+Steers along a corridor's corners (mnav-0005): toward the next corner, or swinging wide of it, at the def's speed, slowing within its slowing distance of the target by the distance left along the corners over it; stopped within the arrival distance of the target or of the next link's takeoff. Keeps no state: call it each step with the corners mnavCorridorCorners gives, feed the velocity to avoidance, and limit acceleration and move the agent yourself.  @param corners     The corners, the agent's position first. @param def         The def, from mnavDefaultSteerDef. @param steeringOut Receives the velocity and state. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, corners with no points or a def not from mnavDefaultSteerDef; `mnav_errorRange` for a def value out of its range or a corner not finite. @par Thread safety Safe from any thread.
+
+```c
 MNAV_NODISCARD MNAV_API mnavResult mnavMoveCorridor(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter, mnavCorridor* corridor, mnavPos3 wanted, mnavMove* moveOut);
 ```
 Moves a corridor's position along the surface toward a wanted point (mnavMoveAlongSurface from its first polygon) and merges the polygons walked into its start: it keeps its polygons from the farthest one the walk passed, led to by the walk.  @param query    The context, for the walk. @param navmesh  The navmesh. @param filter   The areas usable, or NULL for every walkable one. @param corridor The corridor. @param wanted   Where the agent would be; only its ground position counts. @param moveOut  Receives the walk, or NULL. @return As mnavMoveAlongSurface; also `mnav_errorInvalid` for a corridor with no buffer, and `mnav_errorCapacity` when the merged corridor would outgrow its buffer, which leaves it unchanged. @par Thread safety Safe from any thread; the context is used by one thread at a time. So is the corridor.
@@ -664,4 +674,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-123 functions across 12 headers.
+125 functions across 12 headers.

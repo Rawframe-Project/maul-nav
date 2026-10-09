@@ -35,7 +35,9 @@ enum
 };
 
 static const float TILE_SIZE = 32.0f;
-static const double STRIDE = 0.5;
+// A step's seconds and the agents' speed: half a meter a step.
+static const double STEP = 0.1;
+static const double SPEED = 5.0;
 
 // A crate: a square of 2 m on the ground, standing or not.
 typedef struct Crate
@@ -245,10 +247,13 @@ static bool InCrate(mnavPos3 p)
     return false;
 }
 
-// Moves each agent a stride toward its corridor's next corner; returns
-// how many stood in a crate.
+// Moves each agent a step of STEP seconds at the velocity mnavSteer
+// gives along its corridor; returns how many stood in a crate.
 static int32_t Walk(World* w, mnavQuery* query)
 {
+    mnavSteerDef steer = mnavDefaultSteerDef();
+    steer.maxSpeed = (float)SPEED;
+    steer.arriveDistance = 0.01f;
     int32_t inside = 0;
     for (int32_t a = 0; a < AGENTS; ++a)
     {
@@ -258,19 +263,17 @@ static int32_t Walk(World* w, mnavQuery* query)
             continue;
         }
         mnavCorners corners;
+        mnavSteering steering;
         Check(mnavCorridorCorners(query, w->navmesh, &agent->corridor, &corners), "corners");
-        mnavPos3 at = agent->corridor.position;
-        mnavPos3 next = corners.points[corners.pointCount > 1 ? 1 : 0];
-        double dx = next.x - at.x;
-        double dz = next.z - at.z;
-        double left = sqrt(dx * dx + dz * dz);
-        if (corners.pointCount <= 2 && left < 0.01)
+        Check(mnavSteer(&corners, &steer, &steering), "steer");
+        if (steering.state == mnav_steerArrived)
         {
             agent->arrived = true;
             continue;
         }
-        double t = left > STRIDE ? STRIDE / left : 1.0;
-        mnavPos3 wanted = {at.x + dx * t, at.y, at.z + dz * t};
+        mnavPos3 at = agent->corridor.position;
+        mnavPos3 wanted = {at.x + steering.velocity.x * STEP, at.y,
+                           at.z + steering.velocity.z * STEP};
         Check(mnavMoveCorridor(query, w->navmesh, NULL, &agent->corridor, wanted, NULL), "move");
         inside += InCrate(agent->corridor.position) ? 1 : 0;
     }

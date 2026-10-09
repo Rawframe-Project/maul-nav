@@ -237,6 +237,11 @@ mnavResult cornered = mnavCorridorCorners(query, navmesh, &corridor, &corners);
 mnavResult moved = mnavMoveCorridor(query, navmesh, NULL, &corridor, wanted, NULL);
 ```
 
+- `mnavSteer` turns the corners into the velocity the agent wants: at
+  the def's speed toward the next corner, swinging wide of a turn,
+  slowing near the target, and stopped on arriving or at a link's
+  takeoff. It keeps no state; feed its velocity to avoidance as the
+  agent's preferred one, and limit acceleration yourself.
 - `mnavMoveCorridorTarget` moves the target; `mnavShortcutCorridor`
   straightens it where the way is clear.
 - After a commit, `mnavCheckCorridor` counts the polygons still valid;

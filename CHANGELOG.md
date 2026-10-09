@@ -17,6 +17,12 @@ format.
   them, each starting where the straight path starts, enters a polygon
   of another area or lands from an off-mesh link (as Detour's area
   crossings), into a buffer the caller gives.
+- `mnavSteer` and `mnavDefaultSteerDef`: a desired velocity from a
+  corridor's corners, straight at the next corner or swinging wide of
+  a turn as Detour's crowd does, slowing within a distance of the
+  target and stopping on arriving or at an off-mesh link's takeoff;
+  stateless, for avoidance's preferred velocity. The `walk` and
+  `obstacles` samples steer with it.
 
 ### Fixed
 

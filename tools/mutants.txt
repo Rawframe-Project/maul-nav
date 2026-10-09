@@ -548,3 +548,9 @@ ca-crossing-t | src/corridor.c | if (t >= -eps && t <= 1.0 + eps && u >= -eps &&
 ca-capacity | src/corridor.c | return count <= capacity ? mnav_success : mnav_errorCapacity; | return mnav_success;
 ca-run-fits | src/corridor.c | if (*count < capacity) | if (*count <= capacity)
 ca-parallel-within | src/corridor.c | if (side * side <= 1e-6 * reach && w >= -eps && w <= 1.0 + eps) | if (side * side <= 1e-6 * reach)
+st-anticipate | src/steer.c | x -= ax / away * length * 0.5; | x -= ax / away * length;
+st-no-skip-step | src/steer.c | while (n + 1 < corners->pointCount && Ground(corners->points[0], corners->points[n]) == 0.0) | while (false)
+st-takeoff-straight | src/steer.c | mnavPos3 direction = Direction(corners, n, def->anticipateTurns && !takeoff); | mnavPos3 direction = Direction(corners, n, def->anticipateTurns);
+st-slow | src/steer.c | if (left < (double)def->slowDistance) | if (false)
+st-arrive | src/steer.c | if (left <= (double)def->arriveDistance) | if (left < (double)def->arriveDistance)
+st-link-point | src/steer.c | bool takeoff = corners->linkCount > 0 && corners->links[0].point == 1; | bool takeoff = corners->linkCount > 0;

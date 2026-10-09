@@ -4,8 +4,8 @@
 // From geometry to a walking agent: a floor of 64 m by 64 m with a wall
 // across it is baked into four tiles, the tiles are loaded into a
 // navmesh, a path is found round the wall, and an agent follows it
-// through a path corridor, a meter a step, toward the corridor's next
-// corner. Prints the path and the walk; returns 0 when the agent
+// through a path corridor, steered toward the corridor's corners by
+// mnavSteer. Prints the path and the walk; returns 0 when the agent
 // arrives.
 
 #include "maul-nav/bake.h"
@@ -96,27 +96,29 @@ int main(void)
     {
         printf("  (%.2f, %.2f, %.2f)\n", path.points[i].x, path.points[i].y, path.points[i].z);
     }
-    // Follow it: each step, a meter toward the corridor's next corner.
+    // Follow it: each step of a tenth of a second, at the velocity
+    // mnavSteer gives toward the corridor's corners, 10 m/s.
     static mnavPolygonId buffer[CORRIDOR];
     mnavCorridor corridor;
     Check(mnavResetCorridor(&corridor, buffer, CORRIDOR, start.polygon, start.point), "reset");
     Check(mnavSetCorridor(&corridor, &path), "corridor");
+    mnavSteerDef steer = mnavDefaultSteerDef();
+    steer.maxSpeed = 10.0f;
+    steer.arriveDistance = 0.01f;
     int32_t steps = 0;
     for (; steps < 200; ++steps)
     {
         mnavCorners corners;
+        mnavSteering steering;
         Check(mnavCorridorCorners(query, navmesh, &corridor, &corners), "corners");
-        mnavPos3 at = corridor.position;
-        mnavPos3 next = corners.points[corners.pointCount > 1 ? 1 : 0];
-        double dx = next.x - at.x;
-        double dz = next.z - at.z;
-        double left = sqrt(dx * dx + dz * dz);
-        if (corners.pointCount <= 2 && left < 0.01)
+        Check(mnavSteer(&corners, &steer, &steering), "steer");
+        if (steering.state == mnav_steerArrived)
         {
             break;
         }
-        double t = left > 1.0 ? 1.0 / left : 1.0;
-        mnavPos3 wanted = {at.x + dx * t, at.y, at.z + dz * t};
+        mnavPos3 at = corridor.position;
+        mnavPos3 wanted = {at.x + steering.velocity.x * 0.1, at.y,
+                           at.z + steering.velocity.z * 0.1};
         Check(mnavMoveCorridor(query, navmesh, NULL, &corridor, wanted, NULL), "move");
     }
     double dx = corridor.position.x - end.point.x;

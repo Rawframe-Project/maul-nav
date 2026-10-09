@@ -75,3 +75,4 @@ crowd:
 orca3:
 avoidance: allocator crowd draw obstacle orca orca3
 avoidance3: avoidance crowd draw obstacle orca3
+steer:

@@ -105,6 +105,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/scalar.c
     src/shortest.c
     src/sort.c
+    src/steer.c
     src/spatial.c
     src/surface.c
     src/terrain.c
@@ -159,6 +160,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(flow)
     maul_add_test(hierarchy)
     maul_add_test(spatial)
+    maul_add_test(steer)
     maul_add_test(linkgen)
     maul_add_test(debug)
     maul_add_test(guide)
