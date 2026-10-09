@@ -86,7 +86,7 @@ jobs:
       - name: Build
         run: cmake --build build -j 4
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --timeout 300
       - name: Package
         if: matrix.name == 'linux-shared'
         run: |
@@ -109,7 +109,7 @@ jobs:
       - name: Build
         run: cmake --build build --config Release -j 4
       - name: Test
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: ctest --test-dir build -C Release --output-on-failure --timeout 300
       - name: Headers under MSVC
         # The public headers alone under cl's /W4 /WX, in C++17 (family record 0008).
         run: |
