@@ -75,6 +75,30 @@ symmetry face to face.
   A vector of no length at all gives {0, 0}, and the obstacle lines
   then fall back on the edge's own constraint; the callers' conditions
   keep exact zeros away, so that only guards rounding.
+- **In space (amended 2026-10-09):** `mnavAvoid3D` steers fliers on
+  the same set, for agents sharing a flight volume (mnav-0015):
+  - each neighbor gives a half-space of velocities bounded by a plane,
+    built as RVO2-3D builds it (a cut-off sphere, the cone, or parting
+    within the step), in binary64. Exactly head on, where every side of
+    the cone is as near, the plane's normal is square to the line
+    between them, across world up or else world +X, so that each of
+    the pair takes the other's opposite;
+  - the new velocity is RVO2-3D's 3D linear program within the speed
+    sphere, with its 4D fallback breaking the planes least; planes are
+    parallel within 1e-9, as lines are. A plane touching the speed
+    sphere leaves a disc of no size; the projection onto its rim goes
+    by the unit offset and falls back on the disc's center, which the
+    fuzz target found giving NaN when rounding left no offset;
+  - neighbors come from the same sorted grid, its cells cubes searched
+    by shells; the ground call's results stay the same to the bit;
+  - priorities split each avoidance as on the ground. The sidestep goes
+    to the preferred velocity's right, +Y being up, and a vertical one
+    turns toward +X rising and -X falling, so that two fliers meeting
+    head on along Y turn apart rather than stall in line;
+  - obstacles are spheres, still or moving, that never give way, as
+    circles on the ground; they count against the set's obstacle points,
+    and each agent looks at every sphere, which suits the few moving
+    things among fliers. Static geometry is the flight volume's.
 
 ## Consequences
 

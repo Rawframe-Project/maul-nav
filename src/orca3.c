@@ -120,8 +120,11 @@ static bool OnPlane(const mnavPlane* plane, double radius, mnavPos3 wanted, bool
         wanted, mnavScale3(plane->normal, mnavDot3(mnavSub3(plane->point, wanted), plane->normal)));
     if (mnavDot3(projected, projected) > radiusSq)
     {
-        mnavPos3 out = mnavSub3(projected, center);
-        *result = mnavAdd3(center, mnavScale3(out, sqrt(discSq / mnavDot3(out, out))));
+        // Onto the disc's rim. A plane touching the sphere leaves a disc
+        // of no size, where rounding can put the projection a hair
+        // outside it and on its center: the center is then the rim.
+        mnavPos3 out = mnavNormalize3(mnavSub3(projected, center));
+        *result = mnavAdd3(center, mnavScale3(out, sqrt(discSq)));
     }
     else
     {

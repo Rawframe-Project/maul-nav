@@ -3,10 +3,10 @@
 # change a result, its reason in a comment above it. Run on a clean tree:
 #   python3 tools/mutate.py tools/mutants.txt build results.txt
 # 0.2.2 speed-ups: the neighbour ring search and the polygon merge
-ring-stop-early | src/avoidance.c | double near = r > 1 ? (double)(r - 1) * size * (1.0 - 0x1p-20) : 0.0; | double near = r > 1 ? (double)r * size * (1.0 - 0x1p-20) : 0.0;
-ring-last-ring | src/avoidance.c | for (int64_t r = 0; r <= CELL_DIVISIONS + 1; ++r) | for (int64_t r = 0; r <= CELL_DIVISIONS; ++r)
-ring-stop-partial | src/avoidance.c | if (near >= range || (found == limit && near * near > a->neighbors[found - 1].distance)) | if (near >= range || (found > 0 && limit > 0 && near * near > a->neighbors[found - 1].distance))
-ring-one-row | src/avoidance.c | for (int64_t y = cy - r; y <= cy + r; y += side || r == 0 ? 1 : 2 * r) | for (int64_t y = cy - r; y <= cy + r; y += side || r == 0 ? 1 : 4 * r)
+ring-stop-early | src/crowd.c | double near = r > 1 ? (double)(r - 1) * size * (1.0 - 0x1p-20) : 0.0; | double near = r > 1 ? (double)r * size * (1.0 - 0x1p-20) : 0.0;
+ring-last-ring | src/crowd.c | for (int64_t r = 0; r <= CELL_DIVISIONS + 1; ++r) | for (int64_t r = 0; r <= CELL_DIVISIONS; ++r)
+ring-stop-partial | src/crowd.c | (s.found == crowd->limit && near * near > crowd->neighbors[s.found - 1].distance)) | (s.found > 0 && near * near > crowd->neighbors[s.found - 1].distance))
+ring-one-row | src/crowd.c | int64_t stepY = sideX || rz > 0 || r == 0 ? 1 : 2 * r; | int64_t stepY = sideX || rz > 0 || r == 0 ? 1 : 4 * r;
 merge-tie-last | src/polymesh.c | bool first = value == best->value && (j < best->a || (j == best->a && k < best->b)); | bool first = value == best->value && (j > best->a || (j == best->a && k > best->b));
 merge-overwrite | src/polymesh.c | while (table[slot] >= 0) | while (false && table[slot] >= 0)
 # merge-k-any survives, equivalent: the reversed pair has the same value
@@ -356,13 +356,13 @@ near-prune-over | src/nearest.c | if (fabs(dx) > s->half.x || fabs(dz) > s->half
 near-stop | src/nearest.c | if (best == 0.0) | if (best < 0.0)
 
 # Avoidance's cell runs: each occupied cell's first and end key.
-run-end-stays | src/avoidance.c | run->end = k + 1; | run->end = run->end;
-run-end-short | src/avoidance.c | run->end = k + 1; | run->end = k;
-run-first-end | src/avoidance.c | *run = (Run){k, k + 1}; | *run = (Run){k, k};
-run-scan-last | src/avoidance.c | for (int32_t k = run.first; k < run.end; ++k) | for (int32_t k = run.first; k + 1 < run.end; ++k)
-run-scan-past | src/avoidance.c | for (int32_t k = run.first; k < run.end; ++k) | for (int32_t k = run.first; k <= run.end && k < run.end + 1 && k < a->def.limits.agents; ++k)
-run-probe-stop | src/avoidance.c | for (Run run = a->table[slot]; run.first >= 0; run = a->table[slot]) | for (Run run = a->table[slot]; run.first > 0; run = a->table[slot])
-run-place-over | src/avoidance.c | while (a->table[slot].first >= 0) | while (a->table[slot].first > 0)
+run-end-stays | src/crowd.c | run->end = k + 1; | run->end = run->end;
+run-end-short | src/crowd.c | run->end = k + 1; | run->end = k;
+run-first-end | src/crowd.c | *run = (mnavCrowdRun){k, k + 1}; | *run = (mnavCrowdRun){k, k};
+run-scan-last | src/crowd.c | for (int32_t k = run.first; k < run.end; ++k) | for (int32_t k = run.first; k + 1 < run.end; ++k)
+run-scan-before | src/crowd.c | for (int32_t k = run.first; k < run.end; ++k) | for (int32_t k = run.first > 0 ? run.first - 1 : 0; k < run.end; ++k)
+run-probe-stop | src/crowd.c | for (mnavCrowdRun run = crowd->table[slot]; run.first >= 0; run = crowd->table[slot]) | for (mnavCrowdRun run = crowd->table[slot]; run.first > 0; run = crowd->table[slot])
+run-place-over | src/crowd.c | while (crowd->table[slot].first >= 0) | while (crowd->table[slot].first > 0)
 
 # The tile index's grid check (23cce64). ti-grid-none and ti-grid-rows
 # are killed by test_tile_index only in a sanitizer build
@@ -427,7 +427,7 @@ fs-floor-div | src/flight_space.c | return (a % b != 0 && a < 0) ? q - 1 : q; | 
 fs-cache-z | src/flight_space.c | if (!c->cached || tileX != c->tileX || tileZ != c->tileZ) | if (!c->cached || tileX != c->tileX)
 fs-face-inside | src/flight_space.c | r.lo[axis] = f % 2 != 0 ? r.hi[axis] : r.lo[axis] - 1; | r.lo[axis] = f % 2 != 0 ? r.hi[axis] - 1 : r.lo[axis] - 1;
 fs-corners-off | src/flight_space.c | if ((m & ~tied) != 0 || m == tied) | if (true || (m & ~tied) != 0 || m == tied)
-fs-leaf-solid | src/flight_space.c | if ((leaf >> k & 1u) == 0 && Meets(r, vx, vy, vz, 1)) | if (Meets(r, vx, vy, vz, 1))
+fs-leaf-solid | src/flight_space.c | for (uint64_t open = ~leaf & RegionBits(lo, hi); open != 0; open &= open - 1u) | for (uint64_t open = RegionBits(lo, hi); open != 0; open &= open - 1u)
 # sr-size-blind survives, equivalent: open blocks are disjoint, so two
 # with one lowest voxel are one block.
 sr-size-blind | src/flight_search.c | return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3]; | return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
@@ -448,3 +448,44 @@ pr-stop-kind | src/flight_probe.c | hitOut->stop = held == MNAV_SPACE_OPEN    ? 
 fd-radius-margin | src/flight_def.c | !mnavToCells(def->radius, def->voxelSize, true, def->tileVoxels - FLIGHT_BORDER_MARGIN, | !mnavToCells(def->radius, def->voxelSize, true, def->tileVoxels,
 fd-ceiling-top | src/flight_def.c | return top > MNAV_MAX_HEIGHT_CELLS ? mnav_flightSettingCeiling : mnav_flightSettingNone; | return mnav_flightSettingNone;
 fv-removal-count | src/flight_volume.c | count += e->removal ? (held ? -1 : 0) : (held ? 0 : 1); | count += e->removal ? 0 : (held ? 0 : 1);
+
+# Avoidance in space: the shell search, the plane programs, the pair
+# plane, spheres and the sidestep
+crowd-shell-z | src/crowd.c | int64_t rz = s->crowd->space ? r : 0; | int64_t rz = 0;
+crowd-shell-step | src/crowd.c | for (int64_t z = c->z - rz; z <= c->z + rz; z += side || rz == 0 ? 1 : 2 * rz) | for (int64_t z = c->z - rz; z <= c->z + rz; z += rz == 0 ? 1 : 2 * rz)
+crowd-key-z | src/crowd.c | if (a->z != b->z) | if (false && a->z != b->z)
+crowd-cell-z | src/crowd.c | return a->x == b->x && a->y == b->y && a->z == b->z; | return a->x == b->x && a->y == b->y;
+crowd-dz | src/crowd.c | double distance = dx * dx + dy * dy + dz * dz; | double distance = dx * dx + dy * dy;
+o3-bound-parallel | src/orca3.c | if (numerator > 0.0) | if (numerator < 0.0)
+o3-bound-side | src/orca3.c | if (denominator >= 0.0) | if (denominator < 0.0)
+o3-bound-empty | src/orca3.c | if (*left > *right) | if (false && *left > *right)
+o3-lp1-tangent | src/orca3.c | if (discriminant < 0.0) | if (discriminant <= 0.0)
+o3-lp1-direction | src/orca3.c | t = mnavDot3(wanted, line->direction) > 0.0 ? right : left; | t = mnavDot3(wanted, line->direction) > 0.0 ? left : right;
+o3-lp1-no-clamp | src/orca3.c | t = t < left ? left : (t > right ? right : t); | t = t > right ? right : t;
+o3-plane-miss | src/orca3.c | if (distanceSq > radiusSq) | if (false && distanceSq > radiusSq)
+o3-plane-rim | src/orca3.c | if (mnavDot3(projected, projected) > radiusSq) | if (false && mnavDot3(projected, projected) > radiusSq)
+o3-lp2-kept | src/orca3.c | if (mnavDot3(planes[i].normal, mnavSub3(planes[i].point, *result)) <= 0.0) | if (mnavDot3(planes[i].normal, mnavSub3(planes[i].point, *result)) < 0.0)
+o3-lp2-parallel | src/orca3.c | // Parallel, and plane i leaves nothing of plane n. | continue;
+o3-lp3-speed | src/orca3.c | else if (mnavDot3(wanted, wanted) > radius * radius) | else if (false && mnavDot3(wanted, wanted) > radius * radius)
+o3-lp3-violated | src/orca3.c | if (mnavDot3(planes[i].normal, mnavSub3(planes[i].point, *result)) > 0.0) | if (mnavDot3(planes[i].normal, mnavSub3(planes[i].point, *result)) > 1e-3)
+o3-lp4-distance | src/orca3.c | if (mnavDot3(planes[i].normal, mnavSub3(planes[i].point, *result)) <= distance) | if (mnavDot3(planes[i].normal, mnavSub3(planes[i].point, *result)) <= distance + 1e-3)
+o3-lp4-no-fixed | src/orca3.c | for (int32_t k = 0; k < fixed; ++k) | for (int32_t k = 0; k < 0 && k < fixed; ++k)
+o3-bisector-same | src/orca3.c | if (mnavDot3(i->normal, j->normal) > 0.0) | if (mnavDot3(i->normal, j->normal) < 0.0)
+o3-bisector-normal | src/orca3.c | out->normal = mnavNormalize3(mnavSub3(j->normal, i->normal)); | out->normal = mnavNormalize3(mnavSub3(i->normal, j->normal));
+o3-pair-cutoff | src/orca3.c | if (dot < 0.0 && dot * dot > combinedSq * wSq) | if (dot < 0.0 && dot * dot < combinedSq * wSq)
+o3-pair-cone-root | src/orca3.c | double t = (b + sqrt(discriminant > 0.0 ? discriminant : 0.0)) / distance; | double t = (b - sqrt(discriminant > 0.0 ? discriminant : 0.0)) / distance;
+o3-pair-no-square | src/orca3.c | plane.normal = length > 0.0 ? mnavScale3(ww, 1.0 / length) : Square(position); | plane.normal = length > 0.0 ? mnavScale3(ww, 1.0 / length) : (mnavPos3){0.0, 0.0, 1.0};
+o3-pair-no-share | src/orca3.c | plane.point = mnavAdd3(selfVelocity, mnavScale3(u, share)); | plane.point = mnavAdd3(selfVelocity, mnavScale3(u, share * 0.0 + 1.0));
+o3-pair-lower-id | src/orca3.c | plane.normal = (mnavPos3){lowerId ? -1.0 : 1.0, 0.0, 0.0}; | plane.normal = (mnavPos3){lowerId ? 1.0 : -1.0, 0.0, 0.0};
+o3-pair-away | src/orca3.c | plane.normal = mnavNormalize3(mnavScale3(position, -1.0)); | plane.normal = mnavNormalize3(position);
+a3-sphere-range | src/avoidance3.c | if (gap >= range) | if (gap >= range * 0.25)
+a3-sphere-tie | src/avoidance3.c | return ia != ib ? ia < ib : a.vertex < b.vertex; | return a.vertex < b.vertex;
+a3-sphere-leave | src/avoidance3.c | double offset = leave < agent->maxSpeed ? leave : agent->maxSpeed; | double offset = leave;
+a3-sphere-share | src/avoidance3.c | combined, 1.0, horizon, step, agent->id < sphere->id); | combined, 0.5, horizon, step, agent->id < sphere->id);
+a3-right-vertical | src/avoidance3.c | right = (mnavPos3){preferred.y > 0.0 ? 1.0 : -1.0, 0.0, 0.0}; | right = (mnavPos3){1.0, 0.0, 0.0};
+a3-right-side | src/avoidance3.c | mnavPos3 right = {-preferred.z, 0.0, preferred.x}; | mnavPos3 right = {preferred.z, 0.0, -preferred.x};
+a3-no-keep-right | src/avoidance3.c | failed = mnavPlaneProgram3(a->planes, count, self->maxSpeed, KeepRight(self->preferred), | failed = mnavPlaneProgram3(a->planes, count, self->maxSpeed, self->preferred,
+a3-no-fixed | src/avoidance3.c | int32_t fixed = count; | int32_t fixed = 0;
+a3-priority | src/avoidance3.c | other->priority / (self->priority + other->priority), | 0.5,
+a3-speed-cap | src/avoidance3.c | if (speedSq > self->maxSpeed * self->maxSpeed) | if (false && speedSq > self->maxSpeed * self->maxSpeed)
+a3-sphere-limit | src/avoidance3.c | sphereCount > avoidance->def.limits.obstacleVertices) | sphereCount > avoidance->def.limits.obstacleVertices + 1)

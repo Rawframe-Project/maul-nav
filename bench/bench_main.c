@@ -7,7 +7,8 @@
 // tiles that enter and leave and committing each step, for ten laps;
 // then finds paths
 // on the whole terrain; then steers 1,000 agents through a doorway 4 m wide
-// with avoidance; then builds flow fields over a grid of 512 by 512 cells;
+// with avoidance, and 1,000 fliers through a gap in a wall of spheres;
+// then builds flow fields over a grid of 512 by 512 cells;
 // then, on a flat world of 24 by 24 tiles with pillars and walls baked
 // from outlines, builds a hierarchy and finds long paths with and without
 // it; then bakes the terrain and 300 floating boxes into a flight volume
@@ -592,6 +593,97 @@ static void Doorway(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+// 1,000 fliers in a cube 16 m wide cross a wall of spheres through a gap
+// 6 m wide in its middle to a cube on the other side, in steps of 0.1 s.
+static void Gap(void)
+{
+    enum
+    {
+        FLIERS = 1000,
+        STEPS = 600,
+        SIDE = 13
+    };
+    static mnavAgent3D fliers[FLIERS];
+    static mnavPos3 goals[FLIERS];
+    static mnavPos3 velocities[FLIERS];
+    static mnavSphere wall[SIDE * SIDE];
+    int32_t spheres = 0;
+    for (int32_t a = 0; a < SIDE; ++a)
+    {
+        for (int32_t b = 0; b < SIDE; ++b)
+        {
+            double y = (double)(a - SIDE / 2) * 2.5;
+            double z = (double)(b - SIDE / 2) * 2.5;
+            if (fabs(y) < 4.0 && fabs(z) < 4.0)
+            {
+                continue;
+            }
+            wall[spheres] = (mnavSphere){{0.0, y, z}, 1.5, {0.0, 0.0, 0.0}, (uint64_t)spheres};
+            spheres += 1;
+        }
+    }
+    mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
+    def.allocator = (mnavAllocator){Alloc, Free, NULL};
+    def.limits.agents = FLIERS;
+    def.neighborDistance = 3.0;
+    def.timeHorizon = 2.0;
+    def.obstacleTimeHorizon = 1.0;
+    mnavAvoidance* avoidance = NULL;
+    Check(mnavCreateAvoidance(&def, &avoidance), "avoidance");
+    double best = 1e30;
+    int32_t arrived = 0;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        for (int32_t i = 0; i < FLIERS; ++i)
+        {
+            double x = -30.0 + (double)(i % 10) * 1.6;
+            double y = -7.2 + (double)(i / 10 % 10) * 1.6;
+            double z = -7.2 + (double)(i / 100) * 1.6;
+            fliers[i] = (mnavAgent3D){{x, y, z}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, 0.3, 1.5,
+                                      1.0,       (uint64_t)i};
+            goals[i] = (mnavPos3){-x, y, z};
+        }
+        double start = Seconds();
+        for (int32_t s = 0; s < STEPS; ++s)
+        {
+            for (int32_t i = 0; i < FLIERS; ++i)
+            {
+                // Through the gap's middle while still before the wall.
+                mnavPos3 at = fliers[i].position;
+                mnavPos3 aim = at.x < -1.5 ? (mnavPos3){0.0, 0.0, 0.0} : goals[i];
+                double dx = aim.x - at.x;
+                double dy = aim.y - at.y;
+                double dz = aim.z - at.z;
+                double length = sqrt(dx * dx + dy * dy + dz * dz);
+                double scale = length > 1.0 ? 1.0 / length : 1.0;
+                fliers[i].preferred = (mnavPos3){dx * scale, dy * scale, dz * scale};
+            }
+            Check(mnavAvoid3D(avoidance, fliers, FLIERS, wall, spheres, 0.1, velocities),
+                  "avoid in space");
+            for (int32_t i = 0; i < FLIERS; ++i)
+            {
+                fliers[i].velocity = velocities[i];
+                fliers[i].position.x += velocities[i].x * 0.1;
+                fliers[i].position.y += velocities[i].y * 0.1;
+                fliers[i].position.z += velocities[i].z * 0.1;
+            }
+        }
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+        arrived = 0;
+        for (int32_t i = 0; i < FLIERS; ++i)
+        {
+            arrived += fliers[i].position.x > 1.5 ? 1 : 0;
+        }
+    }
+    printf("# gap: %d fliers, %d spheres, %d through after %d steps, %.0f us per step, %.0f "
+           "fliers per ms\n",
+           FLIERS, spheres, arrived, STEPS, best * 1e6 / STEPS, FLIERS * STEPS / (best * 1e3));
+    Report("avoidance in space step, 1000 fliers", best * 1e6 / STEPS, "us");
+    Report("avoidance in space, fliers per ms", FLIERS * STEPS / (best * 1e3), "/ms");
+    mnavDestroyAvoidance(avoidance);
+}
+
 // Times one repair of a field.
 static double Repair(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
                      const mnavCell* changed, int32_t changedCount)
@@ -1133,6 +1225,7 @@ int main(int argc, char** argv)
     Stream(LINKS);
     Paths();
     Doorway();
+    Gap();
     Flow();
     Hierarchy();
     Flight();

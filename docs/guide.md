@@ -284,6 +284,15 @@ Input has named ranges (`MNAV_MAX_AVOIDANCE_COORDINATE`,
 `MNAV_MIN_AVOIDANCE_TIME`), wide enough for any scene, and an agent's
 new velocity is never faster than its maximum speed.
 
+Fliers sharing a flight volume avoid each other in space with
+`mnavAvoid3D`, on the same set: `mnavAgent3D` has the same fields as
+`mnavAgent` in three dimensions, and its obstacles are spheres
+(`mnavSphere`), still or moving, which count against the set's
+obstacle points. Walls and terrain are the flight volume's to keep
+clear of: a flier follows its path and avoids what moves. A held-back
+flier sidesteps to its right, +Y being up, and one rising or falling
+straight sidesteps toward +X or -X, so that two meeting head on pass.
+
 ## Debug output
 
 The library never draws. It fills an `mnavDebugBuffer` you own with

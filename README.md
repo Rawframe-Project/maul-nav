@@ -33,7 +33,8 @@ It has:
 - flight volumes for agents that fly or swim: sparse voxel octree
   tiles baked from the same input, streamed as navmesh tiles are, with
   any-angle paths (Lazy Theta*), raycasts and nearest open points;
-- velocity-space avoidance (ORCA), a component that needs no navmesh;
+- velocity-space avoidance (ORCA) on the ground and among fliers in
+  space, a component that needs no navmesh;
 - debug geometry as plain vertices and indices, and bake reports.
 
 It owns no world, entities, physics or animation: it takes geometry

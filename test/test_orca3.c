@@ -106,6 +106,26 @@ static void TestWantedPastTheSpeed(void)
           "cut to the speed");
 }
 
+static void TestTouchingTheSpeed(void)
+{
+    // A plane touching the speed sphere, its point the one velocity it
+    // allows at that speed, which rounding put a hair outside the sphere:
+    // the projection lands on its point, never NaN (found by the fuzzer).
+    const double r = 0x1.4cccccccccccep+0;
+    const double p = 0x1.8048ca73b75a6p-1;
+    const double n = 0x1.279a74590331cp-1;
+    const mnavPlane planes[2] = {Plane(p, p, p, n, n, n), Plane(0, 0, -r, 0, 0, -1)};
+    mnavPlane scratch[2];
+    double tiny = 0x1.020202020202p-509;
+    mnavPos3 result = {0.0, 0.0, 0.0};
+    int32_t failed = mnavPlaneProgram3(planes, 2, r, (mnavPos3){tiny, tiny, tiny}, false, &result);
+    CHECK(failed == 1 && result.x == p && result.y == p && result.z == p, "on the touching point");
+    mnavPlaneProgram4(planes, 2, 0, failed, r, scratch, &result);
+    CHECK(isfinite(result.x) && isfinite(result.y) && isfinite(result.z) &&
+              mnavDot3(result, result) <= r * r * (1.0 + 1e-12),
+          "a finite velocity within the speed");
+}
+
 static double Violation(const mnavPlane* planes, int32_t count, mnavPos3 v)
 {
     double worst = -(double)INFINITY;
@@ -231,6 +251,7 @@ int main(void)
     TestCorners();
     TestPastTheSpeed();
     TestWantedPastTheSpeed();
+    TestTouchingTheSpeed();
     TestAgainstSamples();
     TestHeadOnPair();
     TestOnOneSpot();
