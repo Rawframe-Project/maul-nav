@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-09
+
+Flight hosts' tools: path searches in slices, a path check for
+replanning after a commit, debug drawing for fliers, and avoidance in
+space up to five times faster. Tiles baked by 0.7.0 still load; tiles baked
+now record 0.8.0 as their generator.
+
 ### Added
 
 - `mnavDebugAvoidance3D`: fliers drawn as three rings each, one in each

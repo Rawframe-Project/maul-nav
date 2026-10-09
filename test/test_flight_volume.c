@@ -29,7 +29,7 @@
 
 // The hash of the test world's four flight tiles' bytes, the same on
 // every platform.
-#define FLIGHT_BYTES_HASH 0x7a0b3de90ef74ac9ull
+#define FLIGHT_BYTES_HASH 0x43e06efc7b5d892cull
 
 // Where the header keeps its fields.
 enum
