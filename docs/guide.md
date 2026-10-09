@@ -402,11 +402,13 @@ for (int32_t i = 0; i < count && avoided == mnav_success; ++i)
   them back short of where avoidance planned. `mnavFindWalls` gives the
   walls within a range of an agent, nearest first, into a buffer of the
   few you keep. Find them again when the agent has moved a quarter of
-  the range; move each out by the agent's radius against its normal,
-  since the navmesh keeps an agent's center a radius from the real
-  walls already and avoidance adds the radius again; skip those of no
-  length (normal zero); and pass each wall once, as a two-point
-  obstacle (`samples/navcrowd.c`).
+  the range. A wall lies on the navmesh's edge, as far as an agent's
+  center may go; move each out against its normal by the agent's own
+  radius, so that avoidance, which keeps an agent its radius from every
+  obstacle, stops its center on that edge, where the surface move would
+  stop it too. One list holds one offset: agents of other radii need a
+  list each. Skip walls of no length (normal zero), and pass each wall
+  once, as a two-point obstacle (`samples/navcrowd.c`).
 - **Acceleration** is the host's, between avoidance and the move, as in
   Detour's crowd; `navcrowd` limits each change to 8 m/s² times the
   step.

@@ -199,10 +199,14 @@ static void FindWalls(mnavQuery* query, const mnavNavmesh* navmesh)
 }
 
 // Every agent's walls as avoidance's segments, each once, moved out by
-// the agent's radius: the navmesh keeps an agent's center a radius from
-// the real walls already, and avoidance keeps an agent a radius from every
-// obstacle. Walls of no length on the ground are left out, as avoidance
-// refuses them. Returns how many.
+// the agents' radius: a wall lies on the navmesh's edge, as far as a
+// center may go, and avoidance keeps an agent its radius from every
+// obstacle, so its center stops on that edge, where the surface move
+// would stop it. Moved out by the radius the mesh is baked for (0.5 m)
+// instead, these 0.4 m agents press 1.4 m into the walls. One list holds
+// one offset: agents of other radii need a list each. Walls of no length
+// on the ground are left out, as avoidance refuses them. Returns how
+// many.
 static int32_t GatherWalls(mnavObstacle* obstacles, mnavPos2 (*ends)[2])
 {
     int32_t count = 0;
