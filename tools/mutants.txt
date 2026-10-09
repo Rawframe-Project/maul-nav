@@ -359,8 +359,8 @@ near-stop | src/nearest.c | if (best == 0.0) | if (best < 0.0)
 run-end-stays | src/crowd.c | run->end = k + 1; | run->end = run->end;
 run-end-short | src/crowd.c | run->end = k + 1; | run->end = k;
 run-first-end | src/crowd.c | *run = (mnavCrowdRun){k, k + 1}; | *run = (mnavCrowdRun){k, k};
-run-scan-last | src/crowd.c | for (int32_t k = run.first; k < run.end; ++k) | for (int32_t k = run.first; k + 1 < run.end; ++k)
-run-scan-before | src/crowd.c | for (int32_t k = run.first; k < run.end; ++k) | for (int32_t k = run.first > 0 ? run.first - 1 : 0; k < run.end; ++k)
+run-scan-last | src/crowd.c | for (int32_t k = run.first; k < run.end && crowd->keys[k].z <= z1; ++k) | for (int32_t k = run.first; k + 1 < run.end && crowd->keys[k].z <= z1; ++k)
+run-scan-before | src/crowd.c | for (int32_t k = run.first; k < run.end && crowd->keys[k].z <= z1; ++k) | for (int32_t k = run.first > 0 ? run.first - 1 : 0; k < run.end && crowd->keys[k].z <= z1; ++k)
 run-probe-stop | src/crowd.c | for (mnavCrowdRun run = crowd->table[slot]; run.first >= 0; run = crowd->table[slot]) | for (mnavCrowdRun run = crowd->table[slot]; run.first > 0; run = crowd->table[slot])
 run-place-over | src/crowd.c | while (crowd->table[slot].first >= 0) | while (crowd->table[slot].first > 0)
 
@@ -452,9 +452,11 @@ fv-removal-count | src/flight_volume.c | count += e->removal ? (held ? -1 : 0) :
 # Avoidance in space: the shell search, the plane programs, the pair
 # plane, spheres and the sidestep
 crowd-shell-z | src/crowd.c | int64_t rz = s->crowd->space ? r : 0; | int64_t rz = 0;
-crowd-shell-step | src/crowd.c | for (int64_t z = c->z - rz; z <= c->z + rz; z += side || rz == 0 ? 1 : 2 * rz) | for (int64_t z = c->z - rz; z <= c->z + rz; z += rz == 0 ? 1 : 2 * rz)
+crowd-shell-step | src/crowd.c | Scan(s, x, y, c->z - rz, c->z + rz, !side); | Scan(s, x, y, c->z - rz, c->z + rz, false);
 crowd-key-z | src/crowd.c | if (a->z != b->z) | if (false && a->z != b->z)
-crowd-cell-z | src/crowd.c | return a->x == b->x && a->y == b->y && a->z == b->z; | return a->x == b->x && a->y == b->y;
+crowd-shell-ends | src/crowd.c | if (key->z < z0 || (ends && key->z != z0 && key->z != z1)) | if (key->z < z0 || (ends && key->z != z0))
+crowd-column-z-stop | src/crowd.c | for (int32_t k = run.first; k < run.end && crowd->keys[k].z <= z1; ++k) | for (int32_t k = run.first; k < run.end && crowd->keys[k].z < z1; ++k)
+crowd-column-key | src/crowd.c | return a->x == b->x && a->y == b->y; | return a->x == b->x;
 crowd-dz | src/crowd.c | double distance = dx * dx + dy * dy + dz * dz; | double distance = dx * dx + dy * dy;
 o3-bound-parallel | src/orca3.c | if (numerator > 0.0) | if (numerator < 0.0)
 o3-bound-side | src/orca3.c | if (denominator >= 0.0) | if (denominator < 0.0)

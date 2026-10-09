@@ -90,7 +90,13 @@ symmetry face to face.
     by the unit offset and falls back on the disc's center, which the
     fuzz target found giving NaN when rounding left no offset;
   - neighbors come from the same sorted grid, its cells cubes searched
-    by shells; the ground call's results stay the same to the bit;
+    by shells; the ground call's results stay the same to the bit. The
+    table finds a column of cells along Z with one probe, since the
+    sorted keys hold a column's cells in order; a shell scans each
+    column's keys in its span, or at its two ends inside the shell. That
+    cut the probes per agent from up to 343 to 84, and a step of 1,000
+    agents on one level from 3.8 ms to 0.72 ms, as fast as on the
+    ground; on the ground a column is a cell;
   - priorities split each avoidance as on the ground. The sidestep goes
     to the preferred velocity's right, +Y being up, and a vertical one
     turns toward +X rising and -X falling, so that two fliers meeting

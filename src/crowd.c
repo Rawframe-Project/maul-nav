@@ -49,9 +49,9 @@ mnavCrowdKey mnavCrowdKeyOf(const mnavCrowd* crowd, mnavPos3 position, uint64_t 
         CellOf(position.x, size), CellOf(position.y, size), z, id, index, position};
 }
 
-static bool SameCell(const mnavCrowdKey* a, const mnavCrowdKey* b)
+static bool SameColumn(const mnavCrowdKey* a, const mnavCrowdKey* b)
 {
-    return a->x == b->x && a->y == b->y && a->z == b->z;
+    return a->x == b->x && a->y == b->y;
 }
 
 static bool KeyBefore(const mnavCrowdKey* a, const mnavCrowdKey* b)
@@ -100,10 +100,9 @@ static void SortKeys(mnavCrowdKey* keys, mnavCrowdKey* scratch, int32_t count)
     }
 }
 
-static uint32_t CellHash(int64_t x, int64_t y, int64_t z)
+static uint32_t ColumnHash(int64_t x, int64_t y)
 {
-    uint64_t h = (uint64_t)x * 0x9E3779B97F4A7C15ull ^ (uint64_t)y * 0xC2B2AE3D27D4EB4Full ^
-                 (uint64_t)z * 0x165667B19E3779F9ull;
+    uint64_t h = (uint64_t)x * 0x9E3779B97F4A7C15ull ^ (uint64_t)y * 0xC2B2AE3D27D4EB4Full;
     return (uint32_t)(h ^ (h >> 32));
 }
 
@@ -116,17 +115,18 @@ void mnavSortCrowd(mnavCrowd* crowd, int32_t count)
     {
         crowd->table[s] = (mnavCrowdRun){-1, -1};
     }
-    // Each occupied cell's run of keys, probed linearly from its hash.
+    // Each occupied column's run of keys, its cells along z in order,
+    // probed linearly from its hash; on the ground a column is a cell.
     mnavCrowdRun* run = nullptr;
     for (int32_t k = 0; k < count; ++k)
     {
         const mnavCrowdKey* key = &crowd->keys[k];
-        if (k > 0 && SameCell(key, &crowd->keys[k - 1]))
+        if (k > 0 && SameColumn(key, &crowd->keys[k - 1]))
         {
             run->end = k + 1;
             continue;
         }
-        uint32_t slot = CellHash(key->x, key->y, key->z) & crowd->tableMask;
+        uint32_t slot = ColumnHash(key->x, key->y) & crowd->tableMask;
         while (crowd->table[slot].first >= 0)
         {
             slot = (slot + 1u) & crowd->tableMask;
@@ -136,14 +136,14 @@ void mnavSortCrowd(mnavCrowd* crowd, int32_t count)
     }
 }
 
-// The keys of a cell, an empty run when no agent is in it.
-static mnavCrowdRun RunIn(const mnavCrowd* crowd, int64_t x, int64_t y, int64_t z)
+// The keys of a column, an empty run when no agent is in it.
+static mnavCrowdRun RunIn(const mnavCrowd* crowd, int64_t x, int64_t y)
 {
-    uint32_t slot = CellHash(x, y, z) & crowd->tableMask;
+    uint32_t slot = ColumnHash(x, y) & crowd->tableMask;
     for (mnavCrowdRun run = crowd->table[slot]; run.first >= 0; run = crowd->table[slot])
     {
         const mnavCrowdKey* key = &crowd->keys[run.first];
-        if (key->x == x && key->y == y && key->z == z)
+        if (key->x == x && key->y == y)
         {
             return run;
         }
@@ -189,14 +189,19 @@ typedef struct Search
     int32_t found;
 } Search;
 
-// Keeps the agents of a cell within range.
-static void Scan(Search* s, int64_t x, int64_t y, int64_t z)
+// Keeps the agents within range of a column's cells from z0 to z1, or of
+// those two cells alone when ends is set.
+static void Scan(Search* s, int64_t x, int64_t y, int64_t z0, int64_t z1, bool ends)
 {
     mnavCrowd* crowd = s->crowd;
-    mnavCrowdRun run = RunIn(crowd, x, y, z);
-    for (int32_t k = run.first; k < run.end; ++k)
+    mnavCrowdRun run = RunIn(crowd, x, y);
+    for (int32_t k = run.first; k < run.end && crowd->keys[k].z <= z1; ++k)
     {
         const mnavCrowdKey* key = &crowd->keys[k];
+        if (key->z < z0 || (ends && key->z != z0 && key->z != z1))
+        {
+            continue;
+        }
         double dx = key->position.x - s->position.x;
         double dy = key->position.y - s->position.y;
         double dz = key->position.z - s->position.z;
@@ -210,7 +215,8 @@ static void Scan(Search* s, int64_t x, int64_t y, int64_t z)
 }
 
 // Scans the cells r out from c: a ring of squares on the ground plane, a
-// shell of cubes in space.
+// shell of cubes in space, a column at a time. A column on the shell's
+// side is in it from end to end; one inside, only at its two ends.
 static void Ring(Search* s, const mnavCrowdKey* c, int64_t r)
 {
     int64_t rz = s->crowd->space ? r : 0;
@@ -221,10 +227,7 @@ static void Ring(Search* s, const mnavCrowdKey* c, int64_t r)
         for (int64_t y = c->y - r; y <= c->y + r; y += stepY)
         {
             bool side = sideX || y == c->y - r || y == c->y + r;
-            for (int64_t z = c->z - rz; z <= c->z + rz; z += side || rz == 0 ? 1 : 2 * rz)
-            {
-                Scan(s, x, y, z);
-            }
+            Scan(s, x, y, c->z - rz, c->z + rz, !side);
         }
     }
 }
