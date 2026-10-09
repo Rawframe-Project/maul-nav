@@ -45,6 +45,7 @@ endif()
 add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/allocator.c
     src/avoidance.c
+    src/avoidance3.c
     src/bake_def.c
     src/bake_input.c
     src/base.c
@@ -54,6 +55,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/compact.c
     src/corridor.c
     src/contour.c
+    src/crowd.c
     src/debug.c
     src/delaunay.c
     src/draw.c
@@ -89,6 +91,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/obstacle.c
     src/offmesh.c
     src/orca.c
+    src/orca3.c
     src/outline.c
     src/path.c
     src/query.c
@@ -170,7 +173,10 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(tile_index)
     maul_add_test(volume WHITEBOX)
     maul_add_test(avoidance)
+    maul_add_test(avoidance3)
+    maul_add_test(crowd WHITEBOX)
     maul_add_test(orca WHITEBOX)
+    maul_add_test(orca3 WHITEBOX)
     maul_add_test(obstacle WHITEBOX)
     maul_add_test(polymesh WHITEBOX)
     maul_add_test(region WHITEBOX)

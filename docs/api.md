@@ -24,7 +24,7 @@ Returns the name of a result code, for diagnostics.  @param result  Any value; a
 
 ## `avoidance.h`
 
-Avoidance (mnav-0006): local steering among agents by velocity obstacles (ORCA), apart from the navmesh: nothing here uses a navmesh, and a host may use it without one. It works on the ground plane, a 3D world's (x, z) or a 2D world's (x, y), in meters and seconds.
+Avoidance (mnav-0006): local steering among agents by velocity obstacles (ORCA), apart from the navmesh: nothing here uses a navmesh, and a host may use it without one. It works on the ground plane, a 3D world's (x, z) or a 2D world's (x, y), and for fliers in space, in meters and seconds.
 
 ```c
 mnavAvoidanceDef mnavDefaultAvoidanceDef(void);
@@ -45,6 +45,11 @@ Destroys an avoidance set.  @param avoidance The set, or NULL. @par Thread safet
 MNAV_NODISCARD MNAV_API mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount, const mnavObstacle* obstacles, int32_t obstacleCount, double step, mnavPos2* velocitiesOut);
 ```
 Finds each agent's new velocity: the one nearest its preferred velocity, no faster than its maximum speed, that avoids the obstacles within the obstacle horizon and colliding with its neighbours within the time horizon if they do their share (ORCA); when none does, the one that keeps clear of the obstacles and breaks the agents' constraints least. An agent sees an obstacle edge only from outside it. An agent held back from its preferred velocity aims 1% of its speed to the right of it, so that agents meeting in perfect symmetry pass rather than stop face to face. The same agents give the same velocities in any order, on every platform.  @param avoidance     The set. @param agents        The agents. @param agentCount    How many, at least 0. @param obstacles     The obstacles. @param obstacleCount How many, at least 0. @param step          The step the velocities are for, in seconds, at least MNAV_MIN_AVOIDANCE_TIME: agents already overlapping part within it. @param velocitiesOut Receives agentCount velocities, in the agents' order. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with agents or obstacles, a negative count, a step not finite or shorter than MNAV_MIN_AVOIDANCE_TIME, an agent or obstacle with a value not finite or out of its range, a zero-length obstacle edge, a circle's radius not more than 0, another obstacle with a radius, or a polygon not counterclockwise; `mnav_errorLimit` for more agents or obstacle points than the set's limits. @par Thread safety Safe from any thread; the set is used by one thread at a time.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavAvoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount, const mnavSphere* spheres, int32_t sphereCount, double step, mnavPos3* velocitiesOut);
+```
+Finds each flier's new velocity, as mnavAvoid does on the ground: the one nearest its preferred velocity, no faster than its maximum speed, that avoids the spheres within the obstacle horizon and colliding with its neighbours within the time horizon if they do their share (ORCA in space); when none does, the one that keeps clear of the spheres and breaks the agents' constraints least. An agent held back from its preferred velocity aims 1% of its speed to the right of it, +Y being up; rising vertically it turns toward +X, falling toward -X. The same agents give the same velocities in any order, on every platform.  @param avoidance     The set. @param agents        The agents. @param agentCount    How many, at least 0. @param spheres       The spheres. @param sphereCount   How many, at least 0. @param step          The step the velocities are for, in seconds, at least MNAV_MIN_AVOIDANCE_TIME: agents already overlapping part within it. @param velocitiesOut Receives agentCount velocities, in the agents' order. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with agents or spheres, a negative count, a step not finite or shorter than MNAV_MIN_AVOIDANCE_TIME, or an agent or sphere with a value not finite or out of its range; `mnav_errorLimit` for more agents than the set's limit or more spheres than its obstacle points. @par Thread safety Safe from any thread; the set is used by one thread at a time.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount, double height, mnavDebugBuffer* buffer);
@@ -584,4 +589,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-107 functions across 12 headers.
+108 functions across 12 headers.

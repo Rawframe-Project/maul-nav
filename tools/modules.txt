@@ -67,4 +67,7 @@ hierarchy_path: hierarchy navmesh path query
 # Avoidance (mnav-0006) uses the base alone, never a navmesh module.
 orca:
 obstacle: orca
-avoidance: allocator draw obstacle orca
+crowd:
+orca3:
+avoidance: allocator crowd draw obstacle orca orca3
+avoidance3: avoidance crowd obstacle orca3

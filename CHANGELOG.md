@@ -8,6 +8,14 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- `mnavAvoid3D`: avoidance among fliers in space, ORCA's planes and
+  RVO2-3D's linear programs in binary64, with the ground call's
+  neighbor grid in cubes, priorities and sidestep, and moving or still
+  spheres as obstacles (`mnavAgent3D`, `mnavSphere`). The same agents
+  give the same velocities in any order, on every platform.
+
 ### Changed
 
 - Flight paths and raycasts look up the octree less, with the same
