@@ -8,6 +8,14 @@ format.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-09
+
+Following a path: agents steered along their corridors by a stateless
+function, the runs of area along a path for gait and sound, a fix for
+paths that start on a portal, and samples of obstacles and of a crowd
+on a navmesh. Tiles baked by 0.9.0 still load; tiles baked now record
+0.10.0 as their generator.
+
 ### Added
 
 - Sample `obstacles`: crates dropped onto and lifted from a floor while
