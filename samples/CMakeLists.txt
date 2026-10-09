@@ -2,7 +2,7 @@
 # subdirectory is a separate project that consumes the installed
 # package instead; CI builds it against a fresh install.
 
-foreach(sample walk crowd flight bake_world)
+foreach(sample walk crowd flight obstacles bake_world)
     add_executable(sample_${sample} ${sample}.c)
     target_link_libraries(sample_${sample} PRIVATE maul-nav)
     maul_apply_flags(sample_${sample})

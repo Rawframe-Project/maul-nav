@@ -8,6 +8,12 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- Sample `obstacles`: crates dropped onto and lifted from a floor while
+  agents cross it, each change rebuilding from a tile cache only the
+  tiles the crates reach; run as a test.
+
 ## [0.9.0] - 2026-10-09
 
 Obstacles without a full bake: a tile cache keeps each tile's open

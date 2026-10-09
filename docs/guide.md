@@ -123,7 +123,9 @@ mnavResult rebuilt = mnavRebuildTile(baker, cache, tileX, tileZ, &crate, 1, &rep
 - **Every obstacle, each time.** A rebuild applies the cached volumes
   and the obstacles it is given, so pass every obstacle on the tile;
   rebuild with none to clear them. An obstacle reaches the tiles its
-  ring touches, widened by the agent's radius.
+  ring touches, widened by a tile's border: the agent's radius rounded
+  up to whole cells, and three cells more. `samples/obstacles.c` drops
+  and lifts crates this way while agents walk.
 - **Memory.** A cached tile is kept compressed: about 10 KB for a 32 m
   tile of hilly terrain at the default cells. Drop tiles
   (`mnavDropCachedTile`) as they stream out; `mnavGetTileCacheBytes`
