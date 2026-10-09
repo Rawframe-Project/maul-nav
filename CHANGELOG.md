@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-10
+
+Steering the same everywhere: `mnavSteer` took lengths with a function
+whose last bits differ between C libraries, which a new scenario of
+1,000 agents through a doorway caught under WebAssembly. Tiles baked by
+0.11.0 still load; tiles baked now record 0.11.1 as their generator.
+
 ### Added
 
 - A scenario test of 1,000 agents crossing between two rooms through a
