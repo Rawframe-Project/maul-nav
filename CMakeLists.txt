@@ -65,6 +65,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/fingerprint.c
     src/flight.c
     src/flight_baker.c
+    src/flight_debug.c
     src/flight_def.c
     src/flight_frame.c
     src/flight_probe.c

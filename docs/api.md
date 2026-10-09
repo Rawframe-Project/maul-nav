@@ -263,6 +263,16 @@ MNAV_NODISCARD MNAV_API mnavResult mnavFindNearestFlightPoint(const mnavFlightVo
 ```
 Finds the nearest point open to the flier's center within a radius of a point: the point itself when it is open, or else a point just inside the nearest open voxel, at most a thousandth of a voxel in from its face. Tiles not loaded are not searched.  @param volume      The flight volume. @param point       The point, in world coordinates. @param radius      How far to look, in meters, at least 0. @param nearestOut  Receives the nearest open point. @param foundOut    Receives whether one lies within the radius. @return `mnav_success`; `mnav_errorRange` for a point not finite or past the extent, or a radius below 0 or not finite; `mnav_errorInvalid` for a NULL argument. @par Thread safety Safe from any thread. Any number of threads may read the volume at once between commits; none may while a stage or commit call runs.
 
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavDebugFlight(const mnavFlightVolume* volume, mnavPos3 low, mnavPos3 high, mnavDebugBuffer* buffer);
+```
+Appends the open blocks of a flight volume's octrees inside a box, each as a wire box of twelve lines (mnav_debugFlightBlock, its value the block's side in voxels), drawn once however much of it the box holds; solid space shows as the gaps. A block shows where a flier's center may go and how the octree merged open space.  @param volume  The flight volume. @param low     The box's lowest corner, in world coordinates. @param high    Its highest corner, at least low on every axis. @param buffer  The buffer appended to. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a corner not finite, a box backward, or a buffer with a count out of range, an array missing or an origin not finite; `mnav_errorRange` for a corner past the extent or a box of more than MNAV_MAX_FLIGHT_DEBUG_VOXELS voxels within the floor and ceiling; `mnav_errorCapacity` when the buffer filled, its counts saying what the whole needs. @par Thread safety Safe from any thread. Any number of threads may read the volume at once between commits; the buffer is used by one thread at a time.
+
+```c
+MNAV_NODISCARD MNAV_API mnavResult mnavDebugFlightPath(const mnavFlightPath* path, mnavDebugBuffer* buffer);
+```
+Appends a flight path's steps, point to point (mnav_debugPath).  @param path    The path. @param buffer  The buffer appended to. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a path with a negative count or no points, or a buffer as mnavDebugFlight refuses it; `mnav_errorCapacity` when the buffer filled. @par Thread safety Safe from any thread; the buffer is used by one thread at a time.
+
 ## `flow.h`
 
 Flow fields (mnav-0007): for every cell of a grid, the cost of its cheapest way to the nearest of a set of goals and the next cell on it, so that any number of agents sharing the goals find their way at the cost of one search.
@@ -614,4 +624,4 @@ Casts a ray along the navmesh on the ground from a point on a polygon toward an 
 
 ---
 
-113 functions across 12 headers.
+115 functions across 12 headers.

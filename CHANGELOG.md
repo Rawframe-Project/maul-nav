@@ -8,6 +8,12 @@ format.
 
 ## [Unreleased]
 
+### Added
+
+- `mnavDebugFlight` draws a flight volume's open blocks in a box as
+  wire boxes of a new kind, `mnav_debugFlightBlock`, each block once;
+  `mnavDebugFlightPath` draws a flight path's steps.
+
 ## [0.8.0] - 2026-10-09
 
 Flight hosts' tools: path searches in slices, a path check for

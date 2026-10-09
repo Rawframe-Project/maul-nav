@@ -612,6 +612,117 @@ static void TestCheck(const mnavFlightVolume* volume)
           "no steps: clear");
 }
 
+static mnavDebugVertex s_debugVertices[1 << 20];
+static uint32_t s_debugLines[1 << 20];
+
+static mnavDebugBuffer DebugBuffer(void)
+{
+    return (mnavDebugBuffer){{0.0, 0.0, 0.0}, s_debugVertices, 1 << 20, 0, nullptr, 0, 0,
+                             s_debugLines,    1 << 20,         0};
+}
+
+// The open blocks drawn in a box, clipped to it, fill exactly its open
+// voxels: each block drawn once, none over a solid voxel.
+static void TestDebugBlocks(const mnavFlightVolume* volume, const int32_t lo[3],
+                            const int32_t hi[3])
+{
+    mnavDebugBuffer b = DebugBuffer();
+    CHECK(mnavDebugFlight(volume, At(lo[0] + 0.5, lo[1] + 0.5, lo[2] + 0.5),
+                          At(hi[0] + 0.5, hi[1] + 0.5, hi[2] + 0.5), &b) == mnav_success &&
+              b.vertexCount % 24 == 0 && b.lineCount == b.vertexCount,
+          "blocks drawn");
+    int64_t filled = 0;
+    int32_t overSolid = 0;
+    for (int32_t k = 0; k < b.vertexCount; k += 24)
+    {
+        const mnavDebugVertex* v = &b.vertices[k];
+        double low[3] = {(double)v[0].x, (double)v[0].y + 1.0, (double)v[0].z};
+        for (int32_t i = 1; i < 24; ++i)
+        {
+            const double p[3] = {(double)v[i].x, (double)v[i].y + 1.0, (double)v[i].z};
+            for (int32_t a = 0; a < 3; ++a)
+            {
+                low[a] = p[a] < low[a] ? p[a] : low[a];
+            }
+        }
+        int32_t size = v[0].value;
+        int32_t from[3];
+        int32_t to[3];
+        for (int32_t a = 0; a < 3; ++a)
+        {
+            int32_t first = (int32_t)low[a];
+            from[a] = first > lo[a] ? first : lo[a];
+            to[a] = first + size - 1 < hi[a] ? first + size - 1 : hi[a];
+        }
+        for (int32_t x = from[0]; x <= to[0]; ++x)
+        {
+            for (int32_t y = from[1]; y <= to[1]; ++y)
+            {
+                for (int32_t z = from[2]; z <= to[2]; ++z)
+                {
+                    filled += 1;
+                    overSolid += Open(x, y, z) ? 0 : 1;
+                }
+            }
+        }
+    }
+    int64_t open = 0;
+    for (int32_t x = lo[0]; x <= hi[0]; ++x)
+    {
+        for (int32_t y = lo[1]; y <= hi[1]; ++y)
+        {
+            for (int32_t z = lo[2]; z <= hi[2]; ++z)
+            {
+                open += Open(x, y, z) ? 1 : 0;
+            }
+        }
+    }
+    CHECK(overSolid == 0 && filled == open && open > 0, "the box's open voxels, once each");
+}
+
+// Drawing: open blocks in boxes, a path's steps, and refusals.
+static void TestDebug(const mnavFlightVolume* volume)
+{
+    const int32_t whole[2][3] = {{0, 0, 0}, {SIDE - 1, LAYERS - 1, SIDE - 1}};
+    const int32_t part[2][3] = {{5, 3, 9}, {40, 20, 27}};
+    TestDebugBlocks(volume, whole[0], whole[1]);
+    TestDebugBlocks(volume, part[0], part[1]);
+    mnavQuery* query = Query(16384, 1000.0f);
+    int32_t a[3];
+    int32_t c[3];
+    FarEnds(a, c);
+    mnavFlightPath path;
+    mnavDebugBuffer b = DebugBuffer();
+    CHECK(mnavFindFlightPath(query, volume, At(a[0] + 0.5, a[1] + 0.5, a[2] + 0.5),
+                             At(c[0] + 0.5, c[1] + 0.5, c[2] + 0.5), &path) == mnav_success &&
+              mnavDebugFlightPath(&path, &b) == mnav_success &&
+              b.lineCount == 2 * (path.pointCount - 1) && b.vertices[0].kind == mnav_debugPath,
+          "a path's steps");
+    mnavDestroyQuery(query);
+    mnavPos3 low = At(0.5, 0.5, 0.5);
+    mnavPos3 high = At(10.5, 10.5, 10.5);
+    mnavDebugBuffer small = DebugBuffer();
+    small.lineCapacity = 4;
+    CHECK(mnavDebugFlight(volume, low, high, &small) == mnav_errorCapacity && small.lineCount > 4,
+          "a full buffer counts what the whole needs");
+    CHECK(mnavDebugFlight(nullptr, low, high, &b) == mnav_errorInvalid &&
+              mnavDebugFlight(volume, high, low, &b) == mnav_errorInvalid &&
+              mnavDebugFlight(volume, low, (mnavPos3){(double)NAN, 0.0, 0.0}, &b) ==
+                  mnav_errorInvalid &&
+              mnavDebugFlight(volume, low, high, nullptr) == mnav_errorInvalid &&
+              mnavDebugFlight(volume, low, (mnavPos3){1e30, 1.0, 1.0}, &b) == mnav_errorRange &&
+              mnavDebugFlight(volume, (mnavPos3){-4000.0, -10.0, -4000.0},
+                              (mnavPos3){4000.0, 100.0, 4000.0}, &b) == mnav_errorRange &&
+              mnavDebugFlightPath(nullptr, &b) == mnav_errorInvalid,
+          "refusals");
+    // A box under the floor holds nothing.
+    b = DebugBuffer();
+    CHECK(mnavDebugFlight(volume, (mnavPos3){0.0, -9.0, 0.0}, (mnavPos3){8.0, -5.0, 8.0}, &b) ==
+                  mnav_success &&
+              b.vertexCount == 0,
+          "nothing below the floor");
+}
+
 // What a sample point holds: 0 open, 1 blocked (a solid voxel, or past
 // the floor or ceiling), 2 no tile.
 static int32_t Sample(double x, double y, double z)
@@ -1048,6 +1159,7 @@ int main(void)
     TestPaths(volume);
     TestSlices(volume);
     TestCheck(volume);
+    TestDebug(volume);
     TestRaycasts(volume);
     TestNearest(volume);
     TestEnds(volume);

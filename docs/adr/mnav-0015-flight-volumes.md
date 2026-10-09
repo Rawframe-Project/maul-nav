@@ -135,6 +135,14 @@ spans, a run-length voxelization of the same geometry.
     left out (research 50 in the docs repository).
   - **`mnavFindNearestFlightPoint`:** branch and bound over the
     committed octrees within a radius.
+  - **Drawing (amended 2026-10-09):** `mnavDebugFlight` draws the open
+    blocks inside a world box as wire boxes (`mnav_debugFlightBlock`,
+    the value the block's side), each once, walking the box a row at a
+    time and skipping each open block's width; a box of more than
+    `MNAV_MAX_FLIGHT_DEBUG_VOXELS` voxels within the floor and ceiling
+    is refused. Open blocks show where fliers may go and how the octree
+    merged; solid space shows as gaps. `mnavDebugFlightPath` draws a
+    path's steps as `mnav_debugPath`.
 - **Measured:** on the Warframe 3D benchmark (research in the docs
   repository), the path searches averaged 0.925 to 0.944 of the
   26-connected grid's shortest. They expanded 4 to 7 times fewer nodes

@@ -38,6 +38,7 @@ flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def 
 flight_volume: allocator flight flight_def flight_tile
 flight_space: flight flight_volume
 flight_frame: flight_volume
+flight_debug: draw flight_frame flight_space
 flight_search: flight_frame flight_space flight_volume query
 flight_probe: flight flight_frame flight_space flight_volume
 fingerprint: bytes outline raster terrain tile_index

@@ -11,6 +11,7 @@
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/draw.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
@@ -33,6 +34,8 @@ extern "C"
 // The largest values a flight tile's node and leaf limits may take.
 #define MNAV_MAX_FLIGHT_TILE_NODES  16777216
 #define MNAV_MAX_FLIGHT_TILE_LEAVES 16777216
+// The most voxels the box mnavDebugFlight draws may span.
+#define MNAV_MAX_FLIGHT_DEBUG_VOXELS 16777216
 
     // The named limits that bound a flight bake's work and a flight
     // volume's size. Each is at least 1 and at most its MNAV_MAX_ value.
@@ -514,6 +517,42 @@ extern "C"
                                                                   mnavPos3 point, float radius,
                                                                   mnavPos3* nearestOut,
                                                                   bool* foundOut);
+
+    /// Appends the open blocks of a flight volume's octrees inside a box,
+    /// each as a wire box of twelve lines (mnav_debugFlightBlock, its value
+    /// the block's side in voxels), drawn once however much of it the box
+    /// holds; solid space shows as the gaps. A block shows where a flier's
+    /// center may go and how the octree merged open space.
+    ///
+    /// @param volume  The flight volume.
+    /// @param low     The box's lowest corner, in world coordinates.
+    /// @param high    Its highest corner, at least low on every axis.
+    /// @param buffer  The buffer appended to.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// corner not finite, a box backward, or a buffer with a count out of
+    /// range, an array missing or an origin not finite; `mnav_errorRange`
+    /// for a corner past the extent or a box of more than
+    /// MNAV_MAX_FLIGHT_DEBUG_VOXELS voxels within the floor and ceiling;
+    /// `mnav_errorCapacity` when the buffer filled, its counts saying what
+    /// the whole needs.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read the volume at
+    /// once between commits; the buffer is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavDebugFlight(const mnavFlightVolume* volume, mnavPos3 low,
+                                                       mnavPos3 high, mnavDebugBuffer* buffer);
+
+    /// Appends a flight path's steps, point to point (mnav_debugPath).
+    ///
+    /// @param path    The path.
+    /// @param buffer  The buffer appended to.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// path with a negative count or no points, or a buffer as
+    /// mnavDebugFlight refuses it; `mnav_errorCapacity` when the buffer
+    /// filled.
+    /// @par Thread safety
+    /// Safe from any thread; the buffer is used by one thread at a time.
+    MNAV_NODISCARD MNAV_API mnavResult mnavDebugFlightPath(const mnavFlightPath* path,
+                                                           mnavDebugBuffer* buffer);
 
 #ifdef __cplusplus
 }

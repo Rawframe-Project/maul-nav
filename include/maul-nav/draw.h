@@ -47,6 +47,9 @@ extern "C"
         mnav_debugNeighbor = 11,
         // An avoidance obstacle's outline: a sphere's three rings.
         mnav_debugObstacle = 12,
+        // An open block of a flight volume's octree, as a wire box; the
+        // value is its side in voxels.
+        mnav_debugFlightBlock = 13,
     };
 
     // A vertex: its place relative to the buffer's origin, what it shows

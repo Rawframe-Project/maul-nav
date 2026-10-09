@@ -507,3 +507,8 @@ ck-last-step | src/flight_probe.c | for (int32_t i = 0; i + 1 < pointCount; ++i)
 ck-step-index | src/flight_probe.c | *stepOut = i; | *stepOut = i + 1;
 ck-no-precheck | src/flight_probe.c | if (!mnavFlightToVoxels(&frame, points[i], v, cell)) | if (false && !mnavFlightToVoxels(&frame, points[i], v, cell))
 ck-stop-kind | src/flight_probe.c | hitOut->stop = held == MNAV_SPACE_SOLID ? mnav_flightBlocked : mnav_flightNotLoaded; | hitOut->stop = mnav_flightBlocked;
+fg-draw-once | src/flight_debug.c | if (y == Larger(b.y, lo[1]) && z == Larger(b.z, lo[2])) | if (true)
+fg-skip-width | src/flight_debug.c | x = b.x + b.size; | x += 1;
+fg-limit | src/flight_debug.c | if (lo[1] <= hi[1] && voxels > (double)MNAV_MAX_FLIGHT_DEBUG_VOXELS) | if (lo[1] <= hi[1] && voxels > 1e30)
+fg-edges | src/flight_debug.c | if ((c & bit) == 0) | if ((c & bit) != 0)
+fg-ceiling | src/flight_debug.c | hi[1] = hi[1] < frame.layers - 1 ? hi[1] : frame.layers - 1; | hi[1] = hi[1];

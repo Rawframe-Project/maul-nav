@@ -23,6 +23,7 @@
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/draw.h"
 #include "maul-nav/flight.h"
 #include "maul-nav/query.h"
 
@@ -361,6 +362,15 @@ static void CheckPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3
         sum += Length(path.points[i], path.points[i + 1]);
     }
     Expect(fabs(sum - path.length) < 1e-6);
+    // Drawn, the path's steps; and the open blocks round its start.
+    static mnavDebugVertex vertices[1 << 15];
+    static uint32_t lines[1 << 15];
+    mnavDebugBuffer buffer = {{0.0, 0.0, 0.0}, vertices, 1 << 15, 0, nullptr, 0, 0,
+                              lines,           1 << 15,  0};
+    Expect(mnavDebugFlightPath(&path, &buffer) == mnav_success && buffer.lineCount == 2 * last);
+    mnavResult drawn = mnavDebugFlight(volume, (mnavPos3){a.x - 4.0, a.y - 4.0, a.z - 4.0},
+                                       (mnavPos3){a.x + 4.0, a.y + 4.0, a.z + 4.0}, &buffer);
+    Expect(drawn == mnav_success || drawn == mnav_errorCapacity || drawn == mnav_errorRange);
     // A path found is clear by the path check too.
     int32_t step = 0;
     Expect(mnavCheckFlightPath(volume, path.points, path.pointCount, &step, nullptr) ==
