@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Timings over a terrain of 8 by 8 tiles of 32 m: hills on a 2 m grid
-// (32,768 triangles) and 256 boxes. Bakes every tile; streams a window
+// (32,768 triangles) and 256 boxes. Bakes every tile, then through a
+// tile cache, and rebuilds each with a crate on it; streams a window
 // of 5 by 5 tiles as a camera crosses the terrain and back, staging the
 // tiles that enter and leave and committing each step, for ten laps;
 // then finds paths
@@ -248,6 +249,49 @@ static void Bake(void)
     printf("# bake: %d tiles, %d triangles, %d polygons, %zu bytes, %.0f us per tile\n",
            TILES * TILES, terrain.triangleCount, polygons, bytes, best * 1e6 / (TILES * TILES));
     Report("bake, a tile", best * 1e6 / (TILES * TILES), "us");
+}
+
+// Caches every tile of the terrain, then rebuilds each with a crate of
+// 2 by 2 m on it (mnav-0016), the crate moving a meter each run.
+static void Rebuild(void)
+{
+    mnavBakeDef def = Def();
+    mnavTriangleMesh terrain = Terrain();
+    const mnavBakeInput input = {&terrain, 1, NULL, 0, NULL, 0, NULL};
+    mnavBaker* baker = NULL;
+    mnavTileCache* cache = NULL;
+    mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();
+    Check(mnavCreateBaker(&def, &baker).result, "baker");
+    Check(mnavCreateTileCache(&cacheDef, &cache), "cache");
+    uint64_t empty = mnavGetTileCacheBytes(cache);
+    double start = Seconds();
+    for (int32_t t = 0; t < TILES * TILES; ++t)
+    {
+        Check(mnavBakeTileCached(baker, cache, &input, t % TILES, t / TILES, NULL), "cached bake");
+    }
+    double cached = (Seconds() - start) / (TILES * TILES);
+    uint64_t bytes = mnavGetTileCacheBytes(cache) - empty;
+    double best = 1e30;
+    for (int32_t run = 0; run < RUNS; ++run)
+    {
+        start = Seconds();
+        for (int32_t t = 0; t < TILES * TILES; ++t)
+        {
+            float x = (float)(t % TILES) * 32.0f + 10.0f + (float)run;
+            float z = (float)(t / TILES) * 32.0f + 12.0f;
+            const mnavVec2 ring[4] = {{x, z}, {x + 2.0f, z}, {x + 2.0f, z + 2.0f}, {x, z + 2.0f}};
+            const mnavBakeVolume crate = {ring, 4, -2.0f, 6.0f, mnav_volumeExclude, 0};
+            Check(mnavRebuildTile(baker, cache, t % TILES, t / TILES, &crate, 1, NULL), "rebuild");
+        }
+        double took = Seconds() - start;
+        best = took < best ? took : best;
+    }
+    printf("# rebuild: %d tiles cached in %llu bytes, %llu per tile; a cached bake %.0f us\n",
+           TILES * TILES, (unsigned long long)bytes, (unsigned long long)(bytes / (TILES * TILES)),
+           cached * 1e6);
+    Report("rebuild, a tile", best * 1e6 / (TILES * TILES), "us");
+    mnavDestroyTileCache(cache);
+    mnavDestroyBaker(baker);
 }
 
 // Whether tile (x, z) is within the window round the camera's tile.
@@ -1247,6 +1291,7 @@ int main(int argc, char** argv)
         }
     }
     Bake();
+    Rebuild();
     Stream(0);
     Stream(LINKS);
     Paths();

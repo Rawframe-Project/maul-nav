@@ -7,7 +7,10 @@
 // range and areas past the last. Most values are drawn from a small set of
 // sensible ones so that bakes reach every stage. A bake must refuse with a
 // typed status or succeed; a tile it makes must bake again to the same
-// bytes, load into a navmesh, and every byte taken must come back.
+// bytes, load into a navmesh, and every byte taken must come back. A 3D
+// input's last volumes are also taken as obstacles: the tile cached from
+// the input without them and rebuilt with them (mnav-0016) must give the
+// full bake's result and bytes.
 
 #include "counting_allocator.h"
 
@@ -29,6 +32,7 @@ enum
     MOST_TRIANGLES = 16,
     MOST_SIDE = 8,
     MOST_POINTS = 8,
+    MOST_VOLUMES = 4,
     TILE_ROOM = 1 << 20
 };
 
@@ -87,8 +91,8 @@ typedef struct Input
     float heights[MOST_SIDE * MOST_SIDE];
     mnavAreaType cells[MOST_SIDE * MOST_SIDE];
     mnavTerrain terrain;
-    mnavVec2 points[3][MOST_POINTS];
-    mnavBakeVolume volumes[2];
+    mnavVec2 points[MOST_VOLUMES][MOST_POINTS];
+    mnavBakeVolume volumes[MOST_VOLUMES];
     mnavOutline outlines[3];
 } Input;
 
@@ -178,6 +182,39 @@ static size_t BakeTwice(mnavBaker* baker, const Input* in, bool flat, int32_t ou
     return size;
 }
 
+// Caches the tile from the input without its last obstacleCount volumes
+// and rebuilds it with them: the result is the full bake's, and so are
+// the bytes; the cache gives every byte back.
+static void Rebuild(mnavBaker* baker, const mnavBakeInput* input, int32_t obstacleCount,
+                    int32_t tileX, int32_t tileZ, const uint8_t* tile, size_t tileSize)
+{
+    mnavTileCacheDef def = mnavDefaultTileCacheDef();
+    def.allocator = CountingAllocator();
+    mnavTileCache* cache = nullptr;
+    Expect(mnavCreateTileCache(&def, &cache) == mnav_success);
+    mnavBakeInput part = *input;
+    part.volumeCount -= obstacleCount;
+    mnavResult cached = mnavBakeTileCached(baker, cache, &part, tileX, tileZ, nullptr);
+    if (cached == mnav_success)
+    {
+        mnavBakeReport report;
+        mnavResult result = mnavRebuildTile(
+            baker, cache, tileX, tileZ, &input->volumes[part.volumeCount], obstacleCount, &report);
+        static uint8_t copy[TILE_ROOM];
+        size_t copySize = 0;
+        Expect(result == report.result && (result == mnav_success) == (tileSize > 0));
+        Expect(result != mnav_success ||
+               (mnavCopyBakedTile(baker, copy, TILE_ROOM, &copySize) == mnav_success &&
+                copySize == tileSize && memcmp(copy, tile, tileSize) == 0));
+    }
+    else
+    {
+        Expect(cached == mnav_errorInvalid || cached == mnav_errorRange ||
+               cached == mnav_errorLimit);
+    }
+    mnavDestroyTileCache(cache);
+}
+
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 {
     Reader r = {data, size, 0};
@@ -203,7 +240,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     {
         ReadTerrain(&r, &in);
     }
-    int32_t volumes = Byte(&r) % 3;
+    int32_t volumes = Byte(&r) % (MOST_VOLUMES + 1);
     for (int32_t v = 0; v < volumes; ++v)
     {
         int32_t count = ReadRing(&r, in.points[v]);
@@ -240,6 +277,10 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
                (mnavCopyBakedTile(baker, copy, TILE_ROOM, &copySize) == mnav_success &&
                 copySize == tileSize && memcmp(copy, tile, tileSize) == 0));
         mnavDestroyTileIndex(index);
+    }
+    if (!flat)
+    {
+        Rebuild(baker, &input, Byte(&r) % (volumes + 1), tileX, tileZ, tile, tileSize);
     }
     mnavDestroyBaker(baker);
     if (tileSize > 0)
