@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-09
+
+Avoidance among fliers: agents sharing a flight volume steer round each
+other and round moving spheres in space, with the ground call's
+determinism. Tiles baked by 0.6.0 still load; tiles baked now record
+0.7.0 as their generator.
+
 ### Added
 
 - `mnavAvoid3D`: avoidance among fliers in space, ORCA's planes and
@@ -27,6 +34,9 @@ format.
 
   The bench's flight section runs 30% fewer instructions, with the
   same paths to the bit.
+- The ground call's neighbor grid moved into a module of its own, which
+  both calls share; its results are the same to the bit.
+- The bench steers 1,000 fliers through a gap in a wall of spheres.
 
 ## [0.6.0] - 2026-10-09
 
