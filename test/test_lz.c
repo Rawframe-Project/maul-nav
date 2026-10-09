@@ -4,10 +4,16 @@
 // The LZ coder of the tile cache (mnav-0016): bytes coded and decoded
 // come back the same, at lengths past each count's first byte and
 // offsets at the window's end; codings cut, padded or bent are refused
-// without reading or writing out of range.
+// without reading or writing out of range. Packed fields whose planes
+// do not add up are refused.
 
+#include "allocator.h"
+#include "compact.h"
+#include "field_pack.h"
 #include "lz.h"
 #include "test_harness.h"
+
+#include "maul-nav/base.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -131,6 +137,10 @@ static void TestRefusals(void)
               !mnavLzDecode(length, sizeof(length), s_out, 1000) &&
               !mnavLzDecode(last, sizeof(last), s_out, 1),
           "literals, counts and tokens cut refused");
+    // Literals cut by the coding's end: read past it, these bytes would
+    // fill the output.
+    const uint8_t shortened[6] = {0x30, 'a', 'b', 'c', 0x01, 0x00};
+    CHECK(!mnavLzDecode(shortened, 3, s_out, 7), "literals past the coding's end refused");
     // A count past what the output holds stops before reading it all.
     uint8_t huge[64];
     memset(huge, 255, sizeof(huge));
@@ -138,9 +148,35 @@ static void TestRefusals(void)
     CHECK(!mnavLzDecode(huge, sizeof(huge), s_out, 100), "a count past the output refused");
 }
 
+// Planes of a field of four columns and one span, its counts given.
+static mnavResult Unpack(uint8_t first, uint8_t second, mnavCompactField* field, mnavMemory* memory)
+{
+    // Counts' low and high bytes, the floor's, the height's, the area.
+    const uint8_t raw[13] = {first, second, 0, 0, 0, 0, 0, 0, 5, 0, 9, 0, 1};
+    static uint8_t coded[64];
+    const mnavPackedField packed = {
+        {.width = 2}, 1, coded, mnavLzEncode(raw, sizeof(raw), coded, s_table)};
+    return mnavUnpackField(memory, &packed, 4, 2, field);
+}
+
+static void TestUnpack(void)
+{
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, 1 << 20);
+    mnavCompactField field;
+    CHECK(Unpack(1, 0, &field, &memory) == mnav_success && field.spanCount == 1 &&
+              field.columns[1] == 1 && field.spans[0].floor == 5 && field.spans[0].height == 9 &&
+              field.areas[0] == 1 && field.spans[0].links[2] == MNAV_NO_LINK,
+          "a field unpacked");
+    mnavReleaseCompactField(&memory, &field);
+    CHECK(Unpack(1, 1, &field, &memory) == mnav_errorInvalid && field.spans == nullptr &&
+              memory.used == 0,
+          "counts past the spans refused, nothing held");
+}
+
 int main(void)
 {
     TestRoundTrips();
     TestRefusals();
+    TestUnpack();
     return s_failures == 0 ? 0 : 1;
 }
