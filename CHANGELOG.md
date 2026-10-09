@@ -8,6 +8,18 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- Flight paths and raycasts look up the octree less, with the same
+  results:
+  - the voxel walk keeps the open block it is in and skips lookups and
+    edge checks while it stays inside;
+  - a face's neighbors are read from each leaf through a mask of the
+    face's slab, not voxel by voxel.
+
+  The bench's flight section runs 30% fewer instructions, with the
+  same paths to the bit.
+
 ## [0.6.0] - 2026-10-09
 
 Flight volumes, for agents that fly or swim: sparse voxel octree tiles

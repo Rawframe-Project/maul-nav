@@ -146,18 +146,54 @@ static void Visit(const Region* r, int32_t x, int32_t y, int32_t z, int32_t size
     r->visit(r->context, (mnavFlightBlock){x + r->ox, y, z + r->oz, size});
 }
 
-// Visits the open voxels of a leaf at (x, y, z) within the region.
+// The bits of a leaf's voxels (bit x + 4y + 16z) within lo to hi on each
+// axis, in the leaf's own frame, clamped to 0 to 4.
+static uint64_t RegionBits(const int32_t lo[3], const int32_t hi[3])
+{
+    uint64_t row = 0;
+    for (int32_t x = lo[0]; x < hi[0]; ++x)
+    {
+        row |= (uint64_t)1 << x;
+    }
+    uint64_t layer = 0;
+    for (int32_t y = lo[1]; y < hi[1]; ++y)
+    {
+        layer |= row << (4 * y);
+    }
+    uint64_t bits = 0;
+    for (int32_t z = lo[2]; z < hi[2]; ++z)
+    {
+        bits |= layer << (16 * z);
+    }
+    return bits;
+}
+
+// The index of a word's lowest set bit, by de Bruijn multiplication.
+static int32_t LowestBit(uint64_t bits)
+{
+    static const int32_t table[64] = {
+        0,  1,  48, 2,  57, 49, 28, 3,  61, 58, 50, 42, 38, 29, 17, 4,  62, 55, 59, 36, 53, 51,
+        43, 22, 45, 39, 33, 30, 24, 18, 12, 5,  63, 47, 56, 27, 60, 41, 37, 16, 54, 35, 52, 21,
+        44, 32, 23, 11, 46, 26, 40, 15, 34, 20, 31, 10, 25, 14, 19, 9,  13, 8,  7,  6};
+    return table[((bits & (~bits + 1u)) * 0x03F79D71B4CB0A89ull) >> 58];
+}
+
+// Visits the open voxels of a leaf at (x, y, z) within the region, in
+// the order of their bits.
 static void VisitLeaf(const Region* r, uint64_t leaf, int32_t x, int32_t y, int32_t z)
 {
-    for (int32_t k = 0; k < 64; ++k)
+    const int32_t at[3] = {x, y, z};
+    int32_t lo[3];
+    int32_t hi[3];
+    for (int32_t k = 0; k < 3; ++k)
     {
-        int32_t vx = x + (k & 3);
-        int32_t vy = y + (k >> 2 & 3);
-        int32_t vz = z + (k >> 4);
-        if ((leaf >> k & 1u) == 0 && Meets(r, vx, vy, vz, 1))
-        {
-            Visit(r, vx, vy, vz, 1);
-        }
+        lo[k] = r->lo[k] - at[k] < 0 ? 0 : r->lo[k] - at[k];
+        hi[k] = r->hi[k] - at[k] > 4 ? 4 : r->hi[k] - at[k];
+    }
+    for (uint64_t open = ~leaf & RegionBits(lo, hi); open != 0; open &= open - 1u)
+    {
+        int32_t k = LowestBit(open);
+        Visit(r, x + (k & 3), y + (k >> 2 & 3), z + (k >> 4), 1);
     }
 }
 
@@ -245,15 +281,36 @@ int32_t mnavFlightFace(mnavFlightCursor* cursor, const mnavFlightBlock* b, int32
     return MNAV_SPACE_OPEN;
 }
 
-// Where the walk stands: its voxel, its steps, and the fraction of the
-// segment at which it next crosses each axis.
+// Where the walk stands: its voxel, its steps, the fraction of the
+// segment at which it next crosses each axis, and the last open block it
+// was in (side 0 for none). Every voxel the walk touches while it stays
+// in that block is the block's, open, so it is looked up no more.
 typedef struct Walk
 {
     int32_t at[3];
     int32_t step[3];
     double next[3];
     double delta[3];
+    mnavFlightBlock open;
 } Walk;
+
+static bool Inside(const mnavFlightBlock* b, const int32_t at[3])
+{
+    return at[0] >= b->x && at[1] >= b->y && at[2] >= b->z && at[0] < b->x + b->size &&
+           at[1] < b->y + b->size && at[2] < b->z + b->size;
+}
+
+// What holds the walk's voxel, keeping the open block that holds it.
+static int32_t Look(mnavFlightCursor* cursor, Walk* w)
+{
+    if (Inside(&w->open, w->at))
+    {
+        return MNAV_SPACE_OPEN;
+    }
+    int32_t held = mnavFlightHolder(cursor, w->at[0], w->at[1], w->at[2], &w->open);
+    w->open.size = held == MNAV_SPACE_OPEN ? w->open.size : 0;
+    return held;
+}
 
 // What holds the voxels the walk touches as it crosses the edge or corner
 // between the axes in tied at once: each one reached by a part of the
@@ -292,6 +349,7 @@ static Walk StartWalk(const double a[3], const double b[3])
         w.next[k] = w.step[k] != 0 ? (edge - a[k]) / d : (double)INFINITY;
         w.delta[k] = w.step[k] != 0 ? fabs(1.0 / d) : (double)INFINITY;
     }
+    w.open = (mnavFlightBlock){0, 0, 0, 0};
     return w;
 }
 
@@ -305,11 +363,20 @@ static int32_t Advance(mnavFlightCursor* cursor, Walk* w, double t)
     {
         tied |= w->next[k] - t < 1e-9 ? 1u << k : 0u;
     }
-    int32_t held = (tied & (tied - 1u)) != 0 ? Corners(cursor, w, tied) : MNAV_SPACE_OPEN;
+    int32_t to[3];
+    for (int32_t k = 0; k < 3; ++k)
+    {
+        to[k] = w->at[k] + ((tied >> k & 1u) != 0 ? w->step[k] : 0);
+    }
+    // Every voxel touched on the way lies in the box between the voxels
+    // left and entered: inside the open block when both are.
+    bool within = Inside(&w->open, to);
+    int32_t held =
+        (tied & (tied - 1u)) != 0 && !within ? Corners(cursor, w, tied) : MNAV_SPACE_OPEN;
     for (int32_t k = 0; k < 3; ++k)
     {
         bool crossed = (tied >> k & 1u) != 0;
-        w->at[k] += crossed ? w->step[k] : 0;
+        w->at[k] = to[k];
         w->next[k] += crossed ? w->delta[k] : 0.0;
     }
     return held;
@@ -320,7 +387,7 @@ int32_t mnavFlightWalk(mnavFlightCursor* cursor, const double a[3], const double
     Walk w = StartWalk(a, b);
     const int32_t end[3] = {(int32_t)floor(b[0]), (int32_t)floor(b[1]), (int32_t)floor(b[2])};
     double t = 0.0;
-    int32_t held = mnavFlightHolder(cursor, w.at[0], w.at[1], w.at[2], nullptr);
+    int32_t held = Look(cursor, &w);
     while (held == MNAV_SPACE_OPEN && (w.at[0] != end[0] || w.at[1] != end[1] || w.at[2] != end[2]))
     {
         t = fmin(w.next[0], fmin(w.next[1], w.next[2]));
@@ -329,9 +396,7 @@ int32_t mnavFlightWalk(mnavFlightCursor* cursor, const double a[3], const double
             return MNAV_SPACE_OPEN;
         }
         held = Advance(cursor, &w, t);
-        held = held == MNAV_SPACE_OPEN
-                   ? mnavFlightHolder(cursor, w.at[0], w.at[1], w.at[2], nullptr)
-                   : held;
+        held = held == MNAV_SPACE_OPEN ? Look(cursor, &w) : held;
     }
     if (held != MNAV_SPACE_OPEN && tOut != nullptr)
     {
