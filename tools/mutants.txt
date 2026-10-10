@@ -608,3 +608,6 @@ ver-flow | src/flow.c | if (def->version != MNAV_ABI_VERSION) | if (false && def
 ver-navflow | src/navflow.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
 ver-hierarchy | src/hierarchy.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
 ver-cache | src/tile_cache.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+# 1.x reads format 1: a loader refusing it is caught by test_stored.
+stored-tile-format | src/tile.c | if (mnavGetU16(&r) != MNAV_TILE_FORMAT) | if (mnavGetU16(&r) != MNAV_TILE_FORMAT + 1)
+stored-flight-format | src/flight_tile.c | if (mnavGetU16(&r) != MNAV_FLIGHT_FORMAT) | if (mnavGetU16(&r) != MNAV_FLIGHT_FORMAT + 1)
