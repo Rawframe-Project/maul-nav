@@ -14,18 +14,6 @@
 #include <stdint.h>
 #include <string.h>
 
-// Marks a def built by mnavDefaultQueryDef.
-#define QUERY_DEF_COOKIE 0x4E415651u
-
-mnavQueryDef mnavDefaultQueryDef(void)
-{
-    mnavQueryDef def = {0};
-    def.cookie = QUERY_DEF_COOKIE;
-    def.limits.nodes = 8192;
-    def.limits.pathLength = 1000.0f;
-    return def;
-}
-
 void mnavDestroyQuery(mnavQuery* query)
 {
     if (query == nullptr)
@@ -53,9 +41,13 @@ mnavResult mnavCreateQuery(const mnavQueryDef* def, mnavQuery** queryOut)
         return mnav_errorInvalid;
     }
     *queryOut = nullptr;
-    if (def == nullptr || def->cookie != QUERY_DEF_COOKIE)
+    if (def == nullptr || def->cookie != MNAV_QUERY_DEF_COOKIE)
     {
         return mnav_errorInvalid;
+    }
+    if (def->version != MNAV_ABI_VERSION)
+    {
+        return mnav_errorVersion;
     }
     const mnavQueryLimits* limits = &def->limits;
     if (limits->nodes < 1 || limits->nodes > MNAV_MAX_QUERY_NODES ||

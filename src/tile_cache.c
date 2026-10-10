@@ -20,9 +20,6 @@
 #include <stdint.h>
 #include <string.h>
 
-// Marks a def built by mnavDefaultTileCacheDef.
-#define TILE_CACHE_DEF_COOKIE 0x4354564Du
-
 struct mnavTileCache
 {
     mnavMemory memory;
@@ -31,11 +28,6 @@ struct mnavTileCache
     int32_t count;
 };
 
-mnavTileCacheDef mnavDefaultTileCacheDef(void)
-{
-    return (mnavTileCacheDef){TILE_CACHE_DEF_COOKIE, {0}, {4096, 67108864ull}};
-}
-
 mnavResult mnavCreateTileCache(const mnavTileCacheDef* def, mnavTileCache** cacheOut)
 {
     if (cacheOut == nullptr)
@@ -43,8 +35,15 @@ mnavResult mnavCreateTileCache(const mnavTileCacheDef* def, mnavTileCache** cach
         return mnav_errorInvalid;
     }
     *cacheOut = nullptr;
-    if (def == nullptr || def->cookie != TILE_CACHE_DEF_COOKIE ||
-        (def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
+    if (def == nullptr || def->cookie != MNAV_TILE_CACHE_DEF_COOKIE)
+    {
+        return mnav_errorInvalid;
+    }
+    if (def->version != MNAV_ABI_VERSION)
+    {
+        return mnav_errorVersion;
+    }
+    if ((def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
     {
         return mnav_errorInvalid;
     }

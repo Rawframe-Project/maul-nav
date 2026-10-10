@@ -27,14 +27,14 @@ Returns the name of a result code, for diagnostics.  @param result  Any value; a
 Avoidance (mnav-0006): local steering among agents by velocity obstacles (ORCA), apart from the navmesh: nothing here uses a navmesh, and a host may use it without one. It works on the ground plane, a 3D world's (x, z) or a 2D world's (x, y), and for fliers in space, in meters and seconds.
 
 ```c
-mnavAvoidanceDef mnavDefaultAvoidanceDef(void);
+static inline mnavAvoidanceDef mnavDefaultAvoidanceDef(void);
 ```
-Returns the default avoidance def: up to 4096 agents, each avoiding its 10 nearest neighbours within 10 m, 2 s ahead, and up to 4096 obstacle points, each agent avoiding its 16 nearest obstacle edges or circles, 2 s ahead.  @return The def. @par Thread safety Safe from any thread.
+Returns the default avoidance def: up to 4096 agents, each avoiding its 10 nearest neighbours within 10 m, 2 s ahead, and up to 4096 obstacle points, each agent avoiding its 16 nearest obstacle edges or circles, 2 s ahead. Built in the program, so that it carries the version of the headers the program includes.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoidanceOut);
 ```
-Makes an avoidance set with the memory its limits need.  @param def         The def, from mnavDefaultAvoidanceDef. @param avoidanceOut Receives the set, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultAvoidanceDef; `mnav_errorRange` for a limit, distance or horizon out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes an avoidance set with the memory its limits need.  @param def         The def, from mnavDefaultAvoidanceDef. @param avoidanceOut Receives the set, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultAvoidanceDef; `mnav_errorVersion` for one built against another major or minor version; `mnav_errorRange` for a limit, distance or horizon out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyAvoidance(mnavAvoidance* avoidance);
@@ -68,27 +68,27 @@ The bake's settings and its input surface: the def a bake runs with, the agent p
 ```c
 MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateOutline(const mnavBakeDef* def, const mnavOutline* outline);
 ```
-Checks a 2D outline as hostile input to a bake with a def.  @param def     The bake def the outline is for. @param outline The outline. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, an invalid def, fewer than 3 points, an area of MNAV_AREA_TYPES or more, or a point that is not finite (the point); `mnav_errorRange` for a point past the extent input may have (the point); `mnav_errorLimit` for more points than the inputTriangles limit. @par Thread safety Safe from any thread.
+Checks a 2D outline as hostile input to a bake with a def.  @param def     The bake def the outline is for. @param outline The outline. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, an invalid def, fewer than 3 points, an area of MNAV_AREA_TYPES or more, or a point that is not finite (the point); `mnav_errorVersion` for a def built against another major or minor version; `mnav_errorRange` for a point past the extent input may have (the point); `mnav_errorLimit` for more points than the inputTriangles limit. @par Thread safety Safe from any thread.
 
 ```c
-mnavBakeDef mnavDefaultBakeDef(void);
+static inline mnavBakeDef mnavDefaultBakeDef(void);
 ```
-Returns the default bake def: cells of 0.25 m by 0.125 m, tiles of 128 cells, an agent 0.5 m in radius and 2 m tall that steps 0.75 m and walks slopes up to 45 degrees, regions of at least 2 square meters, walls within 0.3 m of the cells and at most 12 m long, detail samples every 1.5 m within 0.125 m, and limits sized for a large level.  @return The def, with a valid cookie. @par Thread safety Safe from any thread.
+Returns the default bake def: cells of 0.25 m by 0.125 m, tiles of 128 cells, an agent 0.5 m in radius and 2 m tall that steps 0.75 m and walks slopes up to 45 degrees, regions of at least 2 square meters, walls within 0.3 m of the cells and at most 12 m long, detail samples every 1.5 m within 0.125 m, and limits sized for a large level. Built in the program, so that it carries the version of the headers the program includes.  @return The def, with a valid cookie. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavValidateBakeDef(const mnavBakeDef* def, mnavBakeCells* cellsOut);
 ```
-Checks a bake def and converts its meters to cells.  @param def       The def to check. @param cellsOut  Receives the settings in cells when the def is valid. May be NULL. @return `mnav_success`; `mnav_errorInvalid` with the setting for a NULL def, a def without its cookie, an allocator with one function, a value that is not finite or lies outside its range, an agent radius whose border is wider than a tile, or an agent height or step height past MNAV_MAX_HEIGHT_CELLS. @par Thread safety Safe from any thread.
+Checks a bake def and converts its meters to cells.  @param def       The def to check. @param cellsOut  Receives the settings in cells when the def is valid. May be NULL. @return `mnav_success`; `mnav_errorInvalid` with the setting for a NULL def, a def without its cookie, an allocator with one function, a value that is not finite or lies outside its range, an agent radius whose border is wider than a tile, or an agent height or step height past MNAV_MAX_HEIGHT_CELLS; `mnav_errorVersion` with no setting for a def built against another major or minor version. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateTriangleMesh(const mnavBakeDef* def, const mnavTriangleMesh* mesh);
 ```
-Checks a triangle mesh as hostile input to a bake with a def.  @param def   The bake def the mesh is for. @param mesh  The mesh. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, an invalid def, a negative count, a NULL array its count needs, a vertex coordinate that is not finite, a vertex index outside the vertices or an area type of MNAV_AREA_TYPES or more; `mnav_errorLimit` for more triangles than the def's inputTriangles limit; `mnav_errorRange` for a vertex more than MNAV_MAX_EXTENT_CELLS cells from the origin on the ground or MNAV_MAX_HEIGHT_CELLS cell heights above or below it. The element and index name the first offending vertex or triangle. @par Thread safety Safe from any thread.
+Checks a triangle mesh as hostile input to a bake with a def.  @param def   The bake def the mesh is for. @param mesh  The mesh. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, an invalid def, a negative count, a NULL array its count needs, a vertex coordinate that is not finite, a vertex index outside the vertices or an area type of MNAV_AREA_TYPES or more; `mnav_errorVersion` for a def built against another major or minor version; `mnav_errorLimit` for more triangles than the def's inputTriangles limit; `mnav_errorRange` for a vertex more than MNAV_MAX_EXTENT_CELLS cells from the origin on the ground or MNAV_MAX_HEIGHT_CELLS cell heights above or below it. The element and index name the first offending vertex or triangle. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavCreateBaker(const mnavBakeDef* def, mnavBaker** bakerOut);
 ```
-Makes a baker from a def: checks the def and keeps a copy, its allocator and its memory limit.  @param def       The def. @param bakerOut  Receives the baker, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` with the setting for an invalid def or a NULL argument; `mnav_errorLimit` when the baker does not fit the def's memory limit; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes a baker from a def: checks the def and keeps a copy, its allocator and its memory limit.  @param def       The def. @param bakerOut  Receives the baker, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` with the setting for an invalid def or a NULL argument; `mnav_errorVersion` for a def built against another major or minor version; `mnav_errorLimit` when the baker does not fit the def's memory limit; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyBaker(mnavBaker* baker);
@@ -103,7 +103,7 @@ Bakes one tile from triangle meshes and terrains, shaped by volumes, as mnavBake
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileIndex(const mnavBakeDef* def, const mnavTriangleMesh* meshes, int32_t meshCount, mnavTileIndex** indexOut, mnavBakeReport* reportOut);
 ```
-Makes a tile index of meshes for a def's tile grid (mnav-0014): checks every mesh as a bake does, then lists for each tile the triangles whose ground bounds, widened by the tile's border and two cells, reach it, in input order. A bake given the index through mnavBakeInput reads only the tile's list and makes the same tile, to the byte, as a bake that reads every triangle. Changing a mesh's vertices or triangles calls for a new index.  @param def       The def; the index fits defs with its cell size, tile cells and agent radius. @param meshes    The meshes, in the def's frame. Only read during the call. @param meshCount The number of meshes, at least 0. @param indexOut  Receives the index, or NULL on failure. @param reportOut Receives the result, the first mesh refused and what its check found, and the memory peak; the other fields are 0. May be NULL. @return `mnav_success`; `mnav_errorInvalid` for an invalid def, a NULL indexOut, a negative count, NULL meshes with a positive count, or a mesh its check refuses; `mnav_errorRange` for a mesh past the extent; `mnav_errorLimit` past the def's memory limit or past 2^31 - 1 listed triangles; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread. An index is never changed after it is made, so any number of bakes on any threads may read it at once.
+Makes a tile index of meshes for a def's tile grid (mnav-0014): checks every mesh as a bake does, then lists for each tile the triangles whose ground bounds, widened by the tile's border and two cells, reach it, in input order. A bake given the index through mnavBakeInput reads only the tile's list and makes the same tile, to the byte, as a bake that reads every triangle. Changing a mesh's vertices or triangles calls for a new index.  @param def       The def; the index fits defs with its cell size, tile cells and agent radius. @param meshes    The meshes, in the def's frame. Only read during the call. @param meshCount The number of meshes, at least 0. @param indexOut  Receives the index, or NULL on failure. @param reportOut Receives the result, the first mesh refused and what its check found, and the memory peak; the other fields are 0. May be NULL. @return `mnav_success`; `mnav_errorInvalid` for an invalid def, a NULL indexOut, a negative count, NULL meshes with a positive count, or a mesh its check refuses; `mnav_errorVersion` for a def built against another major or minor version; `mnav_errorRange` for a mesh past the extent; `mnav_errorLimit` past the def's memory limit or past 2^31 - 1 listed triangles; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread. An index is never changed after it is made, so any number of bakes on any threads may read it at once.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileIndex2D(const mnavBakeDef* def, const mnavOutline* outlines, int32_t outlineCount, mnavTileIndex** indexOut, mnavBakeReport* reportOut);
@@ -136,14 +136,14 @@ MNAV_NODISCARD MNAV_API mnavResult mnavCopyBakedTile(const mnavBaker* baker, uin
 Copies the last baked tile's bytes into caller memory.  @param baker     The baker. @param bufferOut Receives the bytes: at least capacity bytes; may be NULL when capacity is 0. @param capacity  The buffer's size in bytes. @param sizeOut   Receives the tile's size in bytes. May be NULL. @return `mnav_success`; `mnav_errorCapacity` when the buffer is smaller than the tile, with the size still written; `mnav_errorInvalid` for a NULL baker, a NULL buffer with a positive capacity, or a baker holding no tile. @par Thread safety Safe from any thread; the baker is used by one thread at a time.
 
 ```c
-mnavTileCacheDef mnavDefaultTileCacheDef(void);
+static inline mnavTileCacheDef mnavDefaultTileCacheDef(void);
 ```
-Returns the default tile cache def: up to 4096 tiles in 64 MiB.  @return The def. @par Thread safety Safe from any thread.
+Returns the default tile cache def: up to 4096 tiles in 64 MiB. Built in the program, so that it carries the version of the headers the program includes.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileCache(const mnavTileCacheDef* def, mnavTileCache** cacheOut);
 ```
-Makes an empty tile cache.  @param def       The def, from mnavDefaultTileCacheDef. @param cacheOut  Receives the cache, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultTileCacheDef; `mnav_errorRange` for a limit out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes an empty tile cache.  @param def       The def, from mnavDefaultTileCacheDef. @param cacheOut  Receives the cache, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultTileCacheDef; `mnav_errorVersion` for one built against another major or minor version; `mnav_errorRange` for a limit out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyTileCache(mnavTileCache* cache);
@@ -199,19 +199,19 @@ Appends the detail triangles of a run of polygons, a path's or a corridor's, eac
 Flight volumes (mnav-0015): where agents that fly or swim may go, baked per tile from the navmesh bake's input into a compact sparse voxel octree, loaded from bytes, staged and committed together as navmesh tiles are.
 
 ```c
-mnavFlightDef mnavDefaultFlightDef(void);
+static inline mnavFlightDef mnavDefaultFlightDef(void);
 ```
-Makes a flight def with every setting at its default: 1 m voxels, tiles of 32 voxels, a volume from 0 to 64 m, a flier of 0.5 m, the ground below solid, and limits for a medium world.  @return The def. @par Thread safety Safe from any thread.
+Makes a flight def with every setting at its default: 1 m voxels, tiles of 32 voxels, a volume from 0 to 64 m, a flier of 0.5 m, the ground below solid, and limits for a medium world. Built in the program, so that it carries the version of the headers the program includes.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavFlightDefResult mnavValidateFlightDef(const mnavFlightDef* def);
 ```
-Checks a flight def.  @param def  The def. @return `mnav_success`; `mnav_errorInvalid` with the first setting refused, or for a NULL def. @par Thread safety Safe from any thread.
+Checks a flight def.  @param def  The def. @return `mnav_success`; `mnav_errorInvalid` with the first setting refused, or for a NULL def; `mnav_errorVersion` with no setting for a def built against another major or minor version. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavFlightDefResult mnavCreateFlightBaker(const mnavFlightDef* def, mnavFlightBaker** bakerOut);
 ```
-Makes a flight baker: checks a def and keeps a copy, its allocator and its memory limit.  @param def       The def. @param bakerOut  Receives the baker, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` with the setting for an invalid def or a NULL argument; `mnav_errorLimit` when the baker does not fit the def's memory limit; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes a flight baker: checks a def and keeps a copy, its allocator and its memory limit.  @param def       The def. @param bakerOut  Receives the baker, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` with the setting for an invalid def or a NULL argument; `mnav_errorVersion` for a def built against another major or minor version; `mnav_errorLimit` when the baker does not fit the def's memory limit; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyFlightBaker(mnavFlightBaker* baker);
@@ -231,7 +231,7 @@ Copies the last baked flight tile's bytes into caller memory.  @param baker     
 ```c
 MNAV_NODISCARD MNAV_API mnavFlightDefResult mnavCreateFlightVolume(const mnavFlightDef* def, mnavFlightVolume** volumeOut);
 ```
-Makes an empty flight volume for tiles baked with a def: checks the def and keeps a copy, its allocator and its limits.  @param def        The def the tiles are baked with. @param volumeOut  Receives the volume, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` with the setting for an invalid def or a NULL argument; `mnav_errorLimit` when the volume does not fit the def's memory limit; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes an empty flight volume for tiles baked with a def: checks the def and keeps a copy, its allocator and its limits.  @param def        The def the tiles are baked with. @param volumeOut  Receives the volume, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` with the setting for an invalid def or a NULL argument; `mnav_errorVersion` for a def built against another major or minor version; `mnav_errorLimit` when the volume does not fit the def's memory limit; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyFlightVolume(mnavFlightVolume* volume);
@@ -313,14 +313,14 @@ Appends a flight path's steps, point to point (mnav_debugPath).  @param path    
 Flow fields (mnav-0007): for every cell of a grid, the cost of its cheapest way to the nearest of a set of goals and the next cell on it, so that any number of agents sharing the goals find their way at the cost of one search.
 
 ```c
-mnavFlowFieldDef mnavDefaultFlowFieldDef(void);
+static inline mnavFlowFieldDef mnavDefaultFlowFieldDef(void);
 ```
-Returns the default flow field def: up to 65536 cells.  @return The def. @par Thread safety Safe from any thread.
+Returns the default flow field def: up to 65536 cells. Built in the program, so that it carries the version of the headers the program includes.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCreateFlowField(const mnavFlowFieldDef* def, mnavFlowField** fieldOut);
 ```
-Makes a flow field with the memory its cell limit needs.  @param def      The def, from mnavDefaultFlowFieldDef. @param fieldOut Receives the field, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultFlowFieldDef; `mnav_errorRange` for a cell limit out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes a flow field with the memory its cell limit needs.  @param def      The def, from mnavDefaultFlowFieldDef. @param fieldOut Receives the field, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultFlowFieldDef; `mnav_errorVersion` for one built against another major or minor version; `mnav_errorRange` for a cell limit out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyFlowField(mnavFlowField* field);
@@ -362,14 +362,14 @@ Appends an arrow for each cell of the field that has a next cell (mnav_debugFlow
 Hierarchical paths (mnav-0008): an abstract graph over clusters of tiles, whose transitions stand at the portals between clusters, for long paths on large navmeshes; a path found on it is refined by the navmesh search confined to the clusters it crosses.
 
 ```c
-mnavHierarchyDef mnavDefaultHierarchyDef(void);
+static inline mnavHierarchyDef mnavDefaultHierarchyDef(void);
 ```
-Returns the default hierarchy def: clusters of 4 by 4 tiles, up to 4,096 tile slots, 16,384 transitions and 262,144 edges.  @return The def. @par Thread safety Safe from any thread.
+Returns the default hierarchy def: clusters of 4 by 4 tiles, up to 4,096 tile slots, 16,384 transitions and 262,144 edges. Built in the program, so that it carries the version of the headers the program includes.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCreateHierarchy(const mnavHierarchyDef* def, mnavHierarchy** hierarchyOut);
 ```
-Makes a hierarchy with the memory its limits need.  @param def          The def, from mnavDefaultHierarchyDef. @param hierarchyOut Receives the hierarchy, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultHierarchyDef; `mnav_errorRange` for a limit or cluster side out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes a hierarchy with the memory its limits need.  @param def          The def, from mnavDefaultHierarchyDef. @param hierarchyOut Receives the hierarchy, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultHierarchyDef; `mnav_errorVersion` for one built against another major or minor version; `mnav_errorRange` for a limit or cluster side out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyHierarchy(mnavHierarchy* hierarchy);
@@ -396,28 +396,28 @@ Finds a path as mnavFindPath does, with the hierarchy's filter, through the hier
 Link generation (mnav-0009): off-mesh links for drops off ledges and jumps across gaps, made from a committed navmesh for the host to stage.
 
 ```c
-mnavLinkGenDef mnavDefaultLinkGenDef(void);
+static inline mnavLinkGenDef mnavDefaultLinkGenDef(void);
 ```
-Returns the default generation def: samples every 1 m, drops up to 3 m going both ways up to 0.5 m, jumps up to 2 m, links dropped when walking is within 3 times as far or their ends within 1 m of another's, a snap radius of 0.5 m, costs 2 and 4, kinds mnav_linkDrop and mnav_linkJump, and no clearance test.  @return The def. @par Thread safety Safe from any thread.
+Returns the default generation def: samples every 1 m, drops up to 3 m going both ways up to 0.5 m, jumps up to 2 m, links dropped when walking is within 3 times as far or their ends within 1 m of another's, a snap radius of 0.5 m, costs 2 and 4, kinds mnav_linkDrop and mnav_linkJump, and no clearance test. Built in the program, so that it carries the version of the headers the program includes.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter, const mnavLinkGenDef* def, int32_t tileX0, int32_t tileZ0, int32_t tileX1, int32_t tileZ1, mnavLinkDef* linksOut, int32_t capacity, int32_t* countOut);
 ```
-Generates links from the edges of the polygons on a range of tile places that have nothing across them and are not tile sides. Each edge is sampled every `spacing` meters; a sample tries a drop, landing `2 * radius + 4 * cellSize` out from the edge on the highest surface between the agent's step height and `dropMax` below, and a jump, landing from `2 * radius` to `jumpMax` out at the nearest distance where a surface lies within the step height of the start, the radius, step height and cell size being the navmesh's. A link is kept when the clearance test, if any, passes it, when the navmesh does not already walk from its start to its landing within `detour` times the straight distance, and when no earlier link has both ends within `filterDistance` of its own. The order is tile place, polygon, edge, sample; the same navmesh gives the same links.  @param query     A context for the walking searches; its last search ends. @param navmesh   The navmesh. @param filter    The areas links may start and land on, and walk through, or NULL. @param def       The def, from mnavDefaultLinkGenDef. @param tileX0    The first tile column. @param tileZ0    The first tile row. @param tileX1    The last tile column, at least tileX0. @param tileZ1    The last tile row, at least tileZ0. @param linksOut  Receives the links, up to capacity. @param capacity  The buffer's size in links, at least 0. @param countOut  Receives the number of links generated, also beyond the capacity. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a def not from mnavDefaultLinkGenDef, a tile range backward, or a filter not built from mnavDefaultQueryFilter; `mnav_errorRange` for a def value or filter cost out of its range; `mnav_errorCapacity` when more links were generated than the buffer holds, the first capacity written. @par Thread safety Safe from any thread; the context is used by one thread at a time, and no commit runs on the navmesh. The def's clearance test runs on the calling thread, within the call.
+Generates links from the edges of the polygons on a range of tile places that have nothing across them and are not tile sides. Each edge is sampled every `spacing` meters; a sample tries a drop, landing `2 * radius + 4 * cellSize` out from the edge on the highest surface between the agent's step height and `dropMax` below, and a jump, landing from `2 * radius` to `jumpMax` out at the nearest distance where a surface lies within the step height of the start, the radius, step height and cell size being the navmesh's. A link is kept when the clearance test, if any, passes it, when the navmesh does not already walk from its start to its landing within `detour` times the straight distance, and when no earlier link has both ends within `filterDistance` of its own. The order is tile place, polygon, edge, sample; the same navmesh gives the same links.  @param query     A context for the walking searches; its last search ends. @param navmesh   The navmesh. @param filter    The areas links may start and land on, and walk through, or NULL. @param def       The def, from mnavDefaultLinkGenDef. @param tileX0    The first tile column. @param tileZ0    The first tile row. @param tileX1    The last tile column, at least tileX0. @param tileZ1    The last tile row, at least tileZ0. @param linksOut  Receives the links, up to capacity. @param capacity  The buffer's size in links, at least 0. @param countOut  Receives the number of links generated, also beyond the capacity. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a def not from mnavDefaultLinkGenDef, a tile range backward, or a filter not built from mnavDefaultQueryFilter; `mnav_errorVersion` for a def or filter built against another major or minor version; `mnav_errorRange` for a def value or filter cost out of its range; `mnav_errorCapacity` when more links were generated than the buffer holds, the first capacity written. @par Thread safety Safe from any thread; the context is used by one thread at a time, and no commit runs on the navmesh. The def's clearance test runs on the calling thread, within the call.
 
 ## `navflow.h`
 
 Flow fields over the navmesh (mnav-0013): for every polygon, the cost of its cheapest way to the nearest of a set of goal points and the polygon to go to next, so that any number of agents sharing the goals find their way at the cost of one search.
 
 ```c
-mnavNavFlowDef mnavDefaultNavFlowDef(void);
+static inline mnavNavFlowDef mnavDefaultNavFlowDef(void);
 ```
-Returns the default navmesh flow field def: up to 65,536 polygons, 4,096 tile slots and 4,096 off-mesh links.  @return The def. @par Thread safety Safe from any thread.
+Returns the default navmesh flow field def: up to 65,536 polygons, 4,096 tile slots and 4,096 off-mesh links. Built in the program, so that it carries the version of the headers the program includes.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCreateNavFlow(const mnavNavFlowDef* def, mnavNavFlow** fieldOut);
 ```
-Makes a navmesh flow field with the memory its limits need.  @param def      The def, from mnavDefaultNavFlowDef. @param fieldOut Receives the field, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultNavFlowDef; `mnav_errorRange` for a limit out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes a navmesh flow field with the memory its limits need.  @param def      The def, from mnavDefaultNavFlowDef. @param fieldOut Receives the field, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultNavFlowDef; `mnav_errorVersion` for one built against another major or minor version; `mnav_errorRange` for a limit out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyNavFlow(mnavNavFlow* field);
@@ -456,7 +456,7 @@ The navmesh queries read: tiles loaded from baked bytes, staged and committed to
 ```c
 MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavCreateNavmesh(const mnavBakeDef* def, mnavNavmesh** navmeshOut);
 ```
-Makes an empty navmesh for tiles baked with a def: checks the def and keeps a copy, its allocator and its limits.  @param def          The def the tiles are baked with. @param navmeshOut   Receives the navmesh, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` with the setting for an invalid def or a NULL argument; `mnav_errorLimit` when the navmesh does not fit the def's memory limit; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes an empty navmesh for tiles baked with a def: checks the def and keeps a copy, its allocator and its limits.  @param def          The def the tiles are baked with. @param navmeshOut   Receives the navmesh, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` with the setting for an invalid def or a NULL argument; `mnav_errorVersion` for a def built against another major or minor version; `mnav_errorLimit` when the navmesh does not fit the def's memory limit; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyNavmesh(mnavNavmesh* navmesh);
@@ -523,9 +523,9 @@ Reads an off-mesh link as committed.  @param navmesh  The navmesh. @param link  
 Queries over a navmesh's committed tiles (mnav-0005). Every query reads and never changes the navmesh, and works in world coordinates: meters, right-handed, +Y up.
 
 ```c
-mnavQueryFilter mnavDefaultQueryFilter(void);
+static inline mnavQueryFilter mnavDefaultQueryFilter(void);
 ```
-Returns the filter that uses every walkable area at a cost of 1 and every kind of off-mesh link.  @return The filter. @par Thread safety Safe from any thread.
+Returns the filter that uses every walkable area at a cost of 1 and every kind of off-mesh link. Built in the program, so that it carries the version of the headers the program includes.  @return The filter. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavFindPolygons(const mnavNavmesh* navmesh, const mnavQueryFilter* filter, mnavPos3 center, mnavVec3 halfExtents, mnavPolygonId* polygonsOut, int32_t capacity, mnavFound* foundOut);
@@ -538,14 +538,14 @@ MNAV_NODISCARD MNAV_API mnavResult mnavFindNearest(const mnavNavmesh* navmesh, c
 Finds the polygon, among those the filter includes, nearest a point whose nearest point lies within a box round it, and that point. A point over a polygon scores the height it lies beyond the agent's step, any other the distance to the polygon; ties go to the shorter distance, then the tile first by place (x, then z), then the lower polygon index.  @param navmesh      The navmesh. @param filter       The areas usable, or NULL for every walkable one. @param point        The query point. @param halfExtents  The box's half sizes, in meters, at least 0. @param nearestOut   Receives the result. @return `mnav_success`, also when no polygon's nearest point lies in the box (the polygon's slot is then 0); `mnav_errorInvalid` for a NULL argument, a point or extent that is not finite, or a negative extent; `mnav_errorInvalid` for a filter not built from mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of its range. @par Thread safety Safe from any thread. Any number of queries may run at once between commits.
 
 ```c
-mnavQueryDef mnavDefaultQueryDef(void);
+static inline mnavQueryDef mnavDefaultQueryDef(void);
 ```
-Returns a query def with 8,192 nodes per search and paths up to 1,000 m.  @return The def. @par Thread safety Safe from any thread.
+Returns a query def with 8,192 nodes per search, paths up to 1,000 m and the C library's allocator. Built in the program, so that it carries the version of the headers the program includes.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavCreateQuery(const mnavQueryDef* def, mnavQuery** queryOut);
 ```
-Makes a query context with the memory its limits need.  @param def      The def, from mnavDefaultQueryDef. @param queryOut Receives the context, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultQueryDef; `mnav_errorRange` for a limit out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
+Makes a query context with the memory its limits need.  @param def      The def, from mnavDefaultQueryDef. @param queryOut Receives the context, or NULL on failure. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def not from mnavDefaultQueryDef; `mnav_errorVersion` for one built against another major or minor version; `mnav_errorRange` for a limit out of its range; `mnav_errorCapacity` when the allocator fails. @par Thread safety Safe from any thread.
 
 ```c
 void mnavDestroyQuery(mnavQuery* query);
@@ -608,14 +608,14 @@ MNAV_NODISCARD MNAV_API mnavResult mnavCorridorAreas( mnavQuery* query, const mn
 Finds the areas along a corridor's straight path: the corners mnavCorridorCorners gives, which replace the context's last ones, and a run where the path starts, one wherever it crosses into a polygon of another area, and one where it lands from each off-mesh link, in order. Hosts change gait or sound at a run's start; a path's areas are its corridor's, once loaded with mnavSetCorridor.  @param query      The context; its memory holds the corners. @param navmesh    The navmesh. @param corridor   The corridor. @param cornersOut Receives the straight path, or NULL. @param runsOut    Receives the runs, in order. May be NULL when capacity is 0. @param capacity   How many runs fit, at least 0. @param countOut   Receives how many runs there are, also when they do not all fit. @return As mnavCorridorCorners; also `mnav_errorInvalid` for a NULL countOut, a negative capacity or NULL runs with a positive one, and `mnav_errorCapacity` when the runs do not fit, the first capacity of them written. @par Thread safety Safe from any thread; the context is used by one thread at a time.
 
 ```c
-mnavSteerDef mnavDefaultSteerDef(void);
+static inline mnavSteerDef mnavDefaultSteerDef(void);
 ```
-Returns a steering def of 3.5 m/s, slowing within 1 m of the target, arriving within 0.1 m, anticipating turns.  @return The def. @par Thread safety Safe from any thread.
+Returns a steering def of 3.5 m/s, slowing within 1 m of the target, arriving within 0.1 m, anticipating turns. Built in the program, so that it carries the version of the headers the program includes.  @return The def. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavSteer(const mnavCorners* corners, const mnavSteerDef* def, mnavSteering* steeringOut);
 ```
-Steers along a corridor's corners (mnav-0005): toward the next corner, or swinging wide of it, at the def's speed, slowing within its slowing distance of the target by the distance left along the corners over it; stopped within the arrival distance of the target or of the next link's takeoff. Keeps no state: call it each step with the corners mnavCorridorCorners gives, feed the velocity to avoidance, and limit acceleration and move the agent yourself.  @param corners     The corners, the agent's position first. @param def         The def, from mnavDefaultSteerDef. @param steeringOut Receives the velocity and state. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, corners with no points or a def not from mnavDefaultSteerDef; `mnav_errorRange` for a def value out of its range or a corner not finite. @par Thread safety Safe from any thread.
+Steers along a corridor's corners (mnav-0005): toward the next corner, or swinging wide of it, at the def's speed, slowing within its slowing distance of the target by the distance left along the corners over it; stopped within the arrival distance of the target or of the next link's takeoff. Keeps no state: call it each step with the corners mnavCorridorCorners gives, feed the velocity to avoidance, and limit acceleration and move the agent yourself.  @param corners     The corners, the agent's position first. @param def         The def, from mnavDefaultSteerDef. @param steeringOut Receives the velocity and state. @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, corners with no points or a def not from mnavDefaultSteerDef; `mnav_errorVersion` for one built against another major or minor version; `mnav_errorRange` for a def value out of its range or a corner not finite. @par Thread safety Safe from any thread.
 
 ```c
 MNAV_NODISCARD MNAV_API mnavResult mnavMoveCorridor(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter, mnavCorridor* corridor, mnavPos3 wanted, mnavMove* moveOut);

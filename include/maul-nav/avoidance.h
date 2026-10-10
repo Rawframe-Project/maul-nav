@@ -147,6 +147,8 @@ extern "C"
     typedef struct mnavAvoidanceDef
     {
         uint32_t cookie;
+        // MNAV_ABI_VERSION, set by mnavDefaultAvoidanceDef.
+        uint32_t version;
         // The allocator the set uses; zeroed for the C library's.
         mnavAllocator allocator;
         mnavAvoidanceLimits limits;
@@ -164,22 +166,45 @@ extern "C"
     // An avoidance set: the memory its limits need.
     typedef struct mnavAvoidance mnavAvoidance;
 
+// The cookie mnavDefaultAvoidanceDef sets and mnavCreateAvoidance checks.
+#define MNAV_AVOIDANCE_DEF_COOKIE 0x4E415641u
+
     /// Returns the default avoidance def: up to 4096 agents, each avoiding
     /// its 10 nearest neighbours within 10 m, 2 s ahead, and up to 4096
     /// obstacle points, each agent avoiding its 16 nearest obstacle edges
     /// or circles, 2 s ahead.
+    /// Built in the program, so that it carries the version of the
+    /// headers the program includes.
     ///
     /// @return The def.
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_API mnavAvoidanceDef mnavDefaultAvoidanceDef(void);
+    static inline mnavAvoidanceDef mnavDefaultAvoidanceDef(void)
+    {
+#ifdef __cplusplus
+        mnavAvoidanceDef def = {};
+#else
+    mnavAvoidanceDef def = {0};
+#endif
+        def.cookie = MNAV_AVOIDANCE_DEF_COOKIE;
+        def.version = MNAV_ABI_VERSION;
+        def.limits.agents = 4096;
+        def.limits.neighbors = 10;
+        def.limits.obstacleVertices = 4096;
+        def.limits.obstacleNeighbors = 16;
+        def.neighborDistance = 10.0;
+        def.timeHorizon = 2.0;
+        def.obstacleTimeHorizon = 2.0;
+        return def;
+    }
 
     /// Makes an avoidance set with the memory its limits need.
     ///
     /// @param def         The def, from mnavDefaultAvoidanceDef.
     /// @param avoidanceOut Receives the set, or NULL on failure.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
-    /// def not from mnavDefaultAvoidanceDef; `mnav_errorRange` for a limit,
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
+    /// not from mnavDefaultAvoidanceDef; `mnav_errorVersion` for one built
+    /// against another major or minor version; `mnav_errorRange` for a limit,
     /// distance or horizon out of its range; `mnav_errorCapacity` when the
     /// allocator fails.
     /// @par Thread safety

@@ -62,6 +62,8 @@ extern "C"
     {
         // Set by mnavDefaultFlightDef; a def not made by it is refused.
         uint32_t cookie;
+        // MNAV_ABI_VERSION, set by mnavDefaultFlightDef.
+        uint32_t version;
         // Where memory comes from; zeroed for the C library's functions.
         mnavAllocator allocator;
         // The world position of the input's (0, 0, 0), as in mnavBakeDef.
@@ -184,20 +186,49 @@ extern "C"
     // mnavCreateFlightVolume.
     typedef struct mnavFlightVolume mnavFlightVolume;
 
+// The cookie mnavDefaultFlightDef sets and every function that takes a
+// flight def checks.
+#define MNAV_FLIGHT_DEF_COOKIE 0x464E564Du
+
     /// Makes a flight def with every setting at its default: 1 m voxels,
     /// tiles of 32 voxels, a volume from 0 to 64 m, a flier of 0.5 m, the
     /// ground below solid, and limits for a medium world.
+    /// Built in the program, so that it carries the version of the
+    /// headers the program includes.
     ///
     /// @return The def.
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_API mnavFlightDef mnavDefaultFlightDef(void);
+    static inline mnavFlightDef mnavDefaultFlightDef(void)
+    {
+#ifdef __cplusplus
+        mnavFlightDef def = {};
+#else
+    mnavFlightDef def = {0};
+#endif
+        def.cookie = MNAV_FLIGHT_DEF_COOKIE;
+        def.version = MNAV_ABI_VERSION;
+        def.voxelSize = 1.0f;
+        def.tileVoxels = 32;
+        def.floor = 0.0f;
+        def.ceiling = 64.0f;
+        def.radius = 0.5f;
+        def.groundBelow = true;
+        def.limits.inputTriangles = 4194304;
+        def.limits.tileSpans = 4194304;
+        def.limits.tileNodes = 1048576;
+        def.limits.tileLeaves = 1048576;
+        def.limits.tiles = 65536;
+        def.limits.memoryBytes = 268435456;
+        return def;
+    }
 
     /// Checks a flight def.
     ///
     /// @param def  The def.
     /// @return `mnav_success`; `mnav_errorInvalid` with the first setting
-    /// refused, or for a NULL def.
+    /// refused, or for a NULL def; `mnav_errorVersion` with no setting for
+    /// a def built against another major or minor version.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavFlightDefResult mnavValidateFlightDef(const mnavFlightDef* def);
@@ -208,7 +239,8 @@ extern "C"
     /// @param def       The def.
     /// @param bakerOut  Receives the baker, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` with the setting for an
-    /// invalid def or a NULL argument; `mnav_errorLimit` when the baker
+    /// invalid def or a NULL argument; `mnav_errorVersion` for a def built
+    /// against another major or minor version; `mnav_errorLimit` when the baker
     /// does not fit the def's memory limit; `mnav_errorCapacity` when the
     /// allocator fails.
     /// @par Thread safety
@@ -272,9 +304,10 @@ extern "C"
     /// @param def        The def the tiles are baked with.
     /// @param volumeOut  Receives the volume, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` with the setting for an
-    /// invalid def or a NULL argument; `mnav_errorLimit` when the volume
-    /// does not fit the def's memory limit; `mnav_errorCapacity` when the
-    /// allocator fails.
+    /// invalid def or a NULL argument; `mnav_errorVersion` for a def built
+    /// against another major or minor version; `mnav_errorLimit` when the
+    /// volume does not fit the def's memory limit; `mnav_errorCapacity` when
+    /// the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavFlightDefResult

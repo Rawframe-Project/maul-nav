@@ -28,6 +28,8 @@ extern "C"
     typedef struct mnavQueryFilter
     {
         uint32_t cookie;
+        // MNAV_ABI_VERSION, set by mnavDefaultQueryFilter.
+        uint32_t version;
         // What a meter costs in each area type, MNAV_MIN_AREA_COST to
         // MNAV_MAX_AREA_COST; 1 by default.
         float costs[MNAV_AREA_TYPES];
@@ -40,13 +42,34 @@ extern "C"
         uint64_t kinds;
     } mnavQueryFilter;
 
+// The cookie mnavDefaultQueryFilter sets and every query checks.
+#define MNAV_QUERY_FILTER_COOKIE 0x4E415646u
+
     /// Returns the filter that uses every walkable area at a cost of 1 and
-    /// every kind of off-mesh link.
+    /// every kind of off-mesh link. Built in the program, so that it
+    /// carries the version of the headers the program includes.
     ///
     /// @return The filter.
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_API mnavQueryFilter mnavDefaultQueryFilter(void);
+    static inline mnavQueryFilter mnavDefaultQueryFilter(void)
+    {
+#ifdef __cplusplus
+        mnavQueryFilter filter = {};
+#else
+    mnavQueryFilter filter = {0};
+#endif
+        filter.cookie = MNAV_QUERY_FILTER_COOKIE;
+        filter.version = MNAV_ABI_VERSION;
+        for (int area = 0; area < MNAV_AREA_TYPES; ++area)
+        {
+            filter.costs[area] = 1.0f;
+        }
+        // Every walkable area type: all but area 0.
+        filter.areas = ~(uint64_t)1;
+        filter.kinds = ~(uint64_t)0;
+        return filter;
+    }
 
     // The nearest point on the navmesh to a query point.
     typedef struct mnavNearest
@@ -154,6 +177,8 @@ extern "C"
     typedef struct mnavQueryDef
     {
         uint32_t cookie;
+        // MNAV_ABI_VERSION, set by mnavDefaultQueryDef.
+        uint32_t version;
         // The allocator the context uses; zeroed for the C library's.
         mnavAllocator allocator;
         // The limits on each search.
@@ -216,21 +241,38 @@ extern "C"
         int32_t linkCount;
     } mnavPath;
 
-    /// Returns a query def with 8,192 nodes per search and paths up to
-    /// 1,000 m.
+// The cookie mnavDefaultQueryDef sets and mnavCreateQuery checks.
+#define MNAV_QUERY_DEF_COOKIE 0x4E415651u
+
+    /// Returns a query def with 8,192 nodes per search, paths up to
+    /// 1,000 m and the C library's allocator. Built in the program, so
+    /// that it carries the version of the headers the program includes.
     ///
     /// @return The def.
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_API mnavQueryDef mnavDefaultQueryDef(void);
+    static inline mnavQueryDef mnavDefaultQueryDef(void)
+    {
+#ifdef __cplusplus
+        mnavQueryDef def = {};
+#else
+    mnavQueryDef def = {0};
+#endif
+        def.cookie = MNAV_QUERY_DEF_COOKIE;
+        def.version = MNAV_ABI_VERSION;
+        def.limits.nodes = 8192;
+        def.limits.pathLength = 1000.0f;
+        return def;
+    }
 
     /// Makes a query context with the memory its limits need.
     ///
     /// @param def      The def, from mnavDefaultQueryDef.
     /// @param queryOut Receives the context, or NULL on failure.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
-    /// def not from mnavDefaultQueryDef; `mnav_errorRange` for a limit out
-    /// of its range; `mnav_errorCapacity` when the allocator fails.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
+    /// not from mnavDefaultQueryDef; `mnav_errorVersion` for one built against
+    /// another major or minor version; `mnav_errorRange` for a limit out of its
+    /// range; `mnav_errorCapacity` when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateQuery(const mnavQueryDef* def,
@@ -577,6 +619,8 @@ extern "C"
     typedef struct mnavSteerDef
     {
         uint32_t cookie;
+        // MNAV_ABI_VERSION, set by mnavDefaultSteerDef.
+        uint32_t version;
         // The speed on the way, 0 to MNAV_MAX_STEER_SPEED.
         float maxSpeed;
         // Within this distance of the target along the corners, the speed
@@ -615,13 +659,32 @@ extern "C"
         int32_t link;
     } mnavSteering;
 
+// The cookie mnavDefaultSteerDef sets and mnavSteer checks.
+#define MNAV_STEER_DEF_COOKIE 0x5354564Du
+
     /// Returns a steering def of 3.5 m/s, slowing within 1 m of the
-    /// target, arriving within 0.1 m, anticipating turns.
+    /// target, arriving within 0.1 m, anticipating turns. Built in the
+    /// program, so that it carries the version of the headers the program
+    /// includes.
     ///
     /// @return The def.
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_API mnavSteerDef mnavDefaultSteerDef(void);
+    static inline mnavSteerDef mnavDefaultSteerDef(void)
+    {
+#ifdef __cplusplus
+        mnavSteerDef def = {};
+#else
+    mnavSteerDef def = {0};
+#endif
+        def.cookie = MNAV_STEER_DEF_COOKIE;
+        def.version = MNAV_ABI_VERSION;
+        def.maxSpeed = 3.5f;
+        def.slowDistance = 1.0f;
+        def.arriveDistance = 0.1f;
+        def.anticipateTurns = true;
+        return def;
+    }
 
     /// Steers along a corridor's corners (mnav-0005): toward the next
     /// corner, or swinging wide of it, at the def's speed, slowing within
@@ -634,10 +697,11 @@ extern "C"
     /// @param corners     The corners, the agent's position first.
     /// @param def         The def, from mnavDefaultSteerDef.
     /// @param steeringOut Receives the velocity and state.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument,
-    /// corners with no points or a def not from mnavDefaultSteerDef;
-    /// `mnav_errorRange` for a def value out of its range or a corner not
-    /// finite.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, corners
+    /// with no points or a def not from mnavDefaultSteerDef;
+    /// `mnav_errorVersion` for one built against another major or minor
+    /// version; `mnav_errorRange` for a def value out of its range or a corner
+    /// not finite.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavSteer(const mnavCorners* corners,

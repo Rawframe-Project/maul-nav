@@ -25,6 +25,12 @@ below, from a walking agent to a crowd among walls;
   back with its `mnavDestroy...` function. A def carries named limits;
   the object takes the memory they need when it is made, and reaching a
   limit is a typed result, never unbounded work or a silent cut.
+- **Versions.** The defaults, and `mnavDefaultQueryFilter`, are built
+  in your program from the headers it includes, and stamp their version
+  (`MNAV_ABI_VERSION`, the major and minor) into the def. The binary
+  interface holds within a minor version only: a library of another
+  major or minor refuses the def with `mnav_errorVersion` before it
+  reads anything else of it, so always start a def from its default.
 - **Memory.** Every def has an allocator; zeroed, the C library's is
   used. Queries allocate nothing: their scratch is the query context's.
 - **Threads.** The library starts none. Each function's documentation

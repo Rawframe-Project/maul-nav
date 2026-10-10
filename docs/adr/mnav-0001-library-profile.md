@@ -50,6 +50,14 @@ must be the same everywhere.
   size before it is checked.
 - **Platform dependencies:** the C library only, with `sqrt` from
   libm.
+- **Versions:** every def and the query filter carry the version of
+  the headers the program was built with, `MNAV_ABI_VERSION` (major and
+  minor), stamped by defaults that are `static inline` in the headers.
+  maul-nav has no root object: each creation, and `mnavSteer`, may be
+  the first call a program makes, so every function that takes a def
+  or a filter refuses another version with `mnav_errorVersion` before
+  it reads anything else of it (conventions section 12; amended
+  2026-10-10).
 - **Commit areas:** `api`, `avoidance`, `bake`, `bench`, `build`,
   `ci`, `corridor`, `docs`, `field`, `format`, `grid`, `query`,
   `samples`, `tests`, `tools`.

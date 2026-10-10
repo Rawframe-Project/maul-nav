@@ -25,16 +25,8 @@
 #include <stdint.h>
 #include <string.h>
 
-// Marks a def built by mnavDefaultAvoidanceDef.
-#define AVOIDANCE_DEF_COOKIE 0x4E415641u
-
 // Obstacle grid entries per obstacle vertex.
 #define ENTRIES_PER_VERTEX 8
-
-mnavAvoidanceDef mnavDefaultAvoidanceDef(void)
-{
-    return (mnavAvoidanceDef){AVOIDANCE_DEF_COOKIE, {0}, {4096, 10, 4096, 16}, 10.0, 2.0, 2.0};
-}
 
 // Whether a def's limits, distance and horizons lie in their ranges.
 static bool GoodLimits(const mnavAvoidanceDef* def)
@@ -147,8 +139,15 @@ mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoi
         return mnav_errorInvalid;
     }
     *avoidanceOut = nullptr;
-    if (def == nullptr || def->cookie != AVOIDANCE_DEF_COOKIE ||
-        (def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
+    if (def == nullptr || def->cookie != MNAV_AVOIDANCE_DEF_COOKIE)
+    {
+        return mnav_errorInvalid;
+    }
+    if (def->version != MNAV_ABI_VERSION)
+    {
+        return mnav_errorVersion;
+    }
+    if ((def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
     {
         return mnav_errorInvalid;
     }

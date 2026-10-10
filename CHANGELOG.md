@@ -8,6 +8,19 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- Every def and the query filter carry the version of the headers a
+  program was built with (`MNAV_ABI_VERSION`, the major and minor), and
+  every function that takes one refuses another version with
+  `mnav_errorVersion` before reading anything else of it: the binary
+  interface is promised within a minor version only. The
+  `mnavDefault...Def` functions and `mnavDefaultQueryFilter` are
+  `static inline` in the headers, so the program stamps its own
+  version, and the cookies are public macros. A def built from its
+  default needs no change; the library no longer exports the defaults
+  as symbols.
+
 ## [0.11.2] - 2026-10-10
 
 Walls on every seam: the parts of a tile side no polygon beyond covers

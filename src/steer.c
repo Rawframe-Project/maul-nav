@@ -11,14 +11,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Marks a def built by mnavDefaultSteerDef.
-#define STEER_DEF_COOKIE 0x5354564Du
-
-mnavSteerDef mnavDefaultSteerDef(void)
-{
-    return (mnavSteerDef){STEER_DEF_COOKIE, 3.5f, 1.0f, 0.1f, true};
-}
-
 static bool InRange(float v, float most)
 {
     return v >= 0.0f && v <= most;
@@ -83,9 +75,13 @@ mnavResult mnavSteer(const mnavCorners* corners, const mnavSteerDef* def, mnavSt
 {
     if (corners == nullptr || def == nullptr || steeringOut == nullptr || corners->pointCount < 1 ||
         corners->points == nullptr || (corners->linkCount > 0 && corners->links == nullptr) ||
-        def->cookie != STEER_DEF_COOKIE)
+        def->cookie != MNAV_STEER_DEF_COOKIE)
     {
         return mnav_errorInvalid;
+    }
+    if (def->version != MNAV_ABI_VERSION)
+    {
+        return mnav_errorVersion;
     }
     if (!InRange(def->maxSpeed, MNAV_MAX_STEER_SPEED) ||
         !InRange(def->slowDistance, MNAV_MAX_STEER_DISTANCE) ||
