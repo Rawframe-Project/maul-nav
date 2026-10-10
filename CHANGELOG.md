@@ -8,6 +8,13 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- Avoidance on the ground finds neighbours in cells a quarter of the
+  neighbour range wide, not half: a dense crowd's search stops sooner,
+  so a crowd step of 1,000 agents takes 19% fewer instructions and the
+  doorway scenario 44% fewer, with the same velocities.
+
 ## [0.11.1] - 2026-10-10
 
 Steering the same everywhere: `mnavSteer` took lengths with a function

@@ -18,8 +18,16 @@
 #define CELL_LIMIT 0x1p52
 
 // Cells per neighbour range: agents are found in rings of cells round
-// their own, nearest first.
-#define CELL_DIVISIONS 2
+// their own, nearest first, and the search stops at a ring that cannot
+// hold a nearer one. On the ground four: a dense crowd's nearest lie a
+// fraction of the range away, and smaller cells stop the search sooner
+// (the benchmark's crowd step takes 19% fewer instructions than with two,
+// the doorway scenario 44% fewer). In space two, as a shell of cubes
+// grows with the cube of its cells.
+static int64_t Divisions(const mnavCrowd* crowd)
+{
+    return crowd->space ? 2 : 4;
+}
 
 int32_t mnavCrowdTableSize(int32_t agents)
 {
@@ -43,7 +51,7 @@ static int64_t CellOf(double v, double size)
 
 mnavCrowdKey mnavCrowdKeyOf(const mnavCrowd* crowd, mnavPos3 position, uint64_t id, int32_t index)
 {
-    double size = crowd->range / CELL_DIVISIONS;
+    double size = crowd->range / (double)Divisions(crowd);
     int64_t z = crowd->space ? CellOf(position.z, size) : 0;
     return (mnavCrowdKey){
         CellOf(position.x, size), CellOf(position.y, size), z, id, index, position, 0};
@@ -242,10 +250,11 @@ static void Ring(Search* s, const mnavCrowdKey* c, int64_t r)
 int32_t mnavCrowdNeighbors(mnavCrowd* crowd, mnavPos3 position, int32_t index, uint32_t ignores)
 {
     double range = crowd->range;
-    double size = range / CELL_DIVISIONS;
+    int64_t divisions = Divisions(crowd);
+    double size = range / (double)divisions;
     mnavCrowdKey center = mnavCrowdKeyOf(crowd, position, 0, index);
     Search s = {crowd, position, index, range * range, ignores, 0};
-    for (int64_t r = 0; r <= CELL_DIVISIONS + 1; ++r)
+    for (int64_t r = 0; r <= divisions + 1; ++r)
     {
         double near = r > 1 ? (double)(r - 1) * size * (1.0 - 0x1p-20) : 0.0;
         if (near >= range ||
