@@ -3,11 +3,13 @@
 # (taskset -c 0), Linux 6.8, 2026-10-10, version 1.0.0, on a quiet
 # machine (load averages 1.72 7.93 26.77 at the start, the minute's
 # under 8 at each run's start and end), the better of two runs, line by
-# line. Wall time differs between runs by a few percent, and between
-# days by more (parts no change touched ran a fifth to a third faster
-# than the first baseline's, and 4 to 7% slower than another's): compare
-# runs on one core of one machine, as information, never as a gate, and
-# compare code by instruction counts. Compare with:
+# line; the doorway's and the crowds' lines again after the ground's
+# neighbour cells came to follow the last call (maul-nav after 1.0.0,
+# loads 1.3 and 4.0 to 4.8). Wall time differs between runs by a few
+# percent, and between days by more (parts no change touched ran a fifth
+# to a third faster than the first baseline's, and 4 to 7% slower than
+# another's): compare runs on one core of one machine, as information,
+# never as a gate, and compare code by instruction counts. Compare with:
 # taskset -c 0 maul-nav_bench bench/baseline.txt
 bake, a tile                           3127.4 us
 rebuild, a tile                        1356.8 us
@@ -18,10 +20,10 @@ path queries per second               43531.5 /s
 sliced path query                        23.0 us
 sliced path, a slice                      8.8 us
 shortest path query                      16.9 us
-avoidance step, 1000 agents             975.8 us
-avoidance, agents per ms               1024.8 /ms
-crowd step, 1000 agents                 996.0 us
-crowd step with walls, 1000            1199.8 us
+avoidance step, 1000 agents             829.5 us
+avoidance, agents per ms               1205.5 /ms
+crowd step, 1000 agents                 976.3 us
+crowd step with walls, 1000            1182.2 us
 avoidance in space step, 1000 fliers       1530.5 us
 avoidance in space, fliers per ms        653.4 /ms
 flow build, 1 goal                    20378.1 us
