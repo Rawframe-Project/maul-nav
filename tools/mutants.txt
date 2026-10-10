@@ -584,7 +584,15 @@ ly3-keys | src/avoidance3.c | crowd->keys[i].layers = agents[i].layers; | (void)
 ly3-debug | src/avoidance3.c | int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i, a->ignores); | int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i, 0);
 # cr-divisions survives, equivalent: the neighbours are those a search
 # of every cell in range finds, for any cell size; only the time changes.
-cr-divisions | src/crowd.c | return crowd->space ? 2 : 4; | return crowd->space ? 2 : 1;
+cr-divisions | src/crowd.c | return crowd->space ? 2 : crowd->divisions; | return crowd->space ? 2 : 1;
+# The ground cells' rule (N97), killed by test_crowd's TestDivisions.
+cr-first | src/crowd.c | crowd->divisions = crowd->divisions == 0 ? GROUND_FIRST : crowd->divisions; | crowd->divisions = crowd->divisions == 0 ? GROUND_FEWEST : crowd->divisions;
+cr-space-end | src/crowd.c | if (crowd->space || crowd->probed == 0) | if (crowd->probed == 0)
+cr-no-band | src/crowd.c | if (held >= HELD_LOW && held <= HELD_HIGH) | if (false)
+cr-band-high | src/crowd.c | if (held >= HELD_LOW && held <= HELD_HIGH) | if (held >= HELD_LOW)
+cr-square | src/crowd.c | held * now * now >= HELD_AIM * (double)(next + 1) * (double)(next + 1)) | held * now >= HELD_AIM * (double)(next + 1) * (double)(next + 1))
+cr-most | src/crowd.c | while (next < GROUND_MOST && | while (next < GROUND_MOST + 2 &&
+cr-aim | src/crowd.c | held * now * now >= HELD_AIM * (double)(next + 1) * (double)(next + 1)) | held * now * now >= 2.0 * (double)(next + 1) * (double)(next + 1))
 ps-covered-from | src/spatial.c | if (low <= from && high > reach) | if (low < from && high > reach)
 ps-next-start | src/spatial.c | else if (low > from && low < *next) | else if (false)
 # ps-end-exact survives, equivalent on navmesh coordinates: a + (b - a)
