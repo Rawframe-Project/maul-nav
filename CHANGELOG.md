@@ -8,6 +8,23 @@ format.
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-10
+
+Walls on every seam: the parts of a tile side no polygon beyond covers
+are walls, as they are where the tile cache has rebuilt one of two
+neighbours, and avoidance on the ground finds its neighbours faster.
+Tiles baked by 0.11.1 still load; tiles baked now record 0.11.2 as their
+generator.
+
+### Changed
+
+- Avoidance on the ground finds neighbours in cells a quarter of the
+  neighbour range wide, not half: a dense crowd's search stops sooner,
+  so a crowd step of 1,000 agents takes 19% fewer instructions and the
+  doorway scenario 44% fewer, with the same velocities.
+- The guide is reviewed against 0.11: it reaches every public function
+  and every sample, and lists every error result.
+
 ### Fixed
 
 - `mnavFindWalls` and `mnavFindWallDistance` take the parts of a tile
@@ -16,13 +33,6 @@ format.
   neighbours, link a side only in part, and the rest of it was taken as
   open: avoidance missed those walls, and the wall distance overlooked
   them.
-
-### Changed
-
-- Avoidance on the ground finds neighbours in cells a quarter of the
-  neighbour range wide, not half: a dense crowd's search stops sooner,
-  so a crowd step of 1,000 agents takes 19% fewer instructions and the
-  doorway scenario 44% fewer, with the same velocities.
 
 ## [0.11.1] - 2026-10-10
 
