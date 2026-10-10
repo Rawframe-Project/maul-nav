@@ -23,7 +23,8 @@
 // fraction of the range away, and smaller cells stop the search sooner
 // (the benchmark's crowd step takes 19% fewer instructions than with two,
 // the doorway scenario 44% fewer). In space two, as a shell of cubes
-// grows with the cube of its cells.
+// grows with the cube of its cells: three take 14% fewer instructions in
+// the benchmark's space step but ran 0.4% to 1.5% slower on a quiet core.
 static int64_t Divisions(const mnavCrowd* crowd)
 {
     return crowd->space ? 2 : 4;

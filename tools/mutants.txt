@@ -593,3 +593,18 @@ ps-next-start | src/spatial.c | else if (low > from && low < *next) | else if (f
 ps-end-exact | src/spatial.c | if (t >= 1.0) | if (false)
 ps-filter | src/spatial.c | mnavIncludes(r->filter, target->mesh.polygons[link->target.polygon].area); | true;
 ps-reach-skip | src/spatial.c | from = reach; | from = 1.0;
+# 1.0 version stamp: each def and the filter refused across a minor or a
+# major. The two status propagations in input.c and tile_index.c sit on
+# lines that appear twice; test_version covers both calls of each.
+ver-query | src/query.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+ver-filter | src/query_filter.c | if (filter->version != MNAV_ABI_VERSION) | if (false && filter->version != MNAV_ABI_VERSION)
+ver-steer | src/steer.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+ver-bake | src/bake_def.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+ver-bake-setting | src/bake_def.c | return (mnavBakeDefResult){mnav_errorVersion, mnav_settingNone}; | return (mnavBakeDefResult){mnav_errorVersion, mnav_settingCookie};
+ver-flight | src/flight_def.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+ver-linkgen | src/linkgen.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+ver-avoidance | src/avoidance.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+ver-flow | src/flow.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+ver-navflow | src/navflow.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+ver-hierarchy | src/hierarchy.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
+ver-cache | src/tile_cache.c | if (def->version != MNAV_ABI_VERSION) | if (false && def->version != MNAV_ABI_VERSION)
