@@ -149,6 +149,25 @@ static void TestPartlyLinkedSide(void)
                         4, &found) == mnav_success &&
               found.count == 1 && walls[0].start.z == 0.0 && walls[0].end.z == 0.0,
           "the linked part is no wall");
+    mnavDestroyNavmesh(navmesh);
+    // The square across from z = 5 to 10 m instead: along the side, from
+    // z = 10 to 0 m, the linked part comes first and the open part after
+    // it, from z = 5 to 0 m.
+    const HandSquare north = {0, 20, 32, 40, {0, 0, 0, 0}, 0};
+    eastSize = HandTileBytes(bytes[1], 1, &north, 1);
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+              mnavStageTile(navmesh, bytes[0], westSize).result == mnav_success &&
+              mnavStageTile(navmesh, bytes[1], eastSize).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "committed");
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){30.0, 0.0, 2.0},
+                          (mnavVec3){1.0f, 4.0f, 1.0f}, &n) == mnav_success &&
+              n.polygon.slot != 0 &&
+              mnavFindWalls(query, navmesh, nullptr, n.polygon, (mnavPos3){30.0, 0.0, 2.0}, 2.5,
+                            walls, 4, &found) == mnav_success &&
+              found.count == 2 && walls[0].start.x == 32.0 && walls[0].start.z == 5.0 &&
+              walls[0].end.z == 0.0 && walls[1].start.z == 0.0 && walls[1].end.z == 0.0,
+          "the open part after the linked one");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }

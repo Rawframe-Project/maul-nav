@@ -569,7 +569,7 @@ lw-last | src/spatial.c | int32_t last = held < r->capacity ? held : r->capacity
 lw-normal | src/spatial.c | length > 0.0 ? (mnavPos3){ez / length, 0.0, -ex / length} : (mnavPos3){0.0, 0.0, 0.0}; | length > 0.0 ? (mnavPos3){-ez / length, 0.0, ex / length} : (mnavPos3){0.0, 0.0, 0.0};
 lw-count | src/spatial.c | r->count += 1; | (void)r;
 fw-capacity | src/spatial.c | return r.count > capacity ? mnav_errorCapacity : mnav_success; | return r.count >= capacity ? mnav_errorCapacity : mnav_success;
-fw-listing | src/spatial.c | if (!open && r->listing) | if (!open && false)
+fw-listing | src/spatial.c | if (r->listing) | if (false)
 ly-crowd-skip | src/crowd.c | if (key->index != s->index && distance < s->rangeSq && (key->layers & s->ignores) == 0) | if (key->index != s->index && distance < s->rangeSq)
 ly-keys | src/avoidance.c | a->crowd.keys[i].layers = agents[i].layers; | (void)agents;
 ly-ignores | src/avoidance.c | &a->crowd, (mnavPos3){self->position.x, self->position.y, 0.0}, i, self->ignores); | &a->crowd, (mnavPos3){self->position.x, self->position.y, 0.0}, i, 0);
@@ -585,3 +585,11 @@ ly3-debug | src/avoidance3.c | int32_t count = mnavCrowdNeighbors(&avoidance->cr
 # cr-divisions survives, equivalent: the neighbours are those a search
 # of every cell in range finds, for any cell size; only the time changes.
 cr-divisions | src/crowd.c | return crowd->space ? 2 : 4; | return crowd->space ? 2 : 1;
+ps-covered-from | src/spatial.c | if (low <= from && high > reach) | if (low < from && high > reach)
+ps-next-start | src/spatial.c | else if (low > from && low < *next) | else if (false)
+# ps-end-exact survives, equivalent on navmesh coordinates: a + (b - a)
+# gives b back for them; the guard keeps a wall's end on the corner
+# exactly whatever the coordinates.
+ps-end-exact | src/spatial.c | if (t >= 1.0) | if (false)
+ps-filter | src/spatial.c | mnavIncludes(r->filter, target->mesh.polygons[link->target.polygon].area); | true;
+ps-reach-skip | src/spatial.c | from = reach; | from = 1.0;
