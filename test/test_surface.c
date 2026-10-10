@@ -295,6 +295,32 @@ static void TestTableLeftEmpty(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestSlicedSearchEnded(void)
+{
+    // A move takes the node table a sliced search was using, so the
+    // search ends: going on with it would read the move's nodes.
+    mnavNavmesh* navmesh = Make(s_row, 5, nullptr, 0);
+    mnavQuery* query = MakeQuery(64);
+    mnavNearest a;
+    mnavNearest b;
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){6.0, 0.0, 7.5}, (mnavVec3){0.1f, 2.0f, 0.1f},
+                          &a) == mnav_success &&
+              mnavFindNearest(navmesh, nullptr, (mnavPos3){29.0, 0.0, 7.5},
+                              (mnavVec3){0.1f, 2.0f, 0.1f}, &b) == mnav_success,
+          "the ends");
+    CHECK(mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point) ==
+              mnav_success,
+          "begun");
+    bool ended = false;
+    CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_success, "a slice");
+    Move(query, navmesh, nullptr, 6.0, 7.5, 9.0, 7.5);
+    CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorInvalid, "ended by the move");
+    mnavPath path;
+    CHECK(mnavFinishPath(query, navmesh, &path) == mnav_errorInvalid, "nothing to finish");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     TestAlongARow();
@@ -303,5 +329,6 @@ int main(void)
     TestArguments();
     TestWorldMoves();
     TestTableLeftEmpty();
+    TestSlicedSearchEnded();
     return s_failures == 0 ? 0 : 1;
 }

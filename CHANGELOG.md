@@ -15,6 +15,14 @@ format.
 
 ## [Unreleased]
 
+### Fixed
+
+- A move along the surface ends a sliced ground or flight search on the
+  same context, as any other search does: the move reuses the node
+  table, and a search continued after it read the move's nodes as its
+  own. mnavContinuePath, mnavFinishPath and their flight forms now
+  return `mnav_errorInvalid` after a move.
+
 ## [1.0.1] - 2026-10-10
 
 Faster avoidance on the ground, with the same velocities: the neighbour
