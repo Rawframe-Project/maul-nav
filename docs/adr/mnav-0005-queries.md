@@ -164,15 +164,19 @@ that are not loaded must say so rather than treat them as walls.
   through the edges within a radius, as Detour's findDistanceToWall
   does, and returns the nearest wall point, its ground distance and the
   unit direction from it to the center; an edge with nothing the filter
-  includes across it is a wall, an unloaded tile side included; off-mesh
-  links are left aside; the node limit's cut is reported.
+  includes across it is a wall, an unloaded tile side included, and so
+  are the parts of a tile side no polygon beyond covers (amended
+  2026-10-10: tiles baked from different geometry, as when the tile
+  cache rebuilds one of two, link a side only in part; Detour's
+  getPolyWallSegments splits it the same way); off-mesh links are left
+  aside; the node limit's cut is reported.
 - **Walls near a point:** `mnavFindWalls` lists the walls of that same
   search within the radius, nearest first, ties in the order met, into
   a caller buffer that keeps the nearest when it is short, as Detour's
   crowd keeps a local boundary; each wall with its ends in its polygon's
   order, its ground distance and the unit normal toward its polygon,
-  for avoidance's segment obstacles. Partly linked tile sides count as
-  open, as for the wall distance.
+  for avoidance's segment obstacles. The parts of a tile side no
+  polygon beyond covers are walls, as for the wall distance.
 - **Random points:** `mnavFindRandomPoint` picks uniformly over the
   ground area of every included polygon from a 64-bit seed through
   SplitMix64, where Detour picks a tile first;

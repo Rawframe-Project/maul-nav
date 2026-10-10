@@ -842,9 +842,10 @@ extern "C"
 
     /// Finds the nearest wall to a point within a radius on the ground,
     /// searching from its polygon across the edges that come within the
-    /// radius, off-mesh links aside. An edge is a wall when no polygon the
-    /// filter includes lies across it, a tile side with no tile loaded
-    /// beyond included. A wall exactly the radius away lies within it; of
+    /// radius, off-mesh links aside. An edge is a wall where no polygon the
+    /// filter includes lies across it: a tile side with no tile loaded
+    /// beyond, and the parts of a side no polygon of the tile beyond
+    /// covers, are walls. A wall exactly the radius away lies within it; of
     /// walls at the same distance it gives one, the same on every
     /// platform, but which one is not promised.
     ///

@@ -8,6 +8,15 @@ format.
 
 ## [Unreleased]
 
+### Fixed
+
+- `mnavFindWalls` and `mnavFindWallDistance` take the parts of a tile
+  side that no polygon of the tile beyond covers as walls. Tiles baked
+  from different geometry, as when the tile cache rebuilds one of two
+  neighbours, link a side only in part, and the rest of it was taken as
+  open: avoidance missed those walls, and the wall distance overlooked
+  them.
+
 ### Changed
 
 - Avoidance on the ground finds neighbours in cells a quarter of the

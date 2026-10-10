@@ -3,8 +3,9 @@
 //
 // The walls near a point (mnav-0005) on a hand-built square, where they
 // lie at exact distances: walls at the same distance keep the order the
-// search meets them in, a wall exactly at the radius lies within it, and
-// a short buffer holds the nearest without writing past its capacity.
+// search meets them in, a wall exactly at the radius lies within it, a
+// short buffer holds the nearest without writing past its capacity, and
+// the part of a tile side no polygon across covers is a wall.
 
 #include "hand_tile.h"
 #include "test_harness.h"
@@ -97,9 +98,65 @@ static void TestShortBuffer(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestPartlyLinkedSide(void)
+{
+    // Tile 0 holds a square from x = 24 to 32 m and z = 0 to 10 m, on its
+    // east side; tile 1, baked from other geometry (as when only one of
+    // two tiles is rebuilt), a square across the seam from z = 0 to 5 m
+    // only. The seam's part from z = 5 to 10 m has nothing across it: a
+    // wall, to the wall distance and the wall list alike.
+    const HandSquare west = {96, 0, 128, 40, {0, 0, 0, 0}, 0};
+    const HandSquare east = {0, 0, 32, 20, {0, 0, 0, 0}, 0};
+    static uint8_t bytes[2][2048];
+    size_t westSize = HandTileBytes(bytes[0], 0, &west, 1);
+    size_t eastSize = HandTileBytes(bytes[1], 1, &east, 1);
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+              mnavStageTile(navmesh, bytes[0], westSize).result == mnav_success &&
+              mnavStageTile(navmesh, bytes[1], eastSize).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "committed");
+    mnavQueryDef queryDef = mnavDefaultQueryDef();
+    mnavQuery* query = nullptr;
+    CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success, "query");
+    mnavNearest n;
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){30.0, 0.0, 8.0},
+                          (mnavVec3){1.0f, 4.0f, 1.0f}, &n) == mnav_success &&
+              n.polygon.slot != 0,
+          "found");
+    // From (30, 8): the north side and the seam's open part, 2 m each, in
+    // the order of the square's sides; the seam's part runs from z = 10
+    // to 5 m, as the side runs.
+    mnavWallSegment walls[4];
+    mnavWallsFound found;
+    CHECK(mnavFindWalls(query, navmesh, nullptr, n.polygon, (mnavPos3){30.0, 0.0, 8.0}, 2.5, walls,
+                        4, &found) == mnav_success &&
+              found.count == 2,
+          "two walls within 2.5 m");
+    CHECK(walls[0].distance == 2.0 && walls[0].start.z == 10.0 && walls[0].end.z == 10.0 &&
+              walls[1].distance == 2.0 && walls[1].start.x == 32.0 && walls[1].end.x == 32.0 &&
+              walls[1].start.z == 10.0 && walls[1].end.z == 5.0 && walls[1].normal.x == -1.0,
+          "the north side, then the seam's open part");
+    mnavWall wall;
+    CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, (mnavPos3){31.0, 0.0, 8.0}, 2.5,
+                               &wall) == mnav_success &&
+              wall.found && wall.distance == 1.0 && wall.point.x == 32.0,
+          "the seam's open part is the nearest wall");
+    // From (30, 2), beside the linked part: only the south side, 2 m away;
+    // the open part lies over 3.6 m off.
+    CHECK(mnavFindWalls(query, navmesh, nullptr, n.polygon, (mnavPos3){30.0, 0.0, 2.0}, 2.5, walls,
+                        4, &found) == mnav_success &&
+              found.count == 1 && walls[0].start.z == 0.0 && walls[0].end.z == 0.0,
+          "the linked part is no wall");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     TestTiesAndTheRadius();
     TestShortBuffer();
+    TestPartlyLinkedSide();
     return s_failures == 0 ? 0 : 1;
 }
