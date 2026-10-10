@@ -155,6 +155,9 @@ static void TestDivisions(void)
     CHECK(crowd.divisions == 5, "denser still");
     Held(&crowd, false, 1000, 3300);
     CHECK(crowd.divisions == 5, "settled");
+    // Sized again, 2.2 a probe would make four; within the band, kept.
+    Held(&crowd, false, 1000, 2200);
+    CHECK(crowd.divisions == 5, "a little sparser, kept");
     Held(&crowd, false, 10, 100000);
     CHECK(crowd.divisions == 6, "at most six");
     Held(&crowd, false, 0, 0);
