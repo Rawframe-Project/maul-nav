@@ -4,7 +4,7 @@
 #   python3 tools/mutate.py tools/mutants.txt build results.txt
 # 0.2.2 speed-ups: the neighbour ring search and the polygon merge
 ring-stop-early | src/crowd.c | double near = r > 1 ? (double)(r - 1) * size * (1.0 - 0x1p-20) : 0.0; | double near = r > 1 ? (double)r * size * (1.0 - 0x1p-20) : 0.0;
-ring-last-ring | src/crowd.c | for (int64_t r = 0; r <= CELL_DIVISIONS + 1; ++r) | for (int64_t r = 0; r <= CELL_DIVISIONS; ++r)
+ring-last-ring | src/crowd.c | for (int64_t r = 0; r <= divisions + 1; ++r) | for (int64_t r = 0; r <= divisions; ++r)
 ring-stop-partial | src/crowd.c | (s.found == crowd->limit && near * near > crowd->neighbors[s.found - 1].distance)) | (s.found > 0 && near * near > crowd->neighbors[s.found - 1].distance))
 ring-one-row | src/crowd.c | int64_t stepY = sideX || rz > 0 || r == 0 ? 1 : 2 * r; | int64_t stepY = sideX || rz > 0 || r == 0 ? 1 : 4 * r;
 merge-tie-last | src/polymesh.c | bool first = value == best->value && (j < best->a || (j == best->a && k < best->b)); | bool first = value == best->value && (j > best->a || (j == best->a && k > best->b));
@@ -582,3 +582,6 @@ ly3-ignores | src/avoidance3.c | int32_t neighbors = mnavCrowdNeighbors(&a->crow
 ly3-share | src/avoidance3.c | double share = (other->ignores & self->layers) != 0 | double share = false
 ly3-keys | src/avoidance3.c | crowd->keys[i].layers = agents[i].layers; | (void)agents;
 ly3-debug | src/avoidance3.c | int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i, a->ignores); | int32_t count = mnavCrowdNeighbors(&avoidance->crowd, a->position, i, 0);
+# cr-divisions survives, equivalent: the neighbours are those a search
+# of every cell in range finds, for any cell size; only the time changes.
+cr-divisions | src/crowd.c | return crowd->space ? 2 : 4; | return crowd->space ? 2 : 1;
