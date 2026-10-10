@@ -69,10 +69,11 @@ static double Recorded(const char* name)
         const char* end = strchr(line, '\n');
         size_t length = end != NULL ? (size_t)(end - line) : strlen(line);
         size_t named = strlen(name);
-        if (line[0] != '#' && length > NAME_WIDTH && strncmp(line, name, named) == 0 &&
+        if (line[0] != '#' && length > named && strncmp(line, name, named) == 0 &&
             line[named] == ' ')
         {
-            return strtod(line + NAME_WIDTH, NULL);
+            // After the name, which may run past NAME_WIDTH.
+            return strtod(line + named, NULL);
         }
         line += length + (end != NULL ? 1 : 0);
     }
