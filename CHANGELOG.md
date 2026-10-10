@@ -15,13 +15,20 @@ format.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-10
+
+Faster avoidance on the ground, with the same velocities: the neighbour
+cells follow how many agents the last call's searches met. No change to
+the API, the ABI or a format; tiles baked by 1.0.0 still load, and tiles
+baked now record 1.0.1 as their generator.
+
 ### Changed
 
 - Avoidance on the ground sizes its neighbour cells from the set's
   last call, a half to a sixth of the neighbour range, so that a cell
   probed holds about three agents: a sparse crowd searches fewer cells,
   a jam fewer agents. The velocities are the same; on one core the
-  benchmark's doorway runs about 13% faster than 1.0.0, and the
+  benchmark's doorway runs about 14% faster than 1.0.0, and the
   scenarios test, mostly its doorway of 1,000 agents, takes 17% fewer
   instructions.
 

@@ -23,7 +23,7 @@ extern "C"
 // The library version. CMake reads it from here.
 #define MNAV_VERSION_MAJOR 1
 #define MNAV_VERSION_MINOR 0
-#define MNAV_VERSION_PATCH 0
+#define MNAV_VERSION_PATCH 1
 
 // The version every def and the query filter carry, stamped by their
 // defaults from the headers a program was built with: the ABI is promised
