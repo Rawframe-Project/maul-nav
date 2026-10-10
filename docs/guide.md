@@ -4,8 +4,9 @@ This guide walks through the library in the order a program uses it:
 bake tiles, load them into a navmesh, query it, follow paths, fly, move
 crowds and draw what happened. Every function named here is described
 in full in [the API reference](api.md); the design records behind each
-part are in `adr/`. `samples/walk.c` and `samples/crowd.c` are complete
-programs built from the steps below.
+part are in `adr/`. The programs in `samples/` are built from the steps
+below, from a walking agent to a crowd among walls;
+[the samples page](samples.md) says what each shows.
 
 ## The ground rules
 
@@ -14,15 +15,16 @@ programs built from the steps below.
   frame the library names (a bake's origin, a tile) are floats.
 - **Results.** Every fallible function returns `mnavResult`: zero is
   success, negative values are errors (`mnav_errorInvalid`,
-  `mnav_errorRange`, `mnav_errorLimit`, `mnav_errorStale`,
-  `mnav_errorCapacity`), and `mnavResultName` names any of them. The
+  `mnav_errorCapacity`, `mnav_errorLimit`, `mnav_errorRange`,
+  `mnav_errorVersion`, `mnav_errorNotLoaded`, `mnav_errorStale`,
+  `mnav_errorTier`), and `mnavResultName` names any of them. The
   results are marked `[[nodiscard]]` where the compiler supports it.
 - **Defs and limits.** Each owner object (baker, navmesh, query
   context, flow field, hierarchy, avoidance set) is made from a def you
-  get from its `mnavDefault...Def` function and adjust. A def carries
-  named limits; the object takes the memory they need when it is made,
-  and reaching a limit is a typed result, never unbounded work or a
-  silent cut.
+  get from its `mnavDefault...Def` function and adjust, and is given
+  back with its `mnavDestroy...` function. A def carries named limits;
+  the object takes the memory they need when it is made, and reaching a
+  limit is a typed result, never unbounded work or a silent cut.
 - **Memory.** Every def has an allocator; zeroed, the C library's is
   used. Queries allocate nothing: their scratch is the query context's.
 - **Threads.** The library starts none. Each function's documentation
@@ -31,7 +33,9 @@ programs built from the steps below.
   and each object is used by one thread at a time.
 - **Determinism.** The same inputs give the same bytes and the same
   results on every platform, compiler and worker count. Random queries
-  take a seed from you.
+  take a seed from you. `mnavHash64` hashes bytes the same way
+  everywhere, as the library's tests do to pin tiles and results; a
+  host can check its own runs the same way.
 
 ## Baking tiles
 
@@ -118,7 +122,7 @@ mnavResult rebuilt = mnavRebuildTile(baker, cache, tileX, tileZ, &crate, 1, &rep
 
 - **The same bytes.** A rebuilt tile is, to the byte, the tile
   `mnavBakeTileInput` bakes from the same input with the obstacles
-  appended to its volumes, in about a third of the time. Copy it out
+  appended to its volumes, in under half the time. Copy it out
   with `mnavCopyBakedTile` and replace the tile in the navmesh.
 - **Every obstacle, each time.** A rebuild applies the cached volumes
   and the obstacles it is given, so pass every obstacle on the tile;
@@ -214,9 +218,11 @@ mnavResult searched =
   between them and refines the path cluster by cluster, with a small
   node budget.
 - **Spatial queries.** `mnavRaycast` along the surface,
-  `mnavFindWallDistance`, `mnavGetHeight`, `mnavMoveAlongSurface`,
-  `mnavFindPolygons` in a box, `mnavFindRandomPoint` and
-  `mnavFindRandomPointAround` from a seed, `mnavCheckReachable`.
+  `mnavFindWallDistance` and `mnavFindWalls` (the nearest wall, and the
+  walls within a radius for avoidance), `mnavGetHeight`,
+  `mnavMoveAlongSurface`, `mnavFindPolygons` in a box,
+  `mnavFindRandomPoint` and `mnavFindRandomPointAround` from a seed,
+  `mnavCheckReachable`.
 - **Grids.** For tile maps, `mnavFindGridPath` runs A* or jump point
   search over an `mnavGrid` of area types, under the same filters.
 
@@ -286,6 +292,8 @@ may occupy.
   in meters, and the flier's radius. Leave `groundBelow` on for worlds
   with ground, so that the space under a terrain is solid; turn it off
   for open space, where it would fill below every floating piece.
+  `mnavValidateFlightDef` checks a def without making anything, naming
+  the first bad setting.
 - **Baking.** `mnavCreateFlightBaker`, then `mnavBakeFlightTile` with
   the same `mnavBakeInput` a navmesh bake takes, then
   `mnavCopyFlightTile`. A voxel any triangle touches is solid, and so is
