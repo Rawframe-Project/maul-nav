@@ -15,7 +15,7 @@
 #include <string.h>
 
 // The hash of the terrain's tile, the same on every platform.
-#define TERRAIN_HASH 0x296b5a5caffc2589ull
+#define TERRAIN_HASH 0x68e01ed9e591730cull
 
 enum
 {

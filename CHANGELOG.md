@@ -2,11 +2,27 @@
 
 All notable changes to this project are recorded here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
-the project uses [Semantic Versioning](https://semver.org/). Before
-1.0.0, any minor release may change the API, the ABI and every data
+the project uses [Semantic Versioning](https://semver.org/). From
+1.0.0, within a major version: the source interface only grows (fields
+are added at the end of their struct, and a removal waits for the next
+major), every tile and flight tile format an earlier 1.x wrote is read,
+and results are deterministic within a version, a change to them a line
+under Changed or Fixed. The binary interface holds within a minor
+version: a program built against 1.y runs with any 1.y.z, and a library
+of another minor refuses its defs with `mnav_errorVersion`. Before
+1.0.0, any minor release could change the API, the ABI and every data
 format.
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-10-10
+
+The first stable release: what 0.11 does, with the promises above. Every
+def and the query filter carry the version of the headers a program was
+built with, so that a library of another minor refuses them rather than
+read them in another layout. The tile and flight tile formats stay
+format 1, the first a 1.x reads; tiles baked by 0.x still load, and
+tiles baked now record 1.0.0 as their generator.
 
 ### Changed
 

@@ -48,12 +48,14 @@ the clock a bake may read for its report.
 
 ## Status
 
-Version 0.11.2. Everything listed above is built and tested on every CI
+Version 1.0.0. Everything listed above is built and tested on every CI
 platform; fuzz targets cover tiles, bake input, queries, avoidance,
 the searches over a whole navmesh, grid flow fields, the exact
 shortest path beside the A* one, flight tiles and queries, and the tile
-cache's coder. Before 1.0.0 a
-minor release may change the API, the ABI and the tile format.
+cache's coder. Within 1.x the source interface only grows, every tile
+and flight tile format an earlier 1.x wrote is read, and the binary
+interface holds within a minor version; [the changelog](CHANGELOG.md)
+states the promise in full.
 
 ## Documentation
 
