@@ -87,7 +87,7 @@ errors.
 | Internal function shared across files | `P` + PascalCase, no `_` | `m3PrepareContacts` |
 | `static` function | PascalCase | `UpdatePairs` |
 | Local variable, parameter, struct field | camelCase | `bodyIndex`, `pairCount` |
-| Out-parameter | camelCase ending in `Out` | `windowIdOut`, `neededOut` |
+| Out-parameter | camelCase ending in `Out` | `windowOut`, `neededOut` |
 | File-scope `static` variable | `s_` + camelCase | `s_propertyTable` |
 
 - Verbs are consistent across the family: `Get`, `Set`, `Is`, `Has`,
@@ -95,7 +95,10 @@ errors.
   `Overlap`, `Collide`, `Validate`, `Next`.
 - Acronyms are written as words: `Aabb`, `Utf8`, `Id`, `Ccd`.
 - Math functions take their mathematical names (`Atan2`, `Hash64`).
-- Struct fields that hold ids end in `Id`: `bodyId`, `shapeIdA`.
+- A field, parameter or out-parameter whose type is a typed id is
+  named for what it names, without `Id`: `owner`, `window`,
+  `windowOut`. Maul2D and Maul3D keep the `Id` names their released
+  API holds (`bodyId`, `shapeIdA`).
 - Create functions take their owner first, then the def, then any
   geometry, and end with the out-parameter for the new id.
 - The same concept has the same name in every library. When one
@@ -314,15 +317,31 @@ with a listed statement); ThreadSanitizer in CI; review.
   only where code spells it through the family's SIMD header.
 - Each library's profile states its determinism class and the rules
   that follow from it.
+- A library whose profile promises the same bits on every platform
+  lists in `tools/libm-allowed.txt` the `<math.h>` functions its
+  sources may call, one per line: only exactly rounded ones (`sqrt`,
+  `fabs`, `floor`, `ceil`, `trunc`, `round`, `lround`, `rint`,
+  `nearbyint`, `fmin`, `fmax`, `fmod`, `remainder`, `copysign`,
+  `frexp`, `ldexp`, `scalbn`, `modf`, `nextafter` and their `f` forms),
+  never `fma` (above). Every other `<math.h>` function is refused in
+  its sources; the library writes its own where it needs one.
 
 Checked by: `cmake/` (flags); `tools/check_source.py` (calls the
-profile bans); the library's determinism tests.
+profile bans, and `<math.h>` calls against `tools/libm-allowed.txt`);
+the library's determinism tests.
 
 ## 12. API design
 
 - Every creation takes a def struct initialized by
   `P..Default..Def`. Defs carry a cookie so that an uninitialized def is
   refused.
+- The root def (the def of the object a program creates first) carries
+  the version of the headers the program was built with. Its default
+  is built in the program, a `static inline` function in the header
+  (or a macro over the library's function), so that it stamps the
+  program's version rather than the library's; the root creation
+  refuses another version with the library's version status, before
+  it reads anything else of the def.
 - Functions that fill a caller array take the array and its capacity
   and report the true total, which may exceed the capacity. A NULL
   array with capacity 0 counts.
@@ -385,6 +404,24 @@ recognizes).
 - Before 1.0.0 any minor release may change the API, the ABI and every
   data format. A data format version is bumped whenever its bytes
   change.
+- From 1.0.0, within a major version a library promises:
+  - **source:** a program that builds against 1.y's headers builds
+    against any later 1.z and means the same. Functions, types, enum
+    values and fields are added, never removed or renamed; a field is
+    added only at the end of its struct. Deprecation names the
+    replacement; removal waits for the next major;
+  - **formats:** a 1.z library reads everything an earlier 1.y wrote,
+    keeping a reader for every 1.x version of each format, and writes
+    its own;
+  - **results:** its profile's determinism class holds within a
+    version; results that change between versions (a bug fixed, a hash
+    moved) are a line under Changed or Fixed in the changelog.
+- The ABI is promised within a minor version only: a program built
+  against 1.y runs with any 1.y.w. Shared libraries carry major.minor in
+  their `SOVERSION`, and the CMake package's version check is
+  SameMinorVersion before 1.0 and SameMajorVersion from it (a program
+  found through it builds against the headers found with it). The root
+  def's version refuses a program built against another minor.
 - `CHANGELOG.md` follows Keep a Changelog. Every user-visible change
   adds a line under `[Unreleased]` in the same commit, in the section
   order Added, Changed, Deprecated, Removed, Fixed, Security.

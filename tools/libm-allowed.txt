@@ -1,0 +1,14 @@
+# The <math.h> functions the library may call (mnav-0001): only those
+# exactly rounded, which give the same bits under every C library; any
+# other is refused. Trigonometry is the library's own, in scalar.c.
+ceil
+ceilf
+fabs
+fabsf
+floor
+floorf
+fmin
+fminf
+fmaxf
+sqrt
+sqrtf

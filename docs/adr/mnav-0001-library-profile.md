@@ -21,7 +21,10 @@ must be the same everywhere.
     the API as doubles;
   - only the operations IEEE 754 rounds exactly and `sqrt` come from
     the platform; anything else (cosines, arc tangents) is the
-    library's own;
+    library's own; `tools/libm-allowed.txt` lists the `<math.h>`
+    functions the sources may call, and the source check refuses any
+    other (amended 2026-10-10, after a `hypot` in steering went
+    unnoticed from 0.10.0 to 0.11.1);
   - no result depends on registration or insertion order, hash-table
     iteration, pointer values, thread count or timing; every tie is
     broken by a stable key (a polygon reference, then tile
