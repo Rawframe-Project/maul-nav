@@ -233,7 +233,7 @@ static bool GoodAgent(const mnavAgent* agent)
 // Checks the agents as hostile input and fills the ground grid's keys.
 static mnavResult FillKeys(mnavAvoidance* a, const mnavAgent* agents, int32_t count)
 {
-    a->crowd.space = false;
+    mnavBeginCrowd(&a->crowd, false);
     for (int32_t i = 0; i < count; ++i)
     {
         if (!GoodAgent(&agents[i]))
@@ -330,6 +330,7 @@ mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t 
     {
         velocitiesOut[i] = Solve(avoidance, agents, step, i);
     }
+    mnavEndCrowd(&avoidance->crowd);
     return mnav_success;
 }
 

@@ -19,15 +19,58 @@
 
 // Cells per neighbour range: agents are found in rings of cells round
 // their own, nearest first, and the search stops at a ring that cannot
-// hold a nearer one. On the ground four: a dense crowd's nearest lie a
-// fraction of the range away, and smaller cells stop the search sooner
-// (the benchmark's crowd step takes 19% fewer instructions than with two,
-// the doorway scenario 44% fewer). In space two, as a shell of cubes
-// grows with the cube of its cells: three take 14% fewer instructions in
-// the benchmark's space step but ran 0.4% to 1.5% slower on a quiet core.
+// hold a nearer one, so the cells' size changes the work, never the
+// neighbours found. Small cells cost a probe each, large ones agents
+// looked at and passed over; on the ground the best size holds about
+// three agents in each cell probed (the benchmark's doorway runs fastest
+// with two cells per range, its crowd with four, the doorway scenario
+// with six), so a call whose probes held under two or over six agents
+// each sizes the next call's cells for three, and one between keeps
+// them; at most six per range, as eight took 10% more instructions than
+// six in the doorway scenario's jam. In space two, as a shell of cubes grows with the cube of its
+// cells: three take 14% fewer instructions in the benchmark's space step
+// but ran 0.4% to 1.5% slower on a quiet core.
+#define GROUND_FIRST  4
+#define GROUND_FEWEST 2
+#define GROUND_MOST   6
+#define HELD_LOW      2.0
+#define HELD_AIM      3.0
+#define HELD_HIGH     6.0
+
 static int64_t Divisions(const mnavCrowd* crowd)
 {
-    return crowd->space ? 2 : 4;
+    return crowd->space ? 2 : crowd->divisions;
+}
+
+void mnavBeginCrowd(mnavCrowd* crowd, bool space)
+{
+    crowd->space = space;
+    crowd->divisions = crowd->divisions == 0 ? GROUND_FIRST : crowd->divisions;
+    crowd->probed = 0;
+    crowd->scanned = 0;
+}
+
+void mnavEndCrowd(mnavCrowd* crowd)
+{
+    if (crowd->space || crowd->probed == 0)
+    {
+        return;
+    }
+    double held = (double)crowd->scanned / (double)crowd->probed;
+    if (held >= HELD_LOW && held <= HELD_HIGH)
+    {
+        return;
+    }
+    // Agents per probe fall with the square of the divisions: the most
+    // divisions whose probes would still hold HELD_AIM.
+    double now = (double)crowd->divisions;
+    int32_t next = GROUND_FEWEST;
+    while (next < GROUND_MOST &&
+           held * now * now >= HELD_AIM * (double)(next + 1) * (double)(next + 1))
+    {
+        next += 1;
+    }
+    crowd->divisions = next;
 }
 
 int32_t mnavCrowdTableSize(int32_t agents)
@@ -205,6 +248,8 @@ static void Scan(Search* s, int64_t x, int64_t y, int64_t z0, int64_t z1, bool e
 {
     mnavCrowd* crowd = s->crowd;
     mnavCrowdRun run = RunIn(crowd, x, y);
+    crowd->probed += 1;
+    crowd->scanned += run.end - run.first;
     for (int32_t k = run.first; k < run.end && crowd->keys[k].z <= z1; ++k)
     {
         const mnavCrowdKey* key = &crowd->keys[k];

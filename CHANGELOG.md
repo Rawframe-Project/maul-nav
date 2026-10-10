@@ -15,6 +15,16 @@ format.
 
 ## [Unreleased]
 
+### Changed
+
+- Avoidance on the ground sizes its neighbour cells from the set's
+  last call, a half to a sixth of the neighbour range, so that a cell
+  probed holds about three agents: a sparse crowd searches fewer cells,
+  a jam fewer agents. The velocities are the same; on one core the
+  benchmark's doorway runs about 13% faster than 1.0.0, and the
+  scenarios test, mostly its doorway of 1,000 agents, takes 17% fewer
+  instructions.
+
 ## [1.0.0] - 2026-10-10
 
 The first stable release: what 0.11 does, with the promises above. Every

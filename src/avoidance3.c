@@ -226,7 +226,7 @@ static mnavResult Prepare(mnavAvoidance* avoidance, const mnavAgent3D* agents, i
         }
     }
     mnavCrowd* crowd = &avoidance->crowd;
-    crowd->space = true;
+    mnavBeginCrowd(crowd, true);
     for (int32_t i = 0; i < agentCount; ++i)
     {
         if (!GoodAgent(&agents[i]))

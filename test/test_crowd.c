@@ -98,10 +98,14 @@ static void Scatter(bool space, double extent, bool layers)
     }
 }
 
-static void Compare(bool space, double extent, double range, bool layers)
+// Compares the grid's neighbours with a search of every agent, the ground
+// cells divisions to the range.
+static void Compare(bool space, double extent, double range, bool layers, int32_t divisions)
 {
     Scatter(space, extent, layers);
-    mnavCrowd crowd = {s_keys, s_scratch, s_table, 0, s_neighbors, LIMIT, range, space};
+    mnavCrowd crowd = {s_keys, s_scratch, s_table, 0, s_neighbors, LIMIT, range,
+                       space,  divisions, 0,       0};
+    mnavBeginCrowd(&crowd, space);
     for (int32_t i = 0; i < AGENTS; ++i)
     {
         s_keys[i] = mnavCrowdKeyOf(&crowd, s_positions[i], s_ids[i], i);
@@ -125,15 +129,54 @@ static void Compare(bool space, double extent, double range, bool layers)
     CHECK(mismatches == 0, "the neighbours of a search of every agent");
 }
 
+// The next call's ground cells: kept while the probes held two to six
+// agents each, otherwise sized for three, within two to six per range;
+// space keeps two.
+static void Held(mnavCrowd* crowd, bool space, int64_t probed, int64_t scanned)
+{
+    mnavBeginCrowd(crowd, space);
+    crowd->probed = probed;
+    crowd->scanned = scanned;
+    mnavEndCrowd(crowd);
+}
+
+static void TestDivisions(void)
+{
+    mnavCrowd crowd = {0};
+    mnavBeginCrowd(&crowd, false);
+    CHECK(crowd.divisions == 4, "four cells per range at first");
+    Held(&crowd, false, 1000, 700);
+    CHECK(crowd.divisions == 2, "sparse agents, larger cells");
+    Held(&crowd, false, 1000, 2700);
+    CHECK(crowd.divisions == 2, "within the band, kept");
+    Held(&crowd, false, 1000, 11700);
+    CHECK(crowd.divisions == 3, "dense agents, smaller cells");
+    Held(&crowd, false, 1000, 8800);
+    CHECK(crowd.divisions == 5, "denser still");
+    Held(&crowd, false, 1000, 3300);
+    CHECK(crowd.divisions == 5, "settled");
+    Held(&crowd, false, 10, 100000);
+    CHECK(crowd.divisions == 6, "at most six");
+    Held(&crowd, false, 0, 0);
+    CHECK(crowd.divisions == 6, "nothing probed, unchanged");
+    Held(&crowd, true, 1000, 100);
+    CHECK(crowd.divisions == 6, "space leaves the ground's cells");
+}
+
 int main(void)
 {
     CHECK(mnavCrowdTableSize(AGENTS) <= 2048, "the table fits");
-    Compare(false, 20.0, 3.0, false);
-    Compare(false, 200.0, 10.0, false);
-    Compare(true, 20.0, 3.0, false);
-    Compare(true, 60.0, 10.0, false);
-    Compare(true, 6.0, 1.0, false);
-    Compare(false, 20.0, 3.0, true);
-    Compare(true, 20.0, 3.0, true);
+    // Every ground division the cells may take finds the same neighbours.
+    for (int32_t d = 2; d <= 6; ++d)
+    {
+        Compare(false, 20.0, 3.0, false, d);
+        Compare(false, 200.0, 10.0, false, d);
+        Compare(false, 20.0, 3.0, true, d);
+    }
+    Compare(true, 20.0, 3.0, false, 0);
+    Compare(true, 60.0, 10.0, false, 0);
+    Compare(true, 6.0, 1.0, false, 0);
+    Compare(true, 20.0, 3.0, true, 0);
+    TestDivisions();
     return s_failures == 0 ? 0 : 1;
 }

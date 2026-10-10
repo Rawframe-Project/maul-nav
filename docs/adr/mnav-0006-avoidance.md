@@ -24,11 +24,18 @@ symmetry face to face.
   priority, the host's id) and a step, and writes each agent's new
   velocity: the 2D linear program over its ORCA lines, the 3D one when
   they leave nothing. Lines count as parallel within 1e-9.
-- **Order:** neighbours come from a grid of cells a quarter of the
-  neighbour range wide on the ground and half of it in space (amended
-  2026-10-10: on the ground the doorway scenario of 1,000 agents took
-  44% fewer instructions with quarters, the crowd step 19%; shells of
-  cubes grow with the cube of their cells), sorted by cell, then id, each occupied cell found through
+- **Order:** neighbours come from a grid of cells, sorted by cell, then
+  id. In space the cells are half the neighbour range wide (shells of
+  cubes grow with the cube of their cells). On the ground they are a
+  half to a sixth of it, chosen from the set's last call: a call whose
+  probed cells held under two or over six agents each sizes the next
+  call's cells for three, one between keeps them, and the first call
+  uses a quarter. The size changes the work, never the neighbours
+  (amended 2026-10-10 twice: quarters first, as the doorway scenario
+  took 44% fewer instructions with them than halves; then sized from
+  the last call, as on a quiet core the benchmark's doorway ran fastest
+  with halves, its crowd with quarters and the doorway scenario with
+  sixths). Each occupied cell is found through
   a hash table built once a step; an agent searches the rings of cells
   round its own, nearest first, and stops at a ring that cannot hold a
   neighbour nearer than the worst it keeps. It keeps the nearest by
