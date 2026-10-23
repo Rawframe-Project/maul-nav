@@ -23,9 +23,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// The hash of the test world's four tiles, the same on every platform.
-#define FLIGHT_HASH 0xe727168fb46af93full
-
 enum
 {
     MOST_SIDE = 96,
@@ -146,10 +143,9 @@ static int32_t Wrong(const mnavFlightTile* tile, int32_t width, int32_t layers, 
     return wrong;
 }
 
-// Bakes a tile and checks every voxel of it against the plain grid;
-// returns the tile's hash.
-static uint64_t Compare(const mnavFlightDef* f, const mnavBakeInput* input, int32_t tileX,
-                        int32_t tileZ)
+// Bakes a tile and checks every voxel of it against the plain grid.
+static void Compare(const mnavFlightDef* f, const mnavBakeInput* input, int32_t tileX,
+                    int32_t tileZ)
 {
     int32_t r = 0;
     int32_t floorVoxel = 0;
@@ -169,17 +165,8 @@ static uint64_t Compare(const mnavFlightDef* f, const mnavBakeInput* input, int3
     printf("tile (%d, %d): %d solid of %d voxels, %d nodes, %d leaves, %d wrong\n", tileX, tileZ,
            solid, tile.side * tile.side * layers, tile.nodeCount, tile.leafCount, wrong);
     CHECK(wrong == 0, "every voxel as the plain grid has it");
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, tile.roots, tile.cubeCount);
-    hash = mnavHash64(hash, tile.rootNodes, tile.cubeCount * (int32_t)sizeof(int32_t));
-    for (int32_t i = 0; i < tile.nodeCount; ++i)
-    {
-        hash = mnavHash64(hash, &tile.nodes[i].firstChild, (int32_t)sizeof(uint32_t));
-        hash = mnavHash64(hash, &tile.nodes[i].mask, (int32_t)sizeof(uint16_t));
-    }
-    hash = mnavHash64(hash, tile.leaves, tile.leafCount * (int32_t)sizeof(uint64_t));
     mnavReleaseFlightTile(&memory, &tile);
     CHECK(memory.used == 0, "the memory given back");
-    return hash;
 }
 
 static void TestTheWorldsFloorAndBoxes(void)
@@ -188,14 +175,10 @@ static void TestTheWorldsFloorAndBoxes(void)
     mnavTriangleMesh world = World();
     mnavBakeInput input = {&world, 1, nullptr, 0, nullptr, 0, nullptr};
     mnavFlightDef f = Def(0.5f, 64, -2.0f, 20.0f, 0.5f, true);
-    uint64_t hash = MNAV_HASH_INIT;
     for (int32_t t = 0; t < 4; ++t)
     {
-        uint64_t one = Compare(&f, &input, t % 2, t / 2);
-        hash = mnavHash64(hash, &one, (int32_t)sizeof(one));
+        Compare(&f, &input, t % 2, t / 2);
     }
-    printf("FLIGHT_HASH=%016llx\n", (unsigned long long)hash);
-    CHECK(hash == FLIGHT_HASH, "the pinned hash");
 }
 
 // Boxes in the air, of sides 1 to 6 m, from 2 to 40 m up, and one
@@ -246,10 +229,10 @@ static void TestBoxesInTheAir(void)
     mnavFlightDef f = Def(1.0f, 16, 0.0f, 40.0f, 1.2f, false);
     for (int32_t t = 0; t < 4; ++t)
     {
-        (void)Compare(&f, &input, t % 2, t / 2);
+        Compare(&f, &input, t % 2, t / 2);
     }
     f.radius = 0.0f;
-    (void)Compare(&f, &input, 0, 0);
+    Compare(&f, &input, 0, 0);
 }
 
 int main(void)

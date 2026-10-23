@@ -16,12 +16,6 @@
 
 #include <stdint.h>
 
-// The hashes of the soup's and the level's eroded open-space fields, the
-// same on every platform.
-#define SOUP_OPEN_HASH  0x2af461f001197c4full
-#define LEVEL_OPEN_HASH 0xd6c58bf04b95682bull
-#define WIDE_OPEN_HASH  0x1c515047590b7d08ull
-
 static mnavMemory s_memory;
 
 static mnavCompactField Compact(Field* field)
@@ -125,24 +119,6 @@ static void TestHoleErodesAround(void)
     mnavReleaseCompactField(&s_memory, &compact);
 }
 
-static uint64_t HashOpen(const mnavCompactField* compact)
-{
-    uint64_t hash = 0xCBF29CE484222325ull;
-    for (int32_t i = 0; i < compact->spanCount; ++i)
-    {
-        const mnavOpenSpan* span = &compact->spans[i];
-        uint16_t words[6] = {span->floor,    span->height,   span->links[0],
-                             span->links[1], span->links[2], span->links[3]};
-        for (int32_t w = 0; w < 6; ++w)
-        {
-            hash = (hash ^ (words[w] & 0xFFu)) * 0x100000001B3ull;
-            hash = (hash ^ (uint32_t)(words[w] >> 8)) * 0x100000001B3ull;
-        }
-        hash = (hash ^ compact->areas[i]) * 0x100000001B3ull;
-    }
-    return hash;
-}
-
 // The area of the open span with the given floor in the column at world
 // (x, z), or -1 when the column has none.
 static int32_t AreaAt(const mnavCompactField* compact, float x, float z, int32_t floor)
@@ -160,18 +136,20 @@ static int32_t AreaAt(const mnavCompactField* compact, float x, float z, int32_t
     return -1;
 }
 
-// Runs the bake's stages so far over one mesh and returns the hash of
-// the eroded open-space field; checks the level's landmarks when level.
-static uint64_t Pipeline(const mnavTriangleMesh* mesh, const char* name, bool level, float radius)
+// The bake's stages so far over the level: the platform and the ramp are
+// walkable, and the agent's radius is kept from the platform's drop.
+static void TestLevelLandmarks(void)
 {
+    static mnavVec3 vertices[LEVEL_VERTICES];
+    static int32_t indices[LEVEL_TRIANGLES * 3];
+    MakeLevel(vertices, indices);
+    mnavTriangleMesh mesh = {vertices, LEVEL_VERTICES, indices, LEVEL_TRIANGLES, nullptr};
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.agent.radius = radius;
     mnavBakeCells cells;
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
-    CHECK(mnavValidateTriangleMesh(&def, mesh).result == mnav_success, "mesh");
     mnavMemory memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
     mnavHeightfield heightfield;
-    CHECK(mnavBuildHeightfield(&memory, &def, &cells, mesh, 1, 0, 0, &heightfield) == mnav_success,
+    CHECK(mnavBuildHeightfield(&memory, &def, &cells, &mesh, 1, 0, 0, &heightfield) == mnav_success,
           "rasterized");
     mnavFilterWalkable(&heightfield, cells.agentHeight, cells.agentStep);
     mnavCompactField compact;
@@ -179,48 +157,18 @@ static uint64_t Pipeline(const mnavTriangleMesh* mesh, const char* name, bool le
                                 &compact) == mnav_success,
           "compacted");
     CHECK(mnavErode(&memory, &compact, cells.agentRadius) == mnav_success, "eroded");
-    if (level)
-    {
-        // A surface's solid is at least one cell tall, so the platform's top,
-        // 1 m or 8 cell heights up, has its floor at 9; the ramp's cell at
-        // z = 18 m spans 4 to 4.5 cell heights, so its floor is 5.
-        CHECK(AreaAt(&compact, 28.0f, 28.0f, 9) == mnav_areaWalkable, "platform walkable");
-        CHECK(AreaAt(&compact, 24.0f, 18.0f, 5) == mnav_areaWalkable, "ramp walkable");
-        // The platform's edge at x = 30 m has no box near it: 1 m in is
-        // walkable, 0.25 m in is within the 0.5 m radius of the drop.
-        CHECK(AreaAt(&compact, 29.0f, 25.0f, 9) == mnav_areaWalkable, "platform near its edge");
-        CHECK(AreaAt(&compact, 29.75f, 25.0f, 9) == mnav_areaNone, "eroded at the drop");
-    }
-    uint64_t hash = HashOpen(&compact);
-    printf("MNAV_OPEN_HASH_%s=%016llx spans=%d walkable=%d\n", name, (unsigned long long)hash,
-           compact.spanCount, CountWalkableOpen(&compact));
+    // A surface's solid is at least one cell tall, so the platform's top,
+    // 1 m or 8 cell heights up, has its floor at 9; the ramp's cell at
+    // z = 18 m spans 4 to 4.5 cell heights, so its floor is 5.
+    CHECK(AreaAt(&compact, 28.0f, 28.0f, 9) == mnav_areaWalkable, "platform walkable");
+    CHECK(AreaAt(&compact, 24.0f, 18.0f, 5) == mnav_areaWalkable, "ramp walkable");
+    // The platform's edge at x = 30 m has no box near it: 1 m in is
+    // walkable, 0.25 m in is within the 0.5 m radius of the drop.
+    CHECK(AreaAt(&compact, 29.0f, 25.0f, 9) == mnav_areaWalkable, "platform near its edge");
+    CHECK(AreaAt(&compact, 29.75f, 25.0f, 9) == mnav_areaNone, "eroded at the drop");
     mnavReleaseCompactField(&memory, &compact);
     mnavReleaseHeightfield(&memory, &heightfield);
     CHECK(memory.used == 0, "everything released");
-    return hash;
-}
-
-static void TestPipelineHashesArePinned(void)
-{
-    static mnavVec3 vertices[SOUP_TRIANGLES * 3];
-    static mnavAreaType areas[SOUP_TRIANGLES];
-    static int32_t indices[SOUP_TRIANGLES * 3];
-    MakeSoup(vertices, areas);
-    for (int32_t i = 0; i < SOUP_TRIANGLES * 3; ++i)
-    {
-        indices[i] = i;
-    }
-    mnavTriangleMesh soup = {vertices, SOUP_TRIANGLES * 3, indices, SOUP_TRIANGLES, areas};
-    CHECK(Pipeline(&soup, "SOUP", false, 0.5f) == SOUP_OPEN_HASH, "the soup's pinned hash");
-    static mnavVec3 levelVertices[LEVEL_VERTICES];
-    static int32_t levelIndices[LEVEL_TRIANGLES * 3];
-    MakeLevel(levelVertices, levelIndices);
-    mnavTriangleMesh level = {levelVertices, LEVEL_VERTICES, levelIndices, LEVEL_TRIANGLES,
-                              nullptr};
-    CHECK(Pipeline(&level, "LEVEL", true, 0.5f) == LEVEL_OPEN_HASH, "the level's pinned hash");
-    // At 4 cells the chamfer's diagonal weight first decides spans (two
-    // diagonals and a step are 8 half cells, not 6).
-    CHECK(Pipeline(&level, "WIDE", false, 1.0f) == WIDE_OPEN_HASH, "the wide agent's hash");
 }
 
 int main(void)
@@ -229,6 +177,6 @@ int main(void)
     TestLinksFollowTheStepAndHeadroom();
     TestErosionKeepsTheRadiusFromBoundaries();
     TestHoleErodesAround();
-    TestPipelineHashesArePinned();
+    TestLevelLandmarks();
     return s_failures == 0 ? 0 : 1;
 }

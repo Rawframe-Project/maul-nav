@@ -8,6 +8,8 @@
 // group led by a flow field through a gap, steered apart by avoidance,
 // and a crowd of 1,000 through a doorway on a navmesh, each agent
 // following its corridor, avoiding the others and the walls near it.
+// The crowd is a large scene: it runs alone, given --doorway, as the
+// nightly-labeled test doorway.
 
 #include "test_harness.h"
 
@@ -785,16 +787,22 @@ static void TestDoorway(mnavQuery* query)
     mnavDestroyNavmesh(navmesh);
 }
 
-int main(void)
+int main(int argc, char** argv)
 {
     mnavQueryDef def = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&def, &query) == mnav_success, "query");
-    TestBuilding(query);
-    TestCollapsingBridge(query);
-    TestStreamedTerrain(query);
-    TestGroup();
-    TestDoorway(query);
+    if (argc > 1 && strcmp(argv[1], "--doorway") == 0)
+    {
+        TestDoorway(query);
+    }
+    else
+    {
+        TestBuilding(query);
+        TestCollapsingBridge(query);
+        TestStreamedTerrain(query);
+        TestGroup();
+    }
     mnavDestroyQuery(query);
     return s_failures == 0 ? 0 : 1;
 }

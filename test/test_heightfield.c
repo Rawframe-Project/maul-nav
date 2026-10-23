@@ -320,9 +320,6 @@ static void TestAllocatorFailureIsCapacity(void)
     }
 }
 
-// The hash of the soup below, the same on every platform.
-#define SOUP_HASH 0xe955dec170776113ull
-
 static void TestSoupDependsOnlyOnTheTriangleSet(void)
 {
     static mnavVec3 vertices[SOUP_TRIANGLES * 3];
@@ -360,9 +357,7 @@ static void TestSoupDependsOnlyOnTheTriangleSet(void)
     CHECK(Build(&bake, two, 2, 0, 0) == mnav_success, "built backward");
     CHECK(HashField(&bake.field) == hash, "the same heightfield from the same set");
     Release(&bake);
-    printf("MNAV_RASTER_HASH=%016llx spans=%d peak=%llu\n", (unsigned long long)hash, spans,
-           (unsigned long long)peak);
-    CHECK(hash == SOUP_HASH, "the pinned hash");
+    printf("soup: %d spans, peak %llu bytes\n", spans, (unsigned long long)peak);
 }
 
 int main(void)

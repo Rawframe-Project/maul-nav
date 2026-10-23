@@ -237,7 +237,7 @@ static void TestPolygonsInBoxes(void)
 
 int main(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     TestPointOnTheFloor();
     TestPointInsideAnObstacle();
     TestNothingInTheBox();

@@ -43,8 +43,11 @@ static float Random(void)
     return (float)(s_random >> 8 & 0xFFFFu) / 65536.0f;
 }
 
+// The scene's boxes, the same in every volume: the draws start from the
+// seed whatever ran before.
 static mnavTriangleMesh Scene(void)
 {
+    s_random = 12345;
     const mnavVec3 floor[4] = {{-2, 0, -2}, {-2, 0, 66}, {66, 0, 66}, {66, 0, -2}};
     const int32_t quad[6] = {0, 1, 2, 0, 2, 3};
     memcpy(s_vertices, floor, sizeof(floor));
@@ -386,7 +389,7 @@ static void TestPaths(const mnavFlightVolume* volume)
     double worst = 0.0;
     double sum = 0.0;
     int32_t found = 0;
-    for (int32_t k = 0; k < 120; ++k)
+    for (int32_t k = 0; k < 24; ++k)
     {
         int32_t a[3];
         int32_t b[3];

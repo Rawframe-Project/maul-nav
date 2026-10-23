@@ -445,7 +445,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     static bool baked = false;
     if (!baked)
     {
-        BakeWorld();
+        LoadWorldTiles();
         baked = true;
     }
     Reader r = {data, size, 0};

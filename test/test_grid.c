@@ -298,7 +298,7 @@ static void TestJumpsMatchAStar(void)
 static void TestEndsASlicedSearch(void)
 {
     // A grid search in a context ends the navmesh search sliced in it.
-    BakeWorld();
+    LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&

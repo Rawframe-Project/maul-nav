@@ -91,13 +91,17 @@ static void TestBakes(void)
     }
     size_t held = s_held;
     int32_t refused = 0;
+    int32_t failed = 0;
     bool reported = true;
     bool restored = true;
-    for (int32_t t = 0; t < 4; ++t)
+    // Tile 0 holds the floor's corner, a box and a tile side: every stage
+    // allocates for it.
+    for (int32_t t = 0; t < 1; ++t)
     {
         FailAfter(-1);
         CHECK(mnavBakeTileInput(baker, &input, t % 2, t / 2, nullptr) == mnav_success, "counted");
         int32_t calls = s_calls;
+        failed += calls;
         for (int32_t k = 0; k < calls; ++k)
         {
             FailAfter(k);
@@ -116,7 +120,8 @@ static void TestBakes(void)
         }
     }
     printf("bakes: %d allocation failures refused\n", refused);
-    CHECK(refused > 100 && reported, "every failure a capacity error, in the report too");
+    CHECK(refused == failed && refused > 50 && reported,
+          "every failure a capacity error, in the report too");
     CHECK(restored && s_held >= held, "the baker bakes the same bytes after each");
     // The 2D bake's paths too.
     const mnavVec2 square[4] = {{1, 1}, {31, 1}, {31, 31}, {1, 31}};

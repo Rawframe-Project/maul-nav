@@ -28,7 +28,7 @@ static uint32_t s_lines[4096];
 
 static mnavNavmesh* Load(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tier = mnav_tierModifiers;
     mnavNavmesh* navmesh = nullptr;

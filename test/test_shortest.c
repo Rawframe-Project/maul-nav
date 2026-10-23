@@ -590,7 +590,7 @@ static void TestTheWorldBesideTheAStarSearch(void)
 
 int main(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     TestTurnsAtTheCorner();
     TestEndsOnTheStartOrTheCorner();
     TestTurnsAtATileBorder();

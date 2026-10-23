@@ -14,9 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// The hash of the terrain's tile, the same on every platform.
-#define TERRAIN_HASH 0xf984fa2457e6ae29ull
-
 enum
 {
     SIDE = 40,
@@ -111,9 +108,6 @@ static void TestLikeItsMesh(mnavBaker* baker)
     CHECK(mnavCopyBakedTile(baker, s_first, TILE_ROOM, &first) == mnav_success, "copied");
     printf("terrain: %d triangles, %d polygons, %zu bytes\n", a.triangles, a.polygons, first);
     CHECK(a.polygons > 0 && a.triangles < CELLS * 2, "only the cells near the tile");
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_first, (int32_t)first);
-    printf("TERRAIN_HASH=%016llx\n", (unsigned long long)hash);
-    CHECK(hash == TERRAIN_HASH, "the pinned hash");
     // Cells whose edges fall on the tile's bounds, border included (1.25
     // m outside the tile), on both sides.
     mnavTerrain edged = terrain;

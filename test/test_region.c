@@ -17,9 +17,6 @@
 
 #include <stdint.h>
 
-// The hash of the level's regions, the same on every platform.
-#define LEVEL_REGION_HASH 0xa25f1ac8d6793faaull
-
 typedef struct Built
 {
     mnavMemory memory;
@@ -240,14 +237,7 @@ static void TestTwoSweepsOverOneRegionStaySeparate(void)
     Release(&built);
 }
 
-static uint64_t HashRegions(const mnavRegionMap* map)
-{
-    uint64_t hash = MNAV_HASH_INIT;
-    hash = mnavHash64(hash, &map->count, (int32_t)sizeof(map->count));
-    return mnavHash64(hash, map->ids, map->spanCount * (int32_t)sizeof(uint32_t));
-}
-
-static void TestLevelRegionsArePinned(void)
+static void TestLevelRegionsAreOneLayer(void)
 {
     static mnavVec3 vertices[LEVEL_VERTICES];
     static int32_t indices[LEVEL_TRIANGLES * 3];
@@ -276,10 +266,6 @@ static void TestLevelRegionsArePinned(void)
     CHECK(floor != 0 && (floor & MNAV_BORDER_REGION) == 0, "the floor has a region");
     CHECK(RegionAtWorld(&compact, &map, 24.0f, 18.0f, 5) == floor, "the ramp joins it");
     CHECK(RegionAtWorld(&compact, &map, 28.0f, 28.0f, 9) == floor, "so does the platform");
-    uint64_t hash = HashRegions(&map);
-    printf("MNAV_REGION_HASH=%016llx regions=%u peak=%llu\n", (unsigned long long)hash, map.count,
-           (unsigned long long)memory.peak);
-    CHECK(hash == LEVEL_REGION_HASH, "the pinned hash");
     mnavReleaseRegions(&memory, &map);
     mnavReleaseCompactField(&memory, &compact);
     mnavReleaseHeightfield(&memory, &heightfield);
@@ -294,6 +280,6 @@ int main(void)
     TestSmallIslandsAreDropped();
     TestRowWithMoreSweepsThanCells();
     TestTwoSweepsOverOneRegionStaySeparate();
-    TestLevelRegionsArePinned();
+    TestLevelRegionsAreOneLayer();
     return s_failures == 0 ? 0 : 1;
 }

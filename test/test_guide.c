@@ -264,7 +264,7 @@ static void GuideCrowd(void)
 
 int main(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     GuideBake();
     GuideNavmesh();
     GuideQueryAndCorridor();

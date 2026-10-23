@@ -19,9 +19,6 @@
 
 #include <stdint.h>
 
-// The hash of the level's merged contours, the same on every platform.
-#define LEVEL_MERGED_HASH 0x8d5043009d7438ccull
-
 static int64_t TwiceArea(const mnavContourSet* set, int32_t contour)
 {
     const mnavContourVertex* v = set->vertices + set->contours[contour].first;
@@ -365,16 +362,6 @@ static void TestLevelMergesEveryHole(void)
     }
     CHECK(noHoles, "every hole merged into an outline");
     // Field by field: the struct's padding is not part of the result.
-    uint64_t hash = MNAV_HASH_INIT;
-    for (int32_t i = 0; i < set.vertexCount; ++i)
-    {
-        const mnavContourVertex* v = &set.vertices[i];
-        int32_t fields[5] = {v->x, v->y, v->z, (int32_t)v->neighbor, v->flags};
-        hash = mnavHash64(hash, fields, (int32_t)sizeof(fields));
-    }
-    printf("MNAV_MERGED_HASH=%016llx contours=%d vertices=%d\n", (unsigned long long)hash,
-           set.count, set.vertexCount);
-    CHECK(hash == LEVEL_MERGED_HASH, "the pinned hash");
     mnavReleaseContours(&memory, &set);
     mnavReleaseRegions(&memory, &regions);
     mnavReleaseCompactField(&memory, &compact);

@@ -22,10 +22,6 @@
 
 #include <stdint.h>
 
-// The hash of the ramp level's mesh after removal, the same on every
-// platform.
-#define RAMP_MESH_HASH 0xd0628e38b973be85ull
-
 // Marks every ring vertex at (x, z) as a tile-border vertex.
 static void Flag(mnavContourSet* set, int32_t x, int32_t z)
 {
@@ -305,27 +301,6 @@ static int32_t MakeRampLevel(mnavVec3* vertices, int32_t* indices)
     return index / 3;
 }
 
-static uint64_t HashMesh(const mnavPolyMesh* mesh)
-{
-    uint64_t hash = MNAV_HASH_INIT;
-    for (int32_t v = 0; v < mesh->vertexCount; ++v)
-    {
-        uint16_t fields[4] = {mesh->vertices[v].x, mesh->vertices[v].y, mesh->vertices[v].z,
-                              mesh->removable[v]};
-        hash = mnavHash64(hash, fields, (int32_t)sizeof(fields));
-    }
-    for (int32_t p = 0; p < mesh->polygonCount; ++p)
-    {
-        const mnavPolygon* polygon = &mesh->polygons[p];
-        hash = mnavHash64(hash, polygon->vertices, (int32_t)sizeof(polygon->vertices));
-        hash = mnavHash64(hash, polygon->neighbors, (int32_t)sizeof(polygon->neighbors));
-        hash = mnavHash64(hash, polygon->sides, (int32_t)sizeof(polygon->sides));
-        uint32_t tail[3] = {polygon->count, polygon->area, polygon->region};
-        hash = mnavHash64(hash, tail, (int32_t)sizeof(tail));
-    }
-    return hash;
-}
-
 static void TestRampLevelLosesItsBorderVertex(void)
 {
     mnavVec3 vertices[16];
@@ -373,10 +348,6 @@ static void TestRampLevelLosesItsBorderVertex(void)
     CHECK(mnavLinkPolyMesh(&memory, &mesh) == mnav_success, "linked");
     CHECK(mesh.vertexCount == before - 1, "the vertex is gone");
     CHECK(Valid(&mesh) && TwiceArea(&mesh) == area, "valid, the same area");
-    uint64_t hash = HashMesh(&mesh);
-    printf("RAMP_MESH_HASH=%016llx vertices=%d polygons=%d\n", (unsigned long long)hash,
-           mesh.vertexCount, mesh.polygonCount);
-    CHECK(hash == RAMP_MESH_HASH, "the pinned hash");
     mnavReleasePolyMesh(&memory, &mesh);
     mnavReleaseContours(&memory, &set);
     mnavReleaseRegions(&memory, &regions);

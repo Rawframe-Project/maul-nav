@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Tiles 1.0.0 wrote, loaded by this version: every
-// 1.x reads tile format 1 and flight tile format 1. The tiles load, commit
-// and answer queries; the answers are pinned, and move only with a line
-// under Changed or Fixed, as any result does. A failure to load is never
-// fixed by rebaking the stored tiles.
+// The stored tiles of tile format 1 and flight tile format 1, loaded by
+// this version: they load, commit and answer queries, and the answers are
+// pinned, moving only with a change of results the changelog names. A
+// failure to load is never fixed by rebaking the stored tiles.
 
-#include "stored_1_0_0.h"
+#include "stored_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -116,7 +115,7 @@ static void TestGround(void)
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavStageTile(navmesh, s_grounds[t], s_groundSizes[t]).result == mnav_success,
-              "a ground tile of 1.0.0 staged");
+              "a stored ground tile staged");
     }
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     uint64_t hash = Path(navmesh, (mnavPos3){2.0, 0.0, 2.0}, (mnavPos3){62.0, 0.0, 62.0});
@@ -131,7 +130,7 @@ static void TestTerrain(void)
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
     CHECK(mnavStageTile(navmesh, s_terrain, sizeof(s_terrain)).result == mnav_success,
-          "the terrain tile of 1.0.0 staged");
+          "the stored terrain tile staged");
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     // Up the slope, round the plateau.
     uint64_t hash = Path(navmesh, (mnavPos3){1.0, 1.5, 12.0}, (mnavPos3){30.0, 5.0, 12.0});
@@ -157,7 +156,7 @@ static void TestFlight(void)
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavStageFlightTile(volume, s_flights[t], s_flightSizes[t]).result == mnav_success,
-              "a flight tile of 1.0.0 staged");
+              "a stored flight tile staged");
     }
     CHECK(mnavCommitFlight(volume) == mnav_success, "committed");
     mnavQueryDef queryDef = mnavDefaultQueryDef();

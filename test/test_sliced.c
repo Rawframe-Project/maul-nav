@@ -238,7 +238,7 @@ static void TestTheFilterIsTheSearchsOwn(void)
 
 int main(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     TestSlicesChangeNothing();
     TestCommitsMakeSearchesStale();
     TestFinishingEarly();
