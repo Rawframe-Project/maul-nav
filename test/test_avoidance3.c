@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Avoidance in space (mnav-0006): fliers steering round each other and
+// Avoidance in space: fliers steering round each other and
 // round spheres by ORCA, in any order, by priority, by layers, within the
 // set's limits.
 

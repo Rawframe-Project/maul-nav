@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The path search: A* over portals, with named limits (mnav-0005).
+// The path search: A* over portals, with named limits.
 
 #include "allocator.h"
 #include "funnel.h"
@@ -371,7 +371,7 @@ static bool Nearer(const mnavQuery* query, int32_t a, int32_t b)
 }
 
 // The heuristic's scale: the cheapest included area's cost, or less for
-// a kind of link the filter crosses that costs less per meter (mnav-0005).
+// a kind of link the filter crosses that costs less per meter.
 double mnavHeuristicScale(const mnavNavmesh* navmesh, const mnavQueryFilter* filter)
 {
     double scale = mnavCheapest(filter);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Hierarchical paths (mnav-0008): the start and end joined to their
+// Hierarchical paths: the start and end joined to their
 // clusters' transitions, A* over the transitions, and a refinement step
 // by step, each step confined to one cluster.
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Maul Nav's side of the differential harness (mnav-0011).
+// Maul Nav's side of the differential harness.
 
 #include "diff.h"
 

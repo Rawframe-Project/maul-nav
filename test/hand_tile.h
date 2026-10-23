@@ -135,7 +135,7 @@ static inline size_t HandTileBytesWith(uint8_t* out, int32_t place, const HandSq
     mnavDetailMesh detail = {parts,     count,     detailVertices,   count * 4, HAND_SQUARES * 4,
                              triangles, count * 2, HAND_SQUARES * 2, 0,         0,
                              0};
-    mnavTileInfo info = {mnavGetVersion(),
+    mnavTileInfo info = {MNAV_BAKE_GENERATOR,
                          0,
                          place,
                          0,

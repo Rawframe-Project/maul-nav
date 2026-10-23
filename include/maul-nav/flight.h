@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Flight volumes (mnav-0015): where agents that fly or swim may go, baked
+// Flight volumes: where agents that fly or swim may go, baked
 // per tile from the navmesh bake's input into a compact sparse voxel
 // octree, loaded from bytes, staged and committed together as navmesh
 // tiles are.
@@ -26,6 +26,11 @@ extern "C"
 
 // The flight tile format's version, written into every flight tile.
 #define MNAV_FLIGHT_FORMAT 1
+
+// The flight bake's generation, written into every flight tile and hashed
+// into its fingerprint: it rises with any change to the library that gives
+// other flight tile bytes for the same def and input, and only then.
+#define MNAV_FLIGHT_GENERATOR 1
 
 // The range of a flight tile's side, in voxels: 4 times a power of 2.
 #define MNAV_MIN_FLIGHT_TILE_VOXELS 16
@@ -144,7 +149,7 @@ extern "C"
         uint64_t memoryPeak;
     } mnavFlightBakeReport;
 
-    // A flight path search's result (mnav-0015). Short of the end point,
+    // A flight path search's result. Short of the end point,
     // the path runs to the point searched nearest it.
     typedef struct mnavFlightPath
     {
@@ -228,7 +233,7 @@ extern "C"
     /// @param def  The def.
     /// @return `mnav_success`; `mnav_errorInvalid` with the first setting
     /// refused, or for a NULL def; `mnav_errorVersion` with no setting for
-    /// a def built against another major or minor version.
+    /// a def built against another version of the headers.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavFlightDefResult mnavValidateFlightDef(const mnavFlightDef* def);
@@ -240,7 +245,7 @@ extern "C"
     /// @param bakerOut  Receives the baker, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` with the setting for an
     /// invalid def or a NULL argument; `mnav_errorVersion` for a def built
-    /// against another major or minor version; `mnav_errorLimit` when the baker
+    /// against another version of the headers; `mnav_errorLimit` when the baker
     /// does not fit the def's memory limit; `mnav_errorCapacity` when the
     /// allocator fails.
     /// @par Thread safety
@@ -255,8 +260,8 @@ extern "C"
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_API void mnavDestroyFlightBaker(mnavFlightBaker* baker);
 
-    /// Bakes one flight tile from the input a navmesh bake reads
-    /// (mnav-0015): every triangle is rasterized at the voxel size, and a
+    /// Bakes one flight tile from the input a navmesh bake reads:
+    /// every triangle is rasterized at the voxel size, and a
     /// voxel any triangle touches is solid; with groundBelow, so is each
     /// column below its lowest solid voxel; then every voxel within the
     /// flier's radius of a solid one, by whole voxels, is blocked too. A
@@ -305,7 +310,7 @@ extern "C"
     /// @param volumeOut  Receives the volume, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` with the setting for an
     /// invalid def or a NULL argument; `mnav_errorVersion` for a def built
-    /// against another major or minor version; `mnav_errorLimit` when the
+    /// against another version of the headers; `mnav_errorLimit` when the
     /// volume does not fit the def's memory limit; `mnav_errorCapacity` when
     /// the allocator fails.
     /// @par Thread safety
@@ -403,7 +408,7 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavIsFlightOpen(const mnavFlightVolume* volume,
                                                         mnavPos3 point, bool* openOut);
 
-    /// Finds a flier's path between two points (mnav-0015): Lazy Theta*
+    /// Finds a flier's path between two points: Lazy Theta*
     /// (Nash, Koenig and Tovey, 2010) over the open blocks of the
     /// committed tiles, linked through shared faces, each block entered at
     /// the point of its face nearest the point the path comes from. A

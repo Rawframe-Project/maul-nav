@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The LZ coder of the tile cache (mnav-0016): bytes coded and decoded
+// The LZ coder of the tile cache: bytes coded and decoded
 // come back the same, at lengths past each count's first byte and
 // offsets at the window's end; codings cut, padded or bent are refused
 // without reading or writing out of range. Packed fields whose planes

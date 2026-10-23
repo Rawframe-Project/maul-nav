@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Runtime tiers (mnav-0004): reading the tier, and changing polygons'
+// Runtime tiers: reading the tier, and changing polygons'
 // areas through the commit.
 
 #include "modifiers.h"

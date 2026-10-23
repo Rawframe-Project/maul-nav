@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Link generation (mnav-0009): drops off a platform, jumps across a gap,
+// Link generation: drops off a platform, jumps across a gap,
 // none past a pillar one walks round, the clearance test, the buffer, and
 // a path through the links staged.
 

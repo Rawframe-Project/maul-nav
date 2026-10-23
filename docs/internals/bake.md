@@ -37,7 +37,7 @@ A stage that cannot finish a piece of work it can do without (a hole no bridge r
 
 ## The tile format
 
-Little-endian, the same bytes on every platform. A 104-byte header holds the magic `MNAV`, the format version `MNAV_TILE_FORMAT`, the header size, the generator version, flags, the fingerprint, the payload's hash and size, the tile's grid place, its side in cells, the cell size and height as binary32 bits, the agent in cells, the origin as binary64 bits, and the counts. The payload is integers only: vertices in cells, polygons of three to six vertices with their area, the neighbor across each edge or the tile side it lies on, detail counts per polygon, detail vertices in sixteenths of a cell, and detail triangles. Nothing that can be derived from the rest is stored, so there is nothing to disagree with it.
+Little-endian, the same bytes on every platform. A 104-byte header holds the magic `MNAV`, the format version `MNAV_TILE_FORMAT`, the header size, the bake's generation and three reserved words, the fingerprint, the payload's hash and size, the tile's grid place, its side in cells, the cell size and height as binary32 bits, the agent in cells, the origin as binary64 bits, and the counts. The payload is integers only: vertices in cells, polygons of three to six vertices with their area, the neighbor across each edge or the tile side it lies on, detail counts per polygon, detail vertices in sixteenths of a cell, and detail triangles. Nothing that can be derived from the rest is stored, so there is nothing to disagree with it.
 
 Loading (`mnavDecodeTile` in `tile.c`) reads every field as hostile: counts against the def's limits and against the bytes present before anything is allocated, the payload's hash, and the mesh itself (convex polygons, walkable areas, neighbors that lead back along the same edge, unlinked edges on the tile's sides, detail indices within their polygon). A malformed tile is `mnav_errorInvalid` naming the section and element; another format version is `mnav_errorVersion`. The hash catches damage, not tampering: a host that needs authenticity signs the bytes.
 
@@ -45,7 +45,9 @@ A new field or section is a new format version, and the loader keeps reading the
 
 ## The fingerprint
 
-A 64-bit hash (`fingerprint.c`) of the generator's version, the def's settings that shape the output, the tile's place, and every input triangle that reaches the tile as rasterization picks it (its vertices' bits and its area), in input order, and of the volumes that reach it. It is written into the tile. Geometry far from a tile leaves its fingerprint alone, so a host skips rebaking tiles whose fingerprint did not change.
+A 64-bit hash (`fingerprint.c`) of the bake's generation, the def's settings that shape the output, the tile's place, and every input triangle that reaches the tile as rasterization picks it (its vertices' bits and its area), in input order, and of the volumes that reach it. It is written into the tile. Geometry far from a tile leaves its fingerprint alone, so a host skips rebaking tiles whose fingerprint did not change.
+
+The generation is `MNAV_BAKE_GENERATOR` (`MNAV_FLIGHT_GENERATOR` for flight tiles), not the library's version, so a release that changes no output keeps every tile and fingerprint as they were. Raise it in the pull request that changes what a bake writes for the same def and input: a stage's rule, a rounding, a tie, a default the bake reads. The golden tile hashes in the tests move in the same pull request, and that is the sign the number must rise. A change of layout raises `MNAV_TILE_FORMAT` too.
 
 ## The tile index
 
@@ -61,6 +63,6 @@ Placing a crate should not mean reading every triangle again: rasterizing and bu
 
 - **Packing** (`field_pack.c`, `lz.c`): each column's span count and each span's floor, height and area, in planes of low bytes then high bytes, coded by a small LZ coder in LZ4's block format. The span links, two thirds of the field, are not kept: a rebuild links the spans again as the bake does. A 32 m tile of hilly terrain packs from about 310 KB to about 10 KB.
 - **Refusals:** a tile not cached is `mnav_errorNotLoaded`; a baker whose settings hash differs from the cached one is `mnav_errorInvalid`. A cached bake that fails leaves nothing cached for the tile.
-- 2D bakes have no volumes and are not cached. The cache lives in memory and has no saved form, since its settings hash includes the library's version.
+- 2D bakes have no volumes and are not cached. The cache lives in memory and has no saved form: its packing is not a format the library promises to read again.
 
 Rejected for now: entropy coding, which would make a tile about three times smaller again for several times the code; carving the polygons themselves, which is exact but numerically fragile and would break the match with a full bake; and a manager of obstacles over time, since the library owns no entities.

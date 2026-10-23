@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Avoidance in space (mnav-0006): each flier's ORCA planes against the
+// Avoidance in space: each flier's ORCA planes against the
 // spheres near it and its nearest neighbours (RVO2-3D src/Agent.cc,
 // computeNewVelocity, in binary64), with the ground call's share by
 // priority, sorted grid and sidestep.

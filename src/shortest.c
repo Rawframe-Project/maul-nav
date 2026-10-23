@@ -3,7 +3,7 @@
 //
 // The exact shortest-path search: Polyanya (Cui, Harabor and Grastien,
 // 2017) over the navmesh's portals, with off-mesh links as roots of their
-// own (mnav-0005).
+// own.
 //
 // A node is an interval of a portal with a root that sees all of it: the
 // start, a corner the way turns at, or a link's landing point. Expanding

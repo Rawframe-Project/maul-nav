@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Steering along a corridor's corners (mnav-0005): a desired velocity on
+// Steering along a corridor's corners: a desired velocity on
 // the ground from the corners alone, after Detour's crowd.
 
 #include "maul-nav/base.h"
@@ -22,7 +22,7 @@ static bool Finite(mnavPos3 p)
 }
 
 // The length of (x, z), by sqrt, which is exactly rounded everywhere, not
-// hypot, which is not and differs between C libraries (mnav-0001).
+// hypot, which is not and differs between C libraries.
 static double Length(double x, double z)
 {
     return sqrt(x * x + z * z);

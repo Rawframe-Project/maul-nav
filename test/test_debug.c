@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Debug geometry (mnav-0010): navmeshes, links, paths, corridors, flow
+// Debug geometry: navmeshes, links, paths, corridors, flow
 // arrows and avoidance neighbours as vertices and indices; counting past
 // a full buffer; positions relative to the origin.
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The flight volume (mnav-0015): flight tiles loaded from bytes, staged
+// The flight volume: flight tiles loaded from bytes, staged
 // and committed together, kept sorted by place.
 
 #include "flight_volume.h"

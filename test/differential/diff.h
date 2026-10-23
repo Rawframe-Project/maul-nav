@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The differential harness (mnav-0011): the scenes both libraries bake,
+// The differential harness: the scenes both libraries bake,
 // and Maul Nav's side of each comparison, in C for the C++ harness.
 
 #ifndef MAUL_NAV_TEST_DIFF_H

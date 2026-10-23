@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Grid paths (mnav-0005): A* over weighted grids, and jump point search
+// Grid paths: A* over weighted grids, and jump point search
 // (Harabor and Grastien, 2011) when every included area costs the same,
 // with no blocked corner cut: a diagonal step needs both cells beside it
 // open. Nodes, the open list and the node table live in the query

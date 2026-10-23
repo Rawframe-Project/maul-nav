@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes query inputs (mnav-0005): a run of queries read from the bytes,
+// Fuzzes query inputs: a run of queries read from the bytes,
 // on the test world with one tile left unloaded and a link: paths, A* and
 // exact, walls, points, boxes and radii from a range around the world or
 // raw bits, polygon ids found or made up, filters with costs out of range,

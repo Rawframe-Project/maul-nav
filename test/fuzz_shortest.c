@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes the exact shortest-path search (mnav-0005) against the A* search:
+// Fuzzes the exact shortest-path search against the A* search:
 // two tiles of 5 m squares on a 4 by 4 grid each, meeting at the tiles'
 // border, some of another area, joined by up to two off-mesh links, read
 // from the bytes; then pairs of points on them. Where the A* search finds

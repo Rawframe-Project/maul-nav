@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Flight volumes through the public API (mnav-0015): the def's checks;
+// Flight volumes through the public API: the def's checks;
 // tiles baked, copied, staged and committed, every voxel's openness as
 // the octree has it; the bytes pinned; every truncated or corrupted tile
 // refused, naming its section; tiles of other settings refused; staging,
@@ -29,7 +29,7 @@
 
 // The hash of the test world's four flight tiles' bytes, the same on
 // every platform.
-#define FLIGHT_BYTES_HASH 0x225bddbfaed052dbull
+#define FLIGHT_BYTES_HASH 0xd3ba7a00ef4db215ull
 
 // Where the header keeps its fields.
 enum
@@ -241,14 +241,14 @@ static void Rehash(size_t size)
 }
 
 // Whether tile 1 with byte i flipped is refused as it should be: but in
-// the generator, the fingerprint and the place, which any value may hold;
+// the generation, the fingerprint and the place, which any value may hold;
 // as another version in the version; as past the limit, or malformed, in
 // the counts.
 static bool FlipRefused(size_t i, size_t size)
 {
     memcpy(s_bad, s_bytes[1], size);
     s_bad[i] ^= 0x5A;
-    bool free = (i >= AT_GENERATOR && i < AT_GENERATOR + 6) ||
+    bool free = (i >= AT_GENERATOR && i < AT_GENERATOR + 2) ||
                 (i >= AT_FINGERPRINT && i < AT_FINGERPRINT + 8) ||
                 (i >= AT_PLACE && i < AT_PLACE + 8);
     bool count = i >= AT_NODES && i < AT_NODES + 8;

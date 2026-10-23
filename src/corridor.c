@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Path corridors (mnav-0005): a caller's buffer of polygons from an agent
+// Path corridors: a caller's buffer of polygons from an agent
 // to its target, checked and pulled tight.
 
 #include "funnel.h"

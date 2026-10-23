@@ -2,8 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Tiles baked by Maul Nav 1.0.0 (v1.0.0, b3f3ebb), kept as they came out:
-// tile format 1 and flight tile format 1, which every 1.x must read
-// (mnav-0003, mnav-0015). Never rebake them within 1.x; a later format
+// tile format 1 and flight tile format 1, which every 1.x must read.
+// Never rebake them within 1.x; a later format
 // adds bytes of its own beside these.
 //
 // - s_ground0 to s_ground3: test/world.h's four tiles, baked by

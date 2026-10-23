@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Spatial queries (mnav-0005): heights, the nearest wall within a
+// Spatial queries: heights, the nearest wall within a
 // radius, and random points from a seed. The walls search is Detour's
 // findDistanceToWall: Dijkstra over polygons from the center's, through
 // the edges within the radius; the random point near a center samples the

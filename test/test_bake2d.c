@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// 2D bakes (mnav-0002): outlines filled into the 3D pipeline, and queries
+// 2D bakes: outlines filled into the 3D pipeline, and queries
 // on the flat navmesh they give. Default def: 0.25 m cells, 32 m tiles,
 // an agent 0.5 m in radius.
 
@@ -17,7 +17,7 @@
 #include <string.h>
 
 // The hash of the room's tile bytes, the same on every platform.
-#define ROOM_HASH 0x7b2ac09b07cb6b1eull
+#define ROOM_HASH 0x4302a6063d1a20f2ull
 
 enum
 {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The tile cache (mnav-0016): a tile rebuilt from the cache with obstacles
+// The tile cache: a tile rebuilt from the cache with obstacles
 // is, byte for byte, the tile a full bake gives with the obstacles
 // appended to its volumes, on meshes, terrains and indexed input, with
 // include, exclude and area volumes; the refusals; the limits.

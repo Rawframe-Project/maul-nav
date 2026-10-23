@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Spatial queries (mnav-0005): heights, the nearest wall, the walls near a
+// Spatial queries: heights, the nearest wall, the walls near a
 // point, random points and reachability, on a gently sloped floor with a
 // block and a walled ring whose inside no one can reach.
 

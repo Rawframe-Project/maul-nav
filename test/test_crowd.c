@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The neighbour grid of avoidance (mnav-0006): on the ground plane and in
+// The neighbour grid of avoidance: on the ground plane and in
 // space, its neighbours are those a search of every agent finds, ties and
 // shared spots included, and agents an agent ignores neither found nor
 // counted against the limit.

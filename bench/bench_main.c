@@ -255,7 +255,7 @@ static void Bake(void)
 }
 
 // Caches every tile of the terrain, then rebuilds each with a crate of
-// 2 by 2 m on it (mnav-0016), the crate moving a meter each run.
+// 2 by 2 m on it, the crate moving a meter each run.
 static void Rebuild(void)
 {
     mnavBakeDef def = Def();
@@ -458,7 +458,7 @@ static double Ground(const mnavPath* path)
     return length;
 }
 
-// The same queries by the exact search (mnav-0005), and the ground the
+// The same queries by the exact search, and the ground the
 // two searches' paths cover.
 static void Shortest(mnavQuery* query, const mnavNavmesh* navmesh, mnavNearest (*ends)[2])
 {

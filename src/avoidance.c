@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Avoidance sets (mnav-0006): their memory, and on the ground plane each
+// Avoidance sets: their memory, and on the ground plane each
 // agent's ORCA lines against its nearest neighbours (RVO2 src/Agent.cc,
 // computeNewVelocity, in binary64), its share of each avoidance set by
 // priority, and neighbours found through the sorted grid of crowd.h, so

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The flight baker (mnav-0015): one call checks the input, builds a
+// The flight baker: one call checks the input, builds a
 // flight tile and encodes it, fingerprinted as navmesh tiles are.
 
 #include "allocator.h"
@@ -88,14 +88,11 @@ void mnavDestroyFlightBaker(mnavFlightBaker* baker)
 // place, after a word that keeps flight tiles apart from navmesh tiles.
 static uint64_t HashSettings(const mnavFlightDef* def, int32_t tileX, int32_t tileZ)
 {
-    mnavVersion version = mnavGetVersion();
     uint64_t origin[3] = {mnavDoubleBits(def->origin.x), mnavDoubleBits(def->origin.y),
                           mnavDoubleBits(def->origin.z)};
     const uint32_t words[] = {
         0x464E564Du,
-        version.major,
-        version.minor,
-        version.patch,
+        MNAV_FLIGHT_GENERATOR,
         (uint32_t)origin[0],
         (uint32_t)(origin[0] >> 32),
         (uint32_t)origin[1],
@@ -146,8 +143,8 @@ static mnavResult Bake(mnavFlightBaker* baker, const mnavBakeInput* input, int32
         report->cubes = tile.cubeCount;
         report->nodes = tile.nodeCount;
         report->leaves = tile.leafCount;
-        result = mnavEncodeFlightTile(&baker->memory, &baker->def, mnavGetVersion(),
-                                      report->fingerprint, &tile, &baker->tile, &baker->tileSize);
+        result = mnavEncodeFlightTile(&baker->memory, &baker->def, report->fingerprint, &tile,
+                                      &baker->tile, &baker->tileSize);
     }
     mnavReleaseFlightTile(&baker->memory, &tile);
     return result;

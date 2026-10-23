@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Avoidance obstacles (mnav-0006): the lines a grid of agents gets from
+// Avoidance obstacles: the lines a grid of agents gets from
 // concave polygons and segments, touching them included, pinned; which
 // obstacles count as near.
 

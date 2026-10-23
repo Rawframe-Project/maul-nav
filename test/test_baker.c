@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The public bake call: a baker made from a def bakes one tile per call,
-// reports what it did, and hands the tile's bytes over (mnav-0003).
+// reports what it did, and hands the tile's bytes over.
 
 #include "soup.h"
 #include "test_harness.h"

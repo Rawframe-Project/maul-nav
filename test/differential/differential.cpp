@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The differential harness (mnav-0011): bakes each scene with Recast and
+// The differential harness: bakes each scene with Recast and
 // with Maul Nav at the same settings, then for a fixed set of point pairs
 // on the navmesh compares whether each library reaches the end and how
 // long its straight path is. Recast builds one untiled mesh with layer

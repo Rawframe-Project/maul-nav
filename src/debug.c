@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Debug geometry of navmeshes, links, paths and corridors (mnav-0010).
+// Debug geometry of navmeshes, links, paths and corridors.
 
 #include "maul-nav/debug.h"
 

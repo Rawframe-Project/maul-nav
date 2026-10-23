@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The exact shortest-path search (mnav-0005): its turning points on
+// The exact shortest-path search: its turning points on
 // hand-built tiles, where the shortest way is known, then the baked world
 // beside the A* search. Hand cells are 0.25 m; heights are 0.
 

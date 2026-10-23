@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes the inputs of the searches over the whole navmesh (mnav-0004,
-// mnav-0008, mnav-0009, mnav-0013): a navmesh of some of the test world's
+// Fuzzes the inputs of the searches over the whole navmesh: a navmesh of some of the test world's
 // tiles with point and edge links read from the bytes, then a hierarchy,
 // a navmesh flow field and link generation over it, with defs, filters,
 // goals, regions, budgets and ends from the bytes, now and then out of

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Avoidance obstacles (mnav-0006). Edges give RVO2's obstacle lines (RVO2
+// Avoidance obstacles. Edges give RVO2's obstacle lines (RVO2
 // src/Agent.cc, computeNewVelocity, lines 274 to 506; the edge choice of
 // src/KdTree.cc, queryObstacleTreeRecursive), in binary64. A moving
 // obstacle is a static one in its own frame: its lines are built from the

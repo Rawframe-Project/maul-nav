@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The nearest point on the navmesh (mnav-0005).
+// The nearest point on the navmesh.
 
 #include "test_harness.h"
 #include "world.h"

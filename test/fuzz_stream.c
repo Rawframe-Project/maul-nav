@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes the runtime navmesh (mnav-0004, mnav-0005): a sequence of
+// Fuzzes the runtime navmesh: a sequence of
 // changes read from the bytes, on a dynamic tier (tiles of the test world
 // added, removed and replaced by a variant baked with another area, links
 // added, removed and toggled, areas changed) with commits between, and

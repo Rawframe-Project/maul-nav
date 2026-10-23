@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Hierarchies (mnav-0008), after HPA* (Botea, Mueller and Schaeffer,
+// Hierarchies, after HPA* (Botea, Mueller and Schaeffer,
 // 2004): clusters of tiles, a transition at the middle link of each run of
 // tile links leaving a cluster and at each off-mesh link between clusters,
 // and edges found by the navmesh search confined to the cluster entered.

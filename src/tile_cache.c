@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The tile cache (mnav-0016): entries in a table of the def's tiles, each
+// The tile cache: entries in a table of the def's tiles, each
 // with a packed field and its own copies of volumes, all in the cache's
 // memory and within its limits.
 

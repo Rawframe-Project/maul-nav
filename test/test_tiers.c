@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Runtime tiers (mnav-0004): what each tier allows, area changes and link
+// Runtime tiers: what each tier allows, area changes and link
 // toggles through the commit. Hand cells are 0.25 m.
 
 #include "hand_tile.h"

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // From a search's last node to its corridor and straight path: the funnel
-// algorithm, stretch by stretch between off-mesh links (mnav-0005).
+// algorithm, stretch by stretch between off-mesh links.
 
 #include "funnel.h"
 

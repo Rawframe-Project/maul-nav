@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The tile format and its loader (mnav-0003). Run as test_tile --seed <file> it
+// The tile format and its loader. Run as test_tile --seed <file> it
 // also writes the level's tile, the fuzz target's seed.
 
 // The seed writer uses fopen, which the Microsoft C library deprecates.
@@ -23,7 +23,7 @@
 #include <string.h>
 
 // The hash of the level tile's bytes, the same on every platform.
-#define LEVEL_TILE_HASH 0xc889acd9ae9749c1ull
+#define LEVEL_TILE_HASH 0xf2b6f799af725145ull
 
 // Offsets into the header.
 enum
@@ -81,7 +81,7 @@ static void Bake(Fixture* f)
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
     f->memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
     CHECK(BakeTile(&f->memory, &def, &cells, &input, &f->baked) == mnav_success, "baked");
-    f->info = (mnavTileInfo){(mnavVersion){1, 2, 3},
+    f->info = (mnavTileInfo){123,
                              0x0123456789ABCDEFull,
                              0,
                              0,
@@ -106,13 +106,11 @@ static void Unbake(Fixture* f)
 
 static bool SameInfo(const mnavTileInfo* a, const mnavTileInfo* b)
 {
-    return a->generator.major == b->generator.major && a->generator.minor == b->generator.minor &&
-           a->generator.patch == b->generator.patch && a->fingerprint == b->fingerprint &&
-           a->x == b->x && a->z == b->z && a->tileCells == b->tileCells &&
-           a->cellSize == b->cellSize && a->cellHeight == b->cellHeight &&
-           a->agentHeight == b->agentHeight && a->agentRadius == b->agentRadius &&
-           a->agentStep == b->agentStep && a->origin.x == b->origin.x &&
-           a->origin.y == b->origin.y && a->origin.z == b->origin.z;
+    return a->generator == b->generator && a->fingerprint == b->fingerprint && a->x == b->x &&
+           a->z == b->z && a->tileCells == b->tileCells && a->cellSize == b->cellSize &&
+           a->cellHeight == b->cellHeight && a->agentHeight == b->agentHeight &&
+           a->agentRadius == b->agentRadius && a->agentStep == b->agentStep &&
+           a->origin.x == b->origin.x && a->origin.y == b->origin.y && a->origin.z == b->origin.z;
 }
 
 static bool SameMesh(const mnavPolyMesh* a, const mnavPolyMesh* b)
@@ -449,8 +447,7 @@ static void HandBegin(Hand* h, const int32_t* points, int32_t count)
     h->mesh = (mnavPolyMesh){h->vertices, nullptr, count, count, h->polygons, 0, 2, 32, 0};
     h->detail =
         (mnavDetailMesh){h->parts, 0, h->detailVertices, 0, 24, h->triangles, 0, 16, 0, 0, 0};
-    h->info = (mnavTileInfo){(mnavVersion){1, 2, 3},   7, 0, 0, 32, 0.25f, 0.125f, 16, 2, 6,
-                             (mnavPos3){0.0, 0.0, 0.0}};
+    h->info = (mnavTileInfo){123, 7, 0, 0, 32, 0.25f, 0.125f, 16, 2, 6, (mnavPos3){0.0, 0.0, 0.0}};
 }
 
 // Adds a polygon over the given vertex indices, with extra detail vertices.

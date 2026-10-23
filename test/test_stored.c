@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Tiles 1.0.0 wrote, loaded by this version (mnav-0003, mnav-0015): every
+// Tiles 1.0.0 wrote, loaded by this version: every
 // 1.x reads tile format 1 and flight tile format 1. The tiles load, commit
 // and answer queries; the answers are pinned, and move only with a line
 // under Changed or Fixed, as any result does. A failure to load is never

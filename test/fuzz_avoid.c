@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes avoidance input (mnav-0006), which a host passes every step:
+// Fuzzes avoidance input, which a host passes every step:
 // agents and obstacles read from the bytes, with NaNs, infinities, huge
 // coordinates, radii and speeds of no size, ids alike, layers and ignores
 // that meet, polygons wound either way and segments of no length, and a

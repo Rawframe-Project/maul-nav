@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Terrains (mnav-0003): a terrain bakes to the same bytes as the triangle
+// Terrains: a terrain bakes to the same bytes as the triangle
 // mesh of its cells; holes; the checks; terrains with meshes.
 
 #include "test_harness.h"
@@ -15,7 +15,7 @@
 #include <string.h>
 
 // The hash of the terrain's tile, the same on every platform.
-#define TERRAIN_HASH 0x5ed406f237a61dd4ull
+#define TERRAIN_HASH 0xf984fa2457e6ae29ull
 
 enum
 {

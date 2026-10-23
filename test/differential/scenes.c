@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The differential corpus (mnav-0011): the test world, the two-floor
+// The differential corpus: the test world, the two-floor
 // building, the terrain bowl and the plateaus with two bridges, each as
 // one triangle mesh, as the scenario tests build them.
 

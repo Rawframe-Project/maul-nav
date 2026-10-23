@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes the tile cache's LZ coder (mnav-0016): any bytes coded must
+// Fuzzes the tile cache's LZ coder: any bytes coded must
 // decode to themselves within the bound, and any bytes decoded as a
 // coding must be refused or fill exactly the length asked for, nothing
 // read or written out of range.
