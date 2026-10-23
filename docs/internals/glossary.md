@@ -11,7 +11,7 @@ Terms the code, the tests and the documentation use with one meaning.
 - **Corridor:** the polygons an agent's path runs through, kept in a buffer the host owns and moved as the agent moves.
 - **Corners:** a corridor's straight path from the agent's position to its target.
 - **Crossing:** one of the point links an edge link is staged as, spaced along its width.
-- **Def:** the struct an object is made from, built by its `mnavDefault...Def` function, carrying a cookie, the version, an allocator and named limits.
+- **Def:** the struct an object is made from, built by its `mnavDefault...Def` function, carrying a cookie and, for an owner object, an allocator and named limits. A root's def (a creation that takes no other library object, or `mnavSteer`) also carries the `MNAV_ABI_VERSION` stamp; the query filter and the link generation def carry only the cookie.
 - **Detail mesh:** the small triangles laid over each polygon that follow the floor's heights.
 - **Edge link:** an off-mesh link between two edges rather than two points.
 - **Filter:** an agent's capabilities in a query: a cost per area type, the area types it may enter and the link kinds it may cross.
