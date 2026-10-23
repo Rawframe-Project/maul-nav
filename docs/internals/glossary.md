@@ -15,7 +15,8 @@ Terms the code, the tests and the documentation use with one meaning.
 - **Detail mesh:** the small triangles laid over each polygon that follow the floor's heights.
 - **Edge link:** an off-mesh link between two edges rather than two points.
 - **Filter:** an agent's capabilities in a query: a cost per area type, the area types it may enter and the link kinds it may cross.
-- **Fingerprint:** a tile's hash of everything that shaped it: the generator, the settings, its place and the input that reaches it.
+- **Fingerprint:** a tile's hash of everything that shaped it: the bake's generation, the settings, its place and the input that reaches it.
+- **Generation:** `MNAV_BAKE_GENERATOR` or `MNAV_FLIGHT_GENERATOR`, raised only when a bake of the same input would give other bytes.
 - **Flight volume:** committed flight tiles, sparse voxel octrees of the space a flier's center may occupy.
 - **Fragment:** what rasterization gives one cell for one triangle: the lowest and highest height of the triangle's part inside it.
 - **Golden value:** a hash of a promised output, committed in a test.
