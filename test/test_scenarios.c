@@ -27,7 +27,7 @@
 #define BUILDING_HASH 0x64041a557af8393bull
 
 // The hash of the terrain's sixteen tiles.
-#define TERRAIN_HASH 0x6e6f155b0ba648a3ull
+#define TERRAIN_HASH 0x9b33689a5c605a30ull
 
 // The hash of the group's final places.
 #define GROUP_HASH 0xb16f4123b3485eedull

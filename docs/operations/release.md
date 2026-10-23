@@ -12,6 +12,6 @@ Releases are made by release-please from the conventional commit titles on `main
 
 ## Notes
 
-- A change to the layout of tile or flight tile bytes bumps `MNAV_TILE_FORMAT` or `MNAV_FLIGHT_FORMAT`, so an older tile is refused with `mnav_errorVersion` instead of misread.
+- A change to the layout of tile or flight tile bytes bumps `MNAV_TILE_FORMAT` or `MNAV_FLIGHT_FORMAT`, so an older tile is refused with `mnav_errorVersion` instead of misread. The library reads only the formats it writes; the changelog tells hosts to rebake. The same pull request rewrites `test/stored_tiles.h` with `test_stored --write`.
 - The shared family files must match their canonical copies in the organization's `.github` repository before a release.
 - A library that pins this one moves its pin in a pull request of its own.

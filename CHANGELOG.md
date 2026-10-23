@@ -50,3 +50,8 @@ platform, compiler and worker count.
 - A shared library option, a CMake package and a pkg-config module, and
   support for Linux on x86-64 and arm64, macOS, Windows with `clang-cl`,
   and WebAssembly.
+
+### Changed
+
+- Tiles and flight tiles baked by earlier releases must be rebaked: they
+  are refused with `mnav_errorVersion`.

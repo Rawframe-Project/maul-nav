@@ -25,7 +25,7 @@ extern "C"
 #endif
 
 // The flight tile format's version, written into every flight tile.
-#define MNAV_FLIGHT_FORMAT 1
+#define MNAV_FLIGHT_FORMAT 2
 
 // The flight bake's generation, written into every flight tile and hashed
 // into its fingerprint: it rises with any change to the library that gives

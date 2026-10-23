@@ -23,7 +23,7 @@
 #include <string.h>
 
 // The hash of the level tile's bytes, the same on every platform.
-#define LEVEL_TILE_HASH 0xf2b6f799af725145ull
+#define LEVEL_TILE_HASH 0x772aa4da964f4edaull
 
 // Offsets into the header.
 enum
@@ -325,7 +325,8 @@ static void TestHeaderRefusals(void)
     static Fixture f;
     Bake(&f);
     CHECK(Is(Changed(&f, 0, 'X', 1, true), mnav_errorInvalid, mnav_tileHeader), "magic");
-    CHECK(Is(Changed(&f, FORMAT_AT, 2, 2, true), mnav_errorVersion, mnav_tileHeader),
+    CHECK(Is(Changed(&f, FORMAT_AT, MNAV_TILE_FORMAT + 1, 2, true), mnav_errorVersion,
+             mnav_tileHeader),
           "another format version");
     CHECK(Is(Changed(&f, HEADER_BYTES_AT, 108, 2, true), mnav_errorInvalid, mnav_tileHeader),
           "header size");
