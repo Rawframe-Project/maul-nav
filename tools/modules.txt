@@ -1,5 +1,5 @@
-# The internal module graph (docs/conventions.md, section 6): each module
-# and the modules it may use. tools/check_modules.py enforces it.
+# The internal module graph: each module and the modules it may use, so
+# dependencies stay one-way. tools/check_modules.py enforces it.
 allocator:
 bytes:
 base:
