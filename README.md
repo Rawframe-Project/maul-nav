@@ -1,100 +1,63 @@
 # Maul Nav
 
-Navigation for games, engines and simulations: navmesh generation from
-triangle meshes, heightfields and 2D polygons, a versioned navmesh
-format that loads hostile input safely, path and spatial queries, path
-corridors, off-mesh links, flow fields for mass movement, flight
-volumes for agents that fly or swim, and local avoidance as a separate
-component. Written in C23 with public headers
-any C17 or C++17 program can include, with no dependencies and an MIT
-license.
+Game navigation in C: navmeshes baked from your geometry, paths, crowds and fliers, the same bits on every machine.
 
-It has:
+[![CI](https://github.com/Rawframe-Project/maul-nav/actions/workflows/ci.yml/badge.svg)](https://github.com/Rawframe-Project/maul-nav/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/Rawframe-Project/maul-nav)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Rawframe-Project/maul-nav)](https://github.com/Rawframe-Project/maul-nav/releases)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Rawframe-Project/maul-nav/badge)](https://scorecard.dev/viewer/?uri=github.com/Rawframe-Project/maul-nav)
 
-- navmesh generation in 3D from triangle meshes and terrains, and in
-  2D from polygons, shaped by bake volumes, tile by tile: each tile is
-  an independent call the host may run on its own workers, giving the
-  same bytes at any worker count, and a tile index of a large mesh or
-  outline set that the workers share, so each tile reads only what
-  reaches it;
-- the navmesh data format, versioned and fingerprinted, and a loader
-  that refuses malformed bytes with a typed error;
-- nearest-point, path, raycast, height, wall-distance, surface-move,
-  shape, random-point and reachability queries, with named limits on
-  every search and typed results when one is hit;
-- exact shortest paths on the navmesh (Polyanya, with off-mesh links)
-  beside the A* and funnel search, for agents with no area preferences;
-- path corridors, sliced and hierarchical searches, grid pathfinding
-  (A* and jump point search), and flow fields over grids and navmeshes;
-- off-mesh links point to point or edge to edge, one or two way, of
-  host-declared kinds, toggled at runtime and generated automatically;
-- runtime changes by declared tier (static, modifiers only, dynamic),
-  committed at a point the host chooses, and obstacles carved into
-  cached tiles, rebuilt to the same bytes as a full bake;
-- flight volumes for agents that fly or swim: sparse voxel octree
-  tiles baked from the same input, streamed as navmesh tiles are, with
-  any-angle paths (Lazy Theta*), raycasts and nearest open points;
-- velocity-space avoidance (ORCA) on the ground and among fliers in
-  space, a component that needs no navmesh;
-- debug geometry as plain vertices and indices, and bake reports.
+Agents in a game need to know where they can walk, how to get somewhere, and how to get there without walking into each other. Maul Nav answers those questions for games, engines and simulations, and leaves the world to the host: it takes the geometry the host extracts and returns paths, corners and velocities the host applies.
 
-It owns no world, entities, physics or animation: it takes geometry
-the host extracts, and returns paths, corners and desired velocities
-the host applies. Results are bit-identical on every platform,
-compiler and worker count. It starts no threads. It calls host code
-only when asked to, synchronously, on the calling thread and within
-the call: an allocator, the clearance test link generation takes and
-the clock a bake may read for its report.
+- **Baking** navmesh tiles from triangle meshes, terrains and 2D outlines, shaped by include, exclude and area volumes. Each tile is an independent call the host runs on its own workers, with the same bytes at any worker count.
+- **A tile format** that is loaded as hostile input: every byte is checked, and a damaged tile is refused with the section and element at fault.
+- **Streaming and runtime changes:** tiles load and unload while queries run, changes commit all at once, areas and links toggle, and obstacles are carved into cached tiles in a third of a bake.
+- **Queries:** nearest points, A* paths and exact shortest paths, sliced and hierarchical searches, rays, surface moves, walls, random points and grid paths, each under named limits.
+- **Path corridors and steering**, and **off-mesh links** (jumps, drops, ladders, doors, teleports, or the host's own kinds), placed by hand or generated.
+- **Flow fields** over grids and navmeshes, for many agents sharing goals.
+- **Flight volumes** for agents that fly or swim: sparse voxel octree tiles with any-angle paths, rays and nearest open points.
+- **Avoidance** (ORCA) on the ground and in space, a component that needs no navmesh.
+- **Debug geometry** as plain vertices and indices any renderer can draw.
 
-## Status
+Results are bit-identical on every platform, compiler and worker count, so a server and its clients agree on every path. The library starts no threads, keeps no clock and takes no dependencies beyond the C library.
 
-Version 1.0.1. Everything listed above is built and tested on every CI
-platform; fuzz targets cover tiles, bake input, queries, avoidance,
-the searches over a whole navmesh, grid flow fields, the exact
-shortest path beside the A* one, flight tiles and queries, and the tile
-cache's coder. Within 1.x the source interface only grows, every tile
-and flight tile format an earlier 1.x wrote is read, and the binary
-interface holds within a minor version; [the changelog](CHANGELOG.md)
-states the promise in full.
-
-## Documentation
-
-- [The guide](docs/guide.md) walks through baking, the navmesh,
-  queries, corridors, flow fields, flight volumes, avoidance and debug
-  output.
-- [The API reference](docs/api.md) lists all 126 public functions,
-  generated from the headers.
-- [The samples](docs/samples.md) are small complete programs.
-- [The changelog](CHANGELOG.md) records every change.
-
-## Building
-
-Requirements: CMake 3.25 and GCC 14 or Clang 19 or newer; on Windows,
-`clang-cl` (the Visual Studio component "C++ Clang tools for Windows").
+## Quick start
 
 ```sh
+git clone https://github.com/Rawframe-Project/maul-nav.git
+cd maul-nav
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build
+./build/sample_walk
 ```
 
-The suite is checked against hand-picked mutants: `tools/mutants.txt`
-lists 234 one-line changes to the library, each of which a test kills
-(a few only in a sanitizer build) or which cannot change a result, the
-file giving the reason above it. To run them, on a clean tree (hours;
-not part of CI):
+Install it with `cmake --install build --prefix <prefix>` and use it from CMake:
 
-```sh
-python3 tools/mutate.py --check tools/mutants.txt
-python3 tools/mutate.py tools/mutants.txt build results.txt
+```cmake
+find_package(maul-nav REQUIRED CONFIG)
+target_link_libraries(app PRIVATE maul-nav::maul-nav)
 ```
 
-## Design
+or through pkg-config as `maul-nav`. [Getting started](docs/user/getting-started.md) covers the build options, the samples and the model the API follows.
 
-The rules every Maul library follows are in `docs/conventions.md` and
-`docs/adr/`; the records particular to this library are listed in
-`docs/adr/mnav.md`.
+## Platforms
+
+Linux on x86-64 and arm64 with GCC 14 or Clang 19 and newer, macOS with Apple Clang, Windows with `clang-cl`, and WebAssembly with Emscripten; CI builds and tests each. The public headers are C17 and C++17, so any C or C++ program can include them.
+
+## Documentation
+
+- [The documentation site](https://rawframe-project.github.io/maul-nav/), with the API reference generated from the headers.
+- [User documentation](docs/README.md): one page per part of the library.
+- [How it works](docs/internals/overview.md) and [how to develop it](docs/operations/development.md).
+- [Changelog](CHANGELOG.md).
+
+Maul Nav belongs to the Maul family of standalone C libraries, which share one set of conventions.
+
+## Contributing
+
+Issues are welcome. Pull requests are accepted for issues a maintainer has approved; see [CONTRIBUTING.md](https://github.com/Rawframe-Project/.github/blob/main/CONTRIBUTING.md). The project is developed with AI coding agents, directed and reviewed by its maintainers; outside contributions follow the [AI policy](https://github.com/Rawframe-Project/.github/blob/main/AI_POLICY.md).
 
 ## License
 
-MIT; see `LICENSE`.
+MIT; see [LICENSE](LICENSE).
