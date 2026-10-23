@@ -3,7 +3,7 @@
 //
 // A world over four 32 m tiles, a floor with boxes 1.5 m tall standing
 // across their sides (lower than the agent, so nothing is walkable
-// inside them), baked once with the default def into s_tiles.
+// inside them), its tiles read from test/stored_tiles.h into s_tiles.
 
 #ifndef MAUL_NAV_TEST_WORLD_H
 #define MAUL_NAV_TEST_WORLD_H

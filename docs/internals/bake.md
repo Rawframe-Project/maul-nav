@@ -41,7 +41,7 @@ Little-endian, the same bytes on every platform. A 104-byte header holds the mag
 
 Loading (`mnavDecodeTile` in `tile.c`) reads every field as hostile: counts against the def's limits and against the bytes present before anything is allocated, the payload's hash, and the mesh itself (convex polygons, walkable areas, neighbors that lead back along the same edge, unlinked edges on the tile's sides, detail indices within their polygon). A malformed tile is `mnav_errorInvalid` naming the section and element; another format version is `mnav_errorVersion`. The hash catches damage, not tampering: a host that needs authenticity signs the bytes.
 
-A new field or section is a new format version, and the loader keeps reading the old ones. `test/stored_tiles.h` holds tiles in format 1 exactly as they were written, and the tests load them.
+A new field or section, or a header word given a new meaning, is a new format version. The loader reads only the format this library writes and refuses every other with `mnav_errorVersion`, so a host rebakes its tiles from source when the format rises; it never guesses at older bytes. `test/stored_tiles.h` holds tiles in the current formats, written by `test_stored --write` in the pull request that raises a format, and the tests load them and pin what they answer. `test/stored_format1.h` holds format 1 tiles written by 1.0.0 and 1.0.1, and the tests check that they are refused.
 
 ## The fingerprint
 
