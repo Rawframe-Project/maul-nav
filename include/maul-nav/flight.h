@@ -424,7 +424,12 @@ extern "C"
     /// @param pathOut  Receives the path. A start or end not open ends the
     ///                 search at once: `mnav_pathNone` for a blocked voxel,
     ///                 `mnav_pathNotLoaded` for a place with no tile, with
-    ///                 the start alone as its path.
+    ///                 the start alone as its path. So does an end in a
+    ///                 closed space without the start, such as the inside
+    ///                 of a closed mesh, when the space is found closed
+    ///                 within 512 blocks and the node budget: the search
+    ///                 looks over the end's space that far first.
+    ///                 `mnav_pathNone`, with the start alone.
     /// @return `mnav_success`; `mnav_errorRange` for a point not finite,
     /// below or above the volume or past the extent; `mnav_errorInvalid`
     /// for a NULL argument.
@@ -439,7 +444,8 @@ extern "C"
     /// Begins a flier's path search to run in slices: the same search as
     /// mnavFindFlightPath, continued by mnavContinueFlightPath and ended by
     /// mnavFinishFlightPath. Whatever the slices, the path is the one
-    /// mnavFindFlightPath gives.
+    /// mnavFindFlightPath gives. It looks over the end's space for a closed
+    /// one, up to 512 blocks, before the first slice.
     ///
     /// @param query   The query context; it holds the search until the next
     ///                search of any kind, or a move along the surface,
