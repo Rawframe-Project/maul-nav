@@ -36,6 +36,10 @@ extern "C"
     // them; NULL on failure.
     DiffMaul* DiffMaulBuild(const DiffScene* scene);
 
+    // Bakes every tile as DiffMaulBuild does, without loading them; the
+    // tiles' bytes in all, or -1 on failure.
+    int64_t DiffMaulBake(const DiffScene* scene);
+
     void DiffMaulDestroy(DiffMaul* maul);
 
     // A random point on the navmesh from a seed; false when there is none.
@@ -43,8 +47,10 @@ extern "C"
 
     // A path between the polygons nearest two points, within 0.5 m across
     // and 2 m up or down: 1 reached, with the straight path's length; 0
-    // not reached; -1 when a point has no polygon near.
-    int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double* length);
+    // not reached; -1 when a point has no polygon near. nodes, which may
+    // be NULL, receives the nodes the search made.
+    int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double* length,
+                         int32_t* nodes);
 
 #ifdef __cplusplus
 }

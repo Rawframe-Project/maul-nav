@@ -7,17 +7,32 @@
 // long its straight path is. Recast builds one untiled mesh with layer
 // regions, as Maul Nav partitions; Maul Nav bakes 32 m tiles. Test only:
 // neither Recast nor Detour is ever linked into the library.
+//
+// It also measures what each costs, reported and never gated: a scene's
+// bake, a pair's path (nearest polygons, search and straight path), the
+// nodes a search makes and the navmesh's bytes. Each is counted in
+// user-space instructions retired where Linux's perf_event_open allows,
+// steady on a loaded machine, and timed, the best of five runs.
 
 #include "DetourNavMesh.h"
 #include "DetourNavMeshBuilder.h"
 #include "DetourNavMeshQuery.h"
+#include "DetourNode.h"
 #include "Recast.h"
 #include "diff.h"
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <vector>
+
+#if defined(__linux__)
+#include <linux/perf_event.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 
 namespace
 {
@@ -60,7 +75,9 @@ struct Detour
 // m, an agent 2 m tall, 0.5 m wide, stepping 0.75 m, on slopes to 45
 // degrees; edges to 12 m and 0.3 m off; regions of 2 square meters;
 // detail samples every 1.5 m within 0.125 m.
-bool Build(const DiffScene& scene, Detour& out)
+// Recast's bake of a scene into Detour's navmesh data, which the caller
+// frees with dtFree.
+bool Bake(const DiffScene& scene, unsigned char** dataOut, int* sizeOut)
 {
     rcConfig cfg{};
     cfg.cs = 0.25f;
@@ -141,7 +158,17 @@ bool Build(const DiffScene& scene, Detour& out)
     rcFreeContourSet(cset);
     rcFreeCompactHeightfield(chf);
     rcFreeHeightField(hf);
-    if (!good)
+    *dataOut = data;
+    *sizeOut = size;
+    return good;
+}
+
+// Recast's bake of a scene, loaded into Detour.
+bool Build(const DiffScene& scene, Detour& out)
+{
+    unsigned char* data = nullptr;
+    int size = 0;
+    if (!Bake(scene, &data, &size))
     {
         return false;
     }
@@ -157,7 +184,7 @@ bool Build(const DiffScene& scene, Detour& out)
 }
 
 // Detour's answer, as DiffMaulPath gives Maul Nav's.
-int DetourPath(const Detour& d, const float a[3], const float b[3], double* length)
+int DetourPath(const Detour& d, const float a[3], const float b[3], double* length, int* nodes)
 {
     dtQueryFilter filter;
     const float extents[3] = {0.5f, 2.0f, 0.5f};
@@ -174,6 +201,10 @@ int DetourPath(const Detour& d, const float a[3], const float b[3], double* leng
     static dtPolyRef path[4096];
     int count = 0;
     dtStatus status = d.query->findPath(start, end, s, e, &filter, path, &count, 4096);
+    if (nodes != nullptr)
+    {
+        *nodes = d.query->getNodePool()->getNodeCount();
+    }
     if (dtStatusFailed(status) || (status & DT_PARTIAL_RESULT) != 0 || count == 0 ||
         path[count - 1] != end)
     {
@@ -221,8 +252,8 @@ void Compare(DiffMaul* maul, const Detour& d, Tally& t)
         }
         double ml = 0.0;
         double dl = 0.0;
-        int m = DiffMaulPath(maul, a, b, &ml);
-        int r = DetourPath(d, a, b, &dl);
+        int m = DiffMaulPath(maul, a, b, &ml, nullptr);
+        int r = DetourPath(d, a, b, &dl, nullptr);
         if (m < 0 || r < 0)
         {
             t.unsnapped += 1;
@@ -241,6 +272,185 @@ void Compare(DiffMaul* maul, const Detour& d, Tally& t)
             t.detourSum += dl;
         }
     }
+}
+
+// User-space instructions retired by this thread, where perf_event_open
+// allows; otherwise unavailable, and only time is measured.
+class Counter
+{
+  public:
+    Counter()
+    {
+#if defined(__linux__)
+        perf_event_attr attr;
+        std::memset(&attr, 0, sizeof(attr));
+        attr.type = PERF_TYPE_HARDWARE;
+        attr.size = sizeof(attr);
+        attr.config = PERF_COUNT_HW_INSTRUCTIONS;
+        attr.exclude_kernel = 1;
+        attr.exclude_hv = 1;
+        fd_ = static_cast<int>(syscall(SYS_perf_event_open, &attr, 0, -1, -1, 0));
+#endif
+    }
+    ~Counter()
+    {
+#if defined(__linux__)
+        if (fd_ >= 0)
+        {
+            close(fd_);
+        }
+#endif
+    }
+    Counter(const Counter&) = delete;
+    Counter& operator=(const Counter&) = delete;
+    bool available() const
+    {
+        return fd_ >= 0;
+    }
+    uint64_t read() const
+    {
+        uint64_t count = 0;
+#if defined(__linux__)
+        if (fd_ >= 0 && ::read(fd_, &count, sizeof(count)) != static_cast<ssize_t>(sizeof(count)))
+        {
+            count = 0;
+        }
+#endif
+        return count;
+    }
+
+  private:
+    int fd_ = -1;
+};
+
+// The best of five runs of a piece of work: instructions and seconds.
+struct Cost
+{
+    double instructions = 0.0;
+    double seconds = 0.0;
+};
+
+template <typename Work> Cost Measure(const Counter& counter, Work work)
+{
+    Cost best{1e300, 1e300};
+    for (int run = 0; run < 5; ++run)
+    {
+        uint64_t before = counter.read();
+        auto start = std::chrono::steady_clock::now();
+        work();
+        std::chrono::duration<double> spent = std::chrono::steady_clock::now() - start;
+        double instructions = static_cast<double>(counter.read() - before);
+        best.instructions = std::fmin(best.instructions, instructions);
+        best.seconds = std::fmin(best.seconds, spent.count());
+    }
+    return best;
+}
+
+// The pairs both libraries snap, as Compare counts them: a pair either
+// side finds no polygon near is left out, so that both sides search every
+// pair measured.
+std::vector<std::vector<float>> Pairs(DiffMaul* maul, const Detour& d)
+{
+    std::vector<std::vector<float>> pairs;
+    for (int i = 0; i < kPairs; ++i)
+    {
+        std::vector<float> p(6);
+        double length = 0.0;
+        if (DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 1u, p.data()) &&
+            DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 2u, p.data() + 3) &&
+            DiffMaulPath(maul, p.data(), p.data() + 3, &length, nullptr) >= 0 &&
+            DetourPath(d, p.data(), p.data() + 3, &length, nullptr) >= 0)
+        {
+            pairs.push_back(p);
+        }
+    }
+    return pairs;
+}
+
+void Row(const char* scene, const char* what, double maul, double detour, double scale,
+         const char* unit)
+{
+    std::printf("%-10s %-12s %12.2f %12.2f %-6s %6.2f\n", scene, what, maul / scale, detour / scale,
+                unit, detour > 0.0 ? maul / detour : 0.0);
+}
+
+// Measures one scene's costs on both sides and prints them.
+void Costs(const Counter& counter, const DiffScene& scene, DiffMaul* maul, const Detour& d)
+{
+    int64_t maulBytes = 0;
+    Cost maulBake = Measure(counter, [&] { maulBytes = DiffMaulBake(&scene); });
+    int detourBytes = 0;
+    Cost detourBake = Measure(counter,
+                              [&]
+                              {
+                                  unsigned char* data = nullptr;
+                                  if (Bake(scene, &data, &detourBytes))
+                                  {
+                                      dtFree(data);
+                                  }
+                              });
+    std::vector<std::vector<float>> pairs = Pairs(maul, d);
+    double n = pairs.empty() ? 1.0 : static_cast<double>(pairs.size());
+    double maulNodes = 0.0;
+    double detourNodes = 0.0;
+    for (const std::vector<float>& p : pairs)
+    {
+        double length = 0.0;
+        int32_t mn = 0;
+        int dn = 0;
+        DiffMaulPath(maul, p.data(), p.data() + 3, &length, &mn);
+        DetourPath(d, p.data(), p.data() + 3, &length, &dn);
+        maulNodes += mn;
+        detourNodes += dn;
+    }
+    Cost maulPaths = Measure(counter,
+                             [&]
+                             {
+                                 double length = 0.0;
+                                 for (const std::vector<float>& p : pairs)
+                                 {
+                                     DiffMaulPath(maul, p.data(), p.data() + 3, &length, nullptr);
+                                 }
+                             });
+    Cost detourPaths = Measure(counter,
+                               [&]
+                               {
+                                   double length = 0.0;
+                                   for (const std::vector<float>& p : pairs)
+                                   {
+                                       DetourPath(d, p.data(), p.data() + 3, &length, nullptr);
+                                   }
+                               });
+    if (counter.available())
+    {
+        Row(scene.name, "bake", maulBake.instructions, detourBake.instructions, 1e6, "M ins");
+    }
+    Row(scene.name, "bake", maulBake.seconds, detourBake.seconds, 1e-3, "ms");
+    if (counter.available())
+    {
+        Row(scene.name, "path", maulPaths.instructions / n, detourPaths.instructions / n, 1e3,
+            "k ins");
+    }
+    Row(scene.name, "path", maulPaths.seconds / n, detourPaths.seconds / n, 1e-6, "us");
+    Row(scene.name, "nodes", maulNodes / n, detourNodes / n, 1.0, "");
+    Row(scene.name, "bytes", static_cast<double>(maulBytes), detourBytes, 1e3, "kB");
+}
+
+// The machine's load over the last minute, where Linux reports it.
+double Load()
+{
+    double load = -1.0;
+#if defined(__linux__)
+    if (std::FILE* f = std::fopen("/proc/loadavg", "r"))
+    {
+        if (std::fscanf(f, "%lf", &load) != 1)
+        {
+            load = -1.0;
+        }
+        std::fclose(f);
+    }
+#endif
+    return load;
 }
 
 } // namespace
@@ -279,5 +489,24 @@ int main()
                std::fabs(sums) <= kSumBound;
     }
     std::printf(pass ? "agreement within the floors\n" : "agreement below a floor\n");
+    Counter counter;
+    std::printf("\ncosts, best of five, reported and not gated; Maul Nav in 32 m tiles, Recast "
+                "untiled; %s; load average %.2f\n",
+                counter.available() ? "instructions are user space's, retired"
+                                    : "no instruction counter here, time only",
+                Load());
+    std::printf("%-10s %-12s %12s %12s %-6s %6s\n", "scene", "measure", "maul nav", "detour",
+                "unit", "ratio");
+    for (int32_t i = 0; i < DiffSceneCount(); ++i)
+    {
+        DiffScene scene = DiffGetScene(i);
+        Detour d;
+        DiffMaul* maul = DiffMaulBuild(&scene);
+        if (maul != nullptr && Build(scene, d))
+        {
+            Costs(counter, scene, maul, d);
+        }
+        DiffMaulDestroy(maul);
+    }
     return pass ? 0 : 1;
 }

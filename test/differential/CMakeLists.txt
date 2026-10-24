@@ -20,7 +20,9 @@ set_target_properties(differential PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED 
 if(NOT MSVC)
     target_compile_options(differential PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 endif()
-target_include_directories(differential PRIVATE ${PROJECT_SOURCE_DIR}/test)
+# The library's src/ too: the harness reads a query context's node count.
+target_include_directories(differential PRIVATE ${PROJECT_SOURCE_DIR}/test
+                                                ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(differential PRIVATE ${PROJECT_NAME} RecastNavigation::Recast
                                            RecastNavigation::Detour)
 add_test(NAME differential COMMAND differential)
