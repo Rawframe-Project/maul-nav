@@ -207,9 +207,12 @@ static mnavPos3 Solve(mnavAvoidance* a, const mnavAgent3D* agents, const mnavSph
     {
         velocity = mnavScale3(velocity, self->maxSpeed / sqrt(speedSq));
     }
-    // Within the speed sphere, but for the scaling's last bits.
+    // Within the speed sphere, but for the scaling's last bits: relative,
+    // and a few units of the least subnormal where the squares are
+    // subnormal and round absolutely.
     MNAV_ASSERT(isfinite(velocity.x) && isfinite(velocity.y) && isfinite(velocity.z) &&
-                mnavDot3(velocity, velocity) <= self->maxSpeed * self->maxSpeed * (1.0 + 0x1p-40));
+                mnavDot3(velocity, velocity) <=
+                    self->maxSpeed * self->maxSpeed * (1.0 + 0x1p-40) + 0x1p-1072);
     return velocity;
 }
 

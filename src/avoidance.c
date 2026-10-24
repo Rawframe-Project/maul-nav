@@ -298,9 +298,12 @@ static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, double step, in
     {
         velocity = mnavScale2(velocity, self->maxSpeed / sqrt(speedSq));
     }
-    // Within the speed circle, but for the scaling's last bits.
+    // Within the speed circle, but for the scaling's last bits: relative,
+    // and a few units of the least subnormal where the squares are
+    // subnormal and round absolutely.
     MNAV_ASSERT(isfinite(velocity.x) && isfinite(velocity.y) &&
-                mnavDot2(velocity, velocity) <= self->maxSpeed * self->maxSpeed * (1.0 + 0x1p-40));
+                mnavDot2(velocity, velocity) <=
+                    self->maxSpeed * self->maxSpeed * (1.0 + 0x1p-40) + 0x1p-1072);
     return velocity;
 }
 

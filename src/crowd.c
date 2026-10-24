@@ -291,12 +291,6 @@ static void Ring(Search* s, const mnavCrowdKey* c, int64_t r)
     }
 }
 
-// The rings or shells from the agent's own cell out. A cell r out lies
-// at least r - 1 cells away, a little less for the cells' rounding; once
-// the list is full, a ring nearer than that to nothing kept holds no
-// agent it would keep (ties at the worst distance are still looked at),
-// and the search stops. The neighbours are those a search of every cell
-// in range finds.
 // At most the limit of neighbours, nearest first in NeighborBefore's
 // order, each another agent within range.
 static void CheckNeighbors(const mnavCrowd* crowd, int32_t index, double rangeSq, int32_t found)
@@ -310,6 +304,12 @@ static void CheckNeighbors(const mnavCrowd* crowd, int32_t index, double rangeSq
     }
 }
 
+// The rings or shells from the agent's own cell out. A cell r out lies
+// at least r - 1 cells away, a little less for the cells' rounding; once
+// the list is full, a ring nearer than that to nothing kept holds no
+// agent it would keep (ties at the worst distance are still looked at),
+// and the search stops. The neighbours are those a search of every cell
+// in range finds.
 int32_t mnavCrowdNeighbors(mnavCrowd* crowd, mnavPos3 position, int32_t index, uint32_t ignores)
 {
     double range = crowd->range;
