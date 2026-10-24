@@ -3,8 +3,10 @@
 //
 // 2D bakes: outlines filled into the 3D pipeline, and queries
 // on the flat navmesh they give. Default def: 0.25 m cells, 32 m tiles,
-// an agent 0.5 m in radius.
+// an agent 0.5 m in radius. The room's bytes hold under every host
+// floating-point setting.
 
+#include "float_hosts.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -65,6 +67,21 @@ static mnavNearest On(const mnavNavmesh* navmesh, double x, double y, float box)
     return n;
 }
 
+// The room baked by a baker of its own: its bytes' hash.
+static uint64_t RoomHash(void)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBaker* baker = nullptr;
+    static uint8_t bytes[CAPACITY];
+    size_t size = 0;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTile2D(baker, s_outlines, 6, 0, 0, nullptr) == mnav_success &&
+              mnavCopyBakedTile(baker, bytes, CAPACITY, &size) == mnav_success,
+          "the room baked");
+    mnavDestroyBaker(baker);
+    return mnavHash64(MNAV_HASH_INIT, bytes, (int32_t)size);
+}
+
 static void TestTheRoom(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
@@ -79,6 +96,7 @@ static void TestTheRoom(void)
     printf("ROOM_HASH=%016llx polygons=%d bytes=%zu\n", (unsigned long long)hash, report.polygons,
            s_sizes[0]);
     CHECK(hash == ROOM_HASH, "the pinned hash");
+    CHECK(EveryFloatHost(RoomHash, ROOM_HASH), "the pinned hash under every host setting");
     mnavNavmesh* navmesh = Load(1);
     // The floor keeps the agent's radius from walls, less the error its
     // simplified outline may have (0.3 m), as in 3D.

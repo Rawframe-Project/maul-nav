@@ -12,6 +12,7 @@
 #include "flight.h"
 #include "flight_def.h"
 #include "flight_tile.h"
+#include "fpenv.h"
 #include "raster.h"
 
 #include "maul-nav/bake.h"
@@ -34,7 +35,8 @@ struct mnavFlightBaker
     size_t tileSize;
 };
 
-mnavFlightDefResult mnavCreateFlightBaker(const mnavFlightDef* def, mnavFlightBaker** bakerOut)
+static MNAV_NOINLINE mnavFlightDefResult CreateFlightBakerWork(const mnavFlightDef* def,
+                                                               mnavFlightBaker** bakerOut)
 {
     if (bakerOut == nullptr)
     {
@@ -64,6 +66,14 @@ mnavFlightDefResult mnavCreateFlightBaker(const mnavFlightDef* def, mnavFlightBa
     *baker = (mnavFlightBaker){*def, shape, voxels, cells, memory, nullptr, 0};
     *bakerOut = baker;
     return (mnavFlightDefResult){mnav_success, mnav_flightSettingNone};
+}
+
+mnavFlightDefResult mnavCreateFlightBaker(const mnavFlightDef* def, mnavFlightBaker** bakerOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavFlightDefResult result = CreateFlightBakerWork(def, bakerOut);
+    mnavFloatEnvLeave(env);
+    return result;
 }
 
 static void DropTile(mnavFlightBaker* baker)
@@ -150,8 +160,9 @@ static mnavResult Bake(mnavFlightBaker* baker, const mnavBakeInput* input, int32
     return result;
 }
 
-mnavResult mnavBakeFlightTile(mnavFlightBaker* baker, const mnavBakeInput* input, int32_t tileX,
-                              int32_t tileZ, mnavFlightBakeReport* reportOut)
+static MNAV_NOINLINE mnavResult BakeFlightTileWork(mnavFlightBaker* baker,
+                                                   const mnavBakeInput* input, int32_t tileX,
+                                                   int32_t tileZ, mnavFlightBakeReport* reportOut)
 {
     mnavFlightBakeReport report = {0};
     report.mesh = -1;
@@ -170,6 +181,15 @@ mnavResult mnavBakeFlightTile(mnavFlightBaker* baker, const mnavBakeInput* input
     {
         *reportOut = report;
     }
+    return result;
+}
+
+mnavResult mnavBakeFlightTile(mnavFlightBaker* baker, const mnavBakeInput* input, int32_t tileX,
+                              int32_t tileZ, mnavFlightBakeReport* reportOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = BakeFlightTileWork(baker, input, tileX, tileZ, reportOut);
+    mnavFloatEnvLeave(env);
     return result;
 }
 

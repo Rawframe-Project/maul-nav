@@ -24,7 +24,9 @@ extern "C"
     // Decides whether the way between two points is free for the agent:
     // the host's collision test. True to keep the link. It is called only
     // within mnavGenerateLinks, on the thread that called it, before that
-    // call returns; never afterward or from another thread.
+    // call returns; never afterward or from another thread. Its answer
+    // decides the links, so it runs in the library's floating-point
+    // environment: round to nearest, denormals kept.
     typedef bool (*mnavClearanceFn)(void* context, mnavPos3 from, mnavPos3 to);
 
     // How links are generated. Build it with mnavDefaultLinkGenDef.

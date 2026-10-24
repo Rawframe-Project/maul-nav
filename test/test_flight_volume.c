@@ -15,6 +15,7 @@
 #include "flight_def.h"
 #include "flight_space.h"
 #include "flight_tile.h"
+#include "float_hosts.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -80,6 +81,32 @@ static uint64_t BakeOne(mnavFlightBaker* baker, const mnavBakeInput* input, int3
     return mnavHash64(MNAV_HASH_INIT, s_bytes[t], (int32_t)size);
 }
 
+// The test world, made beforehand, for WorldHash.
+static mnavTriangleMesh s_world;
+
+// The test world's four tiles baked by a baker of their own: the hash of
+// their bytes' hashes.
+static uint64_t WorldHash(void)
+{
+    mnavFlightDef def = Def();
+    mnavFlightBaker* baker = nullptr;
+    CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success, "baker");
+    mnavBakeInput input = {&s_world, 1, nullptr, 0, nullptr, 0, nullptr};
+    static uint8_t bytes[TILE_MOST];
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t t = 0; t < 4; ++t)
+    {
+        size_t size = 0;
+        CHECK(mnavBakeFlightTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
+                  mnavCopyFlightTile(baker, bytes, TILE_MOST, &size) == mnav_success,
+              "baked");
+        uint64_t one = mnavHash64(MNAV_HASH_INIT, bytes, (int32_t)size);
+        hash = mnavHash64(hash, &one, (int32_t)sizeof(one));
+    }
+    mnavDestroyFlightBaker(baker);
+    return hash;
+}
+
 // Bakes the test world's four tiles into s_bytes, and one again.
 static void BakeAll(void)
 {
@@ -87,6 +114,7 @@ static void BakeAll(void)
     mnavFlightBaker* baker = nullptr;
     CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success, "baker");
     mnavTriangleMesh world = World();
+    s_world = world;
     mnavBakeInput input = {&world, 1, nullptr, 0, nullptr, 0, nullptr};
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t t = 0; t < 4; ++t)
@@ -96,6 +124,8 @@ static void BakeAll(void)
     }
     printf("FLIGHT_BYTES_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == FLIGHT_BYTES_HASH, "the pinned bytes");
+    CHECK(EveryFloatHost(WorldHash, FLIGHT_BYTES_HASH),
+          "the pinned bytes under every host setting");
     // The same bake makes the same bytes.
     CHECK(mnavBakeFlightTile(baker, &input, 0, 0, nullptr) == mnav_success, "again");
     size_t size = 0;

@@ -8,6 +8,7 @@
 #include "flight_frame.h"
 #include "flight_space.h"
 #include "flight_volume.h"
+#include "fpenv.h"
 #include "query.h"
 
 #include "maul-nav/base.h"
@@ -527,8 +528,9 @@ static mnavResult Holds(const mnavQuery* query, const mnavFlightVolume* volume)
     return f->volume == volume && f->commits == volume->commits ? mnav_success : mnav_errorStale;
 }
 
-mnavResult mnavBeginFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 start,
-                               mnavPos3 end)
+static MNAV_NOINLINE mnavResult BeginFlightPathWork(mnavQuery* query,
+                                                    const mnavFlightVolume* volume, mnavPos3 start,
+                                                    mnavPos3 end)
 {
     if (query == nullptr || volume == nullptr)
     {
@@ -593,8 +595,18 @@ mnavResult mnavBeginFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
     return mnav_success;
 }
 
-mnavResult mnavContinueFlightPath(mnavQuery* query, const mnavFlightVolume* volume, int32_t nodes,
-                                  bool* endedOut)
+mnavResult mnavBeginFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 start,
+                               mnavPos3 end)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = BeginFlightPathWork(query, volume, start, end);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult ContinueFlightPathWork(mnavQuery* query,
+                                                       const mnavFlightVolume* volume,
+                                                       int32_t nodes, bool* endedOut)
 {
     mnavResult held = Holds(query, volume);
     if (held != mnav_success || endedOut == nullptr || nodes < 1)
@@ -613,8 +625,18 @@ mnavResult mnavContinueFlightPath(mnavQuery* query, const mnavFlightVolume* volu
     return mnav_success;
 }
 
-mnavResult mnavFinishFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
-                                mnavFlightPath* pathOut)
+mnavResult mnavContinueFlightPath(mnavQuery* query, const mnavFlightVolume* volume, int32_t nodes,
+                                  bool* endedOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = ContinueFlightPathWork(query, volume, nodes, endedOut);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult FinishFlightPathWork(mnavQuery* query,
+                                                     const mnavFlightVolume* volume,
+                                                     mnavFlightPath* pathOut)
 {
     mnavResult held = Holds(query, volume);
     if (held != mnav_success || pathOut == nullptr)
@@ -648,8 +670,18 @@ mnavResult mnavFinishFlightPath(mnavQuery* query, const mnavFlightVolume* volume
     return mnav_success;
 }
 
-mnavResult mnavFindFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 start,
-                              mnavPos3 end, mnavFlightPath* pathOut)
+mnavResult mnavFinishFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
+                                mnavFlightPath* pathOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = FinishFlightPathWork(query, volume, pathOut);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult FindFlightPathWork(mnavQuery* query, const mnavFlightVolume* volume,
+                                                   mnavPos3 start, mnavPos3 end,
+                                                   mnavFlightPath* pathOut)
 {
     if (pathOut == nullptr)
     {
@@ -662,4 +694,13 @@ mnavResult mnavFindFlightPath(mnavQuery* query, const mnavFlightVolume* volume, 
         result = mnavContinueFlightPath(query, volume, INT32_MAX, &ended);
     }
     return result == mnav_success ? mnavFinishFlightPath(query, volume, pathOut) : result;
+}
+
+mnavResult mnavFindFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 start,
+                              mnavPos3 end, mnavFlightPath* pathOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = FindFlightPathWork(query, volume, start, end, pathOut);
+    mnavFloatEnvLeave(env);
+    return result;
 }

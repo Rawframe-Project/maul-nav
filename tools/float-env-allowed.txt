@@ -1,0 +1,33 @@
+# Public functions that compute no floats, so they need not enter the
+# floating-point environment (tools/check_float_env.py). A reason is a
+# line ending in a colon, its names indented below it.
+
+reads or copies stored integers and bytes:
+    mnavGetVersion
+    mnavResultName
+    mnavHash64
+    mnavCopyBakedTile
+    mnavCopyFlightTile
+    mnavGetTile
+    mnavGetFlightTile
+    mnavGetArea
+    mnavGetTier
+    mnavGetTileCacheBytes
+
+gives memory back, which the allocator does in the host's environment:
+    mnavDestroyAvoidance
+    mnavDestroyBaker
+    mnavDestroyFlightBaker
+    mnavDestroyFlightVolume
+    mnavDestroyFlowField
+    mnavDestroyHierarchy
+    mnavDestroyNavFlow
+    mnavDestroyNavmesh
+    mnavDestroyQuery
+    mnavDestroyTileCache
+    mnavDestroyTileIndex
+    mnavDropCachedTile
+
+stages a removal, by its place alone:
+    mnavStageTileRemoval
+    mnavStageFlightTileRemoval

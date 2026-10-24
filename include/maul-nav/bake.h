@@ -120,7 +120,7 @@ extern "C"
 
     // A clock the host passes in: now returns ticks in a unit of the
     // host's choosing, never going back, and is called from the thread
-    // that bakes.
+    // that bakes, in the host's own floating-point environment.
     typedef struct mnavClock
     {
         uint64_t (*now)(void* context);

@@ -4,6 +4,7 @@
 // The path search: A* over portals, with named limits.
 
 #include "allocator.h"
+#include "fpenv.h"
 #include "funnel.h"
 #include "navmesh.h"
 #include "offmesh.h"
@@ -396,9 +397,10 @@ static mnavPathEnd EndOf(const mnavSearch* s)
     return s->notLoaded ? mnav_pathNotLoaded : mnav_pathNone;
 }
 
-mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
-                         const mnavQueryFilter* filter, mnavPolygonId startPolygon, mnavPos3 start,
-                         mnavPolygonId endPolygon, mnavPos3 end)
+static MNAV_NOINLINE mnavResult BeginPathWork(mnavQuery* query, const mnavNavmesh* navmesh,
+                                              const mnavQueryFilter* filter,
+                                              mnavPolygonId startPolygon, mnavPos3 start,
+                                              mnavPolygonId endPolygon, mnavPos3 end)
 {
     if (query == nullptr || navmesh == nullptr || !FinitePoint(start) || !FinitePoint(end))
     {
@@ -454,6 +456,16 @@ mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
     query->nodeCount = 1;
     query->heapCount = 1;
     return mnav_success;
+}
+
+mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
+                         const mnavQueryFilter* filter, mnavPolygonId startPolygon, mnavPos3 start,
+                         mnavPolygonId endPolygon, mnavPos3 end)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = BeginPathWork(query, navmesh, filter, startPolygon, start, endPolygon, end);
+    mnavFloatEnvLeave(env);
+    return result;
 }
 
 void mnavConfineSearch(mnavQuery* query, const uint8_t* inside, bool beyond, bool noEnd)
@@ -560,8 +572,8 @@ static bool Ended(const mnavQuery* query)
     return query->search.found != MNAV_NO_NODE || query->heapCount == 0;
 }
 
-mnavResult mnavContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, int32_t nodes,
-                            bool* endedOut)
+static MNAV_NOINLINE mnavResult ContinuePathWork(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                 int32_t nodes, bool* endedOut)
 {
     if (endedOut == nullptr || nodes < 1)
     {
@@ -598,7 +610,17 @@ mnavResult mnavContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, int32_
     return mnav_success;
 }
 
-mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPath* pathOut)
+mnavResult mnavContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, int32_t nodes,
+                            bool* endedOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = ContinuePathWork(query, navmesh, nodes, endedOut);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult FinishPathWork(mnavQuery* query, const mnavNavmesh* navmesh,
+                                               mnavPath* pathOut)
 {
     if (pathOut == nullptr)
     {
@@ -629,9 +651,19 @@ mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPath
     return mnav_success;
 }
 
-mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                        mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
-                        mnavPos3 end, mnavPath* pathOut)
+mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPath* pathOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = FinishPathWork(query, navmesh, pathOut);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult FindPathWork(mnavQuery* query, const mnavNavmesh* navmesh,
+                                             const mnavQueryFilter* filter,
+                                             mnavPolygonId startPolygon, mnavPos3 start,
+                                             mnavPolygonId endPolygon, mnavPos3 end,
+                                             mnavPath* pathOut)
 {
     if (pathOut == nullptr)
     {
@@ -646,10 +678,22 @@ mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnav
     return result == mnav_success ? mnavFinishPath(query, navmesh, pathOut) : result;
 }
 
-mnavResult mnavCheckReachable(mnavQuery* query, const mnavNavmesh* navmesh,
-                              const mnavQueryFilter* filter, mnavPolygonId startPolygon,
-                              mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
-                              mnavPathEnd* endOut)
+mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                        mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
+                        mnavPos3 end, mnavPath* pathOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result =
+        FindPathWork(query, navmesh, filter, startPolygon, start, endPolygon, end, pathOut);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult CheckReachableWork(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                   const mnavQueryFilter* filter,
+                                                   mnavPolygonId startPolygon, mnavPos3 start,
+                                                   mnavPolygonId endPolygon, mnavPos3 end,
+                                                   mnavPathEnd* endOut)
 {
     if (endOut == nullptr)
     {
@@ -669,4 +713,16 @@ mnavResult mnavCheckReachable(mnavQuery* query, const mnavNavmesh* navmesh,
     *endOut = s->found != MNAV_NO_NODE ? mnav_pathFound : EndOf(s);
     s->active = false;
     return mnav_success;
+}
+
+mnavResult mnavCheckReachable(mnavQuery* query, const mnavNavmesh* navmesh,
+                              const mnavQueryFilter* filter, mnavPolygonId startPolygon,
+                              mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
+                              mnavPathEnd* endOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result =
+        CheckReachableWork(query, navmesh, filter, startPolygon, start, endPolygon, end, endOut);
+    mnavFloatEnvLeave(env);
+    return result;
 }

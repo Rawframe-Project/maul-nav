@@ -4,6 +4,7 @@
 // The navmesh's commit: tiles and off-mesh links together, all
 // or nothing.
 
+#include "fpenv.h"
 #include "invariant.h"
 #include "modifiers.h"
 #include "navmesh.h"
@@ -97,7 +98,7 @@ static void CheckNavmesh(const mnavNavmesh* navmesh)
                 navmesh->linksPending == 0);
 }
 
-mnavResult mnavCommit(mnavNavmesh* navmesh)
+static MNAV_NOINLINE mnavResult CommitWork(mnavNavmesh* navmesh)
 {
     if (navmesh == nullptr)
     {
@@ -130,5 +131,13 @@ mnavResult mnavCommit(mnavNavmesh* navmesh)
             CheckNavmesh(navmesh);
         }
     }
+    return result;
+}
+
+mnavResult mnavCommit(mnavNavmesh* navmesh)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = CommitWork(navmesh);
+    mnavFloatEnvLeave(env);
     return result;
 }

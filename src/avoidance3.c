@@ -9,6 +9,7 @@
 #include "avoidance.h"
 #include "crowd.h"
 #include "draw.h"
+#include "fpenv.h"
 #include "invariant.h"
 #include "obstacle.h"
 #include "orca3.h"
@@ -249,9 +250,10 @@ static mnavResult Prepare(mnavAvoidance* avoidance, const mnavAgent3D* agents, i
     return mnav_success;
 }
 
-mnavResult mnavAvoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
-                       const mnavSphere* spheres, int32_t sphereCount, double step,
-                       mnavPos3* velocitiesOut)
+static MNAV_NOINLINE mnavResult Avoid3DWork(mnavAvoidance* avoidance, const mnavAgent3D* agents,
+                                            int32_t agentCount, const mnavSphere* spheres,
+                                            int32_t sphereCount, double step,
+                                            mnavPos3* velocitiesOut)
 {
     if (avoidance == nullptr || agentCount < 0 || sphereCount < 0 ||
         (agentCount > 0 && (agents == nullptr || velocitiesOut == nullptr)) ||
@@ -272,6 +274,17 @@ mnavResult mnavAvoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int3
     return mnav_success;
 }
 
+mnavResult mnavAvoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
+                       const mnavSphere* spheres, int32_t sphereCount, double step,
+                       mnavPos3* velocitiesOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result =
+        Avoid3DWork(avoidance, agents, agentCount, spheres, sphereCount, step, velocitiesOut);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
 // Draws three 16-gons of a radius round a center, one in each axis plane.
 static void Rings(mnavDebugBuffer* buffer, mnavPos3 c, double radius, mnavDebugKind kind)
 {
@@ -290,9 +303,10 @@ static void Rings(mnavDebugBuffer* buffer, mnavPos3 c, double radius, mnavDebugK
     }
 }
 
-mnavResult mnavDebugAvoidance3D(mnavAvoidance* avoidance, const mnavAgent3D* agents,
-                                int32_t agentCount, const mnavSphere* spheres, int32_t sphereCount,
-                                mnavDebugBuffer* buffer)
+static MNAV_NOINLINE mnavResult DebugAvoidance3DWork(mnavAvoidance* avoidance,
+                                                     const mnavAgent3D* agents, int32_t agentCount,
+                                                     const mnavSphere* spheres, int32_t sphereCount,
+                                                     mnavDebugBuffer* buffer)
 {
     if (avoidance == nullptr || agentCount < 0 || sphereCount < 0 ||
         (agentCount > 0 && agents == nullptr) || (sphereCount > 0 && spheres == nullptr) ||
@@ -321,4 +335,15 @@ mnavResult mnavDebugAvoidance3D(mnavAvoidance* avoidance, const mnavAgent3D* age
         Rings(buffer, spheres[s].center, spheres[s].radius, mnav_debugObstacle);
     }
     return mnavDrawResult(buffer);
+}
+
+mnavResult mnavDebugAvoidance3D(mnavAvoidance* avoidance, const mnavAgent3D* agents,
+                                int32_t agentCount, const mnavSphere* spheres, int32_t sphereCount,
+                                mnavDebugBuffer* buffer)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result =
+        DebugAvoidance3DWork(avoidance, agents, agentCount, spheres, sphereCount, buffer);
+    mnavFloatEnvLeave(env);
+    return result;
 }

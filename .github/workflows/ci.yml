@@ -37,17 +37,17 @@ env:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@40dc8f20f0da3bb2c9d358aa23ec19d0d6ee309b # v0.0.13
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@927292043ce9cd831a92a80486da8b377b05f4ae # v0.0.15
     permissions:
       pull-requests: read
 
   docs:
-    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@40dc8f20f0da3bb2c9d358aa23ec19d0d6ee309b # v0.0.13
+    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@927292043ce9cd831a92a80486da8b377b05f4ae # v0.0.15
     permissions:
       contents: read
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@40dc8f20f0da3bb2c9d358aa23ec19d0d6ee309b # v0.0.13
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@927292043ce9cd831a92a80486da8b377b05f4ae # v0.0.15
     permissions:
       contents: read
 
@@ -77,6 +77,7 @@ jobs:
         run: |
           python3 tools/check_source.py
           python3 tools/check_modules.py
+          python3 tools/check_float_env.py
           python3 tools/check_docs.py
           python3 tools/check_lengths.py
           python3 tools/check_guide.py
@@ -112,7 +113,7 @@ jobs:
           - { preset: linux-arm64-gcc-14, runner: ubuntu-24.04-arm }
           - { preset: macos-clang, runner: macos-15 }
           - { preset: windows-clang-cl, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@40dc8f20f0da3bb2c9d358aa23ec19d0d6ee309b # v0.0.13
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@927292043ce9cd831a92a80486da8b377b05f4ae # v0.0.15
     permissions:
       contents: read
     with:

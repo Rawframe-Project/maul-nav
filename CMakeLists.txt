@@ -74,6 +74,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/flight_space.c
     src/flight_tile.c
     src/flight_volume.c
+    src/fpenv.c
     src/hash.c
     src/funnel.c
     src/flow.c
@@ -186,6 +187,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(terrain)
     maul_add_test(funnel WHITEBOX)
     maul_add_test(lz WHITEBOX)
+    maul_add_test(fpenv WHITEBOX)
     maul_add_test(tile_cache)
     maul_add_test(tile_index)
     maul_add_test(volume WHITEBOX)
@@ -201,6 +203,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(scalar WHITEBOX)
     maul_add_test(tile WHITEBOX)
     maul_add_header_tests()
+    maul_add_exports_test()
     # Installs the build into the binary tree and builds and runs
     # samples/minimal against it, as a consumer of the package would.
     if(MAUL_NAV_TEST_PACKAGE AND MAUL_NAV_INSTALL)
