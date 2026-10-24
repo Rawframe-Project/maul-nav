@@ -8,7 +8,8 @@
 // format rises.
 //
 // stored_tiles.h is written by `test_stored --write > test/stored_tiles.h`
-// in the pull request that raises MNAV_TILE_FORMAT or MNAV_FLIGHT_FORMAT,
+// in the pull request that raises MNAV_TILE_FORMAT or MNAV_FLIGHT_FORMAT, or
+// that adds a scene's tiles while the existing tiles stay byte-identical,
 // and only then.
 
 #include "stored_format1.h"
