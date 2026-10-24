@@ -13,6 +13,11 @@ on:
   schedule:
     - cron: "37 5 * * *"
   workflow_dispatch:
+    inputs:
+      fuzz-seconds:
+        description: Seconds each target runs in fuzz-night (the night's run is 600)
+        type: number
+        default: 600
 
 # A new push to a pull request cancels its running CI; runs on main get a
 # group of their own, so they are never cancelled.
@@ -252,7 +257,9 @@ jobs:
       - name: Run
         env:
           TARGET: ${{ matrix.target }}
-        run: tools/fuzz.sh night out/fuzz "$TARGET" 600
+          # A scheduled run has no inputs, so it takes the full 600.
+          FUZZ_SECONDS: ${{ inputs.fuzz-seconds || 600 }}
+        run: tools/fuzz.sh night out/fuzz "$TARGET" "$FUZZ_SECONDS"
       - name: Save the corpus
         if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
