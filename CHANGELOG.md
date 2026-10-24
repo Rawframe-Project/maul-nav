@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.0.2](https://github.com/Rawframe-Project/maul-nav/compare/v0.0.1...v0.0.2) (2026-10-24)
+
+
+### Fixed
+
+* **navmesh:** retire a slot freed at its last generation ([#11](https://github.com/Rawframe-Project/maul-nav/issues/11)) ([a01a378](https://github.com/Rawframe-Project/maul-nav/commit/a01a378965d141cd7825bdfeed10db20c181a5df))
+
 ## [0.0.1](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.0.1) (2026-10-24)
 
 The first release: navmesh and flight volume baking, queries, corridors,
