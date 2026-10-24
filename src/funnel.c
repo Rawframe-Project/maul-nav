@@ -6,6 +6,7 @@
 
 #include "funnel.h"
 
+#include "invariant.h"
 #include "navmesh.h"
 #include "query.h"
 
@@ -32,6 +33,8 @@ int32_t mnavPathPolygons(mnavQuery* query, const mnavNavmesh* navmesh, int32_t l
         if (previous == nullptr || crossed || previous->slot != id.slot ||
             previous->polygon != id.polygon)
         {
+            // A node is a visit, so the corridor fits the node limit.
+            MNAV_ASSERT(count < query->limits.nodes);
             query->corridor[count++] = id;
         }
         crossed = node->tag == MNAV_TAG_OFFMESH;
@@ -57,6 +60,8 @@ static int32_t Portals(mnavQuery* query, int32_t last)
         // the walker's left. An off-mesh link gives its takeoff point, then
         // its landing point; written backward here.
         const mnavSearchNode* node = &query->nodes[n];
+        // Two portals a node at most, and room for the end's.
+        MNAV_ASSERT(count + 2 < 2 * query->limits.nodes + 1);
         if (node->tag == MNAV_TAG_OFFMESH)
         {
             query->portals[count++] = (mnavPortal){node->b, node->b, -1};
@@ -95,6 +100,8 @@ static void Push(mnavQuery* query, int32_t* count, mnavPos3 p)
 {
     if (*count == 0 || !Same(query->points[*count - 1], p))
     {
+        // A point a portal at most, and the portals fit their buffer.
+        MNAV_ASSERT(*count < 2 * query->limits.nodes + 1);
         query->points[(*count)++] = p;
     }
 }
@@ -127,6 +134,8 @@ static bool OnPortal(mnavPos3 p, const mnavPortal* portal)
 // Makes a side's point the funnel's new apex, a corner of the path.
 static void Corner(mnavQuery* query, int32_t* count, Funnel* f, mnavPos3 p, int32_t at)
 {
+    // A corner lies past the apex, so the scan that restarts from it ends.
+    MNAV_ASSERT(at > f->apexAt);
     Push(query, count, p);
     *f = (Funnel){p, p, p, at, at, at};
 }
@@ -203,6 +212,7 @@ int32_t mnavPullPortals(mnavQuery* query, const mnavNavmesh* navmesh, int32_t po
         {
             // An edge link's crossing is reported as the link its id names.
             const mnavOffLink* link = &navmesh->links[navmesh->links[crossed / 2].parent];
+            MNAV_ASSERT(*linkCount < query->limits.nodes);
             query->links[(*linkCount)++] =
                 (mnavPathLink){{(uint32_t)navmesh->links[crossed / 2].parent + 1, link->generation},
                                link->def.kind,

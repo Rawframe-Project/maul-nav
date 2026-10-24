@@ -5,6 +5,7 @@
 // to its target, checked and pulled tight.
 
 #include "funnel.h"
+#include "invariant.h"
 #include "navmesh.h"
 #include "offmesh.h"
 #include "polymesh.h"
@@ -384,6 +385,7 @@ static int32_t IndexOf(const mnavPolygonId* list, int32_t count, mnavPolygonId i
 static mnavResult MergeStart(mnavCorridor* corridor, const mnavMove* move)
 {
     const mnavPolygonId* walked = move->polygons;
+    MNAV_ASSERT(move->polygonCount >= 1 && SameId(walked[0], corridor->polygons[0]));
     int32_t farthest = -1;
     int32_t at = -1;
     for (int32_t i = corridor->count - 1; i >= 0 && farthest < 0; --i)
@@ -393,6 +395,7 @@ static mnavResult MergeStart(mnavCorridor* corridor, const mnavMove* move)
         at = j;
     }
     // The walk began on the first polygon, so some polygon is shared.
+    MNAV_ASSERT(farthest >= 0 && at >= 0);
     int32_t lead = move->polygonCount - at;
     int32_t rest = corridor->count - farthest - 1;
     if (lead + rest > corridor->capacity)
@@ -414,6 +417,8 @@ static mnavResult MergeStart(mnavCorridor* corridor, const mnavMove* move)
 static mnavResult MergeEnd(mnavCorridor* corridor, const mnavMove* move)
 {
     const mnavPolygonId* walked = move->polygons;
+    MNAV_ASSERT(move->polygonCount >= 1 &&
+                SameId(walked[0], corridor->polygons[corridor->count - 1]));
     int32_t first = -1;
     int32_t at = -1;
     for (int32_t i = 0; i < corridor->count && first < 0; ++i)
@@ -421,6 +426,8 @@ static mnavResult MergeEnd(mnavCorridor* corridor, const mnavMove* move)
         at = IndexOf(walked, move->polygonCount, corridor->polygons[i]);
         first = at >= 0 ? i : -1;
     }
+    // The walk began on the last polygon, so some polygon is shared.
+    MNAV_ASSERT(first >= 0 && at >= 0);
     int32_t tail = move->polygonCount - at - 1;
     if (first + 1 + tail > corridor->capacity)
     {
@@ -446,6 +453,8 @@ mnavResult mnavMoveCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
     if (result == mnav_success)
     {
         corridor->position = move.point;
+        MNAV_ASSERT(corridor->count >= 1 && corridor->count <= corridor->capacity &&
+                    SameId(corridor->polygons[0], move.polygon));
     }
     if (result == mnav_success && moveOut != nullptr)
     {
@@ -470,6 +479,8 @@ mnavResult mnavMoveCorridorTarget(mnavQuery* query, const mnavNavmesh* navmesh,
     if (result == mnav_success)
     {
         corridor->target = move.point;
+        MNAV_ASSERT(corridor->count >= 1 && corridor->count <= corridor->capacity &&
+                    SameId(corridor->polygons[corridor->count - 1], move.polygon));
     }
     if (result == mnav_success && moveOut != nullptr)
     {
@@ -503,6 +514,8 @@ mnavResult mnavShortcutCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
         at = IndexOf(ray.polygons, ray.polygonCount, corridor->polygons[i]);
         last = at >= 0 ? i : -1;
     }
+    // The ray began on the first polygon, so some polygon is shared.
+    MNAV_ASSERT(last >= 0 && at >= 0);
     if (at >= last)
     {
         return mnav_success;
