@@ -226,7 +226,10 @@ jobs:
           persist-credentials: false
       - name: List
         id: list
-        run: echo "targets=$(tools/fuzz.sh targets out/fuzz)" >> "$GITHUB_OUTPUT"
+        # Assigned first, so that a failed listing fails the step.
+        run: |
+          targets=$(tools/fuzz.sh targets out/fuzz)
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
 
   # Every night, each target alone for ten minutes, from the corpus the last
   # night left in its cache and the committed seeds; the merged corpus is

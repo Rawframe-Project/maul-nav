@@ -54,13 +54,14 @@ fuzz() { # target seconds corpus...
     fi
 }
 
-# Configures the fuzz build and lists the targets it defines, one a line.
+# Configures the fuzz build and lists the targets it defines, one a line, as
+# CMake writes them to OUT/fuzz-targets.txt.
 list_targets() {
     cmake -B "$out" -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
         -DMAUL_NAV_FUZZ=ON -DMAUL_NAV_WERROR=ON -DMAUL_NAV_BUILD_BENCH=OFF \
         -DMAUL_NAV_BUILD_SAMPLES=OFF >"$out.log"
     local targets
-    targets=$(ninja -C "$out" -t targets all | grep -oE '^fuzz_[a-z0-9]+:' | tr -d ':' | sort -u)
+    targets=$(cat "$out/fuzz-targets.txt")
     [ -n "$targets" ] || {
         echo "::error::the build defines no fuzz target" >&2
         return 1

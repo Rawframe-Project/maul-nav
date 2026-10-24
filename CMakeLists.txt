@@ -224,7 +224,9 @@ if(MAUL_NAV_FUZZ)
     target_compile_options(maul-nav PRIVATE -fsanitize=fuzzer-no-link,address,undefined
                                             -fno-sanitize-recover=all)
     target_link_options(maul-nav PUBLIC -fsanitize=address,undefined)
+    set(fuzz_targets "")
     foreach(area tile bake query avoid graph stream flow shortest flight lz)
+        list(APPEND fuzz_targets fuzz_${area})
         add_executable(fuzz_${area} test/fuzz_${area}.c)
         target_link_libraries(fuzz_${area} PRIVATE maul-nav)
         # The targets reach the library's own functions.
@@ -234,6 +236,9 @@ if(MAUL_NAV_FUZZ)
                                                      -fno-sanitize-recover=all)
         target_link_options(fuzz_${area} PRIVATE -fsanitize=fuzzer,address,undefined)
     endforeach()
+    # The targets, one a line, for tools/fuzz.sh and the night's matrix.
+    list(JOIN fuzz_targets "\n" fuzz_lines)
+    file(WRITE ${PROJECT_BINARY_DIR}/fuzz-targets.txt "${fuzz_lines}\n")
 endif()
 
 if(MAUL_NAV_DIFFERENTIAL)
