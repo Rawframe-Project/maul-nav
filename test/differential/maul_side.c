@@ -5,6 +5,10 @@
 
 #include "diff.h"
 
+// The query context's insides, for the nodes a search made: the harness
+// is test only and reads them as the white-box suites do.
+#include "query.h"
+
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
@@ -30,8 +34,9 @@ static int32_t TileOf(float v)
     return (int32_t)floorf(v / 32.0f);
 }
 
-// Bakes and stages every tile of the scene's bounds.
-static bool Load(mnavNavmesh* navmesh, const DiffScene* scene)
+// Bakes every tile of the scene's bounds and, with a navmesh, stages it;
+// bytes, which may be NULL, receives the tiles' bytes in all.
+static bool Load(mnavNavmesh* navmesh, const DiffScene* scene, int64_t* bytes)
 {
     float lo[2] = {1e30f, 1e30f};
     float hi[2] = {-1e30f, -1e30f};
@@ -54,18 +59,31 @@ static bool Load(mnavNavmesh* navmesh, const DiffScene* scene)
                                    scene->indices, scene->triangleCount, nullptr};
     static uint8_t tile[TILE_ROOM];
     bool good = true;
+    int64_t total = 0;
     for (int32_t z = TileOf(lo[1]); z <= TileOf(hi[1]) && good; ++z)
     {
         for (int32_t x = TileOf(lo[0]); x <= TileOf(hi[0]) && good; ++x)
         {
             size_t size = 0;
-            good = mnavBakeTile(baker, &mesh, 1, x, z, nullptr) == mnav_success &&
-                   mnavCopyBakedTile(baker, tile, TILE_ROOM, &size) == mnav_success &&
-                   mnavStageTile(navmesh, tile, size).result == mnav_success;
+            good =
+                mnavBakeTile(baker, &mesh, 1, x, z, nullptr) == mnav_success &&
+                mnavCopyBakedTile(baker, tile, TILE_ROOM, &size) == mnav_success &&
+                (navmesh == nullptr || mnavStageTile(navmesh, tile, size).result == mnav_success);
+            total += (int64_t)size;
         }
     }
     mnavDestroyBaker(baker);
-    return good && mnavCommit(navmesh) == mnav_success;
+    if (bytes != nullptr)
+    {
+        *bytes = total;
+    }
+    return good && (navmesh == nullptr || mnavCommit(navmesh) == mnav_success);
+}
+
+int64_t DiffMaulBake(const DiffScene* scene)
+{
+    int64_t bytes = 0;
+    return Load(nullptr, scene, &bytes) ? bytes : -1;
 }
 
 DiffMaul* DiffMaulBuild(const DiffScene* scene)
@@ -74,7 +92,8 @@ DiffMaul* DiffMaulBuild(const DiffScene* scene)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     if (maul == nullptr || mnavCreateNavmesh(&def, &maul->navmesh).result != mnav_success ||
-        mnavCreateQuery(&queryDef, &maul->query) != mnav_success || !Load(maul->navmesh, scene))
+        mnavCreateQuery(&queryDef, &maul->query) != mnav_success ||
+        !Load(maul->navmesh, scene, nullptr))
     {
         DiffMaulDestroy(maul);
         return nullptr;
@@ -113,7 +132,8 @@ static bool Nearest(const DiffMaul* maul, const float at[3], mnavNearest* n)
            n->polygon.slot != 0;
 }
 
-int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double* length)
+int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double* length,
+                     int32_t* nodes)
 {
     mnavNearest s;
     mnavNearest e;
@@ -122,9 +142,13 @@ int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double*
         return -1;
     }
     mnavPath path;
-    if (mnavFindPath(maul->query, maul->navmesh, nullptr, s.polygon, s.point, e.polygon, e.point,
-                     &path) != mnav_success ||
-        path.end != mnav_pathFound)
+    mnavResult result = mnavFindPath(maul->query, maul->navmesh, nullptr, s.polygon, s.point,
+                                     e.polygon, e.point, &path);
+    if (nodes != nullptr)
+    {
+        *nodes = maul->query->nodeCount;
+    }
+    if (result != mnav_success || path.end != mnav_pathFound)
     {
         return 0;
     }

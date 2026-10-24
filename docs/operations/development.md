@@ -67,6 +67,17 @@ cmake --build out/differential --target differential
 ./out/differential/differential
 ```
 
+After the agreement table it prints what each library costs on the same scenes, the best of five runs, reported and never gated:
+
+| Measure | What both sides do |
+|---|---|
+| `bake` | The whole scene. Maul Nav bakes every 32 m tile and copies its bytes; Recast builds one untiled mesh and Detour's navmesh data from it. |
+| `path` | One pair, averaged over the scene's pairs: the nearest polygon at each end, the search and the straight path. |
+| `nodes` | The nodes one search makes, averaged over the pairs: Maul Nav's query context's count, Detour's node pool's. |
+| `bytes` | The navmesh's bytes: Maul Nav's tiles in all, Detour's navmesh data. |
+
+`ratio` is Maul Nav's over Detour's, so below 1 is cheaper. `bake` and `path` appear twice, once in user-space instructions retired (`M ins`, `k ins`) and once in time (`ms`, `us`). The instruction count barely moves with the machine's load, so it is the one to compare runs by; the time shows the cache and memory too, and the header prints the load average it was taken under. Where `perf_event_open` is not available (macOS, Windows, or a sandbox that refuses it), the header says so and only times are printed. A pull request that claims a speedup gives both counts from the same build before and after.
+
 ## Benchmarks
 
 `maul-nav_bench` times a terrain of 8 by 8 tiles: bakes and cached rebuilds, streaming, paths, avoidance in crowds, flow fields, a hierarchy over a flat world, and flight volumes. It prints each section's counts, which do not depend on the machine, then its timings, the best of five runs. Timings are never a CI gate.
