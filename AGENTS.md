@@ -27,7 +27,7 @@ Run the `pr` and `full` tiers, fuzzing and the ThreadSanitizer build through the
 - **Killing by pattern.** Never `pkill -f`, `pgrep | kill` or `kill` a PID found by matching a name or path: other sessions build and fuzz on the same machine with the same binary names. Kill only a PID you started.
 - **Endless fuzzing.** A libFuzzer target runs until it finds something. Always pass `-max_total_time`, and stop what you started.
 - **Moving a golden value to make a test pass.** The hashes in the suites pin promised output. A changed hash is a change of results: find out why, and change the constant only when the change is meant, saying so in the pull request and the changelog.
-- **Rebaking the stored tiles.** `test/stored_tiles.h` holds tiles in the current formats, and the query suites run on its world tiles (`LoadWorldTiles` in `test/world.h`) so that a bake change moves only the bake goldens. `test/stored_format1.h` holds tiles of format 1, which must be refused with `mnav_errorVersion`. Regenerate `stored_tiles.h` (`test_stored --write`) only in the pull request that raises a format; never change `stored_format1.h`.
+- **Rebaking the stored tiles.** `test/stored_tiles.h` holds tiles in the current formats, and every query golden runs on its tiles (`LoadWorldTiles` in `test/world.h` for the test world) so that a bake change moves only the bake goldens. `test/stored_format1.h` holds tiles of format 1, which must be refused with `mnav_errorVersion`. Regenerate `stored_tiles.h` (`test_stored --write`) only in the pull request that raises a format, or that adds a scene's tiles while the existing tiles stay byte-identical; never change `stored_format1.h`.
 - **Editing shared family files.** These are synced from the canonical copies in the organization's `.github` repository (`maul/`) and fail CI when they differ: `docs/internals/maul-conventions.md`; `.clang-format`, `.clang-tidy`, `.editorconfig`, `.gitattributes`, `.gitignore`; `cmake/CompilerFlags.cmake`, `cmake/Install.cmake`, `cmake/Library.cmake`, `cmake/ReadVersion.cmake`, `cmake/Testing.cmake`, `cmake/Config.cmake.in`, `cmake/pkg-config.pc.in`, `cmake/HeaderCheck/CMakeLists.txt`; `bench/CMakeLists.txt`; `test/test_harness.h`; `src/hash.c`; and `tools/build_docs.py`, `check_docs.py`, `check_guide.py`, `check_lengths.py`, `check_modules.py`, `check_source.py`, `gen_api.py`. Change the canonical copy first.
 
 ## Invariants
@@ -41,19 +41,19 @@ Run the `pr` and `full` tiers, fuzzing and the ThreadSanitizer build through the
 - **Formats:** a change to the layout of tile or flight tile bytes bumps `MNAV_TILE_FORMAT` or `MNAV_FLIGHT_FORMAT`. The library reads only the formats it writes: a tile of another format is `mnav_errorVersion`, and the host rebakes from source. Tiles are little-endian; nothing derivable is stored.
 - **Limits are API.** Defaults and `MNAV_MAX_*` ranges are part of the contract; a limit is checked before work starts, and the memory it needs is taken when the object is made.
 - **Assertions:** `MNAV_ASSERT` (`src/invariant.h`) checks internal invariants only. It traps in builds without `NDEBUG` (Debug, sanitizers, fuzzing) and compiles out of Release. Never assert on caller input or tile bytes; validate and return a status. Library code never calls `assert` or `abort`.
-- **Committed data:** `test/corpus/fuzz_<area>.tar.gz` are minimized seed corpora, written by a fuzz target's merge step (`-merge=1`) and packed with `tar -czf`; `test/stored_tiles.h` is written by `test_stored --write` when a format rises, and `test/stored_format1.h` is never changed.
+- **Committed data:** `test/corpus/fuzz_<area>.tar.gz` are minimized seed corpora, written by a fuzz target's merge step (`-merge=1`) and packed with `tar -czf`; `test/stored_tiles.h` is written by `test_stored --write` when a format rises or a scene is added, and `test/stored_format1.h` is never changed.
 
 ## Testing
 
 Follow the [repository standard's Tests section](https://github.com/Rawframe-Project/.github/blob/main/docs/repository-standard.md#tests); in this repository:
 
 - Test through the public headers. A suite that reaches `src/` is `WHITEBOX` and needs a reason the public API cannot give, such as an internal format's exact bytes.
-- Golden hashes pin a few scenes; a new behavior gets an exact check of its own, not another hash. Query suites take their navmesh from `LoadWorldTiles`, not a fresh bake.
+- Golden hashes pin a few scenes; a new behavior gets an exact check of its own, not another hash. A query golden runs on stored tiles (`LoadWorldTiles`, or a scene of `test/stored_tiles.h`), never on a fresh bake; a scene a suite bakes itself gets exact checks only.
 - A large scene (thousands of agents, many tiles) is labeled `nightly` beside its suite's label and runs only at night.
 - Inputs a reader could run past go in a heap allocation of exactly their length, so AddressSanitizer sees an overread.
 - Every C snippet of `docs/user/` appears unchanged in `test/test_guide.c`; `tools/check_guide.py` enforces it.
 - A fuzz finding becomes a test in its module's suite with the minimized input.
-- Bake and query suites share the scenes in `test/world.h`, `test/soup.h`, `test/terrain.h` and `test/bake_tile.h`; build on them before adding geometry.
+- Bake and query suites share the scenes in `test/world.h`, `test/soup.h`, `test/terrain.h`, `test/trench.h` and `test/bake_tile.h`; build on them before adding geometry.
 
 ## Documentation
 

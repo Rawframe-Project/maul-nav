@@ -7,7 +7,9 @@
 // spans a hundred polygons and the search's open list grows and is
 // reordered. Walls are found at the distance the circle's size allows,
 // a center on a wall is at distance 0, random points stay within the
-// circle and reachable, and a circle of no area gives its center.
+// circle and reachable, and a circle of no area gives its center. The
+// tiles are baked here, so nothing is pinned by hash; test_spatial pins the
+// random points around a center on the stored world.
 
 #include "test_harness.h"
 #include "world.h"
@@ -19,9 +21,6 @@
 
 #include <math.h>
 #include <stdint.h>
-
-// The hash of the random points around the world's middle.
-#define RING_HASH 0x27c46ab4532823f3ull
 
 enum
 {
@@ -96,7 +95,6 @@ static void TestWalls(mnavQuery* query, const mnavNavmesh* navmesh)
 static void TestPointsAround(mnavQuery* query, mnavQuery* other, const mnavNavmesh* navmesh)
 {
     mnavNearest c = On(navmesh, 27.0, 27.0);
-    uint64_t hash = MNAV_HASH_INIT;
     int32_t outside = 0;
     int32_t unreachable = 0;
     double farthest = 0.0;
@@ -115,12 +113,10 @@ static void TestPointsAround(mnavQuery* query, mnavQuery* other, const mnavNavme
                                  &end) == mnav_success,
               "checked");
         unreachable += end == mnav_pathFound ? 0 : 1;
-        hash = mnavHash64(hash, &p.point, (int32_t)sizeof(p.point));
     }
-    printf("rings: farthest %.2f m; RING_HASH=%016llx\n", farthest, (unsigned long long)hash);
+    printf("rings: farthest %.2f m\n", farthest);
     CHECK(outside == 0 && unreachable == 0 && farthest > 15.0,
           "within the circle, reachable, spread over it");
-    CHECK(hash == RING_HASH, "the pinned hash");
     // A circle of no area gives its center.
     mnavRandomPoint p;
     CHECK(mnavFindRandomPointAround(query, navmesh, nullptr, c.polygon, c.point, 0.0, 7u, &p) ==

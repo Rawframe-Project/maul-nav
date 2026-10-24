@@ -3,8 +3,11 @@
 //
 // Hierarchical paths: paths through the hierarchy against
 // plain ones, with fewer nodes; the graph the same in any load order;
-// staleness, fallbacks, limits and checks.
+// staleness, fallbacks, limits and checks. The large world is baked here,
+// so its results have exact checks only; the paths pinned by hash run on
+// the stored test world.
 
+#include "stored_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -18,11 +21,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-// The hash of the random pairs' lengths.
-#define RANDOM_HASH 0xaeda7ea61a27779eull
-
-// The hash of the graph's counts and the paths' points.
-#define PATHS_HASH 0xa356f433fa7507e2ull
+// The hash of the graph's counts and the paths' points on the stored test
+// world, the same on every platform.
+#define WORLD_PATHS_HASH 0x8993e895a9ace89full
 
 enum
 {
@@ -172,7 +173,6 @@ static void TestAgainstPlainPaths(float side)
     CHECK(mnavBuildHierarchy(hierarchy, small, navmesh, nullptr, &report) == mnav_success &&
               report.clusters == 16 && report.transitions > 0 && report.edges > 0,
           "built");
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, &report, (int32_t)sizeof(report));
     int32_t starved = 0;
     for (int32_t p = 0; p < 4; ++p)
     {
@@ -191,8 +191,6 @@ static void TestAgainstPlainPaths(float side)
         printf("pair %d: plain %.3f m, hierarchical %.3f m\n", p, plain.length, through.length);
         CHECK(through.length <= plain.length * 1.06 && through.length >= plain.length - 1e-9,
               "within 6% of the plain path");
-        hash = mnavHash64(hash, through.points,
-                          (int32_t)((size_t)through.pointCount * sizeof(mnavPos3)));
         mnavPath alone;
         CHECK(mnavFindPath(small, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
                            &alone) == mnav_success,
@@ -200,8 +198,6 @@ static void TestAgainstPlainPaths(float side)
         starved += alone.end == mnav_pathFound ? 0 : 1;
     }
     CHECK(starved >= 2, "the plain search runs out of nodes where the hierarchy does not");
-    printf("PATHS_HASH=%016llx\n", (unsigned long long)hash);
-    CHECK(hash == PATHS_HASH, "the pinned hash");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(small);
     mnavDestroyQuery(big);
@@ -220,7 +216,6 @@ static void TestRandomPairs(void)
     uint32_t seed = 99u;
     int32_t found = 0;
     int32_t worse = 0;
-    uint64_t hash = MNAV_HASH_INIT;
     for (int32_t p = 0; p < 40; ++p)
     {
         double v[4];
@@ -252,11 +247,9 @@ static void TestRandomPairs(void)
         }
         found += through.end == mnav_pathFound ? 1 : 0;
         worse += through.length <= plain.length * 1.06 ? 0 : 1;
-        hash = mnavHash64(hash, &through.length, (int32_t)sizeof(double));
     }
-    printf("RANDOM_HASH=%016llx found=%d\n", (unsigned long long)hash, found);
+    printf("random pairs: %d found\n", found);
     CHECK(found >= 30 && worse == 0, "every way found, none more than 6% longer");
-    CHECK(hash == RANDOM_HASH, "the pinned hash");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(small);
     mnavDestroyQuery(big);
@@ -932,8 +925,58 @@ static void TestUpdatePastTheTileLimit(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// The stored test world in clusters of one tile: paths across it through
+// the hierarchy are within 6% of the plain ones, and pinned.
+static void TestStoredWorld(void)
+{
+    const uint8_t* const tiles[4] = {s_ground0, s_ground1, s_ground2, s_ground3};
+    const size_t sizes[4] = {sizeof(s_ground0), sizeof(s_ground1), sizeof(s_ground2),
+                             sizeof(s_ground3)};
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    for (int32_t t = 0; t < 4; ++t)
+    {
+        CHECK(mnavStageTile(navmesh, tiles[t], sizes[t]).result == mnav_success, "staged");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    mnavQuery* query = Query(4096);
+    mnavHierarchy* hierarchy = Hierarchy(1);
+    mnavHierarchyReport report;
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &report) == mnav_success &&
+              report.clusters == 4 && report.transitions > 0 && report.edges > 0,
+          "built");
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, &report, (int32_t)sizeof(report));
+    const double pairs[3][4] = {
+        {2.0, 2.0, 62.0, 62.0}, {2.0, 62.0, 62.0, 2.0}, {16.0, 40.0, 48.0, 16.0}};
+    for (int32_t p = 0; p < 3; ++p)
+    {
+        mnavNearest a = On(navmesh, pairs[p][0], pairs[p][1]);
+        mnavNearest b = On(navmesh, pairs[p][2], pairs[p][3]);
+        mnavPath plain;
+        mnavPath through;
+        CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
+                           &plain) == mnav_success &&
+                  plain.end == mnav_pathFound &&
+                  mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                           b.point, &through) == mnav_success &&
+                  through.end == mnav_pathFound,
+              "both ways found");
+        CHECK(through.length <= plain.length * 1.06 && through.length >= plain.length - 1e-9,
+              "within 6% of the plain path");
+        hash = mnavHash64(hash, through.points,
+                          (int32_t)((size_t)through.pointCount * sizeof(mnavPos3)));
+    }
+    printf("WORLD_PATHS_HASH=%016llx\n", (unsigned long long)hash);
+    CHECK(hash == WORLD_PATHS_HASH, "the pinned hash");
+    mnavDestroyHierarchy(hierarchy);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
+    TestStoredWorld();
     float side = BakeWorld(0.0f);
     TestAgainstPlainPaths(side);
     TestRandomPairs();

@@ -8,13 +8,15 @@
 // format rises.
 //
 // stored_tiles.h is written by `test_stored --write > test/stored_tiles.h`
-// in the pull request that raises MNAV_TILE_FORMAT or MNAV_FLIGHT_FORMAT,
+// in the pull request that raises MNAV_TILE_FORMAT or MNAV_FLIGHT_FORMAT, or
+// that adds a scene's tiles while the existing tiles stay byte-identical,
 // and only then.
 
 #include "stored_format1.h"
 #include "stored_tiles.h"
 #include "terrain.h"
 #include "test_harness.h"
+#include "trench.h"
 #include "world.h"
 
 #include "maul-nav/bake.h"
@@ -30,7 +32,7 @@
 
 // The hash of every stored byte, so that the data is never changed by
 // accident.
-#define STORED_HASH 0x034f5eca66c19778ull
+#define STORED_HASH 0x37a4d4d4d060c265ull
 
 // What queries on the stored tiles answer.
 #define GROUND_PATH_HASH  0xc2eb19d847441002ull
@@ -83,8 +85,8 @@ static void PrintBytes(const char* name, const uint8_t* bytes, size_t size)
 }
 
 // Writes stored_tiles.h to stdout: test/world.h's four tiles, tile (0, 0)
-// of test/terrain.h's terrain and the world's four flight tiles, baked with
-// GroundDef and FlightDef.
+// of test/terrain.h's terrain, test/trench.h's two tiles and the world's
+// four flight tiles, baked with GroundDef and FlightDef.
 static int Write(void)
 {
     static uint8_t bytes[1 << 20];
@@ -98,6 +100,8 @@ static int Write(void)
            "//   test_stored.c's GroundDef.\n"
            "// - s_terrain: tile (0, 0) of test/terrain.h's slope with a plateau,\n"
            "//   baked with the same def.\n"
+           "// - s_trench0 and s_trench1: test/trench.h's two tiles, baked with the\n"
+           "//   same def.\n"
            "// - s_flight0 to s_flight3: the world's four flight tiles, baked with\n"
            "//   test_stored.c's FlightDef.\n"
            "\n"
@@ -138,6 +142,17 @@ static int Write(void)
         return 1;
     }
     PrintBytes("s_terrain", bytes, size);
+    const mnavTriangleMesh trench = Trench();
+    for (int32_t t = 0; t < 2; ++t)
+    {
+        if (mnavBakeTile(baker, &trench, 1, t, 0, nullptr) != mnav_success ||
+            mnavCopyBakedTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
+        {
+            return 1;
+        }
+        snprintf(name, sizeof(name), "s_trench%d", t);
+        PrintBytes(name, bytes, size);
+    }
     for (int32_t t = 0; t < 4; ++t)
     {
         if (mnavBakeFlightTile(flightBaker, &input, t & 1, t >> 1, nullptr) != mnav_success ||
@@ -196,6 +211,10 @@ static void TestBytes(void)
     }
     CHECK(s_terrain[4] == MNAV_TILE_FORMAT, "the terrain tile in the current format");
     hash = mnavHash64(hash, s_terrain, (int32_t)sizeof(s_terrain));
+    CHECK(s_trench0[4] == MNAV_TILE_FORMAT && s_trench1[4] == MNAV_TILE_FORMAT,
+          "the trench tiles in the current format");
+    hash = mnavHash64(hash, s_trench0, (int32_t)sizeof(s_trench0));
+    hash = mnavHash64(hash, s_trench1, (int32_t)sizeof(s_trench1));
     printf("STORED_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == STORED_HASH, "the stored bytes");
 }
