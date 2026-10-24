@@ -29,7 +29,7 @@ extern "C"
 #define MNAV_VERSION_MINOR 0
 // x-release-please-end
 // x-release-please-start-patch
-#define MNAV_VERSION_PATCH 2
+#define MNAV_VERSION_PATCH 3
 // x-release-please-end
 
 // The binary interface a program is built for: the whole version before

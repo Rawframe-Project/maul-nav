@@ -5,6 +5,18 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.0.3](https://github.com/Rawframe-Project/maul-nav/compare/v0.0.2...v0.0.3) (2026-10-24)
+
+
+### Fixed
+
+* compute in the library's floating-point environment ([#24](https://github.com/Rawframe-Project/maul-nav/issues/24)) ([63a9711](https://github.com/Rawframe-Project/maul-nav/commit/63a9711effabe595e5fe101618d374b3cd0e83ae)), closes [#20](https://github.com/Rawframe-Project/maul-nav/issues/20)
+
+
+### Changed
+
+* **flight:** cut a flight path's instructions to a third ([#22](https://github.com/Rawframe-Project/maul-nav/issues/22)) ([eeb9430](https://github.com/Rawframe-Project/maul-nav/commit/eeb9430c79d9d7afa1ef55da18ed1ae3a188115c)), closes [#17](https://github.com/Rawframe-Project/maul-nav/issues/17)
+
 ## [0.0.2](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.0.2) (2026-10-24)
 
 ### Fixed
