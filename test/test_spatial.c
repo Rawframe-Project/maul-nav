@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Spatial queries: heights, the nearest wall, the walls near a
-// point, random points and reachability, on a gently sloped floor with a
-// block and a walled ring whose inside no one can reach.
+// Spatial queries: heights, the nearest wall, the walls near a point and
+// reachability, on a gently sloped floor with a block and a walled ring
+// whose inside no one can reach; random points, over the whole navmesh and
+// around a center, on the stored test world, where they are pinned.
 
 #include "test_harness.h"
+#include "world.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
@@ -16,42 +18,42 @@
 #include <stdint.h>
 #include <string.h>
 
-// The hash of fifty random points, and of the points around a center,
-// the same on every platform.
-#define POINTS_HASH 0x023d605e8f7ed13eull
-#define AROUND_HASH 0xedab71c0c9bd9019ull
+// The hash of fifty random points, and of the points around a center, on
+// the stored test world, the same on every platform.
+#define POINTS_HASH 0x1945e3706d561b5eull
+#define AROUND_HASH 0x5710d3c4ee6332f9ull
 
 enum
 {
-    BOXES = 5,
-    VERTICES = 4 + 8 * BOXES,
-    TRIANGLES = 2 + 12 * BOXES,
+    SLOPE_BOXES = 5,
+    SLOPE_VERTICES = 4 + 8 * SLOPE_BOXES,
+    SLOPE_TRIANGLES = 2 + 12 * SLOPE_BOXES,
     CAPACITY = 1 << 17
 };
 
 // The floor rises 0.05 m a meter along X.
 #define SLOPE 0.05f
 
-static mnavVec3 s_vertices[VERTICES];
-static int32_t s_indices[TRIANGLES * 3];
-static uint8_t s_tiles[4][CAPACITY];
-static size_t s_sizes[4];
+static mnavVec3 s_slopeVertices[SLOPE_VERTICES];
+static int32_t s_slopeIndices[SLOPE_TRIANGLES * 3];
+static uint8_t s_slopeTiles[4][CAPACITY];
+static size_t s_slopeSizes[4];
 
-static mnavTriangleMesh World(void)
+static mnavTriangleMesh Slope(void)
 {
     const mnavVec3 floor[4] = {{-1.0f, -SLOPE, -1.0f},
                                {-1.0f, -SLOPE, 65.0f},
                                {65.0f, 65.0f * SLOPE, 65.0f},
                                {65.0f, 65.0f * SLOPE, -1.0f}};
     const int32_t quad[6] = {0, 1, 2, 0, 2, 3};
-    memcpy(s_vertices, floor, sizeof(floor));
-    memcpy(s_indices, quad, sizeof(quad));
+    memcpy(s_slopeVertices, floor, sizeof(floor));
+    memcpy(s_slopeIndices, quad, sizeof(quad));
     // A block, and four walls enclosing x and z from 44 to 56.
-    const float boxes[BOXES][4] = {
+    const float boxes[SLOPE_BOXES][4] = {
         {30, 10, 34, 12}, {43, 43, 57, 44}, {43, 56, 57, 57}, {43, 44, 44, 56}, {56, 44, 57, 56}};
-    for (int32_t b = 0; b < BOXES; ++b)
+    for (int32_t b = 0; b < SLOPE_BOXES; ++b)
     {
-        mnavVec3* v = &s_vertices[4 + 8 * b];
+        mnavVec3* v = &s_slopeVertices[4 + 8 * b];
         for (int32_t k = 0; k < 8; ++k)
         {
             float x = boxes[b][(k & 1) ? 2 : 0];
@@ -61,10 +63,11 @@ static mnavTriangleMesh World(void)
                                    2, 6, 7, 2, 7, 3, 0, 4, 6, 0, 6, 2, 1, 3, 7, 1, 7, 5};
         for (int32_t k = 0; k < 36; ++k)
         {
-            s_indices[6 + 36 * b + k] = 4 + 8 * b + faces[k];
+            s_slopeIndices[6 + 36 * b + k] = 4 + 8 * b + faces[k];
         }
     }
-    return (mnavTriangleMesh){s_vertices, VERTICES, s_indices, TRIANGLES, nullptr};
+    return (mnavTriangleMesh){s_slopeVertices, SLOPE_VERTICES, s_slopeIndices, SLOPE_TRIANGLES,
+                              nullptr};
 }
 
 static mnavNavmesh* Load(void)
@@ -73,18 +76,34 @@ static mnavNavmesh* Load(void)
     def.tier = mnav_tierModifiers;
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
-    mnavTriangleMesh world = World();
+    mnavTriangleMesh world = Slope();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavBakeTile(baker, &world, 1, t & 1, t >> 1, nullptr) == mnav_success &&
-                  mnavCopyBakedTile(baker, s_tiles[t], CAPACITY, &s_sizes[t]) == mnav_success &&
-                  mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+                  mnavCopyBakedTile(baker, s_slopeTiles[t], CAPACITY, &s_slopeSizes[t]) ==
+                      mnav_success &&
+                  mnavStageTile(navmesh, s_slopeTiles[t], s_slopeSizes[t]).result == mnav_success,
               "baked and staged");
     }
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     mnavDestroyBaker(baker);
+    return navmesh;
+}
+
+// The test world from its stored tiles.
+static mnavNavmesh* LoadWorld(void)
+{
+    LoadWorldTiles();
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    for (int32_t t = 0; t < 4; ++t)
+    {
+        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+    }
+    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -417,7 +436,6 @@ static void TestRandomPoints(const mnavNavmesh* navmesh)
 static void TestAroundAndReachable(const mnavNavmesh* navmesh)
 {
     mnavQuery* query = Query(4096);
-    mnavQuery* other = Query(4096);
     mnavNearest center = On(navmesh, 10.0, 10.0);
     mnavNearest inside = On(navmesh, 50.0, 50.0);
     mnavNearest far = On(navmesh, 60.0, 5.0);
@@ -435,7 +453,34 @@ static void TestAroundAndReachable(const mnavNavmesh* navmesh)
                              far.point, &end) == mnav_success &&
               end == mnav_pathOutOfNodes,
           "cannot tell with four nodes");
-    // Points around the center are reachable and within the circle.
+    // From inside the ring, the points stay inside.
+    int32_t escaped = 0;
+    for (uint64_t seed = 0; seed < 50; ++seed)
+    {
+        mnavRandomPoint p;
+        CHECK(mnavFindRandomPointAround(query, navmesh, nullptr, inside.polygon, inside.point, 30.0,
+                                        seed, &p) == mnav_success,
+              "picked");
+        escaped +=
+            p.point.x > 44.0 && p.point.x < 56.0 && p.point.z > 44.0 && p.point.z < 56.0 ? 0 : 1;
+    }
+    CHECK(escaped == 0, "inside the ring");
+    mnavDestroyQuery(tiny);
+    mnavDestroyQuery(query);
+}
+
+// Points around a center on the stored world are reachable and within the
+// circle, half of them in its inner half.
+static void TestAround(const mnavNavmesh* navmesh)
+{
+    mnavQuery* query = Query(4096);
+    mnavQuery* other = Query(4096);
+    mnavNearest center;
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){10.0, 0.0, 10.0},
+                          (mnavVec3){0.5f, 1.0f, 0.5f}, &center) == mnav_success &&
+              center.polygon.slot != 0,
+          "nearest");
+    mnavPathEnd end = mnav_pathFound;
     int32_t unreachable = 0;
     int32_t inner = 0;
     double farthest = 0.0;
@@ -461,19 +506,6 @@ static void TestAroundAndReachable(const mnavNavmesh* navmesh)
     CHECK(unreachable == 0 && farthest <= 8.0, "reachable, within the circle");
     CHECK(inner > 80 && inner < 120, "half in the inner half of the area");
     CHECK(hash == AROUND_HASH, "the pinned hash");
-    // From inside the ring, the points stay inside.
-    int32_t escaped = 0;
-    for (uint64_t seed = 0; seed < 50; ++seed)
-    {
-        mnavRandomPoint p;
-        CHECK(mnavFindRandomPointAround(query, navmesh, nullptr, inside.polygon, inside.point, 30.0,
-                                        seed, &p) == mnav_success,
-              "picked");
-        escaped +=
-            p.point.x > 44.0 && p.point.x < 56.0 && p.point.z > 44.0 && p.point.z < 56.0 ? 0 : 1;
-    }
-    CHECK(escaped == 0, "inside the ring");
-    mnavDestroyQuery(tiny);
     mnavDestroyQuery(other);
     mnavDestroyQuery(query);
 }
@@ -485,8 +517,11 @@ int main(void)
     TestWalls(navmesh);
     TestWallAtTheRadius(navmesh);
     TestWallList(navmesh);
-    TestRandomPoints(navmesh);
     TestAroundAndReachable(navmesh);
     mnavDestroyNavmesh(navmesh);
+    mnavNavmesh* world = LoadWorld();
+    TestRandomPoints(world);
+    TestAround(world);
+    mnavDestroyNavmesh(world);
     return s_failures == 0 ? 0 : 1;
 }

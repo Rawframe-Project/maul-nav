@@ -35,7 +35,7 @@ Run `changed` before every push. On the shared development machine, run `pr` and
 
 ## Tests
 
-Each suite in `test/` is one executable, registered with CTest under its name and labeled with it. The white-box suites include `src/` and are not built in shared builds. Golden values pin a few scenes: the bake goldens hash tile bytes, and the suites that query the test world read its tiles from `test/stored_tiles.h` rather than baking them, so a change to the bake leaves their goldens alone. Suites whose scenes are not the test world (the hierarchy's flat world, the building and terrain scenarios, link generation) still bake theirs. Large scenes carry the label `nightly`, and every test preset but `nightly` leaves them out.
+Each suite in `test/` is one executable, registered with CTest under its name and labeled with it. The white-box suites include `src/` and are not built in shared builds. Golden values pin a few scenes: the bake goldens hash tile bytes, and every query golden runs on tiles read from `test/stored_tiles.h` (the test world, the terrain, the link generation trench), so a change to the bake leaves them alone. Suites that bake scenes of their own (the hierarchy's large world, the world in 8 m tiles, the building) check them exactly, not by hash. Large scenes carry the label `nightly`, and every test preset but `nightly` leaves them out.
 
 ## Budgets
 
