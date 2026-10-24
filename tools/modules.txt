@@ -70,9 +70,9 @@ hierarchy: allocator invariant navmesh offmesh path query query_filter sort
 hierarchy_path: hierarchy navmesh path query
 # Avoidance uses the base alone, never a navmesh module.
 orca:
-obstacle: orca
-crowd:
+obstacle: invariant orca
+crowd: invariant
 orca3:
-avoidance: allocator crowd draw obstacle orca orca3
-avoidance3: avoidance crowd draw obstacle orca3
+avoidance: allocator crowd draw invariant obstacle orca orca3
+avoidance3: avoidance crowd draw invariant obstacle orca3
 steer:

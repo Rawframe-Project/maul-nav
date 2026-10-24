@@ -9,6 +9,7 @@
 #include "avoidance.h"
 #include "crowd.h"
 #include "draw.h"
+#include "invariant.h"
 #include "obstacle.h"
 #include "orca3.h"
 
@@ -171,6 +172,8 @@ static mnavPos3 Solve(mnavAvoidance* a, const mnavAgent3D* agents, const mnavSph
     }
     int32_t fixed = count;
     int32_t neighbors = mnavCrowdNeighbors(&a->crowd, self->position, i, self->ignores);
+    // A plane a sphere and an agent at most: the planes fit their buffer.
+    MNAV_ASSERT(near <= a->def.limits.obstacleNeighbors && neighbors <= a->def.limits.neighbors);
     for (int32_t n = 0; n < neighbors; ++n)
     {
         const mnavAgent3D* other = &agents[a->crowd.neighbors[n].index];
@@ -204,6 +207,9 @@ static mnavPos3 Solve(mnavAvoidance* a, const mnavAgent3D* agents, const mnavSph
     {
         velocity = mnavScale3(velocity, self->maxSpeed / sqrt(speedSq));
     }
+    // Within the speed sphere, but for the scaling's last bits.
+    MNAV_ASSERT(isfinite(velocity.x) && isfinite(velocity.y) && isfinite(velocity.z) &&
+                mnavDot3(velocity, velocity) <= self->maxSpeed * self->maxSpeed * (1.0 + 0x1p-40));
     return velocity;
 }
 

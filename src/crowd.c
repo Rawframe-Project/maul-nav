@@ -7,6 +7,8 @@
 
 #include "crowd.h"
 
+#include "invariant.h"
+
 #include "maul-nav/base.h"
 
 #include <math.h>
@@ -295,6 +297,19 @@ static void Ring(Search* s, const mnavCrowdKey* c, int64_t r)
 // agent it would keep (ties at the worst distance are still looked at),
 // and the search stops. The neighbours are those a search of every cell
 // in range finds.
+// At most the limit of neighbours, nearest first in NeighborBefore's
+// order, each another agent within range.
+static void CheckNeighbors(const mnavCrowd* crowd, int32_t index, double rangeSq, int32_t found)
+{
+    MNAV_ASSERT(found >= 0 && found <= crowd->limit);
+    for (int32_t k = 0; k < found; ++k)
+    {
+        const mnavCrowdNeighbor* n = &crowd->neighbors[k];
+        MNAV_ASSERT(n->index != index && n->distance < rangeSq);
+        MNAV_ASSERT(k == 0 || NeighborBefore(&crowd->neighbors[k - 1], n));
+    }
+}
+
 int32_t mnavCrowdNeighbors(mnavCrowd* crowd, mnavPos3 position, int32_t index, uint32_t ignores)
 {
     double range = crowd->range;
@@ -311,6 +326,10 @@ int32_t mnavCrowdNeighbors(mnavCrowd* crowd, mnavPos3 position, int32_t index, u
             break;
         }
         Ring(&s, &center, r);
+    }
+    if (MNAV_INVARIANTS)
+    {
+        CheckNeighbors(crowd, index, range * range, s.found);
     }
     return s.found;
 }

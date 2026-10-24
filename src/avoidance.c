@@ -13,6 +13,7 @@
 #include "avoidance.h"
 #include "crowd.h"
 #include "draw.h"
+#include "invariant.h"
 #include "obstacle.h"
 #include "orca.h"
 #include "orca3.h"
@@ -259,6 +260,9 @@ static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, double step, in
     int32_t count = fixed;
     int32_t neighbors = mnavCrowdNeighbors(
         &a->crowd, (mnavPos3){self->position.x, self->position.y, 0.0}, i, self->ignores);
+    // A line an obstacle and an agent at most: the lines fit their buffer.
+    MNAV_ASSERT(fixed <= near && near <= a->def.limits.obstacleNeighbors &&
+                neighbors <= a->def.limits.neighbors);
     for (int32_t n = 0; n < neighbors; ++n)
     {
         const mnavAgent* other = &agents[a->crowd.neighbors[n].index];
@@ -294,6 +298,9 @@ static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, double step, in
     {
         velocity = mnavScale2(velocity, self->maxSpeed / sqrt(speedSq));
     }
+    // Within the speed circle, but for the scaling's last bits.
+    MNAV_ASSERT(isfinite(velocity.x) && isfinite(velocity.y) &&
+                mnavDot2(velocity, velocity) <= self->maxSpeed * self->maxSpeed * (1.0 + 0x1p-40));
     return velocity;
 }
 
