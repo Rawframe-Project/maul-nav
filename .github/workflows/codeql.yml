@@ -1,6 +1,8 @@
 # CodeQL on every pull request and on main. An advanced setup, since the
 # default one builds with the runner's default compiler, GCC 13, and the
 # library needs GCC 14 for C23 (cmake/CompilerFlags.cmake refuses older).
+# It builds in the CI image, as ci.yml's jobs do, and without ccache: a
+# cache hit would skip the compile that CodeQL traces.
 name: codeql
 
 on:
@@ -20,6 +22,7 @@ jobs:
   analyze:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
     permissions:
       contents: read
       security-events: write
