@@ -5,8 +5,8 @@
 // every voxel's openness, read through mnavIsFlightOpen: paths found
 // exactly where the grid's 26-connected search finds one, every step in
 // sight, never much longer than the grid's shortest; raycasts against
-// fine sampling; nearest open points against every voxel; and the ends,
-// limits and refusals.
+// fine sampling; nearest open points against every voxel; the ends,
+// limits and refusals; and an end in a closed space.
 
 #include "counting_allocator.h"
 #include "test_harness.h"
@@ -1172,6 +1172,49 @@ static void TestFaceEdges(void)
     mnavDestroyFlightVolume(volume);
 }
 
+// A hollow box, a closed space inside its walls: an end inside it from a
+// start outside is refused at once, with the start alone, rather than
+// searched for over every block the start reaches; a start inside it is
+// searched from, and both inside find their path. Past the node budget,
+// the closed space is not seen and the search runs as before.
+static void TestPocket(void)
+{
+    // Kept off the voxels' faces: walls 1 voxel thick around 6 by 6 by 6.
+    const float boxes[1][6] = {{4.25f, 2.25f, 4.25f, 7.5f, 7.5f, 7.5f}};
+    mnavFlightVolume* volume = Small(boxes, 1, 0.0f);
+    const mnavPos3 inside = {7.5, 5.5, 7.5};
+    const mnavPos3 alsoInside = {9.5, 8.5, 6.5};
+    const mnavPos3 outside = {20.5, 5.5, 20.5};
+    CHECK(OpenAt(volume, inside.x, inside.y, inside.z) &&
+              OpenAt(volume, outside.x, outside.y, outside.z) && !OpenAt(volume, 4.5, 5.5, 7.5),
+          "a closed space inside the box");
+    mnavQuery* query = Query(16384, 1000.0f);
+    mnavFlightPath path;
+    CHECK(mnavFindFlightPath(query, volume, outside, inside, &path) == mnav_success &&
+              path.end == mnav_pathNone && path.pointCount == 1 && path.points[0].x == outside.x &&
+              path.points[0].z == outside.z && path.length == 0.0,
+          "an end inside refused, with the start alone");
+    bool ended = false;
+    CHECK(mnavBeginFlightPath(query, volume, outside, inside) == mnav_success &&
+              mnavContinueFlightPath(query, volume, 1, &ended) == mnav_success && ended &&
+              mnavFinishFlightPath(query, volume, &path) == mnav_success &&
+              path.end == mnav_pathNone,
+          "refused before the first slice");
+    CHECK(mnavFindFlightPath(query, volume, inside, outside, &path) == mnav_success &&
+              path.end == mnav_pathNone && path.pointCount >= 1,
+          "a start inside searches the closed space");
+    CHECK(mnavFindFlightPath(query, volume, inside, alsoInside, &path) == mnav_success &&
+              path.end == mnav_pathFound && StepsClear(volume, &path),
+          "both inside");
+    mnavDestroyQuery(query);
+    query = Query(16, 1000.0f);
+    CHECK(mnavFindFlightPath(query, volume, outside, inside, &path) == mnav_success &&
+              path.end == mnav_pathOutOfNodes,
+          "past the node budget, searched as before");
+    mnavDestroyQuery(query);
+    mnavDestroyFlightVolume(volume);
+}
+
 int main(void)
 {
     mnavFlightVolume* volume = Volume(-1, -1);
@@ -1190,6 +1233,7 @@ int main(void)
     TestEdge();
     TestBendToTheEnd();
     TestFaceEdges();
+    TestPocket();
     CHECK(s_held == 0, "every byte given back");
     return s_failures == 0 ? 0 : 1;
 }

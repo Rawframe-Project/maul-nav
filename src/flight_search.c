@@ -399,6 +399,73 @@ static mnavPathEnd Refused(int32_t held)
     return held == MNAV_SPACE_UNLOADED ? mnav_pathNotLoaded : mnav_pathNone;
 }
 
+// The most blocks of the end's space Pocket searches: more than the
+// closed space inside a hollow object of a few meters holds.
+#define POCKET_BLOCKS 512
+
+// The end's space as Pocket spreads over it: the start's block, the
+// blocks it may make, and whether it has found the space open.
+typedef struct Spread
+{
+    Search* search;
+    const int32_t* start;
+    int32_t budget;
+    bool open;
+} Spread;
+
+// Adds a block across a face to the end's space, unless it was in it.
+static void SpreadTo(void* context, mnavFlightBlock block)
+{
+    Spread* p = context;
+    mnavQuery* q = p->search->query;
+    const int32_t b[4] = {block.x, block.y, block.z, block.size};
+    if (p->open || SameBlock(b, p->start))
+    {
+        p->open = true;
+        return;
+    }
+    uint32_t at = Slot(p->search, b);
+    if (q->table[at] != MNAV_NO_NODE)
+    {
+        return;
+    }
+    if (q->nodeCount == p->budget)
+    {
+        p->open = true;
+        return;
+    }
+    q->table[at] = q->nodeCount;
+    memcpy(p->search->nodes[q->nodeCount++].block, b, sizeof(b));
+}
+
+// Whether the end's block lies in a closed space: the open blocks linked
+// to it through shared faces, searched breadth first, run out within
+// POCKET_BLOCKS (and the node budget) without the start's block or a face
+// with no tile loaded. No path reaches the end from outside it. Uses the
+// search's nodes and table, which Begin clears.
+static bool Pocket(Search* s, const int32_t start[4])
+{
+    mnavQuery* q = s->query;
+    mnavClearTable(q);
+    q->nodeCount = 0;
+    Spread p = {s, start, q->limits.nodes < POCKET_BLOCKS ? q->limits.nodes : POCKET_BLOCKS, false};
+    const mnavFlightBlock end = {s->endBlock[0], s->endBlock[1], s->endBlock[2], s->endBlock[3]};
+    SpreadTo(&p, end);
+    for (int32_t at = 0; at < q->nodeCount && !p.open; ++at)
+    {
+        const int32_t* b = s->nodes[at].block;
+        const mnavFlightBlock block = {b[0], b[1], b[2], b[3]};
+        for (int32_t f = 0; f < 6 && !p.open; ++f)
+        {
+            if (mnavFlightFace(&s->cursor, &block, f, SpreadTo, &p) == MNAV_SPACE_UNLOADED)
+            {
+                p.open = true;
+            }
+        }
+    }
+    return !p.open;
+}
+
 // Starts the search at the start's block; the start is node 0.
 static void Begin(Search* s, const mnavFlightBlock* block, const double start[3])
 {
@@ -511,6 +578,12 @@ mnavResult mnavBeginFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
     s.endBlock[1] = last.y;
     s.endBlock[2] = last.z;
     s.endBlock[3] = last.size;
+    const int32_t from[4] = {first.x, first.y, first.z, first.size};
+    if (Pocket(&s, from))
+    {
+        f->ready = mnav_pathNone;
+        return mnav_success;
+    }
     s.limit = (double)query->limits.pathLength / frame.voxel;
     memcpy(f->end, s.end, sizeof(f->end));
     memcpy(f->endBlock, s.endBlock, sizeof(f->endBlock));

@@ -5,13 +5,15 @@
 // tiles baked, copied, staged and committed, every voxel's openness as
 // the octree has it; the bytes pinned; every truncated or corrupted tile
 // refused, naming its section; tiles of other settings refused; staging,
-// removal, replacement and a refused commit that changes nothing; every
-// byte given back.
+// removal, replacement and a refused commit that changes nothing; the
+// walk along a segment against the plain one, voxel by voxel; every byte
+// given back.
 
 #include "bytes.h"
 #include "counting_allocator.h"
 #include "flight.h"
 #include "flight_def.h"
+#include "flight_space.h"
 #include "flight_tile.h"
 #include "test_harness.h"
 #include "world.h"
@@ -215,6 +217,168 @@ static void TestBakeStageAndQuery(void)
     CHECK(mnavIsFlightOpen(nullptr, inside, &open) == mnav_errorInvalid &&
               mnavIsFlightOpen(volume, inside, nullptr) == mnav_errorInvalid,
           "NULL arguments");
+    mnavDestroyFlightVolume(volume);
+}
+
+// What holds a voxel, looked up alone.
+static int32_t HeldAlone(const mnavFlightVolume* volume, const int32_t p[3])
+{
+    mnavFlightCursor cursor = mnavMakeFlightCursor(volume);
+    return mnavFlightHolder(&cursor, p[0], p[1], p[2], nullptr);
+}
+
+// The walk the plain way: voxel by voxel, every voxel touched looked up
+// alone, and where the segment passes an edge or a corner, each voxel a
+// part of the steps reaches before the one all of them reach.
+static int32_t PlainWalk(const mnavFlightVolume* volume, const double a[3], const double b[3],
+                         double* tOut)
+{
+    int32_t at[3];
+    int32_t step[3];
+    int32_t end[3];
+    double next[3];
+    double delta[3];
+    for (int32_t k = 0; k < 3; ++k)
+    {
+        double d = b[k] - a[k];
+        at[k] = (int32_t)floor(a[k]);
+        end[k] = (int32_t)floor(b[k]);
+        step[k] = d > 0.0 ? 1 : (d < 0.0 ? -1 : 0);
+        double edge = step[k] > 0 ? (double)at[k] + 1.0 : (double)at[k];
+        next[k] = step[k] != 0 ? (edge - a[k]) / d : (double)INFINITY;
+        delta[k] = step[k] != 0 ? fabs(1.0 / d) : (double)INFINITY;
+    }
+    double t = 0.0;
+    int32_t held = HeldAlone(volume, at);
+    while (held == MNAV_SPACE_OPEN && (at[0] != end[0] || at[1] != end[1] || at[2] != end[2]))
+    {
+        t = fmin(next[0], fmin(next[1], next[2]));
+        if (t > 1.0)
+        {
+            return MNAV_SPACE_OPEN;
+        }
+        uint32_t tied = 0;
+        for (int32_t k = 0; k < 3; ++k)
+        {
+            tied |= next[k] - t < 1e-9 ? 1u << k : 0u;
+        }
+        // The parts of the steps in order, the whole of them last.
+        for (uint32_t m = 1; m < 8 && held == MNAV_SPACE_OPEN; ++m)
+        {
+            if ((m & ~tied) != 0)
+            {
+                continue;
+            }
+            int32_t p[3];
+            for (int32_t k = 0; k < 3; ++k)
+            {
+                p[k] = at[k] + ((m >> k & 1u) != 0 ? step[k] : 0);
+            }
+            held = HeldAlone(volume, p);
+        }
+        for (int32_t k = 0; k < 3; ++k)
+        {
+            at[k] += (tied >> k & 1u) != 0 ? step[k] : 0;
+            next[k] += (tied >> k & 1u) != 0 ? delta[k] : 0.0;
+        }
+    }
+    if (held != MNAV_SPACE_OPEN)
+    {
+        *tOut = t;
+    }
+    return held;
+}
+
+static uint32_t s_walkRandom = 7;
+
+// A coordinate from lo to hi: a real one, or on a voxel's center or face.
+static double WalkCoordinate(double lo, double hi)
+{
+    s_walkRandom = s_walkRandom * 1664525u + 1013904223u;
+    double x = lo + (hi - lo) * (double)(s_walkRandom >> 8) / 16777216.0;
+    switch (s_walkRandom & 3u)
+    {
+    case 0:
+        return floor(x) + 0.5;
+    case 1:
+        return floor(x);
+    default:
+        return x;
+    }
+}
+
+// A segment of kind k: anywhere, along an axis, along a diagonal of two
+// or three axes, or within a few voxels; through the test world's four
+// tiles in voxels, and past them, the floor and the ceiling.
+static void WalkSegment(int32_t k, int32_t layers, double a[3], double b[3])
+{
+    const double side = 128.0;
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        double hi = i == 1 ? (double)layers + 2.0 : side + 4.0;
+        a[i] = WalkCoordinate(-4.0, hi);
+        b[i] = WalkCoordinate(-4.0, hi);
+    }
+    double d = WalkCoordinate(-40.0, 40.0);
+    switch (k % 5)
+    {
+    case 1:
+        b[(k / 5) % 3] = a[(k / 5) % 3] + d;
+        b[(k / 5 + 1) % 3] = a[(k / 5 + 1) % 3];
+        b[(k / 5 + 2) % 3] = a[(k / 5 + 2) % 3];
+        break;
+    case 2:
+        b[0] = a[0] + d;
+        b[1] = a[1] + ((k & 8) != 0 ? d : -d);
+        b[2] = a[2] + ((k & 16) != 0 ? d : -d);
+        break;
+    case 3:
+        b[(k / 5) % 3] = a[(k / 5) % 3];
+        b[(k / 5 + 1) % 3] = a[(k / 5 + 1) % 3] + d;
+        b[(k / 5 + 2) % 3] = a[(k / 5 + 2) % 3] - d;
+        break;
+    case 4:
+        for (int32_t i = 0; i < 3; ++i)
+        {
+            b[i] = a[i] + d / 16.0 * (double)(i + 1);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+// The walk, with the blocks it keeps and steps over, against the plain
+// one: what stops it, and where, to the bit, on every segment.
+static void TestWalk(void)
+{
+    mnavFlightDef def = Def();
+    mnavFlightVolume* volume = Volume(&def);
+    int32_t staged = 0;
+    for (int32_t t = 0; t < 4; ++t)
+    {
+        staged += mnavStageFlightTile(volume, s_bytes[t], s_sizes[t]).result == mnav_success;
+    }
+    CHECK(staged == 4 && mnavCommitFlight(volume) == mnav_success, "committed");
+    mnavFlightCursor cursor = mnavMakeFlightCursor(volume);
+    int32_t wrong = 0;
+    int32_t held[3] = {0, 0, 0};
+    for (int32_t k = 0; k < 40000; ++k)
+    {
+        double a[3];
+        double b[3];
+        WalkSegment(k, cursor.layers, a, b);
+        double t = -1.0;
+        double plainT = -1.0;
+        int32_t walk = mnavFlightWalk(&cursor, a, b, &t);
+        int32_t plain = PlainWalk(volume, a, b, &plainT);
+        wrong += walk == plain && memcmp(&t, &plainT, sizeof(t)) == 0 ? 0 : 1;
+        held[walk] += 1;
+    }
+    printf("walks: %d clear, %d solid, %d unloaded, %d wrong\n", held[0], held[1], held[2], wrong);
+    CHECK(wrong == 0 && held[MNAV_SPACE_OPEN] > 0 && held[MNAV_SPACE_SOLID] > 0 &&
+              held[MNAV_SPACE_UNLOADED] > 0,
+          "every walk as the plain one");
     mnavDestroyFlightVolume(volume);
 }
 
@@ -768,6 +932,7 @@ int main(void)
     TestDefIsChecked();
     BakeAll();
     TestBakeStageAndQuery();
+    TestWalk();
     TestTruncatedAndFlippedBytes();
     TestPayloadStructure();
     TestOtherSettingsAndLimits();

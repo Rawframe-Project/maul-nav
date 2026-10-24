@@ -83,3 +83,10 @@ After the agreement table it prints what each library costs on the same scenes, 
 `maul-nav_bench` times a terrain of 8 by 8 tiles: bakes and cached rebuilds, streaming, paths, avoidance in crowds, flow fields, a hierarchy over a flat world, and flight volumes. It prints each section's counts, which do not depend on the machine, then its timings, the best of five runs. Timings are never a CI gate.
 
 To measure a change, build the base and the change in Release with the same compiler, run each pinned to one core (`taskset -c 2 ./maul-nav_bench > base.txt`) on a quiet machine, and pass the base's output to the change's run to print the ratios. On a loaded machine, compare instruction counts (`perf stat -e instructions`) instead. Give both numbers in the pull request.
+
+`maul-nav_bench --count flight-paths <runs>` bakes the flight volume, picks the fliers' 200 ends and then finds their paths `runs` times, printing nothing. The difference between two counts is the paths' alone:
+
+```sh
+perf stat -e instructions:u out/linux-gcc-14/maul-nav_bench --count flight-paths 0
+perf stat -e instructions:u out/linux-gcc-14/maul-nav_bench --count flight-paths 1
+```

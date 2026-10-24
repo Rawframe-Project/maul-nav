@@ -15,7 +15,7 @@ Agents that fly or swim are not bound to the ground, so a navmesh does not descr
 
 ## Baking and loading
 
-- `mnavCreateFlightBaker`, then `mnavBakeFlightTile` with the same `mnavBakeInput` a navmesh bake takes, then `mnavCopyFlightTile`. A voxel any triangle touches is solid. Triangles are surfaces: the inside of a closed mesh stays open space, which no path from outside reaches. Tiles are independent calls, give the same bytes on every platform, and carry a fingerprint as navmesh tiles do.
+- `mnavCreateFlightBaker`, then `mnavBakeFlightTile` with the same `mnavBakeInput` a navmesh bake takes, then `mnavCopyFlightTile`. A voxel any triangle touches is solid. Triangles are surfaces: the inside of a closed mesh stays open space, which no path from outside reaches. A search for an end in such a space gives `mnav_pathNone` with the start alone at once when the space holds at most 512 blocks; a larger one is searched until the node budget runs out, so keep path ends out of closed meshes. Tiles are independent calls, give the same bytes on every platform, and carry a fingerprint as navmesh tiles do.
 - `mnavCreateFlightVolume`, then `mnavStageFlightTile` and `mnavStageFlightTileRemoval`, then `mnavCommitFlight`. Every byte is checked as hostile input, and a tile baked with other settings is refused. `mnavGetFlightTile` reads a committed tile's fingerprint.
 - A world with fliers bakes each tile twice: once at the navmesh's cells, once at the flight volume's voxels.
 

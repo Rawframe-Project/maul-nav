@@ -19,7 +19,9 @@
 // Prints each section's counts and bytes, which do not depend on the
 // machine, as comment lines, then its named results, the best of five
 // runs. Given a baseline file, the saved output of an earlier run, it
-// prints each result's ratio to the recorded one as well.
+// prints each result's ratio to the recorded one as well. With --count,
+// it runs one section's work alone and prints nothing, for an instruction
+// counter (Count).
 
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
@@ -1326,8 +1328,9 @@ static mnavFlightDef FlightDef(void)
     return def;
 }
 
-// Bakes the flight tiles, the best of the runs, into a committed volume.
-static mnavFlightVolume* FlightBake(void)
+// Bakes the flight tiles, the best of runs runs, into a committed volume;
+// reports them unless runs is 1.
+static mnavFlightVolume* FlightBake(int32_t runs)
 {
     mnavFlightDef def = FlightDef();
     mnavTriangleMesh meshes[2] = {Terrain(), Debris()};
@@ -1339,7 +1342,7 @@ static mnavFlightVolume* FlightBake(void)
     size_t bytes = 0;
     int64_t nodes = 0;
     int64_t leaves = 0;
-    for (int32_t run = 0; run < RUNS; ++run)
+    for (int32_t run = 0; run < runs; ++run)
     {
         mnavFlightBaker* baker = NULL;
         Check(mnavCreateFlightBaker(&def, &baker).result, "flight baker");
@@ -1366,6 +1369,10 @@ static mnavFlightVolume* FlightBake(void)
         mnavDestroyFlightBaker(baker);
     }
     Check(mnavCommitFlight(volume), "flight commit");
+    if (runs == 1)
+    {
+        return volume;
+    }
     printf("# flight bake: %d tiles, %lld nodes, %lld leaves, %zu bytes, %.0f us per tile\n",
            TILES * TILES, (long long)nodes, (long long)leaves, bytes, best * 1e6 / (TILES * TILES));
     Report("flight bake, a tile", best * 1e6 / (TILES * TILES), "us");
@@ -1392,37 +1399,56 @@ static mnavPos3 FlightPoint(const mnavFlightVolume* volume, uint32_t* state)
     }
 }
 
-static void FlightPaths(const mnavFlightVolume* volume)
+static mnavPos3 s_flightEnds[FLIGHT_PATHS][2];
+
+// The fliers' paths' ends, and a query context with room for them.
+static mnavQuery* FlightEnds(const mnavFlightVolume* volume)
 {
-    static mnavPos3 ends[FLIGHT_PATHS][2];
     uint32_t state = 5;
     for (int32_t k = 0; k < FLIGHT_PATHS; ++k)
     {
-        ends[k][0] = FlightPoint(volume, &state);
-        ends[k][1] = FlightPoint(volume, &state);
+        s_flightEnds[k][0] = FlightPoint(volume, &state);
+        s_flightEnds[k][1] = FlightPoint(volume, &state);
     }
     mnavQueryDef def = mnavDefaultQueryDef();
     def.limits.nodes = 65536;
     mnavQuery* query = NULL;
     Check(mnavCreateQuery(&def, &query), "query");
+    return query;
+}
+
+typedef struct FlightTotals
+{
+    int32_t found;
+    int64_t points;
+    double length;
+} FlightTotals;
+
+// Finds every flier's path once.
+static FlightTotals FindFlightPaths(mnavQuery* query, const mnavFlightVolume* volume)
+{
+    FlightTotals totals = {0, 0, 0.0};
+    for (int32_t k = 0; k < FLIGHT_PATHS; ++k)
+    {
+        mnavFlightPath path;
+        Check(mnavFindFlightPath(query, volume, s_flightEnds[k][0], s_flightEnds[k][1], &path),
+              "flight path");
+        totals.found += path.end == mnav_pathFound ? 1 : 0;
+        totals.points += path.pointCount;
+        totals.length += path.length;
+    }
+    return totals;
+}
+
+static void FlightPaths(const mnavFlightVolume* volume)
+{
+    mnavQuery* query = FlightEnds(volume);
     double best = 1e30;
-    int32_t found = 0;
-    int64_t points = 0;
-    double length = 0.0;
+    FlightTotals totals = {0, 0, 0.0};
     for (int32_t run = 0; run < RUNS; ++run)
     {
-        found = 0;
-        points = 0;
-        length = 0.0;
         double start = Seconds();
-        for (int32_t k = 0; k < FLIGHT_PATHS; ++k)
-        {
-            mnavFlightPath path;
-            Check(mnavFindFlightPath(query, volume, ends[k][0], ends[k][1], &path), "flight path");
-            found += path.end == mnav_pathFound ? 1 : 0;
-            points += path.pointCount;
-            length += path.length;
-        }
+        totals = FindFlightPaths(query, volume);
         double took = Seconds() - start;
         best = took < best ? took : best;
     }
@@ -1438,7 +1464,8 @@ static void FlightPaths(const mnavFlightVolume* volume)
         {
             bool ended = false;
             mnavFlightPath path;
-            Check(mnavBeginFlightPath(query, volume, ends[k][0], ends[k][1]), "begin");
+            Check(mnavBeginFlightPath(query, volume, s_flightEnds[k][0], s_flightEnds[k][1]),
+                  "begin");
             while (!ended)
             {
                 Check(mnavContinueFlightPath(query, volume, 64, &ended), "continue");
@@ -1452,8 +1479,8 @@ static void FlightPaths(const mnavFlightVolume* volume)
     mnavDestroyQuery(query);
     printf("# flight paths: %d of %d found, %.1f m in all, %lld points, %.1f us per path; in "
            "slices of 64 nodes, %lld slices, %.1f us per path\n",
-           found, FLIGHT_PATHS, length, (long long)points, best * 1e6 / FLIGHT_PATHS,
-           (long long)slices, slicedBest * 1e6 / FLIGHT_PATHS);
+           totals.found, FLIGHT_PATHS, totals.length, (long long)totals.points,
+           best * 1e6 / FLIGHT_PATHS, (long long)slices, slicedBest * 1e6 / FLIGHT_PATHS);
     Report("flight path query", best * 1e6 / FLIGHT_PATHS, "us");
     Report("flight path in slices of 64 nodes", slicedBest * 1e6 / FLIGHT_PATHS, "us");
 }
@@ -1492,14 +1519,39 @@ static void FlightRays(const mnavFlightVolume* volume)
 
 static void Flight(void)
 {
-    mnavFlightVolume* volume = FlightBake();
+    mnavFlightVolume* volume = FlightBake(RUNS);
     FlightPaths(volume);
     FlightRays(volume);
     mnavDestroyFlightVolume(volume);
 }
 
+// For an instruction counter: the flight volume and the fliers' ends, then
+// the 200 fliers' paths found runs times, printing nothing, so that two
+// counts' difference is the paths' (`perf stat -e instructions:u`).
+static int Count(const char* name, int32_t runs)
+{
+    if (strcmp(name, "flight-paths") != 0 || runs < 0)
+    {
+        fprintf(stderr, "--count takes flight-paths and a number of runs\n");
+        return 1;
+    }
+    mnavFlightVolume* volume = FlightBake(1);
+    mnavQuery* query = FlightEnds(volume);
+    for (int32_t run = 0; run < runs; ++run)
+    {
+        FindFlightPaths(query, volume);
+    }
+    mnavDestroyQuery(query);
+    mnavDestroyFlightVolume(volume);
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
+    if (argc == 4 && strcmp(argv[1], "--count") == 0)
+    {
+        return Count(argv[2], atoi(argv[3]));
+    }
     if (argc > 1)
     {
         FILE* file = fopen(argv[1], "rb");
