@@ -558,6 +558,26 @@ static void TestChecks(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+// A maximum speed whose square is subnormal, about 3.4 units of the least
+// subnormal: the squares round absolutely, so a velocity clamped to the
+// sphere may square to a unit or so past the speed's square, and is kept.
+static void TestSubnormalSpeed(void)
+{
+    mnavAvoidance* avoidance = Make(4, 4, 2.0);
+    mnavAgent3D agent = Agent(0.0, 0.0, 0.0, 1);
+    agent.maxSpeed = sqrt(3.4) * 0x1p-537;
+    agent.preferred =
+        (mnavPos3){sqrt(0.65) * 0x1p-537, sqrt(0.65) * 0x1p-537, sqrt(2.1) * 0x1p-537};
+    mnavPos3 velocity;
+    CHECK(mnavAvoid3D(avoidance, &agent, 1, nullptr, 0, 0.05, &velocity) == mnav_success,
+          "stepped");
+    CHECK(isfinite(velocity.x) && isfinite(velocity.y) && isfinite(velocity.z) &&
+              velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z <=
+                  agent.maxSpeed * agent.maxSpeed + 0x1p-1072,
+          "on the sphere, but for subnormal rounding");
+    mnavDestroyAvoidance(avoidance);
+}
+
 int main(void)
 {
     TestLayers();
@@ -572,5 +592,6 @@ int main(void)
     TestFastSphere();
     TestSphereTie();
     TestChecks();
+    TestSubnormalSpeed();
     return s_failures == 0 ? 0 : 1;
 }

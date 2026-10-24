@@ -699,6 +699,24 @@ static void TestSpeedKept(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+// A maximum speed whose square is subnormal, about 1.4 units of the least
+// subnormal, which rounds to 1: a velocity on the circle squares to 2,
+// since the squares round absolutely, and is kept all the same.
+static void TestSubnormalSpeed(void)
+{
+    mnavAvoidance* avoidance = Make(4, 4, 2.0);
+    mnavAgent agent = Agent(0.0, 0.0, 1);
+    agent.maxSpeed = 2.6533818898224513e-162;
+    agent.preferred = (mnavPos2){1.8899272380723789e-162, 1.8624205991209053e-162};
+    mnavPos2 velocity;
+    CHECK(mnavAvoid(avoidance, &agent, 1, nullptr, 0, 0.05, &velocity) == mnav_success, "stepped");
+    CHECK(isfinite(velocity.x) && isfinite(velocity.y) &&
+              velocity.x * velocity.x + velocity.y * velocity.y <=
+                  agent.maxSpeed * agent.maxSpeed + 0x1p-1072,
+          "on the circle, but for subnormal rounding");
+    mnavDestroyAvoidance(avoidance);
+}
+
 static void TestNeighbourThreeCellsOut(void)
 {
     // Cells are half the range wide; dividing a position by the width
@@ -789,6 +807,7 @@ int main(void)
     TestMixedScene();
     TestObstacleChecks();
     TestSpeedKept();
+    TestSubnormalSpeed();
     TestOnACorner();
     TestNeighbourThreeCellsOut();
     TestFarNeighbourPastANearOne();
