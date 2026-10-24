@@ -14,7 +14,8 @@
 // def; each flight tile is tile (0, 0) of the world baked with the default
 // flight def but 0.5 m voxels, 64-voxel tiles and a volume from 2 m below
 // the ground to 20 m up.
-// They were written by commits b3f3ebb and 239c683 of this repository.
+// Commit b3f3ebb of this repository wrote s_ground100 and s_flight100,
+// and commit 239c683 wrote s_ground101 and s_flight101.
 
 #ifndef MAUL_NAV_TEST_STORED_FORMAT1_H
 #define MAUL_NAV_TEST_STORED_FORMAT1_H
