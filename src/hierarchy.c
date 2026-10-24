@@ -10,6 +10,7 @@
 
 #include "allocator.h"
 #include "hierarchy.h"
+#include "invariant.h"
 #include "navmesh.h"
 #include "offmesh.h"
 #include "query.h"
@@ -752,6 +753,74 @@ static mnavResult Rebuild(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh*
     return result;
 }
 
+// Each cluster's slots lie in its range of slots, in clusters made of the
+// navmesh's places, and the transitions leaving it in its range of
+// leaving, each leaving it.
+static void CheckClusters(const mnavHierarchy* h, const mnavNavmesh* navmesh)
+{
+    MNAV_ASSERT(h->firstSlot[0] == 0 && h->firstSlot[h->clusterCount] == navmesh->placeCount);
+    MNAV_ASSERT(h->firstLeaving[0] == 0 && h->firstLeaving[h->clusterCount] == h->transitionCount);
+    for (int32_t c = 0; c < h->clusterCount; ++c)
+    {
+        MNAV_ASSERT(h->firstSlot[c] < h->firstSlot[c + 1]);
+        for (int32_t i = h->firstSlot[c]; i < h->firstSlot[c + 1]; ++i)
+        {
+            MNAV_ASSERT(h->clusterOf[h->slots[i]] == c);
+        }
+        MNAV_ASSERT(h->firstLeaving[c] <= h->firstLeaving[c + 1]);
+        for (int32_t i = h->firstLeaving[c]; i < h->firstLeaving[c + 1]; ++i)
+        {
+            MNAV_ASSERT(h->transitions[h->leaving[i]].from == c);
+        }
+    }
+}
+
+// Transition u crosses from one cluster into another, its slots in those
+// clusters; one the other way, if any, crosses back.
+static void CheckTransition(const mnavHierarchy* h, int32_t u)
+{
+    const mnavTransition* t = &h->transitions[u];
+    MNAV_ASSERT(t->cluster >= 0 && t->cluster < h->clusterCount && t->from >= 0 &&
+                t->from < h->clusterCount && t->cluster != t->from);
+    MNAV_ASSERT(h->clusterOf[t->slot] == t->cluster && h->clusterOf[t->fromSlot] == t->from);
+    MNAV_ASSERT(t->reverse >= -1 && t->reverse < h->transitionCount);
+    if (t->reverse >= 0)
+    {
+        const mnavTransition* r = &h->transitions[t->reverse];
+        MNAV_ASSERT(r->from == t->cluster && r->cluster == t->from);
+    }
+}
+
+// Transition u's edges lie in its range, each to another transition
+// leaving the cluster u enters, other than u's reverse, at a finite cost.
+static void CheckEdges(const mnavHierarchy* h, int32_t u)
+{
+    const mnavTransition* t = &h->transitions[u];
+    MNAV_ASSERT(h->firstEdge[u] <= h->firstEdge[u + 1]);
+    for (int32_t e = h->firstEdge[u]; e < h->firstEdge[u + 1]; ++e)
+    {
+        const mnavEdge* edge = &h->edges[e];
+        MNAV_ASSERT(edge->to >= 0 && edge->to < h->transitionCount && edge->to != t->reverse);
+        MNAV_ASSERT(h->transitions[edge->to].from == t->cluster);
+        MNAV_ASSERT(isfinite(edge->cost) && edge->cost >= 0.0);
+    }
+}
+
+// A graph within its limits whose clusters, transitions and edges hold
+// (CheckClusters, CheckTransition, CheckEdges).
+static void CheckGraph(const mnavHierarchy* h, const mnavNavmesh* navmesh)
+{
+    MNAV_ASSERT(h->transitionCount <= h->def.limits.transitions &&
+                h->edgeCount <= h->def.limits.edges);
+    MNAV_ASSERT(h->firstEdge[0] == 0 && h->firstEdge[h->transitionCount] == h->edgeCount);
+    CheckClusters(h, navmesh);
+    for (int32_t u = 0; u < h->transitionCount; ++u)
+    {
+        CheckTransition(h, u);
+        CheckEdges(h, u);
+    }
+}
+
 // Ends a build or update: the graph for this commit on success, none on
 // an error; and the report.
 static mnavResult Finish(mnavHierarchy* h, const mnavNavmesh* navmesh, mnavResult result,
@@ -764,6 +833,10 @@ static mnavResult Finish(mnavHierarchy* h, const mnavNavmesh* navmesh, mnavResul
     }
     h->navmesh = navmesh;
     h->commits = navmesh->commits;
+    if (MNAV_INVARIANTS)
+    {
+        CheckGraph(h, navmesh);
+    }
     if (reportOut != nullptr)
     {
         *reportOut =

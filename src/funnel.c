@@ -79,6 +79,7 @@ static int32_t Portals(mnavQuery* query, int32_t last)
     const mnavSearchNode* node = &query->nodes[last];
     if (node->tag != MNAV_TAG_END)
     {
+        MNAV_ASSERT(count < 2 * query->limits.nodes + 1);
         query->portals[count++] = (mnavPortal){node->at, node->at, -1};
     }
     return count;
@@ -150,6 +151,7 @@ static void Corner(mnavQuery* query, int32_t* count, Funnel* f, mnavPos3 p, int3
 static int32_t Pull(mnavQuery* query, int32_t first, int32_t last, int32_t count)
 {
     const mnavPortal* p = query->portals;
+    MNAV_ASSERT(count < 2 * query->limits.nodes + 1);
     query->points[count++] = p[first].left;
     Funnel f = {p[first].left, p[first].left, p[first].right, first, first, first};
     for (int32_t i = first + 1; i <= last; ++i)
