@@ -54,10 +54,11 @@ function(maul_apply_flags target)
         endif()
     else()
         # -fno-math-errno makes sqrt the one rounded instruction on every
-        # target, never a C library call (on 32-bit x86, an x87 one).
+        # target, never a C library call (on 32-bit x86, an x87 one). It
+        # comes after -fno-fast-math, which in GCC turns errno math back on.
         target_compile_options(${target} PRIVATE
-            -ffp-contract=off -fno-math-errno -fno-trapping-math -fno-fast-math -fno-unsafe-math-optimizations
-            -Wall -Wextra -Wshadow -Wdouble-promotion -Wfloat-conversion
+            -ffp-contract=off -fno-trapping-math -fno-fast-math -fno-unsafe-math-optimizations
+            -fno-math-errno -Wall -Wextra -Wshadow -Wdouble-promotion -Wfloat-conversion
             $<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>)
         # A 64-bit value cut to 32 bits, where pointers are 64 bits (a
         # 32-bit size_t would flag every size taken from a 64-bit value);
