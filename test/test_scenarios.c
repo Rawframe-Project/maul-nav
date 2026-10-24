@@ -12,7 +12,9 @@
 // nightly-labeled test doorway. The terrain's bytes hold under every host
 // floating-point setting.
 
+#include "doorway.h"
 #include "float_hosts.h"
+#include "stored_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/avoidance.h"
@@ -361,13 +363,13 @@ static mnavNearest Ground(const mnavNavmesh* navmesh, double x, double z)
 }
 
 // The terrain, made beforehand, for TerrainHash.
-static mnavTerrain s_terrain;
+static mnavTerrain s_streamedTerrain;
 
 // The terrain's 16 tiles baked into s_tiles: their bytes' hash.
 static uint64_t TerrainHash(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    const mnavBakeInput input = {nullptr, 0, &s_terrain, 1, nullptr, 0, nullptr};
+    const mnavBakeInput input = {nullptr, 0, &s_streamedTerrain, 1, nullptr, 0, nullptr};
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     uint64_t hash = MNAV_HASH_INIT;
@@ -385,7 +387,7 @@ static uint64_t TerrainHash(void)
 static void TestStreamedTerrain(mnavQuery* query)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    s_terrain = Terrain();
+    s_streamedTerrain = Terrain();
     uint64_t hash = TerrainHash();
     printf("TERRAIN_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == TERRAIN_HASH, "the pinned hash");
@@ -685,21 +687,15 @@ static double CrowdClosest(void)
 
 static void TestDoorway(mnavQuery* query)
 {
-    // Two rooms of 30 m by 32 m, 4 m apart, joined by a doorway 6 m wide
-    // that crosses the seam of the two tiles; the navmesh's edges are the
-    // walls. A thousand agents in the west room cross to the same places
-    // in the east one.
-    Quads q = {0};
-    AddQuad(&q, 0, 0, 30, 32, 0, 0);
-    AddQuad(&q, 34, 0, 64, 32, 0, 0);
-    AddQuad(&q, 30, 13, 34, 19, 0, 0);
-    mnavBakeDef def = mnavDefaultBakeDef();
-    def.agent.radius = (float)CROWD_RADIUS;
-    Bake(&def, &q, 0, 0, 1, 0);
+    // test/doorway.h's two rooms and the doorway between them, from the
+    // stored tiles; the navmesh's edges are the walls. A thousand agents in
+    // the west room cross to the same places in the east one.
+    mnavBakeDef def = DoorwayDef();
+    CHECK(def.agent.radius == (float)CROWD_RADIUS, "the tiles baked for the crowd's agents");
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
-              mnavStageTile(navmesh, s_tiles[1], s_sizes[1]).result == mnav_success &&
+              mnavStageTile(navmesh, s_doorway0, sizeof(s_doorway0)).result == mnav_success &&
+              mnavStageTile(navmesh, s_doorway1, sizeof(s_doorway1)).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "loaded");
     for (int32_t i = 0; i < CROWD; ++i)
