@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.0.4](https://github.com/Rawframe-Project/maul-nav/compare/v0.0.3...v0.0.4) (2026-10-24)
+
+
+### Changed
+
+* **bake:** cut the rasterize stage's instructions by a third ([#25](https://github.com/Rawframe-Project/maul-nav/issues/25)) ([e3eb66d](https://github.com/Rawframe-Project/maul-nav/commit/e3eb66d5d283ea3641995c6486d9dec20aca9101)), closes [#18](https://github.com/Rawframe-Project/maul-nav/issues/18)
+
 ## [0.0.3](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.0.3) (2026-10-24)
 
 ### Changed
