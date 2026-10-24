@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Tiles in tile format 1 and flight tile format 1, as releases 1.0.0 and
-// 1.0.1 wrote them, kept to show they are refused with mnav_errorVersion.
-// They are never rebaked.
+// Tiles in tile format 1 and flight tile format 1, kept to show that a
+// tile of another format is refused with mnav_errorVersion. They are never
+// rebaked, since the library writes only the current formats.
 //
-// - s_ground100 and s_flight100: written by 1.0.0 (b3f3ebb), header words
-//   1, 0, 0 after the size.
-// - s_ground101 and s_flight101: written by 1.0.1 (239c683), header words
-//   1, 0, 1 after the size.
+// A format 1 header holds the writing library's version in three words
+// after the header size. The two tiles of each kind differ only in those
+// words and in the fingerprint after them: s_ground100 and s_flight100
+// hold 1, 0, 0, and s_ground101 and s_flight101 hold 1, 0, 1.
 //
 // Each ground tile is tile (0, 0) of test/world.h baked with the default
 // def; each flight tile is tile (0, 0) of the world baked with the default
 // flight def but 0.5 m voxels, 64-voxel tiles and a volume from 2 m below
 // the ground to 20 m up.
+// They were written by commits b3f3ebb and 239c683 of this repository.
 
 #ifndef MAUL_NAV_TEST_STORED_FORMAT1_H
 #define MAUL_NAV_TEST_STORED_FORMAT1_H
