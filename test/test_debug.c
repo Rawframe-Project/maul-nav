@@ -42,7 +42,7 @@ static mnavDebugBuffer Buffer(mnavPos3 origin)
 
 static mnavNavmesh* Load(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;

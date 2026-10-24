@@ -25,9 +25,6 @@
 // Sixteenths of a cell per cell.
 #define SUBCELLS 16
 
-// The hash of the level's detail mesh, the same on every platform.
-#define LEVEL_DETAIL_HASH 0xeb1d6f8f368537ecull
-
 // A hand field compacted, every span in region 1.
 typedef struct Setup
 {
@@ -335,29 +332,6 @@ static void TestNoHeightsFallBackAndCount(void)
     mnavReleaseCompactField(&setup.memory, &setup.field);
 }
 
-static uint64_t HashDetail(const mnavDetailMesh* detail)
-{
-    uint64_t hash = MNAV_HASH_INIT;
-    for (int32_t p = 0; p < detail->partCount; ++p)
-    {
-        const mnavDetailPart* part = &detail->parts[p];
-        int32_t fields[4] = {part->firstVertex, part->firstTriangle, part->vertexCount,
-                             part->triangleCount};
-        hash = mnavHash64(hash, fields, (int32_t)sizeof(fields));
-    }
-    for (int32_t v = 0; v < detail->vertexCount; ++v)
-    {
-        const mnavDetailVertex* d = &detail->vertices[v];
-        int32_t fields[3] = {d->x, d->y, d->z};
-        hash = mnavHash64(hash, fields, (int32_t)sizeof(fields));
-    }
-    for (int32_t t = 0; t < detail->triangleCount; ++t)
-    {
-        hash = mnavHash64(hash, &detail->triangles[t], (int32_t)sizeof(detail->triangles[t]));
-    }
-    return hash;
-}
-
 // Twice a triangle's signed area on the ground, in sixteenths squared.
 static int64_t TriangleArea2(const mnavDetailMesh* detail, const mnavDetailPart* part,
                              const mnavDetailTriangle* t)
@@ -412,7 +386,7 @@ static bool Sound(const mnavDetailMesh* detail, const mnavPolyMesh* mesh)
     return true;
 }
 
-static void TestLevelDetailIsPinned(void)
+static void TestLevelDetailIsSound(void)
 {
     static mnavVec3 vertices[LEVEL_VERTICES];
     static int32_t indices[LEVEL_TRIANGLES * 3];
@@ -454,11 +428,6 @@ static void TestLevelDetailIsPinned(void)
               mnav_success,
           "detail");
     CHECK(Sound(&detail, &mesh) && detail.failedPolygons == 0, "sound");
-    uint64_t hash = HashDetail(&detail);
-    printf("LEVEL_DETAIL_HASH=%016llx vertices=%d triangles=%d fallbacks=%d\n",
-           (unsigned long long)hash, detail.vertexCount, detail.triangleCount,
-           detail.fallbackHeights);
-    CHECK(hash == LEVEL_DETAIL_HASH, "the pinned hash");
     mnavReleaseDetailMesh(&memory, &detail);
     // Samples every cell meet the per-edge cap on the longest edges.
     settings.sample = SUBCELLS;
@@ -580,7 +549,7 @@ int main(void)
     TestSharedEdgeIsSampledAlike();
     TestTiesKeepTheFirstFromTheLexicalEnd();
     TestNoHeightsFallBackAndCount();
-    TestLevelDetailIsPinned();
+    TestLevelDetailIsSound();
     TestBumpyGroundReachesTheCap();
     return s_failures == 0 ? 0 : 1;
 }

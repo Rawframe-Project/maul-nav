@@ -3,11 +3,12 @@
 //
 // A world over four 32 m tiles, a floor with boxes 1.5 m tall standing
 // across their sides (lower than the agent, so nothing is walkable
-// inside them), baked once with the default def into s_tiles.
+// inside them), its tiles read from test/stored_tiles.h into s_tiles.
 
 #ifndef MAUL_NAV_TEST_WORLD_H
 #define MAUL_NAV_TEST_WORLD_H
 
+#include "stored_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -54,24 +55,23 @@ static inline mnavTriangleMesh World(void)
     return (mnavTriangleMesh){s_vertices, WORLD_VERTICES, s_indices, WORLD_TRIANGLES, nullptr};
 }
 
-// The world's four tiles, baked once.
+// The world's four tiles, as stored (test/stored_tiles.h): the bake of
+// World() with the default def, kept fixed so that the suites that query
+// them pin query results, not the bake's.
 static uint8_t s_tiles[4][TILE_CAPACITY];
 static size_t s_sizes[4];
 
-static inline void BakeWorld(void)
+static inline void LoadWorldTiles(void)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
-    mnavBaker* baker = nullptr;
-    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
-    mnavTriangleMesh world = World();
+    const uint8_t* stored[4] = {s_ground0, s_ground1, s_ground2, s_ground3};
+    const size_t sizes[4] = {sizeof(s_ground0), sizeof(s_ground1), sizeof(s_ground2),
+                             sizeof(s_ground3)};
     for (int32_t t = 0; t < 4; ++t)
     {
-        mnavBakeReport report;
-        CHECK(mnavBakeTile(baker, &world, 1, t & 1, t >> 1, &report) == mnav_success, "baked");
-        CHECK(mnavCopyBakedTile(baker, s_tiles[t], TILE_CAPACITY, &s_sizes[t]) == mnav_success,
-              "copied");
+        CHECK(sizes[t] <= TILE_CAPACITY, "the stored tile fits");
+        memcpy(s_tiles[t], stored[t], sizes[t]);
+        s_sizes[t] = sizes[t];
     }
-    mnavDestroyBaker(baker);
 }
 
 #endif // MAUL_NAV_TEST_WORLD_H

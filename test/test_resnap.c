@@ -54,7 +54,7 @@ static void TestOnlyChangedPlacesResnap(void)
     // toggle at random: after every commit, every link's snaps are what
     // snapping it from scratch gives, though only links near a changed
     // place were snapped again.
-    BakeWorld();
+    LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;

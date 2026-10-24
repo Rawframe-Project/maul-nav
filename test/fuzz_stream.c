@@ -356,7 +356,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     static bool baked = false;
     if (!baked)
     {
-        BakeWorld();
+        LoadWorldTiles();
         BakeVariants();
         baked = true;
     }

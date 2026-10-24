@@ -12,22 +12,22 @@ It never compromises on:
 ## Commands
 
 ```sh
-cmake -B out/asan -G Ninja -DCMAKE_C_COMPILER=clang-20 -DMAUL_NAV_SANITIZE=ON -DMAUL_NAV_WERROR=ON
-cmake --build out/asan && ctest --test-dir out/asan -j 8   # before every push
-ctest --test-dir out/asan -L corridor                     # one suite, by label
-python3 tools/check_source.py && python3 tools/check_modules.py && python3 tools/check_docs.py \
-  && python3 tools/check_lengths.py && python3 tools/check_guide.py
-python3 ../../.github/scripts/docs_check.py --strict        # the organization's documentation check
+tools/check.sh changed          # before every push: rules, format, ASan build, reached suites (< 2 min)
+tools/check.sh pr               # what the pull request check runs (< 10 min)
+tools/check.sh full             # adds TSan, Clang Release, shared, the large scenes, longer fuzzing (< 20 min)
+cmake --preset linux-clang-20-asan && cmake --build --preset linux-clang-20-asan   # one CI cell
+ctest --preset linux-clang-20-asan -L corridor   # one suite, by label
+tools/fuzz.sh build out/fuzz && tools/fuzz.sh run out/fuzz 30 4   # every fuzz target, 30 s each
 ```
 
-The server's default `gcc` is 13, which the family refuses: use `gcc-14` or `clang-20`. Run full builds, the ThreadSanitizer build and fuzzing through the workspace's heavy-job wrapper. Each suite is `test/test_<label>.c`, labeled with its name.
+Run the `pr` and `full` tiers, fuzzing and the ThreadSanitizer build through the workspace's heavy-job wrapper on the shared machine. The server's default `gcc` is 13, which the family refuses: the presets name `gcc-14` and `clang-20`. Every CI cell is a preset in `CMakePresets.json` (configure, build and test of one name, built in `out/<preset>`); add a cell there, never as commands in a workflow. Each suite is `test/test_<label>.c`, labeled with its name; large scenes also carry `nightly`, which every test preset but `nightly` leaves out.
 
 ## Ways to hurt yourself
 
 - **Killing by pattern.** Never `pkill -f`, `pgrep | kill` or `kill` a PID found by matching a name or path: other sessions build and fuzz on the same machine with the same binary names. Kill only a PID you started.
 - **Endless fuzzing.** A libFuzzer target runs until it finds something. Always pass `-max_total_time`, and stop what you started.
 - **Moving a golden value to make a test pass.** The hashes in the suites pin promised output. A changed hash is a change of results: find out why, and change the constant only when the change is meant, saying so in the pull request and the changelog.
-- **Rebaking the stored tiles.** `test/stored_tiles.h` holds tiles in the current formats, and `test/stored_format1.h` tiles of format 1, which must be refused with `mnav_errorVersion`. Regenerate `stored_tiles.h` (`test_stored --write`) only in the pull request that raises a format; never change `stored_format1.h`.
+- **Rebaking the stored tiles.** `test/stored_tiles.h` holds tiles in the current formats, and the query suites run on its world tiles (`LoadWorldTiles` in `test/world.h`) so that a bake change moves only the bake goldens. `test/stored_format1.h` holds tiles of format 1, which must be refused with `mnav_errorVersion`. Regenerate `stored_tiles.h` (`test_stored --write`) only in the pull request that raises a format; never change `stored_format1.h`.
 - **Editing shared family files.** These are synced from the canonical copies in the organization's `.github` repository (`maul/`) and fail CI when they differ: `docs/internals/maul-conventions.md`; `.clang-format`, `.clang-tidy`, `.editorconfig`, `.gitattributes`, `.gitignore`; `cmake/CompilerFlags.cmake`, `cmake/Install.cmake`, `cmake/Library.cmake`, `cmake/ReadVersion.cmake`, `cmake/Testing.cmake`, `cmake/Config.cmake.in`, `cmake/pkg-config.pc.in`, `cmake/HeaderCheck/CMakeLists.txt`; `bench/CMakeLists.txt`; `test/test_harness.h`; `src/hash.c`; and `tools/build_docs.py`, `check_docs.py`, `check_guide.py`, `check_lengths.py`, `check_modules.py`, `check_source.py`, `gen_api.py`. Change the canonical copy first.
 
 ## Invariants
@@ -48,11 +48,12 @@ The server's default `gcc` is 13, which the family refuses: use `gcc-14` or `cla
 Follow the [repository standard's Tests section](https://github.com/Rawframe-Project/.github/blob/main/docs/repository-standard.md#tests); in this repository:
 
 - Test through the public headers. A suite that reaches `src/` is `WHITEBOX` and needs a reason the public API cannot give, such as an internal format's exact bytes.
-- Golden hashes pin a few scenes; a new behavior gets an exact check of its own, not another hash.
+- Golden hashes pin a few scenes; a new behavior gets an exact check of its own, not another hash. Query suites take their navmesh from `LoadWorldTiles`, not a fresh bake.
+- A large scene (thousands of agents, many tiles) is labeled `nightly` beside its suite's label and runs only at night.
 - Inputs a reader could run past go in a heap allocation of exactly their length, so AddressSanitizer sees an overread.
 - Every C snippet of `docs/user/` appears unchanged in `test/test_guide.c`; `tools/check_guide.py` enforces it.
 - A fuzz finding becomes a test in its module's suite with the minimized input.
-- Bake and query suites share the scenes in `test/world.h`, `test/soup.h` and `test/bake_tile.h`; build on them before adding geometry.
+- Bake and query suites share the scenes in `test/world.h`, `test/soup.h`, `test/terrain.h` and `test/bake_tile.h`; build on them before adding geometry.
 
 ## Documentation
 

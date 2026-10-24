@@ -393,7 +393,7 @@ static void* Read(void* context)
 // one goal on it, and a grid of walls and costs.
 static void Share(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tier = mnav_tierDynamic;
     CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success, "a navmesh");

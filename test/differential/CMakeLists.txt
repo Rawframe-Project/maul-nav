@@ -24,3 +24,4 @@ target_include_directories(differential PRIVATE ${PROJECT_SOURCE_DIR}/test)
 target_link_libraries(differential PRIVATE ${PROJECT_NAME} RecastNavigation::Recast
                                            RecastNavigation::Detour)
 add_test(NAME differential COMMAND differential)
+set_tests_properties(differential PROPERTIES LABELS differential)

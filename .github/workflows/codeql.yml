@@ -1,0 +1,44 @@
+# CodeQL on every pull request and on main. An advanced setup, since the
+# default one builds with the runner's default compiler, GCC 13, and the
+# library needs GCC 14 for C23 (cmake/CompilerFlags.cmake refuses older).
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "41 8 * * 5"
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          languages: c-cpp
+          build-mode: manual
+      - name: Build
+        # The library, the tests, the samples and the benchmark, as the
+        # linux-gcc-14 cell builds them; the Recast differential is left out,
+        # since its findings would be Recast's.
+        run: |
+          cmake -B out/codeql -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_CXX_COMPILER=g++-14
+          cmake --build out/codeql -j 4
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          category: /language:c-cpp

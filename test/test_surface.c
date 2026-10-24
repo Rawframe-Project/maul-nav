@@ -194,7 +194,7 @@ static const double s_fan[16][2] = {{6, 0},  {5.5, 2.3},   {4.2, 4.2},   {2.3, 5
 
 static mnavNavmesh* WorldNavmesh(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");

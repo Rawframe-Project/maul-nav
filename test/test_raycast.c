@@ -198,7 +198,7 @@ static void TestWorldRays(void)
 {
     // Rays fanned from points of the baked world: a reached ray's ground
     // stays on the navmesh, sampled every 0.25 m; all are pinned.
-    BakeWorld();
+    LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");

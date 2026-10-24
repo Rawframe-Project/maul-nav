@@ -99,7 +99,7 @@ static size_t s_baseline;
 // places on it; a few polygon ids found on it.
 static void Load(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     Expect(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success);
     for (int32_t t = 0; t < 3; ++t)

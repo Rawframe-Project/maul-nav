@@ -405,7 +405,7 @@ static void TestSearchesArePinned(void)
 
 int main(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     TestAcrossTheWorld();
     TestLimitsEndTheSearch();
     TestSearchWorkIsPinned();

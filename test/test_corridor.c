@@ -656,7 +656,7 @@ static void TestStartOnASeam(void)
 
 int main(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     TestCornersAreThePathsStraightPath();
     TestChecksAndLimits();
     TestFiltersAndLinks();

@@ -25,34 +25,36 @@ The organization's CI image, `ghcr.io/rawframe-project/ci-cpp`, has everything b
 
 `MNAV_ASSERT` is on in every build without `NDEBUG`: Debug, the sanitizer builds and the fuzz builds. A broken invariant traps with `__builtin_trap`, so a debugger or a core dump stops at the failing check.
 
-## Running tests
+## Presets and running one test
 
-Every suite is `test/test_<name>.c`, one executable and one CTest test labeled with its name:
+Every CI cell is a CMake preset in `CMakePresets.json`: a configure, a build and a test preset of the same name, built in `out/<preset>`. The Linux presets name `gcc-14` or `clang-20`; `linux-clang-20-asan` and `linux-clang-20-tsan` are Debug builds with assertions on. Every suite is `test/test_<name>.c`, one executable and one CTest test labeled with its name:
 
 ```sh
-cmake -B out/debug -G Ninja -DCMAKE_C_COMPILER=clang-20 -DMAUL_NAV_SANITIZE=ON
-cmake --build out/debug
-ctest --test-dir out/debug -L corridor
-./out/debug/test_corridor
+cmake --preset linux-clang-20-asan
+cmake --build --preset linux-clang-20-asan
+ctest --preset linux-clang-20-asan -L corridor
+./out/linux-clang-20-asan/test_corridor
 ```
+
+The test presets leave out the tests labeled `nightly`, the large scenes; `ctest --preset nightly` runs them in the `linux-clang-20` build. `linux-clang-20`, `linux-shared`, `macos-clang` and `windows-clang-cl` also run the `package` test (`MAUL_NAV_TEST_PACKAGE`, `cmake/PackageTest.cmake`), which installs the build and builds `samples/minimal` against it.
 
 A suite prints one line per failed check with its file and line. Suites marked `WHITEBOX` in `CMakeLists.txt` include `src/` and are not built in shared builds, where internal symbols are hidden. `test_guide.c` runs the C snippets of `docs/user/` as written; `tools/check_guide.py` fails when a snippet and its copy differ.
 
-Golden values (tile bytes and results of a few scenes, by `mnavHash64`) are constants in the suites. A test that prints a changed hash names it; change the constant only for a change of results that the pull request explains.
+Golden values (tile bytes and results of a few scenes, by `mnavHash64`) are constants in the suites. A test that prints a changed hash names it; change the constant only for a change of results that the pull request explains. The suites that query the test world read its tiles from `test/stored_tiles.h` rather than baking them, so a bake change leaves their goldens alone. It moves the bake goldens (`LEVEL_TILE_HASH`, `TILES_HASH`, `ROOM_HASH`, `VOLUME_HASH`, the scenarios' `TERRAIN_HASH`, `FLIGHT_BYTES_HASH`) and those of suites that bake their own scenes; when it does, raise `MNAV_BAKE_GENERATOR` or `MNAV_FLIGHT_GENERATOR` in the same pull request.
 
 ## Fuzzing
 
-Each target, `test/fuzz_<area>.c`, reads bytes as the library's input: tile and flight tile bytes, bake input, queries, the searches over a whole navmesh, avoidance, grid flow fields, the exact shortest path against the A* search, flight queries and the tile cache's coder. `test/corpus/fuzz_<area>.tar.gz` holds a minimized seed corpus for each, and `test_tile --seed <file>` writes `fuzz_tile`'s first seed.
+Each target, `test/fuzz_<area>.c`, reads bytes as the library's input: tile and flight tile bytes, bake input, queries, the searches over a whole navmesh, avoidance, grid flow fields, the exact shortest path against the A* search, flight queries and the tile cache's coder. `test/corpus/fuzz_<area>.tar.gz` holds a minimized seed corpus for each, which every target must have, and `test_tile --seed <file>` adds the level tile to `fuzz_tile`'s.
 
 ```sh
-cmake -B out/fuzz -G Ninja -DCMAKE_C_COMPILER=clang-20 -DMAUL_NAV_FUZZ=ON -DMAUL_NAV_BUILD_TESTS=OFF
-cmake --build out/fuzz
-mkdir -p out/corpus/fuzz_query && tar -xzf test/corpus/fuzz_query.tar.gz -C out/corpus/fuzz_query
-./out/fuzz/fuzz_query -max_total_time=300 out/corpus/fuzz_query
-./out/fuzz/fuzz_query crash-<hash>
+tools/fuzz.sh build out/fuzz                     # every target, Clang 20 with the sanitizers
+tools/fuzz.sh run out/fuzz 300 4                 # each for 300 s from its seeds, 4 at a time
+tools/fuzz.sh night out/fuzz fuzz_query 600      # one target from out/corpus/fuzz_query and its seeds, merged back
+tools/fuzz.sh targets out/fuzz                   # the targets the build defines, as JSON
+./out/fuzz/fuzz_query out/fuzz-crashes/crash-<hash>
 ```
 
-Always pass `-max_total_time`, and run long campaigns through the workspace's heavy-job wrapper. A crash becomes a test in the suite of its module, with the smallest input that still fails (`-minimize_crash=1`).
+`tools/fuzz.sh` always bounds a run by `-max_total_time`; run long campaigns through the workspace's heavy-job wrapper. To grow a target's committed seeds, pack a merged corpus with `tar -czf test/corpus/fuzz_<area>.tar.gz -C out/corpus/fuzz_<area> .` when its new inputs reach code the seeds do not. A crash becomes a test in the suite of its module, with the smallest input that still fails (`-minimize_crash=1`).
 
 ## The differential harness
 

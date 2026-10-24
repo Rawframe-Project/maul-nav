@@ -316,7 +316,7 @@ static void TestSlotAboutToWrapIsRetired(void)
 
 int main(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     TestLinksNeedHeightsWithinAStepAtBothEnds();
     TestSlotAboutToWrapIsRetired();
     TestStagedTilesAppearAtCommit();

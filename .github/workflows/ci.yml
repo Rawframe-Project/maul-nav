@@ -1,183 +1,334 @@
-# Continuous integration for Maul Nav.
+# Continuous integration: the pull request check, the full check on main,
+# and every night the large scenes and long fuzzing. Each build cell is a
+# CMake preset built by the organization's shared workflow; the other jobs
+# run in the same CI image. Every test cell checks the golden values, so all
+# cells agree on every bit. docs/operations/checks.md explains each job, and
+# tools/check.sh runs the Linux ones locally.
 name: ci
 
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "37 5 * * *"
   workflow_dispatch:
+    inputs:
+      fuzz-seconds:
+        description: Seconds each target runs in fuzz-night (the night's run is 600)
+        type: number
+        default: 600
+
+# A new push to a pull request cancels its running CI; runs on main get a
+# group of their own, so they are never cancelled.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
 
 env:
   PREFIX: MAUL_NAV
-  # Retries and a timeout for every apt-get, so a slow mirror fails or
-  # recovers instead of hanging the job.
-  APT_OPTIONS: -o Acquire::Retries=3 -o Acquire::http::Timeout=30
 
 jobs:
-  # The rules no compiler checks: formatting, static analysis and the
-  # family's source, module, documentation and length checks.
+  # Whether anything beyond documentation changed; the builds skip when not.
+  changes:
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@e75683076741e3a2499e0f3c112081a3dc95a66f # v0.0.11
+    permissions:
+      pull-requests: read
+
+  docs:
+    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@e75683076741e3a2499e0f3c112081a3dc95a66f # v0.0.11
+    permissions:
+      contents: read
+
+  zizmor:
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@e75683076741e3a2499e0f3c112081a3dc95a66f # v0.0.11
+    permissions:
+      contents: read
+
+  # The rules no compiler checks: formatting, the family's source, module,
+  # API documentation, length and snippet checks, the documentation site,
+  # and clang-tidy. It runs on documentation changes too, since the snippet
+  # check and the site read docs/.
   checks:
-    name: checks
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - name: Install tools
-        timeout-minutes: 15
-        run: |
-          sudo apt-get $APT_OPTIONS update -q
-          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 clang-tidy-20 \
-            ninja-build
-          pip install clang-format==22.1.5 markdown==3.6 >/dev/null
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: clang-format
         run: |
           clang-format --version
-          clang-format --dry-run -Werror $(find include src test tools bench samples -name '*.[ch]' 2>/dev/null)
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          files=$(git ls-files 'include/*.h' 'src/*.[ch]' 'test/*.[ch]' 'tools/*.[ch]' 'bench/*.[ch]' \
+            'samples/*.[ch]')
+          [ -n "$files" ] || { echo "::error::no files to format"; exit 1; }
+          echo "$files" | xargs clang-format --dry-run -Werror
       - name: Family checks
         run: |
           python3 tools/check_source.py
           python3 tools/check_modules.py
           python3 tools/check_docs.py
-          python3 tools/check_guide.py
           python3 tools/check_lengths.py
+          python3 tools/check_guide.py
       - name: The documentation site builds
-        # The API reference is generated into the site, never committed.
         run: python3 tools/build_docs.py
       - name: clang-tidy
         run: |
-          cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-          for f in src/*.c; do
-            clang-tidy-20 -p build --quiet --warnings-as-errors='*' "$f" || exit 1
+          cmake -B out/tidy -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -D${PREFIX}_BUILD_TESTS=OFF -D${PREFIX}_BUILD_BENCH=OFF -D${PREFIX}_BUILD_SAMPLES=OFF
+          files=(src/*.c)
+          [ -e "${files[0]}" ] || { echo "::error::no sources for clang-tidy"; exit 1; }
+          for f in "${files[@]}"; do
+            clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*' "$f"
           done
 
-  # Every cell builds with warnings as errors and runs the whole suite,
-  # the header tests included.
-  build-test:
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
+  # Every cell builds with warnings as errors and runs the whole suite but
+  # the large scenes, the golden values and the header tests included. GCC
+  # 14 builds every part, the Recast differential with it; the Clang Release,
+  # shared, macOS and Windows cells install the library and build
+  # samples/minimal against it (the "package" test).
+  build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: linux-gcc-14,        os: ubuntu-24.04, cc: gcc-14,   cxx: g++-14,     config: Release, extra: "" }
-          - { name: linux-clang-20,      os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "" }
-          - { name: linux-clang-20-asan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_NAV_SANITIZE=ON" }
-          - { name: linux-clang-20-tsan, os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Debug,   extra: "-DMAUL_NAV_TSAN=ON" }
-          - { name: linux-shared,        os: ubuntu-24.04, cc: clang-20, cxx: clang++-20, config: Release, extra: "-DMAUL_NAV_BUILD_SHARED=ON" }
-          - { name: linux-arm64-gcc-14,  os: ubuntu-24.04-arm, cc: gcc-14, cxx: g++-14,   config: Release, extra: "" }
-          - { name: macos-clang,         os: macos-15,     cc: clang,    cxx: clang++,    config: Release, extra: "" }
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install compilers
-        if: runner.os == 'Linux'
-        timeout-minutes: 15
-        run: |
-          sudo apt-get $APT_OPTIONS update -q
-          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends gcc-14 g++-14 clang-20 \
-            libclang-rt-20-dev ninja-build
-      - name: Configure
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -D${PREFIX}_WERROR=ON \
-            -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} ${{ matrix.extra }}
-      - name: Build
-        run: cmake --build build -j 4
-      - name: Test
-        run: ctest --test-dir build --output-on-failure --timeout 300
-      - name: Package
-        if: matrix.name == 'linux-shared'
-        run: |
-          cmake --install build --prefix "$PWD/package"
-          cmake -S samples/minimal -B build-minimal -DCMAKE_C_COMPILER=${{ matrix.cc }} \
-            -DCMAKE_PREFIX_PATH="$PWD/package"
-          cmake --build build-minimal
-          LD_LIBRARY_PATH="$PWD/package/lib" ./build-minimal/minimal
+          - { preset: linux-gcc-14 }
+          - { preset: linux-clang-20 }
+          - { preset: linux-clang-20-asan, repeat: 3 }
+          - { preset: linux-clang-20-tsan }
+          - { preset: linux-shared }
+          - { preset: linux-arm64-gcc-14, runner: ubuntu-24.04-arm }
+          - { preset: macos-clang, runner: macos-15 }
+          - { preset: windows-clang-cl, runner: windows-2025 }
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@e75683076741e3a2499e0f3c112081a3dc95a66f # v0.0.11
+    permissions:
+      contents: read
+    with:
+      preset: ${{ matrix.preset }}
+      runner: ${{ matrix.runner || 'ubuntu-24.04' }}
+      repeat: ${{ matrix.repeat || 1 }}
 
-  windows-clang-cl:
-    name: windows-clang-cl
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
+  # The public headers alone under MSVC's cl, as C17 and C++17 with /W4 /WX:
+  # consumers may compile them with it, though it cannot build the library.
+  msvc-headers:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - name: Configure
-        run: cmake -B build -T ClangCL -D${PREFIX}_WERROR=ON
-      - name: Build
-        run: cmake --build build --config Release -j 4
-      - name: Test
-        run: ctest --test-dir build -C Release --output-on-failure --timeout 300
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Headers under MSVC
-        # The public headers alone under cl's /W4 /WX, in C++17 (family record 0008).
         run: |
-          cmake -S cmake/HeaderCheck -B build-headers
-          cmake --build build-headers --config Release
+          cmake -S cmake/HeaderCheck -B out/headers
+          cmake --build out/headers --config Release
 
+  # The library and its tests under Emscripten and Node, and the size of the
+  # static library. The CI image has no Emscripten, so this job uses the
+  # runner and the emsdk action; it checks for skipped tests and keeps the
+  # logs of a failure as cpp.yml does.
   web:
-    name: web-emscripten
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: emscripten-core/setup-emsdk@v16
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
       - name: Configure
-        run: emcmake cmake -B build -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_WERROR=ON
+        run: cmake --preset web-emscripten
       - name: Build
-        run: cmake --build build -j 4
+        run: cmake --build --preset web-emscripten -j 4
       - name: Test
         run: |
-          for t in build/test_*.js; do node "$t" || exit 1; done
+          ctest --preset web-emscripten --no-tests=error | tee "$RUNNER_TEMP/ctest.log"
+          # A skipped, disabled or missing test fails the cell: it would hide
+          # a check that no longer runs.
+          if grep -E '\*\*\*(Skipped|Not Run)' "$RUNNER_TEMP/ctest.log"; then
+            echo "::error::a test did not run"; exit 1
+          fi
+      - name: Test logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logs-web-emscripten
+          path: out/web-emscripten/Testing/Temporary/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Size
-        # The static library's size, reported, not gated (family record
-        # 0013).
-        run: stat -c '%s bytes' build/libmaul-nav.a
+        # The static library's size, reported, not gated.
+        run: stat -c '%s bytes' out/web-emscripten/libmaul-nav.a
 
-  # The differential harness against Recast and Detour: path
-  # lengths and reachability on the scenario corpus, test only.
-  differential:
-    name: differential
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install compilers
-        timeout-minutes: 15
-        run: |
-          sudo apt-get $APT_OPTIONS update -q
-          sudo apt-get $APT_OPTIONS install -y -q gcc-14 g++-14
-      - name: Build
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release -D${PREFIX}_DIFFERENTIAL=ON \
-            -DCMAKE_C_COMPILER=gcc-14 -DCMAKE_CXX_COMPILER=g++-14
-          cmake --build build --target differential -j4
-      - name: Run
-        run: build/differential
-
-  # Each fuzz target runs for one minute on every push, from the seed
-  # corpus in test/corpus (minimized from local campaigns): the tile loader
-  # from its seed, the bake input, the query inputs, avoidance input, the
-  # searches over the whole navmesh, the runtime navmesh's changes and grid
-  # flow fields.
+  # Every fuzz target from its committed seeds, four at a time, briefly: on
+  # pull requests and on main. The night's long run is fuzz-night.
   fuzz:
-    name: fuzz
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
+    permissions:
+      contents: read
+    env:
+      FUZZ_SECONDS: 20
     steps:
-      - uses: actions/checkout@v7
-      - name: Install compilers
-        timeout-minutes: 15
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build
+        run: tools/fuzz.sh build out/fuzz
+      - name: Run
+        run: tools/fuzz.sh run out/fuzz "$FUZZ_SECONDS" 4
+      - name: Fuzz logs and crash inputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz
+          path: |
+            out/fuzz-logs/
+            out/fuzz-crashes/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The fuzz targets the build defines, so that a new one runs at night
+  # without a list to keep.
+  fuzz-targets:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
+    permissions:
+      contents: read
+    outputs:
+      targets: ${{ steps.list.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: List
+        id: list
+        # Assigned first, so that a failed listing fails the step.
         run: |
-          sudo apt-get $APT_OPTIONS update -q
-          sudo apt-get $APT_OPTIONS install -y -q --no-install-recommends clang-20 \
-            libclang-rt-20-dev ninja-build
+          targets=$(tools/fuzz.sh targets out/fuzz)
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+
+  # Every night, each target alone for ten minutes, from the corpus the last
+  # night left in its cache and the committed seeds; the merged corpus is
+  # saved for the next night.
+  fuzz-night:
+    needs: fuzz-targets
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.fuzz-targets.outputs.targets) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Restore the corpus
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/corpus/${{ matrix.target }}
+          key: corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: corpus-${{ matrix.target }}-
+      - name: Build
+        run: tools/fuzz.sh build out/fuzz
+      - name: Run
+        env:
+          TARGET: ${{ matrix.target }}
+          # A scheduled run has no inputs, so it takes the full 600.
+          FUZZ_SECONDS: ${{ inputs.fuzz-seconds || 600 }}
+        run: tools/fuzz.sh night out/fuzz "$TARGET" "$FUZZ_SECONDS"
+      - name: Save the corpus
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/corpus/${{ matrix.target }}
+          key: corpus-${{ matrix.target }}-${{ github.run_id }}
+      - name: Fuzz log and crash inputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: |
+            out/fuzz-logs/
+            out/fuzz-crashes/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Every night, the large scenes the pull request check leaves out: the
+  # 1,000-agent doorway crowd, with its golden value.
+  scenes:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Build
         run: |
-          cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang-20 -D${PREFIX}_FUZZ=ON \
-            -D${PREFIX}_WERROR=ON
-          cmake --build build
-      - name: Run
+          cmake --preset linux-clang-20
+          cmake --build --preset linux-clang-20
+      - name: Test
         run: |
-          mkdir -p corpus-fuzz_tile
-          build/test_tile --seed corpus-fuzz_tile/level.tile
-          for target in build/fuzz_*; do
-            name=$(basename $target)
-            mkdir -p "corpus-$name"
-            tar -xzf "test/corpus/$name.tar.gz" -C "corpus-$name"
-            "$target" -max_total_time=60 "corpus-$name"
+          ctest --preset nightly --no-tests=error | tee "$RUNNER_TEMP/ctest.log"
+          if grep -E '\*\*\*(Skipped|Not Run)' "$RUNNER_TEMP/ctest.log"; then
+            echo "::error::a test did not run"; exit 1
+          fi
+      - name: Test logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logs-nightly
+          path: out/linux-clang-20/Testing/Temporary/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The one check the ruleset requires: it passes when every job above
+  # passed or was skipped, for a documentation-only change or because it
+  # runs at night only, so adding or renaming a job never touches the
+  # ruleset.
+  required:
+    if: always()
+    needs: [changes, docs, zizmor, checks, build, msvc-headers, web, fuzz, fuzz-targets, fuzz-night,
+            scenes]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Every job passed or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success | skipped) ;; *) exit 1 ;; esac
           done

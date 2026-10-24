@@ -35,7 +35,7 @@ static size_t s_smallSizes[100];
 
 static mnavNavmesh* Load(void)
 {
-    BakeWorld();
+    LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
