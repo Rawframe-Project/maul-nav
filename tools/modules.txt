@@ -10,25 +10,25 @@ tile_index: allocator bake_def input
 raster: allocator
 terrain: raster
 volume: allocator compact outline raster
-heightfield: allocator outline raster terrain tile_index
+heightfield: allocator invariant outline raster terrain tile_index
 outline: allocator raster tile_index
 filter: heightfield
-compact: allocator heightfield raster
+compact: allocator heightfield invariant raster
 erode: allocator compact
 hash:
 draw:
 debug: draw navmesh nearest
 sort:
-region: allocator compact sort
+region: allocator compact invariant sort
 invariant:
 contour: allocator compact invariant region
 holes: allocator contour planar
 planar: contour
 triangulate: contour planar
-polymesh: allocator contour triangulate
+polymesh: allocator contour invariant triangulate
 border_vertices: allocator contour planar polymesh triangulate
 height_patch: allocator compact polymesh region
-detail: allocator compact contour delaunay height_patch polymesh region triangulate
+detail: allocator compact contour delaunay height_patch invariant polymesh region triangulate
 delaunay: invariant
 tile: allocator bytes detail polymesh
 flight_def: bake_def scalar
