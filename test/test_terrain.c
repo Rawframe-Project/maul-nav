@@ -4,6 +4,7 @@
 // Terrains: a terrain bakes to the same bytes as the triangle
 // mesh of its cells; holes; the checks; terrains with meshes.
 
+#include "terrain.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -16,33 +17,16 @@
 
 enum
 {
-    SIDE = 40,
+    SIDE = TERRAIN_SIDE,
     CELLS = (SIDE - 1) * (SIDE - 1),
     TILE_ROOM = 1 << 20
 };
 
-static float s_heights[SIDE * SIDE];
 static mnavAreaType s_areas[CELLS];
 static mnavVec3 s_vertices[SIDE * SIDE];
 static int32_t s_indices[CELLS * 6];
 static uint8_t s_first[TILE_ROOM];
 static uint8_t s_second[TILE_ROOM];
-
-// A slope rising along X with a plateau, 1 m between samples, starting 2 m
-// before tile (0, 0); the plateau's sides are too steep to climb.
-static mnavTerrain Terrain(void)
-{
-    for (int32_t r = 0; r < SIDE; ++r)
-    {
-        for (int32_t c = 0; c < SIDE; ++c)
-        {
-            int32_t dx = c - 18;
-            int32_t dz = r - 14;
-            s_heights[r * SIDE + c] = 0.125f * (float)c + (dx * dx + dz * dz < 36 ? 1.5f : 0.0f);
-        }
-    }
-    return (mnavTerrain){{-2.0f, 1.0f, -2.0f}, 1.0f, 1.0f, SIDE, SIDE, s_heights, nullptr};
-}
 
 // The same cells as a triangle mesh, split and wound as the terrain is.
 static mnavTriangleMesh Mesh(const mnavTerrain* t)
@@ -182,12 +166,12 @@ static void TestChecks(mnavBaker* baker)
     t = good;
     t.origin.y = (float)NAN;
     CHECK(Refused(baker, &t, mnav_errorInvalid, mnav_elementNone) == -1, "a NaN origin");
-    s_heights[77] = (float)NAN;
+    s_terrainHeights[77] = (float)NAN;
     CHECK(Refused(baker, &good, mnav_errorInvalid, mnav_elementSample) == 77, "a NaN height");
-    s_heights[77] = 0.0f;
-    s_heights[78] = 1e9f;
+    s_terrainHeights[77] = 0.0f;
+    s_terrainHeights[78] = 1e9f;
     CHECK(Refused(baker, &good, mnav_errorRange, mnav_elementSample) == 78, "a height too far");
-    s_heights[78] = 0.0f;
+    s_terrainHeights[78] = 0.0f;
     t = good;
     t.spacingX = 1e7f;
     CHECK(Refused(baker, &t, mnav_errorRange, mnav_elementSample) == 1, "a sample too far");

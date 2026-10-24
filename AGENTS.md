@@ -53,7 +53,7 @@ Follow the [repository standard's Tests section](https://github.com/Rawframe-Pro
 - Inputs a reader could run past go in a heap allocation of exactly their length, so AddressSanitizer sees an overread.
 - Every C snippet of `docs/user/` appears unchanged in `test/test_guide.c`; `tools/check_guide.py` enforces it.
 - A fuzz finding becomes a test in its module's suite with the minimized input.
-- Bake and query suites share the scenes in `test/world.h`, `test/soup.h` and `test/bake_tile.h`; build on them before adding geometry.
+- Bake and query suites share the scenes in `test/world.h`, `test/soup.h`, `test/terrain.h` and `test/bake_tile.h`; build on them before adding geometry.
 
 ## Documentation
 
