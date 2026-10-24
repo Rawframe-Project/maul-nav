@@ -11,7 +11,7 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    - cron: "37 2 * * *"
+    - cron: "37 5 * * *"
   workflow_dispatch:
 
 # A new push to a pull request cancels its running CI; runs on main get a
@@ -204,16 +204,34 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # Every night, each target alone for ten minutes, from the corpus the last
-  # night left in its cache with the committed seeds as its floor; the
-  # merged corpus is saved for the next night.
-  fuzz-night:
+  # The fuzz targets the build defines, so that a new one runs at night
+  # without a list to keep.
+  fuzz-targets:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
+    permissions:
+      contents: read
+    outputs:
+      targets: ${{ steps.list.outputs.targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: List
+        id: list
+        run: echo "targets=$(tools/fuzz.sh targets out/fuzz)" >> "$GITHUB_OUTPUT"
+
+  # Every night, each target alone for ten minutes, from the corpus the last
+  # night left in its cache and the committed seeds; the merged corpus is
+  # saved for the next night.
+  fuzz-night:
+    needs: fuzz-targets
     strategy:
       fail-fast: false
       matrix:
-        target: [fuzz_avoid, fuzz_bake, fuzz_flight, fuzz_flow, fuzz_graph, fuzz_lz, fuzz_query,
-                 fuzz_shortest, fuzz_stream, fuzz_tile]
+        target: ${{ fromJSON(needs.fuzz-targets.outputs.targets) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     container: ghcr.io/rawframe-project/ci-cpp:2026.10.6@sha256:50c383f608f992c272196139d749f15978e35143a2876362b1e0aef6993480bd
@@ -290,7 +308,8 @@ jobs:
   # ruleset.
   required:
     if: always()
-    needs: [changes, docs, zizmor, checks, build, msvc-headers, web, fuzz, fuzz-night, scenes]
+    needs: [changes, docs, zizmor, checks, build, msvc-headers, web, fuzz, fuzz-targets, fuzz-night,
+            scenes]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions: {}

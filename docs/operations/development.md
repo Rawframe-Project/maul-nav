@@ -44,12 +44,13 @@ Golden values (tile bytes and results of a few scenes, by `mnavHash64`) are cons
 
 ## Fuzzing
 
-Each target, `test/fuzz_<area>.c`, reads bytes as the library's input: tile and flight tile bytes, bake input, queries, the searches over a whole navmesh, avoidance, grid flow fields, the exact shortest path against the A* search, flight queries and the tile cache's coder. `test/corpus/fuzz_<area>.tar.gz` holds a minimized seed corpus for each, and `test_tile --seed <file>` writes `fuzz_tile`'s first seed.
+Each target, `test/fuzz_<area>.c`, reads bytes as the library's input: tile and flight tile bytes, bake input, queries, the searches over a whole navmesh, avoidance, grid flow fields, the exact shortest path against the A* search, flight queries and the tile cache's coder. `test/corpus/fuzz_<area>.tar.gz` holds a minimized seed corpus for each, which every target must have, and `test_tile --seed <file>` adds the level tile to `fuzz_tile`'s.
 
 ```sh
 tools/fuzz.sh build out/fuzz                     # every target, Clang 20 with the sanitizers
 tools/fuzz.sh run out/fuzz 300 4                 # each for 300 s from its seeds, 4 at a time
-tools/fuzz.sh night out/fuzz fuzz_query 600      # one target from out/corpus/fuzz_query, merged back
+tools/fuzz.sh night out/fuzz fuzz_query 600      # one target from out/corpus/fuzz_query and its seeds, merged back
+tools/fuzz.sh targets out/fuzz                   # the targets the build defines, as JSON
 ./out/fuzz/fuzz_query out/fuzz-crashes/crash-<hash>
 ```
 
