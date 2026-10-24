@@ -37,17 +37,17 @@ env:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@b832e9728328aee42542c4b27e92458b2c2e5aaa # v0.0.18
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@c84f41e11c17d61e2876d65faf9aed1bea5130f7 # v0.0.19
     permissions:
       pull-requests: read
 
   docs:
-    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@b832e9728328aee42542c4b27e92458b2c2e5aaa # v0.0.18
+    uses: Rawframe-Project/.github/.github/workflows/docs-check.yml@c84f41e11c17d61e2876d65faf9aed1bea5130f7 # v0.0.19
     permissions:
       contents: read
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@b832e9728328aee42542c4b27e92458b2c2e5aaa # v0.0.18
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@c84f41e11c17d61e2876d65faf9aed1bea5130f7 # v0.0.19
     permissions:
       contents: read
 
@@ -113,7 +113,7 @@ jobs:
           - { preset: linux-arm64-gcc-14, runner: ubuntu-24.04-arm }
           - { preset: macos-clang, runner: macos-15 }
           - { preset: windows-clang-cl, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@b832e9728328aee42542c4b27e92458b2c2e5aaa # v0.0.18
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@c84f41e11c17d61e2876d65faf9aed1bea5130f7 # v0.0.19
     permissions:
       contents: read
     with:
