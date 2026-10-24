@@ -5,17 +5,32 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
-## [0.0.3](https://github.com/Rawframe-Project/maul-nav/compare/v0.0.2...v0.0.3) (2026-10-24)
-
-
-### Fixed
-
-* compute in the library's floating-point environment ([#24](https://github.com/Rawframe-Project/maul-nav/issues/24)) ([63a9711](https://github.com/Rawframe-Project/maul-nav/commit/63a9711effabe595e5fe101618d374b3cd0e83ae)), closes [#20](https://github.com/Rawframe-Project/maul-nav/issues/20)
-
+## [0.0.3](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.0.3) (2026-10-24)
 
 ### Changed
 
-* **flight:** cut a flight path's instructions to a third ([#22](https://github.com/Rawframe-Project/maul-nav/issues/22)) ([eeb9430](https://github.com/Rawframe-Project/maul-nav/commit/eeb9430c79d9d7afa1ef55da18ed1ae3a188115c)), closes [#17](https://github.com/Rawframe-Project/maul-nav/issues/17)
+- A flight path search takes about a third of the instructions it
+  did: the line-of-sight walk skips open blocks whole and steps through
+  mixed leaves by bit tests. Found paths and raycasts are the same bits
+  as before.
+- A flight path whose end (or start) lies in a closed space the other
+  cannot reach, such as the inside of a closed mesh, now ends at once
+  with `mnav_pathNone` and the start alone as its path. This applies
+  when the space is found closed within 512 blocks and the node budget.
+  Before, the search flooded its whole node budget and returned
+  `mnav_pathOutOfNodes` with a partial path toward the outside, which
+  could never reach the end.
+  ([#22](https://github.com/Rawframe-Project/maul-nav/pull/22))
+
+### Fixed
+
+- A host that runs its threads with flush-to-zero, denormals-are-zero
+  or another rounding mode now gets the same bakes, paths and query
+  results as every other host. Every public call that computes switches
+  to the library's floating-point setting and restores the host's on
+  return. The allocator and the bake clock run in the host's own
+  setting. Results in the default setting do not change.
+  ([#24](https://github.com/Rawframe-Project/maul-nav/pull/24))
 
 ## [0.0.2](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.0.2) (2026-10-24)
 
