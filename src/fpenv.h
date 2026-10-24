@@ -85,8 +85,9 @@ mnavFloatHost mnavFloatHostEnter(void);
 // register, whatever host code set.
 void mnavFloatHostLeave(mnavFloatHost host);
 
-// The thread's control register as it is: MXCSR on x86, FPCR on AArch64,
-// 0 on WebAssembly. For tests and diagnostics.
+// The thread's control register as it is: MXCSR on x86 (with the x87
+// control word in bits 32 to 47 on 32-bit x86), FPCR on AArch64, 0 on
+// WebAssembly. For tests and diagnostics.
 uint64_t mnavFloatControlRead(void);
 
 // Sets the thread's control register to value; nothing on WebAssembly. For
