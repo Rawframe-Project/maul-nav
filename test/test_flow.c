@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Flow fields (mnav-0007): their costs against grid paths, the ways they
+// Flow fields: their costs against grid paths, the ways they
 // give, several goals, blocked cells and corners, limits and checks.
 
 #include "test_harness.h"

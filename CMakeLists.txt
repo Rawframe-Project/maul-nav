@@ -118,7 +118,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/triangulate.c)
 maul_configure_library(maul-nav)
 # floor, ceil, fabs and sqrt, the exactly rounded functions the library
-# takes from libm (mnav-0001).
+# takes from libm.
 if(NOT WIN32 AND NOT APPLE)
     target_link_libraries(maul-nav PUBLIC m)
 endif()

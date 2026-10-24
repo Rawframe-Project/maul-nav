@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Grid paths (mnav-0005): jump point search and A*, their limits and ends.
+// Grid paths: jump point search and A*, their limits and ends.
 
 #include "test_harness.h"
 #include "world.h"

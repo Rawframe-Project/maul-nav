@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The spheres near a flier (mnav-0006): found through the obstacle grid,
+// The spheres near a flier: found through the obstacle grid,
 // they are those a look at every sphere finds, in the same order, for
 // shared spots, repeated ids, fast spheres and cells of any size.
 

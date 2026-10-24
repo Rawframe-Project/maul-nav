@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Flow-field repairs (mnav-0007), after Ramalingam and Reps' incremental
+// Flow-field repairs, after Ramalingam and Reps' incremental
 // shortest paths. Costs raised by what changed are those of the cells
 // whose next-cell chains run through it: they are reset and given the
 // best cost their neighbours offer. Lowered costs spread from new

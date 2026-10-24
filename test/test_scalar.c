@@ -44,7 +44,7 @@ static void TestCosineEndpoints(void)
 
 static void TestCosineBitsArePinned(void)
 {
-    // The bits every platform must produce (mnav-0001).
+    // The bits every platform must produce.
     CHECK(Bits(mnavCosDegrees(45.0f)) == 0x3F3504F2u, "cos 45 bits");
     CHECK(Bits(mnavCosDegrees(30.0f)) == 0x3F5DB3D7u, "cos 30 bits");
     CHECK(Bits(mnavCosDegrees(89.0f)) == 0x3C8EF859u, "cos 89 bits");

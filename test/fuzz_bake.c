@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes the bake's input (mnav-0002, mnav-0003): triangle meshes,
+// Fuzzes the bake's input: triangle meshes,
 // terrains and volumes, or 2D outlines, read from the bytes as a host
 // might hand them over, with NaNs, infinities, huge values, indices out of
 // range and areas past the last. Most values are drawn from a small set of
@@ -9,7 +9,7 @@
 // typed status or succeed; a tile it makes must bake again to the same
 // bytes, load into a navmesh, and every byte taken must come back. A 3D
 // input's last volumes are also taken as obstacles: the tile cached from
-// the input without them and rebuilt with them (mnav-0016) must give the
+// the input without them and rebuilt with them must give the
 // full bake's result and bytes.
 
 #include "counting_allocator.h"
@@ -258,7 +258,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
                                  in.volumes, volumes, nullptr};
     static uint8_t tile[TILE_ROOM];
     size_t tileSize = BakeTwice(baker, &in, flat, outlines, &input, tileX, tileZ, tile);
-    // A tile index of the meshes (mnav-0014), made only when they all
+    // A tile index of the meshes, made only when they all
     // pass their checks, gives the same result and the same bytes.
     mnavTileIndex* index = nullptr;
     if (flat ? mnavCreateTileIndex2D(&def, in.outlines, outlines, &index, nullptr) == mnav_success

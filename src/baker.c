@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The baker: one call runs every stage of the bake for a tile (mnav-0003).
+// The baker: one call runs every stage of the bake for a tile.
 
 #include "allocator.h"
 #include "bake_def.h"
@@ -215,13 +215,10 @@ static mnavResult CheckInput(const mnavBaker* baker, const Input* in, int32_t ti
 // place.
 static uint64_t HashSettings(const mnavBakeDef* def, int32_t tileX, int32_t tileZ)
 {
-    mnavVersion version = mnavGetVersion();
     uint64_t origin[3] = {mnavDoubleBits(def->origin.x), mnavDoubleBits(def->origin.y),
                           mnavDoubleBits(def->origin.z)};
     const uint32_t words[] = {
-        version.major,
-        version.minor,
-        version.patch,
+        MNAV_BAKE_GENERATOR,
         (uint32_t)origin[0],
         (uint32_t)(origin[0] >> 32),
         (uint32_t)origin[1],
@@ -434,9 +431,9 @@ static mnavResult Encode(mnavBaker* baker, int32_t tileX, int32_t tileZ, const S
 {
     const mnavBakeDef* def = &baker->def;
     const mnavBakeCells* cells = &baker->cells;
-    mnavTileInfo info = {mnavGetVersion(),   fingerprint,      tileX,           tileZ,
-                         def->tileCells,     def->cellSize,    def->cellHeight, cells->agentHeight,
-                         cells->agentRadius, cells->agentStep, def->origin};
+    mnavTileInfo info = {MNAV_BAKE_GENERATOR, fingerprint,      tileX,           tileZ,
+                         def->tileCells,      def->cellSize,    def->cellHeight, cells->agentHeight,
+                         cells->agentRadius,  cells->agentStep, def->origin};
     return mnavEncodeTile(&baker->memory, &info, &s->mesh, &s->detail, &baker->tile,
                           &baker->tileSize);
 }

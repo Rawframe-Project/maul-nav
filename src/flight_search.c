@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The flier's path (mnav-0015): Lazy Theta* over the flight volume's open
+// The flier's path: Lazy Theta* over the flight volume's open
 // blocks, each entered at the point of its face nearest the point the
 // path comes from, in voxels of the volume's frame.
 

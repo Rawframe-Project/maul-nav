@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Hierarchical paths (mnav-0008): paths through the hierarchy against
+// Hierarchical paths: paths through the hierarchy against
 // plain ones, with fewer nodes; the graph the same in any load order;
 // staleness, fallbacks, limits and checks.
 

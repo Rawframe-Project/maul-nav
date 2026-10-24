@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Scenarios from game shapes (requirements section 5): a building of two
+// Scenarios from game shapes: a building of two
 // floors joined by stairs and a ramp, a bridge that collapses under a
 // dynamic navmesh while an agent's corridor runs over it, a large
 // terrain streamed in and out around an agent crossing it, an RTS
@@ -27,7 +27,7 @@
 #define BUILDING_HASH 0x64041a557af8393bull
 
 // The hash of the terrain's sixteen tiles.
-#define TERRAIN_HASH 0x1e52bdaa776be168ull
+#define TERRAIN_HASH 0x9b33689a5c605a30ull
 
 // The hash of the group's final places.
 #define GROUP_HASH 0xb16f4123b3485eedull

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes flight volumes (mnav-0015). The first byte picks the target:
+// Fuzzes flight volumes. The first byte picks the target:
 //
 // - Even: the tile loader. The rest is tile bytes, the payload's size and
 //   hash set to match so that mutations reach the octree's checks. A tile
-//   that loads must encode back to the same bytes but its generator's,
+//   that loads must encode back to the same bytes but its generation,
 //   its form being canonical; every load must give back all it took.
 // - Odd: the queries. The rest places up to 12 boxes in a volume of 2 by
 //   2 tiles of 16 voxels, one cube high, and then asks for a path, a
@@ -96,16 +96,13 @@ static void Load(const uint8_t* data, size_t size)
         mnavDecodeFlightTile(&memory, &def, &shape, bytes, size, &tile, &fingerprint);
     if (result.result == mnav_success)
     {
-        mnavVersion generator = {0, 0, 0};
-        mnavByteReader r = {bytes + 8, 6, false};
-        generator.major = (uint16_t)mnavGetU16(&r);
-        generator.minor = (uint16_t)mnavGetU16(&r);
-        generator.patch = (uint16_t)mnavGetU16(&r);
         uint8_t* again = nullptr;
         size_t againSize = 0;
-        Expect(mnavEncodeFlightTile(&memory, &def, generator, fingerprint, &tile, &again,
-                                    &againSize) == mnav_success);
-        Expect(againSize == size && memcmp(again, bytes, size) == 0);
+        Expect(mnavEncodeFlightTile(&memory, &def, fingerprint, &tile, &again, &againSize) ==
+               mnav_success);
+        // The loader reads any generation; the encoder writes this one's.
+        Expect(againSize == size && memcmp(again, bytes, 8) == 0 &&
+               memcmp(again + 10, bytes + 10, size - 10) == 0);
         mnavReleaseFlightTileBytes(&memory, again, againSize);
         mnavReleaseFlightTile(&memory, &tile);
     }

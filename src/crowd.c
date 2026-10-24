@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The neighbour grid of avoidance (mnav-0006): keys sorted by cell and
+// The neighbour grid of avoidance: keys sorted by cell and
 // id with a stable merge, cells found by a linear-probed hash, and
 // neighbours by rings or shells of cells, nearest first.
 

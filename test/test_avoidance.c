@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Avoidance (mnav-0006): agents steering round each other by ORCA, in any
+// Avoidance: agents steering round each other by ORCA, in any
 // order, by priority, by layers, within the set's limits.
 
 #include "test_harness.h"

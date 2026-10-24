@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Fuzzes grid flow fields (mnav-0007): a grid, a filter, a region and
+// Fuzzes grid flow fields: a grid, a filter, a region and
 // goals read from the bytes, now and then out of range. Every call must
 // end in a typed status. A field built in budgeted steps must be the one
 // built at once; each cell's cost must be its next cell's plus the step

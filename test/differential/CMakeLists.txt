@@ -1,6 +1,6 @@
-# The differential harness (mnav-0011): Recast and Detour at the commit
-# the research cites, fetched for this harness alone and never linked
-# into the library. A local copy stands in with
+# The differential harness: Recast and Detour at a pinned commit, so
+# the comparison's floors hold, fetched for this harness alone and never
+# linked into the library. A local copy stands in with
 # -DFETCHCONTENT_SOURCE_DIR_RECASTNAVIGATION=<dir>.
 enable_language(CXX)
 include(FetchContent)

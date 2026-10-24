@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Flow fields over the navmesh (mnav-0013) on the test world: every way
+// Flow fields over the navmesh on the test world: every way
 // leads to a goal down falling costs, each cost is its next polygon's
 // plus the walk between their places, links are taken one way, and the
 // checks; the field pinned.

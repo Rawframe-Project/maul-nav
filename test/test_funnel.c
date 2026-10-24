@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The funnel (mnav-0005) on portals written by hand: a start on a portal
+// The funnel on portals written by hand: a start on a portal
 // passes it over, as on a seam; a start on a portal's line beyond its
 // ends does not, and the path turns at the near end; a start at a vertex
 // several portals meet at passes them all over.

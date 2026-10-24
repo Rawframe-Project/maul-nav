@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The version every def and the query filter carry (mnav-0001): one
-// stamped for another minor or major version is refused with
-// mnav_errorVersion and nothing is made; a wrong cookie is still invalid.
+// The ABI stamp. Every creation that takes no other library object, and
+// mnavSteer, checks its def's cookie and then its version: a def stamped
+// for another version is refused with mnav_errorVersion and nothing is
+// made, and a def with a wrong cookie is invalid whatever its version
+// says, so the cookie is read first. The query filter and the link
+// generation def carry only a cookie.
 
 #include "test_harness.h"
 
@@ -20,110 +23,184 @@
 
 #include <stdint.h>
 
-// The versions of headers one minor and one major past these.
-static const uint32_t s_others[2] = {MNAV_ABI_VERSION + 1, MNAV_ABI_VERSION + (1u << 16)};
+// Stamps of other headers: the next patch, the next minor, a zeroed def,
+// and the stamp's form without its top bit.
+static const uint32_t s_others[4] = {
+    MNAV_ABI_VERSION + 1u,
+    MNAV_ABI_VERSION + (1u << 8),
+    0u,
+    MNAV_ABI_VERSION & 0x7FFFFFFFu,
+};
 
 static void TestStamp(void)
 {
     mnavVersion linked = mnavGetVersion();
-    CHECK(MNAV_ABI_VERSION == (((uint32_t)linked.major << 16) | linked.minor),
-          "the headers' version is the library's");
+    uint32_t expected =
+        0x80000000u | ((uint32_t)linked.major << 16) |
+        (linked.major == 0 ? ((uint32_t)linked.minor << 8) | linked.patch : (uint32_t)linked.minor);
+    CHECK(MNAV_ABI_VERSION == expected, "the headers' stamp is the linked library's version");
+    CHECK((MNAV_ABI_VERSION & 0x80000000u) != 0, "the stamp's top bit is set");
     CHECK(mnavDefaultBakeDef().version == MNAV_ABI_VERSION &&
               mnavDefaultFlightDef().version == MNAV_ABI_VERSION &&
               mnavDefaultQueryDef().version == MNAV_ABI_VERSION &&
-              mnavDefaultQueryFilter().version == MNAV_ABI_VERSION &&
               mnavDefaultSteerDef().version == MNAV_ABI_VERSION &&
               mnavDefaultAvoidanceDef().version == MNAV_ABI_VERSION &&
               mnavDefaultFlowFieldDef().version == MNAV_ABI_VERSION &&
               mnavDefaultNavFlowDef().version == MNAV_ABI_VERSION &&
               mnavDefaultHierarchyDef().version == MNAV_ABI_VERSION &&
-              mnavDefaultTileCacheDef().version == MNAV_ABI_VERSION &&
-              mnavDefaultLinkGenDef().version == MNAV_ABI_VERSION,
-          "every default carries the headers' version");
+              mnavDefaultTileCacheDef().version == MNAV_ABI_VERSION,
+          "every root default carries the headers' stamp");
+}
+
+// The results a creation gives a def of another version, with the right
+// cookie and with a wrong one.
+typedef struct Refusals
+{
+    mnavResult version;
+    mnavResult cookie;
+} Refusals;
+
+static bool Refused(Refusals r)
+{
+    return r.version == mnav_errorVersion && r.cookie == mnav_errorInvalid;
 }
 
 static void TestBake(uint32_t other)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
-    def.version = other;
-    mnavBakeDefResult checked = mnavValidateBakeDef(&def, nullptr);
-    CHECK(checked.result == mnav_errorVersion && checked.setting == mnav_settingNone,
+    mnavBakeDef stale = mnavDefaultBakeDef();
+    stale.version = other;
+    mnavBakeDef wrong = stale;
+    wrong.cookie ^= 1u;
+
+    mnavBakeDefResult checked = mnavValidateBakeDef(&stale, nullptr);
+    mnavBakeDefResult cookie = mnavValidateBakeDef(&wrong, nullptr);
+    CHECK(checked.result == mnav_errorVersion && checked.setting == mnav_settingNone &&
+              cookie.result == mnav_errorInvalid && cookie.setting == mnav_settingCookie,
           "a bake def checked");
+
     mnavBaker* baker = nullptr;
+    Refusals r = {mnavCreateBaker(&stale, &baker).result, mnavCreateBaker(&wrong, &baker).result};
+    CHECK(Refused(r) && baker == nullptr, "a baker");
+
     mnavNavmesh* navmesh = nullptr;
+    r = (Refusals){mnavCreateNavmesh(&stale, &navmesh).result,
+                   mnavCreateNavmesh(&wrong, &navmesh).result};
+    CHECK(Refused(r) && navmesh == nullptr, "a navmesh");
+
     mnavTileIndex* index = nullptr;
-    CHECK(mnavCreateBaker(&def, &baker).result == mnav_errorVersion && baker == nullptr, "a baker");
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_errorVersion && navmesh == nullptr,
-          "a navmesh");
-    mnavBakeReport report;
-    CHECK(mnavCreateTileIndex(&def, nullptr, 0, &index, &report) == mnav_errorVersion &&
-              report.result == mnav_errorVersion && index == nullptr,
-          "a tile index");
-    CHECK(mnavCreateTileIndex2D(&def, nullptr, 0, &index, nullptr) == mnav_errorVersion &&
-              index == nullptr,
-          "a 2D tile index");
+    r = (Refusals){mnavCreateTileIndex(&stale, nullptr, 0, &index, nullptr),
+                   mnavCreateTileIndex(&wrong, nullptr, 0, &index, nullptr)};
+    CHECK(Refused(r) && index == nullptr, "a tile index");
+    r = (Refusals){mnavCreateTileIndex2D(&stale, nullptr, 0, &index, nullptr),
+                   mnavCreateTileIndex2D(&wrong, nullptr, 0, &index, nullptr)};
+    CHECK(Refused(r) && index == nullptr, "a 2D tile index");
+
     mnavVec3 v[3] = {{0, 0, 0}, {1, 0, 0}, {0, 0, 1}};
     int32_t indices[3] = {0, 1, 2};
     mnavTriangleMesh mesh = {v, 3, indices, 1, nullptr};
-    CHECK(mnavValidateTriangleMesh(&def, &mesh).result == mnav_errorVersion, "a mesh checked");
+    r = (Refusals){mnavValidateTriangleMesh(&stale, &mesh).result,
+                   mnavValidateTriangleMesh(&wrong, &mesh).result};
+    CHECK(Refused(r), "a mesh checked");
     const mnavVec2 square[4] = {{1, 1}, {31, 1}, {31, 31}, {1, 31}};
     const mnavOutline outline = {square, 4, mnav_areaWalkable};
-    CHECK(mnavValidateOutline(&def, &outline).result == mnav_errorVersion, "an outline checked");
+    r = (Refusals){mnavValidateOutline(&stale, &outline).result,
+                   mnavValidateOutline(&wrong, &outline).result};
+    CHECK(Refused(r), "an outline checked");
+
+    mnavTileCacheDef cacheStale = mnavDefaultTileCacheDef();
+    cacheStale.version = other;
+    mnavTileCacheDef cacheWrong = cacheStale;
+    cacheWrong.cookie ^= 1u;
+    mnavTileCache* cache = nullptr;
+    r = (Refusals){mnavCreateTileCache(&cacheStale, &cache),
+                   mnavCreateTileCache(&cacheWrong, &cache)};
+    CHECK(Refused(r) && cache == nullptr, "a tile cache");
 }
 
 static void TestFlight(uint32_t other)
 {
-    mnavFlightDef def = mnavDefaultFlightDef();
-    def.version = other;
-    mnavFlightDefResult checked = mnavValidateFlightDef(&def);
-    CHECK(checked.result == mnav_errorVersion && checked.setting == mnav_flightSettingNone,
+    mnavFlightDef stale = mnavDefaultFlightDef();
+    stale.version = other;
+    mnavFlightDef wrong = stale;
+    wrong.cookie ^= 1u;
+    mnavFlightDefResult checked = mnavValidateFlightDef(&stale);
+    mnavFlightDefResult cookie = mnavValidateFlightDef(&wrong);
+    CHECK(checked.result == mnav_errorVersion && checked.setting == mnav_flightSettingNone &&
+              cookie.result == mnav_errorInvalid && cookie.setting == mnav_flightSettingCookie,
           "a flight def checked");
     mnavFlightBaker* baker = nullptr;
+    Refusals r = {mnavCreateFlightBaker(&stale, &baker).result,
+                  mnavCreateFlightBaker(&wrong, &baker).result};
+    CHECK(Refused(r) && baker == nullptr, "a flight baker");
     mnavFlightVolume* volume = nullptr;
-    CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_errorVersion && baker == nullptr,
-          "a flight baker");
-    CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_errorVersion && volume == nullptr,
-          "a flight volume");
+    r = (Refusals){mnavCreateFlightVolume(&stale, &volume).result,
+                   mnavCreateFlightVolume(&wrong, &volume).result};
+    CHECK(Refused(r) && volume == nullptr, "a flight volume");
 }
 
-static void TestObjects(uint32_t other)
+static void TestQuery(uint32_t other)
 {
-    mnavQueryDef queryDef = mnavDefaultQueryDef();
-    mnavAvoidanceDef avoidanceDef = mnavDefaultAvoidanceDef();
-    mnavFlowFieldDef flowDef = mnavDefaultFlowFieldDef();
-    mnavNavFlowDef navFlowDef = mnavDefaultNavFlowDef();
-    mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
-    mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();
-    queryDef.version = other;
-    avoidanceDef.version = other;
-    flowDef.version = other;
-    navFlowDef.version = other;
-    hierarchyDef.version = other;
-    cacheDef.version = other;
+    mnavQueryDef stale = mnavDefaultQueryDef();
+    stale.version = other;
+    mnavQueryDef wrong = stale;
+    wrong.cookie ^= 1u;
     mnavQuery* query = nullptr;
-    mnavAvoidance* avoidance = nullptr;
-    mnavFlowField* flow = nullptr;
-    mnavNavFlow* navFlow = nullptr;
+    Refusals r = {mnavCreateQuery(&stale, &query), mnavCreateQuery(&wrong, &query)};
+    CHECK(Refused(r) && query == nullptr, "a query context");
+
+    mnavSteerDef steerStale = mnavDefaultSteerDef();
+    steerStale.version = other;
+    mnavSteerDef steerWrong = steerStale;
+    steerWrong.cookie ^= 1u;
+    const mnavPos3 point = {0, 0, 0};
+    const mnavCorners corners = {&point, 1, nullptr, 0};
+    mnavSteering steering;
+    r = (Refusals){mnavSteer(&corners, &steerStale, &steering),
+                   mnavSteer(&corners, &steerWrong, &steering)};
+    CHECK(Refused(r), "a steering def");
+
+    mnavHierarchyDef hierarchyStale = mnavDefaultHierarchyDef();
+    hierarchyStale.version = other;
+    mnavHierarchyDef hierarchyWrong = hierarchyStale;
+    hierarchyWrong.cookie ^= 1u;
     mnavHierarchy* hierarchy = nullptr;
-    mnavTileCache* cache = nullptr;
-    CHECK(mnavCreateQuery(&queryDef, &query) == mnav_errorVersion && query == nullptr, "a query");
-    CHECK(mnavCreateAvoidance(&avoidanceDef, &avoidance) == mnav_errorVersion &&
-              avoidance == nullptr,
-          "an avoidance set");
-    CHECK(mnavCreateFlowField(&flowDef, &flow) == mnav_errorVersion && flow == nullptr,
-          "a flow field");
-    CHECK(mnavCreateNavFlow(&navFlowDef, &navFlow) == mnav_errorVersion && navFlow == nullptr,
-          "a nav flow");
-    CHECK(mnavCreateHierarchy(&hierarchyDef, &hierarchy) == mnav_errorVersion &&
-              hierarchy == nullptr,
-          "a hierarchy");
-    CHECK(mnavCreateTileCache(&cacheDef, &cache) == mnav_errorVersion && cache == nullptr,
-          "a tile cache");
+    r = (Refusals){mnavCreateHierarchy(&hierarchyStale, &hierarchy),
+                   mnavCreateHierarchy(&hierarchyWrong, &hierarchy)};
+    CHECK(Refused(r) && hierarchy == nullptr, "a hierarchy");
+
+    mnavNavFlowDef navFlowStale = mnavDefaultNavFlowDef();
+    navFlowStale.version = other;
+    mnavNavFlowDef navFlowWrong = navFlowStale;
+    navFlowWrong.cookie ^= 1u;
+    mnavNavFlow* navFlow = nullptr;
+    r = (Refusals){mnavCreateNavFlow(&navFlowStale, &navFlow),
+                   mnavCreateNavFlow(&navFlowWrong, &navFlow)};
+    CHECK(Refused(r) && navFlow == nullptr, "a navmesh flow field");
 }
 
-// The defs and the filter read without a creation: through a query, a
-// navmesh, or mnavSteer alone.
-static void TestCalls(uint32_t other)
+static void TestFieldsAndAvoidance(uint32_t other)
+{
+    mnavFlowFieldDef flowStale = mnavDefaultFlowFieldDef();
+    flowStale.version = other;
+    mnavFlowFieldDef flowWrong = flowStale;
+    flowWrong.cookie ^= 1u;
+    mnavFlowField* flow = nullptr;
+    Refusals r = {mnavCreateFlowField(&flowStale, &flow), mnavCreateFlowField(&flowWrong, &flow)};
+    CHECK(Refused(r) && flow == nullptr, "a flow field");
+
+    mnavAvoidanceDef avoidanceStale = mnavDefaultAvoidanceDef();
+    avoidanceStale.version = other;
+    mnavAvoidanceDef avoidanceWrong = avoidanceStale;
+    avoidanceWrong.cookie ^= 1u;
+    mnavAvoidance* avoidance = nullptr;
+    r = (Refusals){mnavCreateAvoidance(&avoidanceStale, &avoidance),
+                   mnavCreateAvoidance(&avoidanceWrong, &avoidance)};
+    CHECK(Refused(r) && avoidance == nullptr, "an avoidance set");
+}
+
+// The filter and the link generation def carry only a cookie: a wrong one
+// is invalid, and the right one is read with the objects' versions.
+static void TestCookieOnly(void)
 {
     mnavBakeDef bakeDef = mnavDefaultBakeDef();
     mnavQueryDef queryDef = mnavDefaultQueryDef();
@@ -133,58 +210,38 @@ static void TestCalls(uint32_t other)
               mnavCreateQuery(&queryDef, &query) == mnav_success,
           "an empty navmesh and a query");
     mnavQueryFilter filter = mnavDefaultQueryFilter();
-    filter.version = other;
     mnavNearest nearest;
-    CHECK(mnavFindNearest(navmesh, &filter, (mnavPos3){1, 0, 1}, (mnavVec3){1, 1, 1}, &nearest) ==
-              mnav_errorVersion,
-          "a filter");
+    const mnavPos3 at = {1, 0, 1};
+    const mnavVec3 box = {1, 1, 1};
+    CHECK(mnavFindNearest(navmesh, &filter, at, box, &nearest) == mnav_success,
+          "a default filter is read");
+    filter.cookie ^= 1u;
+    CHECK(mnavFindNearest(navmesh, &filter, at, box, &nearest) == mnav_errorInvalid,
+          "a filter with a wrong cookie");
     mnavLinkGenDef linkDef = mnavDefaultLinkGenDef();
-    linkDef.version = other;
     int32_t count = -1;
     CHECK(mnavGenerateLinks(query, navmesh, nullptr, &linkDef, 0, 0, 0, 0, nullptr, 0, &count) ==
-              mnav_errorVersion,
-          "a link generation def");
-    linkDef = mnavDefaultLinkGenDef();
-    CHECK(mnavGenerateLinks(query, navmesh, &filter, &linkDef, 0, 0, 0, 0, nullptr, 0, &count) ==
-              mnav_errorVersion,
-          "a filter for link generation");
-    mnavSteerDef steerDef = mnavDefaultSteerDef();
-    steerDef.version = other;
-    const mnavPos3 point = {0, 0, 0};
-    const mnavCorners corners = {&point, 1, nullptr, 0};
-    mnavSteering steering;
-    CHECK(mnavSteer(&corners, &steerDef, &steering) == mnav_errorVersion, "a steer def");
+                  mnav_success &&
+              count == 0,
+          "a default link generation def is read");
+    linkDef.cookie ^= 1u;
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &linkDef, 0, 0, 0, 0, nullptr, 0, &count) ==
+              mnav_errorInvalid,
+          "a link generation def with a wrong cookie");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
-}
-
-// A wrong cookie is refused as invalid whatever the version says.
-static void TestCookie(void)
-{
-    mnavQueryDef def = mnavDefaultQueryDef();
-    def.cookie ^= 1u;
-    mnavQuery* query = nullptr;
-    CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid, "a wrong cookie, the right version");
-    def.version = s_others[0];
-    CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid, "a wrong cookie, another version");
-    mnavBakeDef bake = mnavDefaultBakeDef();
-    bake.cookie ^= 1u;
-    bake.version = s_others[1];
-    mnavBakeDefResult checked = mnavValidateBakeDef(&bake, nullptr);
-    CHECK(checked.result == mnav_errorInvalid && checked.setting == mnav_settingCookie,
-          "a bake def with a wrong cookie");
 }
 
 int main(void)
 {
     TestStamp();
-    for (int32_t i = 0; i < 2; ++i)
+    for (int32_t i = 0; i < 4; ++i)
     {
         TestBake(s_others[i]);
         TestFlight(s_others[i]);
-        TestObjects(s_others[i]);
-        TestCalls(s_others[i]);
+        TestQuery(s_others[i]);
+        TestFieldsAndAvoidance(s_others[i]);
     }
-    TestCookie();
+    TestCookieOnly();
     return s_failures == 0 ? 0 : 1;
 }

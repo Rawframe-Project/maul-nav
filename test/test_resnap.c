@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Off-mesh links (mnav-0004) snapped again only near the places a commit
+// Off-mesh links snapped again only near the places a commit
 // changes, yet always as if snapped from scratch.
 
 #include "navmesh.h"

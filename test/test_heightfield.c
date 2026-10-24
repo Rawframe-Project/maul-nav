@@ -320,7 +320,7 @@ static void TestAllocatorFailureIsCapacity(void)
     }
 }
 
-// The hash of the soup below, the same on every platform (mnav-0001).
+// The hash of the soup below, the same on every platform.
 #define SOUP_HASH 0xe955dec170776113ull
 
 static void TestSoupDependsOnlyOnTheTriangleSet(void)

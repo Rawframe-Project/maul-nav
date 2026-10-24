@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The walls near a point (mnav-0005) on a hand-built square, where they
+// The walls near a point on a hand-built square, where they
 // lie at exact distances: walls at the same distance keep the order the
 // search meets them in, a wall exactly at the radius lies within it, a
 // short buffer holds the nearest without writing past its capacity, and

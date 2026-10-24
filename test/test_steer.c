@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Steering (mnav-0005) on corners written by hand: straight at the next
+// Steering on corners written by hand: straight at the next
 // corner, swinging wide of a turn, slowing within the slowing distance
 // of the target along the corners, stopping at the target or at a link's
 // takeoff, passing a corner straight above the agent; the refusals.

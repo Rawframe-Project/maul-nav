@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Moving along the surface (mnav-0005) on hand-built tiles and the baked
+// Moving along the surface on hand-built tiles and the baked
 // world, and the node table a move leaves empty. Hand cells are 0.25 m by
 // 0.125 m.
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Flow fields (mnav-0007): Dijkstra's search from every goal at once over
+// Flow fields: Dijkstra's search from every goal at once over
 // a grid, with the grid path's steps. The step rule is symmetric, so the
 // cost found from the goals to a cell is the cost of the cell's way to
 // them. The open list is a binary heap by cost, then by cell index, with

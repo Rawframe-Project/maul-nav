@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The flier's queries (mnav-0015) against plain searches over a grid of
+// The flier's queries against plain searches over a grid of
 // every voxel's openness, read through mnavIsFlightOpen: paths found
 // exactly where the grid's 26-connected search finds one, every step in
 // sight, never much longer than the grid's shortest; raycasts against

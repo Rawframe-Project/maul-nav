@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The flier's raycast and nearest open point (mnav-0015).
+// The flier's raycast and nearest open point.
 
 #include "flight.h"
 #include "flight_frame.h"

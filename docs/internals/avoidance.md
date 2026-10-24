@@ -44,16 +44,16 @@ Obstacle candidates come from a grid of their bounds whose cells double until th
 
 ## Input ranges and edge cases
 
-Input lies within named ranges: coordinates within `MNAV_MAX_AVOIDANCE_COORDINATE` (1e12 m), velocities and speeds within `MNAV_MAX_AVOIDANCE_SPEED` (1e6 m/s), radii up to `MNAV_MAX_AVOIDANCE_RADIUS`, the step and horizons at least `MNAV_MIN_AVOIDANCE_TIME` (1e-6 s). Merely finite values let an ORCA line lie so far out that its program cancels catastrophically (a fuzz target found a velocity of 3.7e210 m/s come out for a limit of 0.3), and the step and horizons scale the lines by their inverses. Grid cells saturate at 2^52.
+Input lies within named ranges: coordinates within `MNAV_MAX_AVOIDANCE_COORDINATE` (1e12 m), velocities and speeds within `MNAV_MAX_AVOIDANCE_SPEED` (1e6 m/s), radii up to `MNAV_MAX_AVOIDANCE_RADIUS`, the step and horizons at least `MNAV_MIN_AVOIDANCE_TIME` (1e-6 s). Merely finite values let an ORCA line lie so far out that its program cancels catastrophically, and an agent limited to 0.3 m/s can then be given a velocity of 1e200 m/s or more; the step and horizons scale the lines by their inverses, so a tiny step does the same. Grid cells saturate at 2^52.
 
-A unit vector of a vector so short that its squared length is subnormal is taken by first scaling it by 2^600, exactly; a fuzz target found an agent a hair from an obstacle corner given a NaN velocity when that vector squared to zero. A vector of no length at all gives zero, and the obstacle lines then fall back on the edge's own constraint.
+A unit vector of a vector so short that its squared length is subnormal is taken by first scaling it by 2^600, exactly. Without that, an agent a hair from an obstacle corner has a vector to the corner that squares to zero, and dividing by its length gives the agent a NaN velocity. A vector of no length at all gives zero, and the obstacle lines then fall back on the edge's own constraint.
 
 ## In space
 
 `mnavAvoid3D` steers fliers sharing a flight volume, on the same set.
 
 - Each neighbor gives a half-space of velocities bounded by a plane, built as RVO2-3D builds it (a cut-off sphere, the cone, or parting within the step), in binary64. Exactly head on, where every side of the cone is as near, the plane's normal is square to the line between them, across world up or else world +X, so that each of the pair takes the other's opposite.
-- The new velocity is RVO2-3D's 3D linear program within the speed sphere, with its 4D fallback breaking the planes least. A plane touching the speed sphere leaves a disc of no size; the projection onto its rim falls back on the disc's center, which a fuzz target found giving NaN when rounding left no offset.
+- The new velocity is RVO2-3D's 3D linear program within the speed sphere, with its 4D fallback breaking the planes least. A plane touching the speed sphere leaves a disc of no size; the projection onto its rim falls back on the disc's center, since rounding can leave no offset from the center to scale, and projecting by it would give NaN.
 - Neighbors come from the same sorted grid, its cells cubes searched by shells; the table finds a column of cells along Z with one probe, since the sorted keys hold a column's cells in order. That cut the probes per agent from up to 343 to 84.
 - The sidestep goes to the preferred velocity's right, +Y being up; a vertical one turns toward +X rising and -X falling, so two fliers meeting head on along Y turn apart.
 - Obstacles are spheres that never give way, found through the obstacles' grid by their ground bounds, the reach counting their fastest speed and padded so that rounding at a cell's side drops none. Static geometry is the flight volume's to keep clear of, not avoidance's.

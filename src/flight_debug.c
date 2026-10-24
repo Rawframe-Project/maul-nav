@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Debug drawing for flight volumes (mnav-0015): the open blocks in a
+// Debug drawing for flight volumes: the open blocks in a
 // box, each a wire box drawn once, and a flight path's steps.
 
 #include "draw.h"

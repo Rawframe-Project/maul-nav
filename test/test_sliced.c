@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Sliced path searches (mnav-0005): any slicing gives the one search's
+// Sliced path searches: any slicing gives the one search's
 // result; a commit makes a search stale; the filter is the search's own.
 
 #include "hand_tile.h"

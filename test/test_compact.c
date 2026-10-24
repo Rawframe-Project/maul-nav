@@ -17,7 +17,7 @@
 #include <stdint.h>
 
 // The hashes of the soup's and the level's eroded open-space fields, the
-// same on every platform (mnav-0001).
+// same on every platform.
 #define SOUP_OPEN_HASH  0x2af461f001197c4full
 #define LEVEL_OPEN_HASH 0xd6c58bf04b95682bull
 #define WIDE_OPEN_HASH  0x1c515047590b7d08ull

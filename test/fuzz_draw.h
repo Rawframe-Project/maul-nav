@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Debug output under fuzzing (mnav-0010): a draw call into a buffer of
+// Debug output under fuzzing: a draw call into a buffer of
 // capacities from the bytes must end in a typed status; on success its
 // counts lie within the capacities, its indices name vertices drawn and
 // its positions are finite; on a capacity error its counts say what the

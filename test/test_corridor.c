@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Path corridors (mnav-0005): loading paths, their corners, their checks.
+// Path corridors: loading paths, their corners, their checks.
 
 #include "hand_tile.h"
 #include "test_harness.h"

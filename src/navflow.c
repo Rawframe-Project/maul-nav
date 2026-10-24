@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Flow fields over the navmesh (mnav-0013): Dijkstra's search backward from
+// Flow fields over the navmesh: Dijkstra's search backward from
 // the goals over polygons, as Detour's findPolysAroundCircle searches
 // forward from one. Polygons are numbered slot by slot, so the heap's order
 // by cost, then number, is the order by cost, then slot and polygon. The

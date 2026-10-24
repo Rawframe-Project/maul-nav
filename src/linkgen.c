@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Link generation (mnav-0009), after Unity's drop-down and jump-across
+// Link generation, after Unity's drop-down and jump-across
 // links: samples along the edges with nothing across, a landing found
 // below or across from each, kept unless the host's clearance test
 // refuses it, the navmesh already walks there nearly as directly, or an
@@ -284,10 +284,6 @@ mnavResult mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,
         def->cookie != MNAV_LINK_GEN_DEF_COOKIE || tileX1 < tileX0 || tileZ1 < tileZ0)
     {
         return mnav_errorInvalid;
-    }
-    if (def->version != MNAV_ABI_VERSION)
-    {
-        return mnav_errorVersion;
     }
     const mnavQueryFilter* usable = nullptr;
     mnavResult result = mnavCheckFilter(filter, &usable);

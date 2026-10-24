@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Bake volumes (mnav-0003): include, exclude and area volumes on the
+// Bake volumes: include, exclude and area volumes on the
 // open-space field, their heights, order and erosion; the checks; the
 // fingerprint.
 
@@ -22,7 +22,7 @@
 
 // The hash of a tile baked with every kind of volume, the same on every
 // platform.
-#define VOLUME_HASH 0x8012c53dd46efa1cull
+#define VOLUME_HASH 0xa8ca75399d4b6db7ull
 
 enum
 {

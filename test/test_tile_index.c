@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Tile indexes (mnav-0014): a bake given one makes the same tile, to the
+// Tile indexes: a bake given one makes the same tile, to the
 // byte, as a bake reading every triangle; the refusals; the checks of the
 // triangles read; the memory limit.
 

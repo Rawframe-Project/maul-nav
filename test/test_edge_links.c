@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Edge-to-edge links (mnav-0004): a ledge 3 m high over a gap of 2 m,
+// Edge-to-edge links: a ledge 3 m high over a gap of 2 m,
 // joined by one link 16 m wide; its crossings, how they attach, paths
 // across it near the place they need, the link limit, removal, toggles and
 // the checks.

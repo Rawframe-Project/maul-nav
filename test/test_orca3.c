@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// ORCA's linear programs in space (mnav-0006): planes laid out by hand,
+// ORCA's linear programs in space: planes laid out by hand,
 // parallel ones included, and random ones against a search of sampled
 // velocities.
 

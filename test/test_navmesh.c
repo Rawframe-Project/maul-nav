@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The navmesh: staged tiles, atomic commits, generation ids and links
-// across tile sides (mnav-0004).
+// across tile sides.
 
 #include "allocator.h"
 #include "counting_allocator.h"

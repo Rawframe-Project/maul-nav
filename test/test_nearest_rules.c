@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The nearest point's score on hand-built tiles (mnav-0005): the height beyond
+// The nearest point's score on hand-built tiles: the height beyond
 // the agent's step over a polygon, the distance beside one; and the detail
 // surface's height where its triangles meet or one is degenerate.
 

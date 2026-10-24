@@ -130,7 +130,7 @@ jobs:
         # 0013).
         run: stat -c '%s bytes' build/libmaul-nav.a
 
-  # The differential harness against Recast and Detour (mnav-0011): path
+  # The differential harness against Recast and Detour: path
   # lengths and reachability on the scenario corpus, test only.
   differential:
     name: differential

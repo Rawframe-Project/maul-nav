@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Query contexts (mnav-0005): their memory, sized by their limits, and the
+// Query contexts: their memory, sized by their limits, and the
 // table that finds a search's nodes.
 
 #include "query.h"

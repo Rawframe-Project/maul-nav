@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Flight volume tiles (mnav-0015): every voxel of a baked tile against a
+// Flight volume tiles: every voxel of a baked tile against a
 // voxel grid made the plain way from the same heightfield, on the test
 // world's floor and boxes and on boxes floating in the air; the octree
 // the same on every platform; the memory given back.

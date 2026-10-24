@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The flight volume's space (mnav-0015): descents of the compact octrees
+// The flight volume's space: descents of the compact octrees
 // to a voxel and over a face's slab, and the conservative voxel walk.
 
 #include "flight_space.h"

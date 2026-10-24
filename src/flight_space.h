@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The flight volume's space as its queries see it (mnav-0015): voxels in
+// The flight volume's space as its queries see it: voxels in
 // the volume's frame, the open blocks of the octrees that hold them, the
 // blocks across a block's faces, and a conservative walk along a segment.
 

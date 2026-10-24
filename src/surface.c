@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Moving along the surface (mnav-0005): a breadth-first walk toward a
+// Moving along the surface: a breadth-first walk toward a
 // wanted point, stopped by walls.
 
 #include "navmesh.h"

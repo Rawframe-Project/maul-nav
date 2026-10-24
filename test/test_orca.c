@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// ORCA's linear programs (mnav-0006) on lines laid out by hand, parallel
+// ORCA's linear programs on lines laid out by hand, parallel
 // ones included.
 
 #include "orca.h"

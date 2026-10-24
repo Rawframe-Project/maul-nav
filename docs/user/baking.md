@@ -43,7 +43,7 @@ Input is hostile: a coordinate that is not finite, an index out of range or an a
 
 - **Workers.** Tiles are independent calls. Run them on the host's own task system with one baker per worker; bakers share nothing, and the bytes are the same at any worker count.
 - **Large meshes.** A bake tests every input triangle against its tile. When many tiles bake from meshes much larger than a tile, make a tile index of the meshes once (`mnavCreateTileIndex`) and pass it as `mnavBakeInput.index`: each bake then reads only the triangles near its tile and makes the same bytes. An index is never changed after it is made, so workers share one. After editing a mesh, make a new index: a bake refuses an index whose counts no longer match, but a triangle moved into a tile it was not listed for is missed. Outlines have their own index, `mnavCreateTileIndex2D`, passed in an `mnavBake2DInput` to `mnavBakeTile2DInput`.
-- **Skipping unchanged tiles.** The report's `fingerprint`, also written into the tile, hashes the library's version, the def's settings, the tile's place and every input triangle that reaches it. A host can skip rebaking a tile whose fingerprint has not changed.
+- **Skipping unchanged tiles.** The report's `fingerprint`, also written into the tile, hashes the bake's generation (`MNAV_BAKE_GENERATOR`, which rises only when a bake of the same input would differ), the def's settings, the tile's place and every input triangle that reaches it. A host can skip rebaking a tile whose fingerprint has not changed.
 
 ## The report
 
