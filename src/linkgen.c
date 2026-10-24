@@ -9,6 +9,7 @@
 
 #include "maul-nav/linkgen.h"
 
+#include "fpenv.h"
 #include "navmesh.h"
 #include "query.h"
 #include "query_filter.h"
@@ -274,10 +275,12 @@ static void SampleTile(Gen* g, int32_t slot)
     }
 }
 
-mnavResult mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,
-                             const mnavQueryFilter* filter, const mnavLinkGenDef* def,
-                             int32_t tileX0, int32_t tileZ0, int32_t tileX1, int32_t tileZ1,
-                             mnavLinkDef* linksOut, int32_t capacity, int32_t* countOut)
+static MNAV_NOINLINE mnavResult GenerateLinksWork(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                  const mnavQueryFilter* filter,
+                                                  const mnavLinkGenDef* def, int32_t tileX0,
+                                                  int32_t tileZ0, int32_t tileX1, int32_t tileZ1,
+                                                  mnavLinkDef* linksOut, int32_t capacity,
+                                                  int32_t* countOut)
 {
     if (query == nullptr || navmesh == nullptr || def == nullptr || countOut == nullptr ||
         capacity < 0 || (capacity > 0 && linksOut == nullptr) ||
@@ -319,4 +322,16 @@ mnavResult mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,
     }
     *countOut = g.count;
     return g.count > capacity ? mnav_errorCapacity : mnav_success;
+}
+
+mnavResult mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,
+                             const mnavQueryFilter* filter, const mnavLinkGenDef* def,
+                             int32_t tileX0, int32_t tileZ0, int32_t tileX1, int32_t tileZ1,
+                             mnavLinkDef* linksOut, int32_t capacity, int32_t* countOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = GenerateLinksWork(query, navmesh, filter, def, tileX0, tileZ0, tileX1,
+                                          tileZ1, linksOut, capacity, countOut);
+    mnavFloatEnvLeave(env);
+    return result;
 }

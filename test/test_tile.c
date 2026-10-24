@@ -2,7 +2,9 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The tile format and its loader. Run as test_tile --seed <file> it
-// also writes the level's tile, the fuzz target's seed.
+// also writes the level's tile, the fuzz target's seed. The level's bytes
+// hold under every host floating-point setting, baked inside the
+// library's environment as a public bake runs.
 
 // The seed writer uses fopen, which the Microsoft C library deprecates.
 #define _CRT_SECURE_NO_WARNINGS
@@ -10,6 +12,8 @@
 #include "allocator.h"
 #include "bake_tile.h"
 #include "detail.h"
+#include "float_hosts.h"
+#include "fpenv.h"
 #include "polymesh.h"
 #include "soup.h"
 #include "test_harness.h"
@@ -196,6 +200,26 @@ static mnavTileResult Load(mnavMemory* memory, const uint8_t* bytes, size_t size
     return result;
 }
 
+// The level baked, its scene made too, as a worker of its own: the
+// environment's writes are calls, and no arithmetic moves across them.
+static MNAV_NOINLINE uint64_t LevelHashWork(void)
+{
+    static Fixture f;
+    Bake(&f);
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, f.bytes, (int32_t)f.size);
+    Unbake(&f);
+    return hash;
+}
+
+// The level's bytes' hash, baked inside the library's environment.
+static uint64_t LevelHash(void)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    uint64_t hash = LevelHashWork();
+    mnavFloatEnvLeave(env);
+    return hash;
+}
+
 static void TestRoundTrip(void)
 {
     static Fixture f;
@@ -214,6 +238,7 @@ static void TestRoundTrip(void)
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, f.bytes, (int32_t)f.size);
     printf("LEVEL_TILE_HASH=%016llx bytes=%zu\n", (unsigned long long)hash, f.size);
     CHECK(hash == LEVEL_TILE_HASH, "the pinned hash");
+    CHECK(EveryFloatHost(LevelHash, LEVEL_TILE_HASH), "the pinned hash under every host setting");
     Unbake(&f);
 }
 

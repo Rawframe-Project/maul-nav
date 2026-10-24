@@ -9,8 +9,10 @@
 // and a crowd of 1,000 through a doorway on a navmesh, each agent
 // following its corridor, avoiding the others and the walls near it.
 // The crowd is a large scene: it runs alone, given --doorway, as the
-// nightly-labeled test doorway.
+// nightly-labeled test doorway. The terrain's bytes hold under every host
+// floating-point setting.
 
+#include "float_hosts.h"
 #include "test_harness.h"
 
 #include "maul-nav/avoidance.h"
@@ -358,11 +360,14 @@ static mnavNearest Ground(const mnavNavmesh* navmesh, double x, double z)
     return n;
 }
 
-static void TestStreamedTerrain(mnavQuery* query)
+// The terrain, made beforehand, for TerrainHash.
+static mnavTerrain s_terrain;
+
+// The terrain's 16 tiles baked into s_tiles: their bytes' hash.
+static uint64_t TerrainHash(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    mnavTerrain terrain = Terrain();
-    const mnavBakeInput input = {nullptr, 0, &terrain, 1, nullptr, 0, nullptr};
+    const mnavBakeInput input = {nullptr, 0, &s_terrain, 1, nullptr, 0, nullptr};
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     uint64_t hash = MNAV_HASH_INIT;
@@ -374,8 +379,17 @@ static void TestStreamedTerrain(mnavQuery* query)
         hash = mnavHash64(hash, s_tiles[t], (int32_t)s_sizes[t]);
     }
     mnavDestroyBaker(baker);
+    return hash;
+}
+
+static void TestStreamedTerrain(mnavQuery* query)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    s_terrain = Terrain();
+    uint64_t hash = TerrainHash();
     printf("TERRAIN_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == TERRAIN_HASH, "the pinned hash");
+    CHECK(EveryFloatHost(TerrainHash, TERRAIN_HASH), "the pinned hash under every host setting");
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     bool loaded[4][4] = {{false}};

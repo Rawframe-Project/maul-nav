@@ -3,12 +3,13 @@
 //
 // Bake volumes: include, exclude and area volumes on the
 // open-space field, their heights, order and erosion; the checks; the
-// fingerprint.
+// fingerprint; the pinned tile under every host floating-point setting.
 
 #include "allocator.h"
 #include "compact.h"
 #include "erode.h"
 #include "filter.h"
+#include "float_hosts.h"
 #include "heightfield.h"
 #include "test_harness.h"
 #include "volume.h"
@@ -279,6 +280,17 @@ static uint64_t BakeHash(mnavBaker* baker, const mnavBakeVolume* volumes, int32_
     return mnavHash64(MNAV_HASH_INIT, s_tile, (int32_t)size);
 }
 
+// The baker and the three volumes of the pinned tile, made beforehand,
+// for VolumeHash.
+static mnavBaker* s_volumeBaker;
+static mnavBakeVolume s_pinned[3];
+
+static uint64_t VolumeHash(void)
+{
+    mnavBakeReport report;
+    return BakeHash(s_volumeBaker, s_pinned, 3, &report);
+}
+
 static void TestBake(mnavBaker* baker)
 {
     mnavBakeReport plain;
@@ -302,6 +314,9 @@ static void TestBake(mnavBaker* baker)
            (unsigned long long)hash);
     CHECK(report.polygons > 2 && report.fingerprint != plain.fingerprint, "a shaped tile");
     CHECK(hash == VOLUME_HASH, "the pinned hash");
+    s_volumeBaker = baker;
+    memcpy(s_pinned, all, sizeof(s_pinned));
+    CHECK(EveryFloatHost(VolumeHash, VOLUME_HASH), "the pinned hash under every host setting");
     // Volume points count as input triangles.
     mnavBakeDef def = mnavDefaultBakeDef();
     def.limits.inputTriangles = 4 + 3 * 4 - 1;

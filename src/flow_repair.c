@@ -13,6 +13,7 @@
 // the field a rebuild would make.
 
 #include "flow.h"
+#include "fpenv.h"
 
 #include "maul-nav/base.h"
 #include "maul-nav/flow.h"
@@ -197,8 +198,9 @@ static void SwapGoals(const mnavFlowSearch* s, const mnavCell* goals, int32_t go
     }
 }
 
-mnavResult mnavUpdateFlowField(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
-                               int32_t goalCount, const mnavCell* changed, int32_t changedCount)
+static MNAV_NOINLINE mnavResult UpdateFlowFieldWork(mnavFlowField* field, const mnavGrid* grid,
+                                                    const mnavCell* goals, int32_t goalCount,
+                                                    const mnavCell* changed, int32_t changedCount)
 {
     mnavResult result = Check(field, grid, goals, goalCount, changed, changedCount);
     if (result != mnav_success)
@@ -244,6 +246,15 @@ mnavResult mnavUpdateFlowField(mnavFlowField* field, const mnavGrid* grid, const
     }
     field->state = mnav_flowWorking;
     return mnav_success;
+}
+
+mnavResult mnavUpdateFlowField(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
+                               int32_t goalCount, const mnavCell* changed, int32_t changedCount)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = UpdateFlowFieldWork(field, grid, goals, goalCount, changed, changedCount);
+    mnavFloatEnvLeave(env);
+    return result;
 }
 
 // The next cell a build gives a cell: itself at a goal or when no goal is

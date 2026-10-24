@@ -2,8 +2,10 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Avoidance: agents steering round each other by ORCA, in any
-// order, by priority, by layers, within the set's limits.
+// order, by priority, by layers, within the set's limits; and the same
+// velocities under every host floating-point setting, subnormals kept.
 
+#include "float_hosts.h"
 #include "test_harness.h"
 
 #include "maul-nav/avoidance.h"
@@ -717,6 +719,30 @@ static void TestSubnormalSpeed(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+// Two agents whose squared distance is subnormal: flushing it to zero
+// would put them on one spot, and A would turn straight back.
+static mnavPos2 s_closeVelocities[2];
+
+static uint64_t CloseHash(void)
+{
+    mnavAvoidance* avoidance = Make(4, 4, 2.0);
+    const mnavAgent agents[2] = {{{0, 0}, {0, 0}, {1.0, 0.0}, 0.5, 1.5, 1.0, 1, 0, 0},
+                                 {{3e-160, 1e-160}, {0, 0}, {0, 0}, 0.5, 1.5, 1.0, 2, 0, 0}};
+    CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.05, s_closeVelocities) == mnav_success,
+          "stepped");
+    mnavDestroyAvoidance(avoidance);
+    return mnavHash64(MNAV_HASH_INIT, s_closeVelocities, (int32_t)sizeof(s_closeVelocities));
+}
+
+static void TestUnderEveryHost(void)
+{
+    uint64_t hash = CloseHash();
+    CHECK(s_closeVelocities[0].x == -0x1.6c4b5ce91523p+0 &&
+              s_closeVelocities[0].y == -0x1.e5b9d136c6d95p-2,
+          "a subnormal distance kept");
+    CHECK(EveryFloatHost(CloseHash, hash), "the same velocities under every host setting");
+}
+
 static void TestNeighbourThreeCellsOut(void)
 {
     // Cells are half the range wide; dividing a position by the width
@@ -808,6 +834,7 @@ int main(void)
     TestObstacleChecks();
     TestSpeedKept();
     TestSubnormalSpeed();
+    TestUnderEveryHost();
     TestOnACorner();
     TestNeighbourThreeCellsOut();
     TestFarNeighbourPastANearOne();

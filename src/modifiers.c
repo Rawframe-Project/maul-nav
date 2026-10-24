@@ -7,6 +7,7 @@
 #include "modifiers.h"
 
 #include "allocator.h"
+#include "fpenv.h"
 #include "navmesh.h"
 
 #include "maul-nav/bake.h"
@@ -21,7 +22,8 @@ mnavTier mnavGetTier(const mnavNavmesh* navmesh)
     return navmesh != nullptr ? navmesh->def.tier : mnav_tierStatic;
 }
 
-mnavResult mnavStageArea(mnavNavmesh* navmesh, mnavPolygonId polygon, mnavAreaType area)
+static MNAV_NOINLINE mnavResult StageAreaWork(mnavNavmesh* navmesh, mnavPolygonId polygon,
+                                              mnavAreaType area)
 {
     if (navmesh == nullptr || area >= MNAV_AREA_TYPES)
     {
@@ -43,6 +45,14 @@ mnavResult mnavStageArea(mnavNavmesh* navmesh, mnavPolygonId polygon, mnavAreaTy
     {
         navmesh->areaChanges[navmesh->areaChangeCount++] = (mnavAreaChange){polygon, area};
     }
+    return result;
+}
+
+mnavResult mnavStageArea(mnavNavmesh* navmesh, mnavPolygonId polygon, mnavAreaType area)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = StageAreaWork(navmesh, polygon, area);
+    mnavFloatEnvLeave(env);
     return result;
 }
 

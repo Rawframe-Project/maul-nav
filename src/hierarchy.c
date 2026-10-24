@@ -9,6 +9,7 @@
 #include "maul-nav/hierarchy.h"
 
 #include "allocator.h"
+#include "fpenv.h"
 #include "hierarchy.h"
 #include "invariant.h"
 #include "navmesh.h"
@@ -99,7 +100,8 @@ static mnavResult Allocate(mnavHierarchy* h)
     return r;
 }
 
-mnavResult mnavCreateHierarchy(const mnavHierarchyDef* def, mnavHierarchy** hierarchyOut)
+static MNAV_NOINLINE mnavResult CreateHierarchyWork(const mnavHierarchyDef* def,
+                                                    mnavHierarchy** hierarchyOut)
 {
     if (hierarchyOut == nullptr)
     {
@@ -142,6 +144,14 @@ mnavResult mnavCreateHierarchy(const mnavHierarchyDef* def, mnavHierarchy** hier
     memset(h->inside, 0, (size_t)def->limits.tiles);
     *hierarchyOut = h;
     return mnav_success;
+}
+
+mnavResult mnavCreateHierarchy(const mnavHierarchyDef* def, mnavHierarchy** hierarchyOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = CreateHierarchyWork(def, hierarchyOut);
+    mnavFloatEnvLeave(env);
+    return result;
 }
 
 void mnavDestroyHierarchy(mnavHierarchy* hierarchy)
@@ -845,9 +855,10 @@ static mnavResult Finish(mnavHierarchy* h, const mnavNavmesh* navmesh, mnavResul
     return mnav_success;
 }
 
-mnavResult mnavBuildHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
-                              const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                              mnavHierarchyReport* reportOut)
+static MNAV_NOINLINE mnavResult BuildHierarchyWork(mnavHierarchy* hierarchy, mnavQuery* query,
+                                                   const mnavNavmesh* navmesh,
+                                                   const mnavQueryFilter* filter,
+                                                   mnavHierarchyReport* reportOut)
 {
     if (hierarchy == nullptr || query == nullptr || navmesh == nullptr)
     {
@@ -864,8 +875,19 @@ mnavResult mnavBuildHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
     return Finish(hierarchy, navmesh, Rebuild(hierarchy, query, navmesh), reportOut);
 }
 
-mnavResult mnavUpdateHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
-                               const mnavNavmesh* navmesh, mnavHierarchyReport* reportOut)
+mnavResult mnavBuildHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
+                              const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                              mnavHierarchyReport* reportOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = BuildHierarchyWork(hierarchy, query, navmesh, filter, reportOut);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult UpdateHierarchyWork(mnavHierarchy* hierarchy, mnavQuery* query,
+                                                    const mnavNavmesh* navmesh,
+                                                    mnavHierarchyReport* reportOut)
 {
     if (hierarchy == nullptr || query == nullptr || navmesh == nullptr ||
         hierarchy->navmesh != navmesh)
@@ -884,4 +906,13 @@ mnavResult mnavUpdateHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
         return Finish(h, navmesh, Rebuild(h, query, navmesh), reportOut);
     }
     return Finish(h, navmesh, Research(h, query, navmesh), reportOut);
+}
+
+mnavResult mnavUpdateHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
+                               const mnavNavmesh* navmesh, mnavHierarchyReport* reportOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = UpdateHierarchyWork(hierarchy, query, navmesh, reportOut);
+    mnavFloatEnvLeave(env);
+    return result;
 }

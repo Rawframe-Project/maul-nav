@@ -5,13 +5,15 @@
 // and answer queries, and the answers are pinned. Tiles in an older format
 // (stored_format1.h) are refused with mnav_errorVersion: a library reads
 // only the formats it writes, and a host rebakes from source when the
-// format rises.
+// format rises. The pinned answers hold under every host floating-point
+// setting.
 //
 // stored_tiles.h is written by `test_stored --write > test/stored_tiles.h`
 // in the pull request that raises MNAV_TILE_FORMAT or MNAV_FLIGHT_FORMAT, or
 // that adds a scene's tiles while the existing tiles stay byte-identical,
 // and only then.
 
+#include "float_hosts.h"
 #include "stored_format1.h"
 #include "stored_tiles.h"
 #include "terrain.h"
@@ -246,7 +248,8 @@ static uint64_t Path(const mnavNavmesh* navmesh, mnavPos3 from, mnavPos3 to)
     return hash;
 }
 
-static void TestGround(void)
+// The path across the four stored ground tiles: its hash.
+static uint64_t GroundHash(void)
 {
     mnavBakeDef def = GroundDef();
     mnavNavmesh* navmesh = nullptr;
@@ -258,14 +261,21 @@ static void TestGround(void)
     }
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     uint64_t hash = Path(navmesh, (mnavPos3){2.0, 0.0, 2.0}, (mnavPos3){62.0, 0.0, 62.0});
+    mnavDestroyNavmesh(navmesh);
+    return hash;
+}
+
+static void TestGround(void)
+{
+    uint64_t hash = GroundHash();
     printf("GROUND_PATH_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == GROUND_PATH_HASH, "the path across the four tiles");
-    mnavDestroyNavmesh(navmesh);
+    CHECK(EveryFloatHost(GroundHash, GROUND_PATH_HASH), "the path under every host setting");
 }
 
 // A path up the slope and round the plateau, and a height on the slope,
-// on the stored terrain tile.
-static void TestTerrain(void)
+// on the stored terrain tile: their hash.
+static uint64_t TerrainHash(void)
 {
     mnavBakeDef def = GroundDef();
     mnavNavmesh* navmesh = nullptr;
@@ -281,14 +291,23 @@ static void TestTerrain(void)
                   mnav_success &&
               mnavGetHeight(navmesh, on.polygon, 10.0, 25.0, &height) == mnav_success,
           "a height on the slope");
-    printf("height at (10, 25): %.9f\n", height);
     hash = mnavHash64(hash, &height, (int32_t)sizeof(height));
-    printf("TERRAIN_PATH_HASH=%016llx\n", (unsigned long long)hash);
-    CHECK(hash == TERRAIN_PATH_HASH, "the path and the height on the terrain");
     mnavDestroyNavmesh(navmesh);
+    return hash;
 }
 
-static void TestFlight(void)
+static void TestTerrain(void)
+{
+    uint64_t hash = TerrainHash();
+    printf("TERRAIN_PATH_HASH=%016llx\n", (unsigned long long)hash);
+    CHECK(hash == TERRAIN_PATH_HASH, "the path and the height on the terrain");
+    CHECK(EveryFloatHost(TerrainHash, TERRAIN_PATH_HASH),
+          "the path and the height under every host setting");
+}
+
+// The flight path across the four stored flight tiles: its hash, 0 when
+// none is found.
+static uint64_t FlightHash(void)
 {
     mnavFlightDef def = FlightDef();
     mnavFlightVolume* volume = nullptr;
@@ -310,15 +329,21 @@ static void TestFlight(void)
     {
         hash = HashPoints(MNAV_HASH_INIT, path.points, path.pointCount);
         hash = mnavHash64(hash, &path.length, (int32_t)sizeof(path.length));
-        printf("a flight path of %d points, %.6f m\n", path.pointCount, path.length);
     }
     bool open = true;
     CHECK(mnavIsFlightOpen(volume, (mnavPos3){31.0, 0.5, 11.0}, &open) == mnav_success && !open,
           "inside a box, closed");
-    printf("FLIGHT_PATH_HASH=%016llx\n", (unsigned long long)hash);
-    CHECK(hash == FLIGHT_PATH_HASH, "the flight path across the four tiles");
     mnavDestroyQuery(query);
     mnavDestroyFlightVolume(volume);
+    return hash;
+}
+
+static void TestFlight(void)
+{
+    uint64_t hash = FlightHash();
+    printf("FLIGHT_PATH_HASH=%016llx\n", (unsigned long long)hash);
+    CHECK(hash == FLIGHT_PATH_HASH, "the flight path across the four tiles");
+    CHECK(EveryFloatHost(FlightHash, FLIGHT_PATH_HASH), "the flight path under every host setting");
 }
 
 int main(int argc, char** argv)

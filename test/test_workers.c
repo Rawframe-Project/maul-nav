@@ -6,9 +6,13 @@
 // each with its own baker and taking tiles as they come, give the same
 // bytes as one thread; navmeshes staged in another order answer the same
 // paths; and 8 threads querying one navmesh, each with its own query
-// context, get what one thread gets. Run under ThreadSanitizer, the test
-// also shows that bakers and queries share nothing they write.
+// context, get what one thread gets. Each worker runs with another
+// floating-point setting (a rounding mode, flush-to-zero), as a host's
+// threads may, and the tiles' hash holds under every setting. Run under
+// ThreadSanitizer, the test also shows that bakers and queries share
+// nothing they write.
 
+#include "float_hosts.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -59,9 +63,12 @@ static bool BakeOne(mnavBaker* baker, int32_t t, uint8_t* bytes, size_t* size)
            mnavCopyBakedTile(baker, bytes, ROOM, size) == mnav_success;
 }
 
-static void* Worker(void* unused)
+// Bakes tiles as they come, under the host setting its index names; a
+// setting changed by the library counts as a failure.
+static void* Worker(void* index)
 {
-    (void)unused;
+    TestFloatSetting host = TestFloatHostileAt((int)(intptr_t)index);
+    TestFloatSet(host);
     mnavBakeDef def = SmallDef();
     mnavBaker* baker = nullptr;
     if (mnavCreateBaker(&def, &baker).result != mnav_success)
@@ -77,12 +84,16 @@ static void* Worker(void* unused)
         }
     }
     mnavDestroyBaker(baker);
+    if (!TestFloatSame(TestFloatGet(), host))
+    {
+        atomic_store(&s_failed, true);
+    }
     return nullptr;
 }
 
-static void TestBakesAtAnyWorkerCount(void)
+// The 100 tiles baked on this thread into s_one: their bytes' hash.
+static uint64_t OneThreadHash(void)
 {
-    s_world = World();
     mnavBakeDef def = SmallDef();
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "a baker");
@@ -93,8 +104,16 @@ static void TestBakesAtAnyWorkerCount(void)
         hash = mnavHash64(hash, s_one[t], (int32_t)s_oneSizes[t]);
     }
     mnavDestroyBaker(baker);
+    return hash;
+}
+
+static void TestBakesAtAnyWorkerCount(void)
+{
+    s_world = World();
+    uint64_t hash = OneThreadHash();
     printf("workers: TILES_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == TILES_HASH, "the pinned hash");
+    CHECK(EveryFloatHost(OneThreadHash, TILES_HASH), "the pinned hash under every host setting");
     const int32_t counts[3] = {2, 4, 8};
     for (int32_t c = 0; c < 3; ++c)
     {
@@ -104,7 +123,8 @@ static void TestBakesAtAnyWorkerCount(void)
         pthread_t threads[MAX_WORKERS];
         for (int32_t w = 0; w < counts[c]; ++w)
         {
-            CHECK(pthread_create(&threads[w], nullptr, Worker, nullptr) == 0, "a worker");
+            CHECK(pthread_create(&threads[w], nullptr, Worker, (void*)(intptr_t)w) == 0,
+                  "a worker");
         }
         for (int32_t w = 0; w < counts[c]; ++w)
         {
@@ -116,7 +136,7 @@ static void TestBakesAtAnyWorkerCount(void)
             same = same && s_manySizes[t] == s_oneSizes[t] &&
                    memcmp(s_many[t], s_one[t], s_oneSizes[t]) == 0;
         }
-        CHECK(same, "every tile's bytes the same at any worker count");
+        CHECK(same, "every tile's bytes the same at any worker count and host setting");
     }
 }
 
@@ -134,7 +154,8 @@ static mnavNavmesh* Load(bool backward)
     return navmesh;
 }
 
-// A path's ends, from a seed, on the world's floor.
+// A path's ends, from a seed, on the world's floor: sums of a few binary
+// digits, exact under any rounding mode.
 static void Ends(int32_t i, mnavPos3* a, mnavPos3* b)
 {
     uint32_t state = 7u + (uint32_t)i * 2654435761u;
@@ -178,6 +199,8 @@ static uint64_t PathHash(mnavQuery* query, const mnavNavmesh* navmesh, int32_t i
 typedef struct Querier
 {
     const mnavNavmesh* navmesh;
+    // The host setting it runs under, as test_fenv.h numbers them.
+    int host;
     int32_t first;
     uint64_t hashes[PATHS];
     bool failed;
@@ -186,6 +209,8 @@ typedef struct Querier
 static void* Query(void* context)
 {
     Querier* q = context;
+    TestFloatSetting host = TestFloatHostileAt(q->host);
+    TestFloatSet(host);
     mnavQueryDef def = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     q->failed = mnavCreateQuery(&def, &query) != mnav_success;
@@ -197,6 +222,7 @@ static void* Query(void* context)
         q->hashes[i] = PathHash(query, q->navmesh, i);
     }
     mnavDestroyQuery(query);
+    q->failed = q->failed || !TestFloatSame(TestFloatGet(), host);
     return nullptr;
 }
 
@@ -225,7 +251,7 @@ static void TestQueriesOnManyThreads(void)
     pthread_t threads[MAX_WORKERS];
     for (int32_t w = 0; w < MAX_WORKERS; ++w)
     {
-        queriers[w] = (Querier){forward, w * (PATHS / MAX_WORKERS), {0}, false};
+        queriers[w] = (Querier){forward, w, w * (PATHS / MAX_WORKERS), {0}, false};
         CHECK(pthread_create(&threads[w], nullptr, Query, &queriers[w]) == 0, "a querier");
     }
     bool same = true;
@@ -234,7 +260,8 @@ static void TestQueriesOnManyThreads(void)
         pthread_join(threads[w], nullptr);
         same = same && !queriers[w].failed && memcmp(queriers[w].hashes, one, sizeof(one)) == 0;
     }
-    CHECK(same, "8 threads querying one navmesh get what one thread gets");
+    CHECK(same, "8 threads querying one navmesh, each under another host setting, get what one "
+                "thread gets");
     mnavDestroyNavmesh(backward);
     mnavDestroyNavmesh(forward);
 }
