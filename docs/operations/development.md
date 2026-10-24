@@ -67,12 +67,12 @@ cmake --build out/differential --target differential
 ./out/differential/differential
 ```
 
-After the agreement table it prints what each library costs on the same scenes, the best of five runs, reported and never gated:
+After the agreement table it prints what each library costs on the same scenes, the best of five runs, reported and never gated. The header says Maul Nav is measured in 32 m tiles and Recast untiled:
 
 | Measure | What both sides do |
 |---|---|
 | `bake` | The whole scene. Maul Nav bakes every 32 m tile and copies its bytes; Recast builds one untiled mesh and Detour's navmesh data from it. |
-| `path` | One pair, averaged over the scene's pairs: the nearest polygon at each end, the search and the straight path. |
+| `path` | One pair, averaged over the pairs both sides snap to a polygon (as the agreement table counts them), so both search every pair measured: the nearest polygon at each end, the search and the straight path. |
 | `nodes` | The nodes one search makes, averaged over the pairs: Maul Nav's query context's count, Detour's node pool's. |
 | `bytes` | The navmesh's bytes: Maul Nav's tiles in all, Detour's navmesh data. |
 

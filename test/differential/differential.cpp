@@ -346,15 +346,20 @@ template <typename Work> Cost Measure(const Counter& counter, Work work)
     return best;
 }
 
-// The pairs both libraries snap, as Compare picks them.
-std::vector<std::vector<float>> Pairs(DiffMaul* maul)
+// The pairs both libraries snap, as Compare counts them: a pair either
+// side finds no polygon near is left out, so that both sides search every
+// pair measured.
+std::vector<std::vector<float>> Pairs(DiffMaul* maul, const Detour& d)
 {
     std::vector<std::vector<float>> pairs;
     for (int i = 0; i < kPairs; ++i)
     {
         std::vector<float> p(6);
+        double length = 0.0;
         if (DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 1u, p.data()) &&
-            DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 2u, p.data() + 3))
+            DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 2u, p.data() + 3) &&
+            DiffMaulPath(maul, p.data(), p.data() + 3, &length, nullptr) >= 0 &&
+            DetourPath(d, p.data(), p.data() + 3, &length, nullptr) >= 0)
         {
             pairs.push_back(p);
         }
@@ -384,7 +389,7 @@ void Costs(const Counter& counter, const DiffScene& scene, DiffMaul* maul, const
                                       dtFree(data);
                                   }
                               });
-    std::vector<std::vector<float>> pairs = Pairs(maul);
+    std::vector<std::vector<float>> pairs = Pairs(maul, d);
     double n = pairs.empty() ? 1.0 : static_cast<double>(pairs.size());
     double maulNodes = 0.0;
     double detourNodes = 0.0;
@@ -485,7 +490,8 @@ int main()
     }
     std::printf(pass ? "agreement within the floors\n" : "agreement below a floor\n");
     Counter counter;
-    std::printf("\ncosts, best of five, reported and not gated; %s; load average %.2f\n",
+    std::printf("\ncosts, best of five, reported and not gated; Maul Nav in 32 m tiles, Recast "
+                "untiled; %s; load average %.2f\n",
                 counter.available() ? "instructions are user space's, retired"
                                     : "no instruction counter here, time only",
                 Load());
