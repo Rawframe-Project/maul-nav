@@ -493,7 +493,9 @@ static int32_t TakeSlot(mnavTilePlan* plan)
 
 // Puts a staged change into the planned slots: a replacement keeps its
 // slot with the next generation, unless that would wrap, which retires
-// the slot; a removal empties its slot with the next generation.
+// the slot; a removal empties its slot with the next generation, and
+// retires it when that is the last, since a free slot is taken at the
+// generation after.
 static void PlanChange(mnavTilePlan* plan, int32_t existing, const mnavStaged* staged)
 {
     if (existing >= 0)
@@ -507,6 +509,7 @@ static void PlanChange(mnavTilePlan* plan, int32_t existing, const mnavStaged* s
             slot->tile = staged->tile;
             return;
         }
+        slot->retired = slot->generation == UINT32_MAX;
     }
     if (staged->tile != nullptr)
     {

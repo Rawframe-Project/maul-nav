@@ -314,11 +314,37 @@ static void TestSlotAboutToWrapIsRetired(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestSlotFreedAtTheLastGenerationIsRetired(void)
+{
+    mnavNavmesh* navmesh = Make();
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "one");
+    navmesh->slots[0].generation = UINT32_MAX - 2;
+    mnavTileId id;
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success &&
+              mnavGetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 1 &&
+              id.generation == UINT32_MAX - 1,
+          "replaced in its slot");
+    CHECK(mnavStageTileRemoval(navmesh, 0, 0) == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "removed");
+    // Freed at the last generation, the slot has no next one to be taken
+    // at: it is retired, not reused at a generation that wrapped to 0.
+    CHECK(navmesh->slots[0].retired && navmesh->slots[0].generation == UINT32_MAX,
+          "the slot retired");
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success &&
+              mnavGetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 2 && id.generation == 1,
+          "the tile again, in a new slot");
+    CHECK(mnavCheckPolygon(navmesh, (mnavPolygonId){id.slot, id.generation, 0}) == mnav_success,
+          "its ids current");
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     LoadWorldTiles();
     TestLinksNeedHeightsWithinAStepAtBothEnds();
     TestSlotAboutToWrapIsRetired();
+    TestSlotFreedAtTheLastGenerationIsRetired();
     TestStagedTilesAppearAtCommit();
     TestNeighborsLinkBothWays();
     TestReplacingAndRemovingMakeIdsStale();
