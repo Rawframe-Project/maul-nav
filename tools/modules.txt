@@ -56,9 +56,9 @@ query: allocator
 query_filter:
 offmesh: allocator navmesh nearest sort
 commit: invariant modifiers navmesh offmesh
-funnel: navmesh query
+funnel: invariant navmesh query
 surface: navmesh nearest polymesh query query_filter
-corridor: funnel navmesh offmesh polymesh query query_filter
+corridor: funnel invariant navmesh offmesh polymesh query query_filter
 modifiers: allocator navmesh
 grid: query query_filter
 spatial: navmesh nearest query query_filter
