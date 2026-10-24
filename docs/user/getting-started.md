@@ -5,8 +5,8 @@ Maul Nav turns level geometry into a navmesh and answers the questions agents as
 ## Requirements
 
 - CMake 3.25 or newer.
-- GCC 14 or Clang 19 or newer; on Windows, `clang-cl` (the Visual Studio component "C++ Clang tools for Windows"). The library is C23.
-- On the web, Emscripten: with `EMSDK` set, `cmake --preset web-emscripten` builds the library and its tests, which `ctest --preset web-emscripten` runs under Node.
+- GCC 14 or Clang 19 or newer, or Apple Clang; on Windows, `clang-cl` (the Visual Studio component "C++ Clang tools for Windows"). The library is C23.
+- On the web, Emscripten: with `EMSDK` set, `cmake --preset web-emscripten` configures the library and its tests, `cmake --build --preset web-emscripten` builds them, and `ctest --preset web-emscripten` runs the tests under Node.
 - The public headers are the common subset of C17 and C++17, so any C or C++ program can include them.
 
 ## Building and installing
