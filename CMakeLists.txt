@@ -186,7 +186,10 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(path_links)
     maul_add_test(shortest WHITEBOX)
     maul_add_test(flight WHITEBOX)
-    maul_add_test(flight_volume WHITEBOX)
+    maul_add_test(flight_volume)
+    # The octree the tiles hold, the walk and the payload's structure,
+    # which no public call shows (test_flight_octree.c).
+    maul_add_test(flight_octree WHITEBOX)
     maul_add_test(flight_query)
     maul_add_dense(flight_query)
     maul_add_test(sliced)
