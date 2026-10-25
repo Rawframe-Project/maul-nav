@@ -531,11 +531,7 @@ mnavResult mnavBuildRegions(mnavMemory* memory, const mnavCompactField* field, i
     {
         result = Layer(memory, field, regions, minRegion, map);
     }
-    if (result != mnav_success)
-    {
-        mnavReleaseRegions(memory, map);
-    }
-    else if (MNAV_INVARIANTS)
+    if (result == mnav_success && MNAV_INVARIANTS)
     {
         CheckRegions(field, border, map);
     }

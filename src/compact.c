@@ -183,10 +183,6 @@ mnavResult mnavAllocateCompactField(mnavMemory* memory, const mnavTileFrame* fra
         result = mnavAllocate(memory, (size_t)spanCount, sizeof(mnavAreaType),
                               alignof(mnavAreaType), (void**)&field->areas);
     }
-    if (result != mnav_success)
-    {
-        mnavReleaseCompactField(memory, field);
-    }
     return result;
 }
 

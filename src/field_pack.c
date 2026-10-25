@@ -147,7 +147,6 @@ mnavResult mnavUnpackField(mnavMemory* memory, const mnavPackedField* packed, in
     }
     if (result == mnav_success && !Fill(raw, field))
     {
-        mnavReleaseCompactField(memory, field);
         result = mnav_errorInvalid;
     }
     mnavRelease(memory, raw, rawSize, 1, 1);

@@ -35,13 +35,15 @@ typedef struct BakedTile
 } BakedTile;
 
 // Bakes tile (0, 0) of input; returns the first failing stage's result.
+// Whatever the result, ReleaseBakedTile frees what the tile holds.
 static inline mnavResult BakeTile(mnavMemory* memory, const mnavBakeDef* def,
                                   const mnavBakeCells* cells, const mnavTriangleMesh* input,
                                   BakedTile* tile)
 {
     *tile = (BakedTile){0};
+    const mnavBakeInput solid = {input, 1, nullptr, 0, nullptr, 0, nullptr};
     mnavResult result =
-        mnavBuildHeightfield(memory, def, cells, input, 1, 0, 0, &tile->heightfield);
+        mnavBuildHeightfieldInput(memory, def, cells, &solid, 0, 0, &tile->heightfield);
     if (result != mnav_success)
     {
         return result;

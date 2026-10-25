@@ -89,8 +89,12 @@ static void TestLimitsAreTyped(void)
     mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
     mnavContourSet set = Rings(&memory, points, counts, 1);
     mnavPolyMesh mesh;
+    // A refused mesh holds what it built so far until released, as after
+    // success.
     CHECK(BuildLinked(&memory, &set, 20, 5, 100, &mesh) == mnav_errorLimit, "vertices");
+    mnavReleasePolyMesh(&memory, &mesh);
     CHECK(BuildLinked(&memory, &set, 20, 100, 1, &mesh) == mnav_errorLimit, "polygons");
+    mnavReleasePolyMesh(&memory, &mesh);
     CHECK(BuildLinked(&memory, &set, 20, 6, 2, &mesh) == mnav_success, "at the limits");
     mnavReleasePolyMesh(&memory, &mesh);
     mnavReleaseContours(&memory, &set);
@@ -237,8 +241,9 @@ static void TestLevelMeshIsValid(void)
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
     mnavMemory memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
     mnavHeightfield heightfield;
-    CHECK(mnavBuildHeightfield(&memory, &def, &cells, &input, 1, 0, 0, &heightfield) ==
-              mnav_success,
+    CHECK(mnavBuildHeightfieldInput(&memory, &def, &cells,
+                                    &(mnavBakeInput){&input, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
+                                    0, &heightfield) == mnav_success,
           "rasterized");
     mnavFilterWalkable(&heightfield, cells.agentHeight, cells.agentStep);
     mnavCompactField compact;

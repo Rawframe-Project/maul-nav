@@ -397,8 +397,9 @@ static void TestLevelDetailIsSound(void)
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
     mnavMemory memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
     mnavHeightfield heightfield;
-    CHECK(mnavBuildHeightfield(&memory, &def, &cells, &input, 1, 0, 0, &heightfield) ==
-              mnav_success,
+    CHECK(mnavBuildHeightfieldInput(&memory, &def, &cells,
+                                    &(mnavBakeInput){&input, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
+                                    0, &heightfield) == mnav_success,
           "rasterized");
     mnavFilterWalkable(&heightfield, cells.agentHeight, cells.agentStep);
     mnavCompactField compact;
@@ -500,8 +501,9 @@ static void TestBumpyGroundReachesTheCap(void)
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
     mnavMemory memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
     mnavHeightfield heightfield;
-    CHECK(mnavBuildHeightfield(&memory, &def, &cells, &input, 1, 0, 0, &heightfield) ==
-              mnav_success,
+    CHECK(mnavBuildHeightfieldInput(&memory, &def, &cells,
+                                    &(mnavBakeInput){&input, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
+                                    0, &heightfield) == mnav_success,
           "rasterized");
     mnavFilterWalkable(&heightfield, cells.agentHeight, cells.agentStep);
     mnavCompactField compact;
