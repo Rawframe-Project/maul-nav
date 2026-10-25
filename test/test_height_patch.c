@@ -195,7 +195,7 @@ static void TestMixedPolygonsSeedFromTheirVertices(void)
         const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
         mnavBakeDef def = mnavDefaultBakeDef();
         UseDef(&def);
-        CHECK(mnavBakeTileInput(s_baker, &input, 0, 0, &s_report) == mnav_success &&
+        CHECK(mnavBakeTile(s_baker, &input, 0, 0, &s_report) == mnav_success &&
                   mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &s_tileSize) == mnav_success,
               "baked");
         mnavDestroyNavmesh(s_navmesh);

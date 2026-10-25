@@ -57,7 +57,7 @@ static mnavResult Bake(const mnavBakeDef* def, const mnavTriangleMesh* meshes, i
         return result;
     }
     const mnavBakeInput input = {meshes, count, nullptr, 0, nullptr, 0, nullptr};
-    result = mnavBakeTileInput(baker, &input, tileX, tileZ, report);
+    result = mnavBakeTile(baker, &input, tileX, tileZ, report);
     if (result == mnav_success)
     {
         // The navmesh takes the default allocator, which never refuses.

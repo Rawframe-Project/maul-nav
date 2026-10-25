@@ -36,7 +36,8 @@ static void BakeLedge(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &mesh, 1, 0, 0, nullptr) == mnav_success &&
+              mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                           nullptr) == mnav_success &&
               mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &s_size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);

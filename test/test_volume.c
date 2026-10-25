@@ -91,7 +91,7 @@ static const Map* BakeMesh(mnavBaker* baker, const mnavTriangleMesh* mesh,
 {
     const mnavBakeInput input = {mesh, 1, nullptr, 0, volumes, count, nullptr};
     size_t size = 0;
-    CHECK(mnavBakeTileInput(baker, &input, 0, 0, nullptr) == mnav_success &&
+    CHECK(mnavBakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
               mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavBakeDef def = mnavDefaultBakeDef();
@@ -286,7 +286,7 @@ static mnavBakeReport Refused(mnavBaker* baker, mnavBakeVolume volume, mnavResul
     const mnavBakeVolume volumes[2] = {volume, volume};
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, volumes, 2, nullptr};
     mnavBakeReport report;
-    CHECK(mnavBakeTileInput(baker, &input, 0, 0, &report) == result, "refused");
+    CHECK(mnavBakeTile(baker, &input, 0, 0, &report) == result, "refused");
     return report;
 }
 
@@ -333,17 +333,16 @@ static void TestChecks(mnavBaker* baker)
     v = good;
     v.pointCount = 2;
     const mnavBakeInput withTerrain = {&s_mesh, 1, &terrain, 1, &v, 1, nullptr};
-    CHECK(mnavBakeTileInput(baker, &withTerrain, 0, 0, &r) == mnav_errorInvalid && r.mesh == 2,
+    CHECK(mnavBakeTile(baker, &withTerrain, 0, 0, &r) == mnav_errorInvalid && r.mesh == 2,
           "a volume named after the meshes and terrains");
     // An exclude or include volume's area is unused.
     v = good;
     v.kind = mnav_volumeExclude;
     v.area = mnav_areaNone;
     const mnavBakeInput fine = {&s_mesh, 1, nullptr, 0, &v, 1, nullptr};
-    CHECK(mnavBakeTileInput(baker, &fine, 0, 0, nullptr) == mnav_success, "an exclude volume");
+    CHECK(mnavBakeTile(baker, &fine, 0, 0, nullptr) == mnav_success, "an exclude volume");
     const mnavBakeInput missing = {&s_mesh, 1, nullptr, 0, nullptr, 1, nullptr};
-    CHECK(mnavBakeTileInput(baker, &missing, 0, 0, nullptr) == mnav_errorInvalid,
-          "volumes missing");
+    CHECK(mnavBakeTile(baker, &missing, 0, 0, nullptr) == mnav_errorInvalid, "volumes missing");
 }
 
 static uint64_t BakeHash(mnavBaker* baker, const mnavBakeVolume* volumes, int32_t count,
@@ -351,7 +350,7 @@ static uint64_t BakeHash(mnavBaker* baker, const mnavBakeVolume* volumes, int32_
 {
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, volumes, count, nullptr};
     size_t size = 0;
-    CHECK(mnavBakeTileInput(baker, &input, 0, 0, report) == mnav_success &&
+    CHECK(mnavBakeTile(baker, &input, 0, 0, report) == mnav_success &&
               mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     return mnavHash64(MNAV_HASH_INIT, s_tile, (int32_t)size);
@@ -400,7 +399,7 @@ static void TestBake(mnavBaker* baker)
     mnavBaker* small = nullptr;
     CHECK(mnavCreateBaker(&def, &small).result == mnav_success, "baker");
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, all, 3, nullptr};
-    CHECK(mnavBakeTileInput(small, &input, 0, 0, &report) == mnav_errorLimit && report.mesh == -1,
+    CHECK(mnavBakeTile(small, &input, 0, 0, &report) == mnav_errorLimit && report.mesh == -1,
           "points over the input limit");
     mnavVec2 many[16];
     for (int32_t k = 0; k < 16; ++k)
@@ -409,12 +408,12 @@ static void TestBake(mnavBaker* baker)
     }
     const mnavBakeVolume big = {many, 16, -1, 1, mnav_volumeExclude, 0};
     const mnavBakeInput alone = {nullptr, 0, nullptr, 0, &big, 1, nullptr};
-    CHECK(mnavBakeTileInput(small, &alone, 0, 0, &report) == mnav_errorLimit && report.mesh == 0,
+    CHECK(mnavBakeTile(small, &alone, 0, 0, &report) == mnav_errorLimit && report.mesh == 0,
           "one volume over the input limit, named");
     mnavDestroyBaker(small);
     def.limits.inputTriangles += 1;
     CHECK(mnavCreateBaker(&def, &small).result == mnav_success &&
-              mnavBakeTileInput(small, &input, 0, 0, &report) == mnav_success,
+              mnavBakeTile(small, &input, 0, 0, &report) == mnav_success,
           "points at the input limit");
     mnavDestroyBaker(small);
 }

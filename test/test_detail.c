@@ -338,7 +338,8 @@ static void TestNoHeightsFallBackAndCount(void)
     def.detailMaxError = 0.0f;
     UseDef(&def);
     size_t size = 0;
-    CHECK(mnavBakeTile2D(s_baker, outlines, 2, 0, 0, &s_report) == mnav_success &&
+    CHECK(mnavBakeTile2D(s_baker, &(mnavBake2DInput){outlines, 2, nullptr}, 0, 0, &s_report) ==
+                  mnav_success &&
               mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);
@@ -439,7 +440,7 @@ static void TestBumpyGroundReachesTheCap(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success,
+              mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
     CHECK(report.cappedDetail > 0 && report.partialRings == 0, "some polygons reach the cap");
@@ -464,7 +465,7 @@ static void TestLevelDetailIsSound(void)
         mnavBakeReport report;
         mnavBaker* baker = nullptr;
         CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-                  mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success,
+                  mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success,
               "baked");
         mnavDestroyBaker(baker);
         CHECK(report.partialRings == 0 && report.detailTriangles >= report.polygons,

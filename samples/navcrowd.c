@@ -101,7 +101,8 @@ static mnavNavmesh* Load(void)
     mnavTriangleMesh room = Room();
     uint8_t* bytes = malloc(TILE_ROOM);
     size_t size = 0;
-    Check(mnavBakeTile(baker, &room, 1, 0, 0, NULL), "bake");
+    Check(mnavBakeTile(baker, &(mnavBakeInput){&room, 1, NULL, 0, NULL, 0, NULL}, 0, 0, NULL),
+          "bake");
     Check(mnavCopyBakedTile(baker, bytes, TILE_ROOM, &size), "copy");
     Check(mnavStageTile(navmesh, bytes, size).result, "stage");
     Check(mnavCommit(navmesh), "commit");

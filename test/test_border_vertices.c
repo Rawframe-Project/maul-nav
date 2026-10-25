@@ -67,7 +67,7 @@ static void TestFloorAndRampMeetOnEachSide(void)
         mnavBakeReport report;
         size_t size = 0;
         CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-                  mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success &&
+                  mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success &&
                   mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
               "baked");
         mnavDestroyBaker(baker);

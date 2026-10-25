@@ -164,7 +164,8 @@ static void TestOpenSpansToTheFrameEdge(void)
     mnavBakeReport report;
     size_t size = 0;
     CHECK(mnavCreateBaker(&s_def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &outline, 1, 0, 0, &report) == mnav_success &&
+              mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0, &report) ==
+                  mnav_success &&
               mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
@@ -215,7 +216,7 @@ static void TestLevelLandmarks(void)
     const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
     size_t size = 0;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTileInput(baker, &input, 0, 0, nullptr) == mnav_success &&
+              mnavBakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
               mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);

@@ -234,7 +234,9 @@ static void Bake(void)
         for (int32_t t = 0; t < TILES * TILES; ++t)
         {
             mnavBakeReport report;
-            Check(mnavBakeTile(baker, &terrain, 1, t % TILES, t / TILES, &report), "bake");
+            Check(mnavBakeTile(baker, &(mnavBakeInput){&terrain, 1, NULL, 0, NULL, 0, NULL},
+                               t % TILES, t / TILES, &report),
+                  "bake");
             Check(mnavCopyBakedTile(baker, buffer, TILE_BYTES, &s_sizes[t]), "copy");
             if (run == 0)
             {
@@ -1107,7 +1109,8 @@ static mnavNavmesh* FlatWorld(float* sideOut)
         for (int32_t x = 0; x < WORLD_TILES; ++x)
         {
             size_t size = 0;
-            Check(mnavBakeTile2D(baker, s_worldOutlines, n, x, z, NULL), "bake 2D");
+            Check(mnavBakeTile2D(baker, &(mnavBake2DInput){s_worldOutlines, n, NULL}, x, z, NULL),
+                  "bake 2D");
             Check(mnavCopyBakedTile(baker, buffer, capacity, &size), "copy");
             Check(mnavStageTile(navmesh, buffer, size).result, "stage");
         }

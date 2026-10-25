@@ -91,8 +91,8 @@ static float BakeWorld(float shift)
         {
             int32_t t = z * TILES + x;
             free(s_bytes[t]);
-            CHECK(mnavBakeTile2D(baker, s_outlines, s_outlineCount, first + x, first + z,
-                                 nullptr) == mnav_success &&
+            CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, s_outlineCount, nullptr},
+                                 first + x, first + z, nullptr) == mnav_success &&
                       mnavCopyBakedTile(baker, buffer, CAPACITY, &s_sizes[t]) == mnav_success,
                   "baked");
             s_bytes[t] = malloc(s_sizes[t]);
@@ -494,7 +494,8 @@ static void TestUpdates(void)
     size_t size = 0;
     Box(170.0f, 170.0f, 180.0f, 180.0f, mnav_areaNone);
     CHECK(mnavCreateBaker(&bakeDef, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, s_outlines, s_outlineCount, 5, 5, nullptr) == mnav_success &&
+              mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, s_outlineCount, nullptr}, 5, 5,
+                             nullptr) == mnav_success &&
               mnavCopyBakedTile(baker, bytes, CAPACITY, &size) == mnav_success &&
               mnavStageTile(navmesh, bytes, size).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success,

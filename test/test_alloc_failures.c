@@ -102,7 +102,7 @@ static void TestBakes(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "a baker");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavBakeTileInput(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
+        CHECK(mnavBakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
                   mnavCopyBakedTile(baker, s_expected[t], TILE_CAPACITY, &s_expectedSizes[t]) ==
                       mnav_success,
               "the tiles, with every allocation granted");
@@ -117,14 +117,14 @@ static void TestBakes(void)
     for (int32_t t = 0; t < 1; ++t)
     {
         FailAfter(-1);
-        CHECK(mnavBakeTileInput(baker, &input, t % 2, t / 2, nullptr) == mnav_success, "counted");
+        CHECK(mnavBakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success, "counted");
         int32_t calls = s_calls;
         failed += calls;
         for (int32_t k = 0; k < calls; ++k)
         {
             FailAfter(k);
             mnavBakeReport report;
-            mnavResult result = mnavBakeTileInput(baker, &input, t % 2, t / 2, &report);
+            mnavResult result = mnavBakeTile(baker, &input, t % 2, t / 2, &report);
             refused += result == mnav_errorCapacity ? 1 : 0;
             reported = reported && result == mnav_errorCapacity && report.result == result;
             // The baker holds no more than its own scratch afterwards, and
@@ -132,7 +132,7 @@ static void TestBakes(void)
             FailAfter(-1);
             size_t size = 0;
             restored = restored &&
-                       mnavBakeTileInput(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
+                       mnavBakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
                        mnavCopyBakedTile(baker, s_bytes, TILE_CAPACITY, &size) == mnav_success &&
                        size == s_expectedSizes[t] && memcmp(s_bytes, s_expected[t], size) == 0;
         }
@@ -145,13 +145,16 @@ static void TestBakes(void)
     const mnavVec2 square[4] = {{1, 1}, {31, 1}, {31, 31}, {1, 31}};
     const mnavOutline outline = {square, 4, mnav_areaWalkable};
     FailAfter(-1);
-    CHECK(mnavBakeTile2D(baker, &outline, 1, 0, 0, nullptr) == mnav_success, "a 2D tile");
+    CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0, nullptr) ==
+              mnav_success,
+          "a 2D tile");
     int32_t calls = s_calls;
     bool flat = true;
     for (int32_t k = 0; k < calls; ++k)
     {
         FailAfter(k);
-        flat = flat && mnavBakeTile2D(baker, &outline, 1, 0, 0, nullptr) == mnav_errorCapacity;
+        flat = flat && mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0,
+                                      nullptr) == mnav_errorCapacity;
     }
     CHECK(flat, "2D bakes refused alike");
     FailAfter(-1);
@@ -258,17 +261,23 @@ static void TestHoles(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &mesh, 1, 0, 0, &report) == mnav_success && report.polygons > 4,
+              mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                           &report) == mnav_success &&
+              report.polygons > 4,
           "a floor round a pillar");
     // Counted on a baker that has baked before, as every bake below is.
     FailAfter(-1);
-    CHECK(mnavBakeTile(baker, &mesh, 1, 0, 0, nullptr) == mnav_success, "again");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       nullptr) == mnav_success,
+          "again");
     int32_t calls = s_calls;
     bool refused = true;
     for (int32_t k = 0; k < calls; ++k)
     {
         FailAfter(k);
-        refused = refused && mnavBakeTile(baker, &mesh, 1, 0, 0, nullptr) == mnav_errorCapacity;
+        refused = refused &&
+                  mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                               0, 0, nullptr) == mnav_errorCapacity;
     }
     CHECK(refused, "every failure round the hole refused");
     FailAfter(-1);
@@ -289,17 +298,23 @@ static void TestBorderVertices(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &mesh, 1, 0, 0, &report) == mnav_success && report.regions == 2,
+              mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                           &report) == mnav_success &&
+              report.regions == 2,
           "the floor and the ramp");
     // Counted on a baker that has baked before, as every bake below is.
     FailAfter(-1);
-    CHECK(mnavBakeTile(baker, &mesh, 1, 0, 0, nullptr) == mnav_success, "again");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       nullptr) == mnav_success,
+          "again");
     int32_t calls = s_calls;
     bool refused = true;
     for (int32_t k = 0; k < calls; ++k)
     {
         FailAfter(k);
-        refused = refused && mnavBakeTile(baker, &mesh, 1, 0, 0, nullptr) == mnav_errorCapacity;
+        refused = refused &&
+                  mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                               0, 0, nullptr) == mnav_errorCapacity;
     }
     CHECK(refused, "every failure round the removal refused");
     FailAfter(-1);

@@ -94,7 +94,8 @@ static void BakeVariants(void)
     Expect(mnavCreateBaker(&def, &baker).result == mnav_success);
     for (int32_t t = 0; t < 4; ++t)
     {
-        Expect(mnavBakeTile(baker, &world, 1, t % 2, t / 2, nullptr) == mnav_success &&
+        Expect(mnavBakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr},
+                            t % 2, t / 2, nullptr) == mnav_success &&
                mnavCopyBakedTile(baker, s_variants[t], VARIANT_CAPACITY, &s_variantSizes[t]) ==
                    mnav_success);
     }

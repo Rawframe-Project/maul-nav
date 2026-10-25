@@ -36,7 +36,8 @@ int main(void)
     size_t size = 0;
     unsigned char* bytes = malloc(room);
     int ok = bytes != NULL && mnavCreateBaker(&def, &baker).result == mnav_success &&
-             mnavBakeTile(baker, &floor, 1, 0, 0, NULL) == mnav_success &&
+             mnavBakeTile(baker, &(mnavBakeInput){&floor, 1, NULL, 0, NULL, 0, NULL}, 0, 0, NULL) ==
+                 mnav_success &&
              mnavCopyBakedTile(baker, bytes, room, &size) == mnav_success &&
              mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
              mnavStageTile(navmesh, bytes, size).result == mnav_success &&

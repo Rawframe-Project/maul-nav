@@ -60,7 +60,9 @@ static mnavNavmesh* BakeAndLoad(void)
         for (int32_t x = 0; x < 2; ++x)
         {
             size_t size = 0;
-            Check(mnavBakeTile(baker, &mesh, 1, x, z, NULL), "bake");
+            Check(
+                mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, NULL, 0, NULL, 0, NULL}, x, z, NULL),
+                "bake");
             Check(mnavCopyBakedTile(baker, bytes, TILE_ROOM, &size), "copy");
             Check(mnavStageTile(navmesh, bytes, size).result, "stage");
         }
