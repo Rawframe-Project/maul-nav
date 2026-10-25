@@ -7,6 +7,7 @@
 // include, exclude and area volumes; the refusals; the limits.
 
 #include "counting_allocator.h"
+#include "dense.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -140,11 +141,16 @@ static int32_t MakeObstacles(Obstacles* sets)
 
 // Caches the world's four tiles from the input, each alike a plain bake,
 // and rebuilds each with every obstacle set; counts the rebuilds alike.
-static int32_t Scene(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput* input)
+// Outside the dense form, each tile takes every fourth set, starting
+// from one that rotates with the scene: every set is still rebuilt on
+// every tile across the six scenes.
+static int32_t Scene(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput* input,
+                     int32_t scene)
 {
     Obstacles sets[10];
     int32_t setCount = MakeObstacles(sets);
     int32_t alike = 0;
+    int32_t tried = 0;
     for (int32_t t = 0; t < 4; ++t)
     {
         size_t size = 0;
@@ -157,10 +163,15 @@ static int32_t Scene(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput
               "a cached bake gives a plain bake's bytes");
         for (int32_t k = 0; k < setCount; ++k)
         {
+            if (!s_dense && (k + scene) % 4 != t)
+            {
+                continue;
+            }
+            tried += 1;
             alike += Alike(baker, cache, input, t & 1, t >> 1, sets[k].list, sets[k].count) ? 1 : 0;
         }
     }
-    CHECK(alike == 4 * setCount, "every rebuild alike a full bake");
+    CHECK(alike == tried, "every rebuild alike a full bake");
     return alike;
 }
 
@@ -188,14 +199,14 @@ static void TestAlike(mnavBaker* baker, mnavTileCache* cache)
     int32_t alike = 0;
     for (size_t s = 0; s < sizeof(scenes) / sizeof(scenes[0]); ++s)
     {
-        alike += Scene(baker, cache, &scenes[s]);
+        alike += Scene(baker, cache, &scenes[s], (int32_t)s);
     }
     // Indexed meshes.
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavTileIndex* index = nullptr;
     CHECK(mnavCreateTileIndex(&def, &world, 1, &index, nullptr) == mnav_success, "an index");
     const mnavBakeInput indexed = {&world, 1, &terrain, 1, volumes, 3, index};
-    alike += Scene(baker, cache, &indexed);
+    alike += Scene(baker, cache, &indexed, (int32_t)(sizeof(scenes) / sizeof(scenes[0])));
     mnavDestroyTileIndex(index);
     printf("rebuilds: %d alike a full bake\n", alike);
     // The obstacles shape the tiles: a crate leaves another tile.
@@ -358,8 +369,12 @@ static void TestLimits(mnavBaker* baker)
     mnavDestroyTileCache(cache);
 }
 
-int main(void)
+int main(int argc, char** argv)
 {
+    if (!ReadDense(argc, argv))
+    {
+        return 2;
+    }
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBaker* baker = nullptr;
     mnavTileCache* cache = nullptr;

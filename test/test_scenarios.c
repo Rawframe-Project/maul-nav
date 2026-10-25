@@ -12,6 +12,7 @@
 // nightly-labeled test doorway. The terrain's bytes hold under every host
 // floating-point setting.
 
+#include "dense.h"
 #include "doorway.h"
 #include "float_hosts.h"
 #include "stored_tiles.h"
@@ -391,7 +392,11 @@ static void TestStreamedTerrain(mnavQuery* query)
     uint64_t hash = TerrainHash();
     printf("TERRAIN_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == TERRAIN_HASH, "the pinned hash");
-    CHECK(EveryFloatHost(TerrainHash, TERRAIN_HASH), "the pinned hash under every host setting");
+    // Sixteen bakes a setting: outside the dense form, every third setting,
+    // which on x86-64 and AArch64 is to nearest, downward with the flush
+    // bits and toward zero.
+    CHECK(FloatHosts(TerrainHash, TERRAIN_HASH, s_dense ? 1 : 3),
+          "the pinned hash under the host settings");
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     bool loaded[4][4] = {{false}};
@@ -790,10 +795,15 @@ static void TestDoorway(mnavQuery* query)
 
 int main(int argc, char** argv)
 {
+    bool doorway = argc == 2 && strcmp(argv[1], "--doorway") == 0;
+    if (!doorway && !ReadDense(argc, argv))
+    {
+        return 2;
+    }
     mnavQueryDef def = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&def, &query) == mnav_success, "query");
-    if (argc > 1 && strcmp(argv[1], "--doorway") == 0)
+    if (doorway)
     {
         TestDoorway(query);
     }

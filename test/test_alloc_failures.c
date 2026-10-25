@@ -9,6 +9,7 @@
 // state, and every made object is destroyed with nothing held.
 
 #include "counting_allocator.h"
+#include "dense.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -73,12 +74,28 @@ static mnavBakeInput Input(const mnavTriangleMesh* world)
     return (mnavBakeInput){world, 1, &terrain, 1, volumes, 2, nullptr};
 }
 
+// The def the world's tile is baked with, on the failing allocator.
+// Outside the dense form its cells are 0.5 m, a quarter of the default's
+// in the same 32 m tile: the bake allocates from the same 44 call stacks,
+// at a quarter of the work per failure.
+static mnavBakeDef BakeDef(void)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.allocator = Allocator();
+    if (!s_dense)
+    {
+        def.cellSize = 0.5f;
+        def.cellHeight = 0.25f;
+        def.tileCells = 64;
+    }
+    return def;
+}
+
 static void TestBakes(void)
 {
     mnavTriangleMesh world = World();
     mnavBakeInput input = Input(&world);
-    mnavBakeDef def = mnavDefaultBakeDef();
-    def.allocator = Allocator();
+    mnavBakeDef def = BakeDef();
     FailAfter(-1);
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "a baker");
@@ -161,8 +178,7 @@ static void TestCache(void)
 {
     mnavTriangleMesh world = World();
     mnavBakeInput input = Input(&world);
-    mnavBakeDef def = mnavDefaultBakeDef();
-    def.allocator = Allocator();
+    mnavBakeDef def = BakeDef();
     mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();
     cacheDef.allocator = Allocator();
     FailAfter(-1);
@@ -441,8 +457,12 @@ static void TestObjects(void)
     CHECK(EachRefused(MakeTileCache, DestroyTileCache), "tile caches");
 }
 
-int main(void)
+int main(int argc, char** argv)
 {
+    if (!ReadDense(argc, argv))
+    {
+        return 2;
+    }
     TestBakes();
     TestCache();
     TestHoles();

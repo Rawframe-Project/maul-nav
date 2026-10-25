@@ -152,7 +152,8 @@ for name in linux-clang-20-tsan linux-clang-20 linux-shared; do
     preset "$name"
 done
 
-step "the large scenes"
+step "the large scenes, and the dense forms under AddressSanitizer"
 ctest --preset nightly
+ctest --preset dense-asan -j "$jobs"
 
 step "all checks passed"

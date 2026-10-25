@@ -7,6 +7,7 @@
 // so its results have exact checks only; the paths pinned by hash run on
 // the stored test world.
 
+#include "dense.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
 
@@ -598,7 +599,9 @@ static void TestChangeAcrossASide(void)
     filter.areas &= ~((uint64_t)1 << 4);
     int32_t agreed = 0;
     int32_t tried = 0;
-    for (double z = 6.0; z < 250.0; z += 12.0)
+    // Every 12 m along the side; outside the dense form every 48 m, a
+    // place in each of the side's clusters.
+    for (double z = 6.0; z < 250.0; z += s_dense ? 12.0 : 48.0)
     {
         mnavNavmesh* navmesh = Load(false);
         mnavQuery* query = Query(1024);
@@ -857,7 +860,8 @@ static void TestUpdatesMatchBuildsUnderAFilter(float side)
           "built");
     uint32_t s = 17u;
     bool same = true;
-    for (int32_t round = 0; round < 40; ++round)
+    // Forty rounds; outside the dense form, the first ten.
+    for (int32_t round = 0; round < (s_dense ? 40 : 10); ++round)
     {
         for (int32_t c = 0; c < 2; ++c)
         {
@@ -974,8 +978,12 @@ static void TestStoredWorld(void)
     mnavDestroyNavmesh(navmesh);
 }
 
-int main(void)
+int main(int argc, char** argv)
 {
+    if (!ReadDense(argc, argv))
+    {
+        return 2;
+    }
     TestStoredWorld();
     float side = BakeWorld(0.0f);
     TestAgainstPlainPaths(side);

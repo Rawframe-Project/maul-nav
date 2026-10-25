@@ -9,6 +9,7 @@
 // limits and refusals; and an end in a closed space.
 
 #include "counting_allocator.h"
+#include "dense.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -395,6 +396,10 @@ static void TestPaths(const mnavFlightVolume* volume)
         int32_t b[3];
         RandomOpen(a);
         RandomOpen(b);
+        if (!Runs(k, 8))
+        {
+            continue;
+        }
         double ratio = CheckPath(query, volume, a, b, &wrong);
         none += ratio == 0.0 ? 1 : 0;
         found += ratio > 0.0 ? 1 : 0;
@@ -439,6 +444,10 @@ static void TestSlices(const mnavFlightVolume* volume)
         int32_t b[3];
         RandomOpen(a);
         RandomOpen(b);
+        if (!Runs(k, 10))
+        {
+            continue;
+        }
         mnavPos3 from = At(a[0] + 0.5, a[1] + 0.5, a[2] + 0.5);
         mnavPos3 to = At(b[0] + 0.5, b[1] + 0.5, b[2] + 0.5);
         mnavFlightPath once;
@@ -858,12 +867,18 @@ static void TestNearest(const mnavFlightVolume* volume)
 {
     int32_t wrong = 0;
     int32_t found = 0;
+    int32_t tried = 0;
     for (int32_t k = 0; k < 150; ++k)
     {
         double p[3];
         p[0] = (double)Random() * SIDE;
         p[1] = (double)Random() * LAYERS;
         p[2] = (double)Random() * SIDE;
+        if (!Runs(k, 50))
+        {
+            continue;
+        }
+        tried += 1;
         mnavPos3 nearest;
         bool any = false;
         CHECK(mnavFindNearestFlightPoint(volume, At(p[0], p[1], p[2]), 2.5f, &nearest, &any) ==
@@ -883,7 +898,7 @@ static void TestNearest(const mnavFlightVolume* volume)
         }
         wrong += right ? 0 : 1;
     }
-    printf("nearest: %d of 150 found, %d wrong\n", found, wrong);
+    printf("nearest: %d of %d found, %d wrong\n", found, tried, wrong);
     CHECK(wrong == 0, "every nearest point as every voxel has it");
 }
 
@@ -1215,8 +1230,12 @@ static void TestPocket(void)
     mnavDestroyFlightVolume(volume);
 }
 
-int main(void)
+int main(int argc, char** argv)
 {
+    if (!ReadDense(argc, argv))
+    {
+        return 2;
+    }
     mnavFlightVolume* volume = Volume(-1, -1);
     ReadOpen(volume);
     TestPaths(volume);
