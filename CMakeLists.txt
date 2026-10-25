@@ -167,7 +167,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(filter)
     maul_add_test(filter_random WHITEBOX)
     maul_add_test(height_patch WHITEBOX)
-    maul_add_test(heightfield WHITEBOX)
+    maul_add_test(heightfield)
     maul_add_test(holes WHITEBOX)
     maul_add_test(navmesh)
     # The navmesh's link and slot tables, which no public call shows
