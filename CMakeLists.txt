@@ -224,6 +224,9 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(terrain)
     maul_add_test(funnel WHITEBOX)
     maul_add_test(lz WHITEBOX)
+    # The family's suite of the floating-point environment's module
+    # (synced from .github with src/fpenv.c): it calls the module's entries
+    # under every host setting, which no public call exposes on its own.
     maul_add_test(fpenv WHITEBOX)
     maul_add_test(tile_cache)
     maul_add_dense(tile_cache)
