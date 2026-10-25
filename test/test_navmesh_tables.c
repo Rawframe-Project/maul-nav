@@ -155,6 +155,21 @@ static void TestLinksFollowTheirNeighbors(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestFailedCommitLinksNothing(void)
+{
+    // Past the links limit, the commit adds tile (1, 0) to nothing, and
+    // tile (0, 0) keeps its links, none.
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.limits.tileLinks = 1;
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "one tile");
+    CHECK(StageAt(navmesh, 1) == mnav_success && mnavCommit(navmesh) == mnav_errorLimit,
+          "past the links limit");
+    CHECK(Links(navmesh, 0, 0) == 0, "nothing linked");
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestStaleIdsFindNoPolygon(void)
 {
     mnavNavmesh* navmesh = Make();
@@ -219,6 +234,7 @@ int main(void)
     LoadWorldTiles();
     TestNeighborsLinkBothWays();
     TestLinksFollowTheirNeighbors();
+    TestFailedCommitLinksNothing();
     TestStaleIdsFindNoPolygon();
     TestSlotAboutToWrapIsRetired();
     TestSlotFreedAtTheLastGenerationIsRetired();
