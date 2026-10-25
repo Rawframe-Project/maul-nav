@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Bake volumes: include, exclude and area volumes on the
-// open-space field, their heights, order and erosion; the checks; the
+// Bake volumes: include, exclude and area volumes, their heights, order
+// and erosion, read cell by cell from the baked tile; the checks; the
 // fingerprint; the pinned tile under every host floating-point setting.
 
-#include "allocator.h"
-#include "compact.h"
-#include "erode.h"
-#include "filter.h"
 #include "float_hosts.h"
-#include "heightfield.h"
 #include "test_harness.h"
-#include "volume.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/navmesh.h"
+#include "maul-nav/query.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -39,6 +35,16 @@ static const mnavVec3 s_vertices[8] = {{-4, 0, -4}, {36, 0, -4}, {36, 0, 36}, {-
 static const int32_t s_indices[12] = {0, 3, 2, 0, 2, 1, 4, 7, 6, 4, 6, 5};
 static const mnavTriangleMesh s_mesh = {s_vertices, 8, s_indices, 4, nullptr};
 
+// The same ground with a slab 0.5 m up over 8 to 12 m, x and z, and a
+// ceiling 2.25 m up over x = 4 to 8 m, z = 4 to 16 m, beside it. Under
+// the ceiling and on the slab are walkable, but an agent 2 m tall cannot
+// pass between them: 2.25 - 0.5 m is too low.
+static const mnavVec3 s_lowVertices[12] = {
+    {-4, 0, -4},    {36, 0, -4},   {36, 0, 36},   {-4, 0, 36},   {8, 0.5f, 8},   {12, 0.5f, 8},
+    {12, 0.5f, 12}, {8, 0.5f, 12}, {4, 2.25f, 4}, {8, 2.25f, 4}, {8, 2.25f, 16}, {4, 2.25f, 16}};
+static const int32_t s_lowIndices[18] = {0, 3, 2, 0, 2, 1, 4, 7, 6, 4, 6, 5, 8, 11, 10, 8, 10, 9};
+static const mnavTriangleMesh s_low = {s_lowVertices, 12, s_lowIndices, 6, nullptr};
+
 // A square ring from (x0, z0) to (x1, z1).
 typedef struct Square
 {
@@ -56,84 +62,165 @@ static mnavBakeVolume Volume(const Square* s, float minY, float maxY, mnavVolume
     return (mnavBakeVolume){s->points, 4, minY, maxY, kind, area};
 }
 
-typedef struct Field
+// The tile's cells are 0.25 m from the origin, so a square with
+// whole-meter corners holds 16 cells per meter squared: one from 22 to
+// 26 m covers cells 88 to 103.
+enum
 {
-    mnavBakeDef def;
-    mnavBakeCells cells;
-    mnavMemory memory;
-    mnavHeightfield heightfield;
-    mnavCompactField compact;
-} Field;
+    CELLS = 128,
+    NO_POLYGON = 0xFF,
+    GROUND = 0,
+    PLATFORM = 1
+};
 
-static void Build(Field* f)
+// What the baked tile holds over each cell's center at the ground and at
+// the platform: the area of the polygon there, or NO_POLYGON. Baked with
+// no edge error, the polygons cover exactly the cells the volumes and
+// erosion leave walkable.
+typedef struct Map
 {
-    f->def = mnavDefaultBakeDef();
-    CHECK(mnavValidateBakeDef(&f->def, &f->cells).result == mnav_success, "def");
-    f->memory = mnavMakeMemory(f->def.allocator, f->def.limits.memoryBytes);
-    CHECK(mnavBuildHeightfield(&f->memory, &f->def, &f->cells, &s_mesh, 1, 0, 0, &f->heightfield) ==
-              mnav_success,
-          "rasterized");
-    mnavFilterWalkable(&f->heightfield, f->cells.agentHeight, f->cells.agentStep);
-    CHECK(mnavBuildCompactField(&f->memory, &f->heightfield, f->cells.agentHeight,
-                                f->cells.agentStep, &f->compact) == mnav_success,
-          "compacted");
+    uint8_t at[2][CELLS][CELLS];
+} Map;
+
+static Map s_map;
+
+// Bakes tile (0, 0) of a mesh with the volumes and reads its map back
+// through a navmesh holding it.
+static const Map* BakeMesh(mnavBaker* baker, const mnavTriangleMesh* mesh,
+                           const mnavBakeVolume* volumes, int32_t count)
+{
+    const mnavBakeInput input = {mesh, 1, nullptr, 0, volumes, count, nullptr};
+    size_t size = 0;
+    CHECK(mnavBakeTileInput(baker, &input, 0, 0, nullptr) == mnav_success &&
+              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+          "baked");
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+              mnavStageTile(navmesh, s_tile, size).result == mnav_success &&
+              mnavCommit(navmesh) == mnav_success,
+          "loaded");
+    for (int32_t level = 0; level < 2; ++level)
+    {
+        for (int32_t z = 0; z < CELLS; ++z)
+        {
+            for (int32_t x = 0; x < CELLS; ++x)
+            {
+                mnavPos3 center = {0.125 + 0.25 * x, level == 0 ? 0.0 : 3.0, 0.125 + 0.25 * z};
+                mnavNearest n;
+                mnavAreaType area = NO_POLYGON;
+                CHECK(mnavFindNearest(navmesh, nullptr, center, (mnavVec3){0.01f, 1.0f, 0.01f},
+                                      &n) == mnav_success,
+                      "nearest");
+                if (n.polygon.slot != 0 && n.over)
+                {
+                    CHECK(mnavGetArea(navmesh, n.polygon, &area) == mnav_success, "area");
+                }
+                s_map.at[level][z][x] = area;
+            }
+        }
+    }
+    mnavDestroyNavmesh(navmesh);
+    return &s_map;
 }
 
-static void Release(Field* f)
+static const Map* Bake(mnavBaker* baker, const mnavBakeVolume* volumes, int32_t count)
 {
-    mnavReleaseCompactField(&f->memory, &f->compact);
-    mnavReleaseHeightfield(&f->memory, &f->heightfield);
-    CHECK(f->memory.used == 0, "all released");
+    return BakeMesh(baker, &s_mesh, volumes, count);
 }
 
-// The spans of an area, and of an area at the ground or the platform.
-static int32_t Count(const Field* f, mnavAreaType area, int32_t level)
+// The cells of a level holding a value.
+static int32_t Count(const Map* m, int32_t level, uint8_t value)
 {
     int32_t n = 0;
-    for (int32_t i = 0; i < f->compact.spanCount; ++i)
+    for (int32_t z = 0; z < CELLS; ++z)
     {
-        bool high = f->compact.spans[i].floor > MNAV_HEIGHT_OFFSET + 8;
-        n += f->compact.areas[i] == area && (level < 0 || high == (level == 1)) ? 1 : 0;
+        for (int32_t x = 0; x < CELLS; ++x)
+        {
+            n += m->at[level][z][x] == value ? 1 : 0;
+        }
     }
     return n;
 }
 
-// The ground's cell edges fall on whole quarter meters from -1.25 m, so
-// a square with whole-meter corners holds 16 cells per meter squared.
-static void TestKinds(void)
+// Whether every cell from (x0, z0) to (x1, z1) of a level holds a value.
+static bool Cells(const Map* m, int32_t level, int32_t x0, int32_t z0, int32_t x1, int32_t z1,
+                  uint8_t value)
 {
-    Field f;
-    Build(&f);
-    int32_t ground = Count(&f, mnav_areaWalkable, 0);
-    int32_t platform = Count(&f, mnav_areaWalkable, 1);
-    // The field's outer ring and the platform's rim are ledges.
-    CHECK(ground == 136 * 136 && platform == 30 * 30, "the field");
+    bool all = true;
+    for (int32_t z = z0; z <= z1; ++z)
+    {
+        for (int32_t x = x0; x <= x1; ++x)
+        {
+            all = all && m->at[level][z][x] == value;
+        }
+    }
+    return all;
+}
+
+// The platform's 32 cells a side lose their rim as a ledge and two more
+// cells, the agent's radius, to erosion: cells 83 to 108 stay.
+static void TestField(mnavBaker* cells)
+{
+    const Map* m = Bake(cells, nullptr, 0);
+    CHECK(Count(m, GROUND, mnav_areaWalkable) == CELLS * CELLS,
+          "the ground, wider than the tile, is walkable everywhere");
+    CHECK(Count(m, PLATFORM, mnav_areaWalkable) == 26 * 26 &&
+              Cells(m, PLATFORM, 83, 83, 108, 108, mnav_areaWalkable),
+          "the platform less its rim and the radius");
+}
+
+// Carved before erosion, an excluded square of cells x0 to x1 and z0 to
+// z1 widens by the radius, two cells, along each side; erosion's
+// distances of 2 a straight step and 3 a diagonal one keep only the
+// widened square's four corner cells. Whether the cells up to three
+// past the square are just those.
+static bool Hole(const Map* m, int32_t x0, int32_t z0, int32_t x1, int32_t z1)
+{
+    bool exact = true;
+    for (int32_t z = z0 - 3; z <= z1 + 3; ++z)
+    {
+        for (int32_t x = x0 - 3; x <= x1 + 3; ++x)
+        {
+            int32_t dx = x < x0 ? x0 - x : x > x1 ? x - x1 : 0;
+            int32_t dz = z < z0 ? z0 - z : z > z1 ? z - z1 : 0;
+            bool gone = dx <= 2 && dz <= 2 && !(dx == 2 && dz == 2);
+            exact = exact && (m->at[GROUND][z][x] == NO_POLYGON) == gone;
+        }
+    }
+    return exact;
+}
+
+static void TestKinds(mnavBaker* cells)
+{
     // Excluded below the platform: the ground goes, the platform stays.
     Square under = MakeSquare(22, 22, 26, 26);
     mnavBakeVolume exclude = Volume(&under, -1.0f, 1.0f, mnav_volumeExclude, 0);
-    CHECK(mnavCarveVolumes(&f.memory, &f.compact, &exclude, 1) == mnav_success &&
-              Count(&f, mnav_areaNone, 0) == 256 && Count(&f, mnav_areaNone, 1) == 0,
+    const Map* m = Bake(cells, &exclude, 1);
+    CHECK(Hole(m, 88, 88, 103, 103) && Count(m, GROUND, NO_POLYGON) == 20 * 20 - 4 &&
+              Count(m, PLATFORM, mnav_areaWalkable) == 26 * 26,
           "an exclude volume takes the ground within its heights");
     // An area volume over the platform's heights alone.
     Square over = MakeSquare(20, 20, 24, 24);
     mnavBakeVolume high = Volume(&over, 2.0f, 4.0f, mnav_volumeArea, 7);
-    CHECK(mnavMarkVolumes(&f.memory, &f.compact, &high, 1) == mnav_success &&
-              Count(&f, 7, 1) == 15 * 15 && Count(&f, 7, 0) == 0,
+    m = Bake(cells, &high, 1);
+    CHECK(Count(m, PLATFORM, 7) == 13 * 13 && Cells(m, PLATFORM, 83, 83, 95, 95, 7) &&
+              Count(m, GROUND, 7) == 0,
           "an area volume marks the platform");
-    // Two overlapping area volumes: the last wins; excluded spans stay out.
+    // Two overlapping area volumes: the last wins; excluded cells stay out.
     Square a = MakeSquare(0, 0, 8, 8);
     Square b = MakeSquare(4, 0, 12, 8);
     Square c = MakeSquare(22, 22, 23, 23);
-    const mnavBakeVolume areas[3] = {Volume(&a, -1, 1, mnav_volumeArea, 3),
+    const mnavBakeVolume areas[4] = {exclude, Volume(&a, -1, 1, mnav_volumeArea, 3),
                                      Volume(&b, -1, 1, mnav_volumeArea, 4),
                                      Volume(&c, -1, 1, mnav_volumeArea, 5)};
-    CHECK(mnavMarkVolumes(&f.memory, &f.compact, areas, 3) == mnav_success &&
-              Count(&f, 3, 0) == 16 * 32 && Count(&f, 4, 0) == 32 * 32 && Count(&f, 5, -1) == 0,
+    m = Bake(cells, areas, 4);
+    CHECK(Count(m, GROUND, 3) == 16 * 32 && Cells(m, GROUND, 0, 0, 15, 31, 3) &&
+              Count(m, GROUND, 4) == 32 * 32 && Cells(m, GROUND, 16, 0, 47, 31, 4) &&
+              Count(m, GROUND, 5) == 0 && Count(m, PLATFORM, 5) == 0,
           "the last volume wins; no walkable ground is made");
-    Release(&f);
     // A ring of many points before a square: the scan has room for the
     // most points of any.
-    Build(&f);
     mnavVec2 strip[24];
     for (int32_t k = 0; k < 24; ++k)
     {
@@ -144,64 +231,54 @@ static void TestKinds(void)
     Square small = MakeSquare(20, 2, 24, 6);
     const mnavBakeVolume two[2] = {{strip, 24, -1, 1, mnav_volumeExclude, 0},
                                    Volume(&small, -1, 1, mnav_volumeExclude, 0)};
-    CHECK(mnavCarveVolumes(&f.memory, &f.compact, two, 2) == mnav_success &&
-              Count(&f, mnav_areaNone, 0) > 256 + 11 * 2 * 16,
+    m = Bake(cells, two, 2);
+    // The strip lies within x = 2 to 13 and z = 2 to 6, cells 8 to 51
+    // and 8 to 23, and holds all of z = 3 to 5, cells 12 to 19; each
+    // widens by the radius.
+    CHECK(Cells(m, GROUND, 6, 12, 53, 19, NO_POLYGON) &&
+              Cells(m, GROUND, 8, 10, 51, 21, NO_POLYGON) && Hole(m, 80, 8, 95, 23) &&
+              Count(m, GROUND, NO_POLYGON) <= 48 * 20 + 20 * 20 - 4,
           "a many-pointed ring, then a square");
-    Release(&f);
-    // Include volumes: ground outside every one goes.
-    Build(&f);
+    // Include volumes: ground outside every one goes, and erosion takes
+    // the radius inside each.
     Square left = MakeSquare(0, 0, 4, 4);
     Square right = MakeSquare(8, 0, 12, 4);
     Square far = MakeSquare(500, 500, 504, 504);
     const mnavBakeVolume includes[3] = {Volume(&left, -1, 1, mnav_volumeInclude, 0),
                                         Volume(&right, -1, 1, mnav_volumeInclude, 0),
                                         Volume(&far, -1, 1, mnav_volumeExclude, 0)};
-    CHECK(mnavCarveVolumes(&f.memory, &f.compact, includes, 3) == mnav_success &&
-              Count(&f, mnav_areaWalkable, -1) == 2 * 256,
+    m = Bake(cells, includes, 3);
+    CHECK(Count(m, GROUND, mnav_areaWalkable) == 2 * 12 * 12 &&
+              Cells(m, GROUND, 2, 2, 13, 13, mnav_areaWalkable) &&
+              Cells(m, GROUND, 34, 2, 45, 13, mnav_areaWalkable) &&
+              Count(m, PLATFORM, mnav_areaWalkable) == 0,
           "only the ground two include volumes hold");
-    Release(&f);
-    // An include volume missing the tile leaves nothing.
-    Build(&f);
-    CHECK(mnavCarveVolumes(&f.memory, &f.compact, &includes[2], 1) == mnav_success &&
-              Count(&f, mnav_areaWalkable, -1) == ground + platform,
+    // An exclude volume missing the tile changes nothing.
+    m = Bake(cells, &includes[2], 1);
+    CHECK(Count(m, GROUND, mnav_areaWalkable) == CELLS * CELLS &&
+              Count(m, PLATFORM, mnav_areaWalkable) == 26 * 26,
           "an exclude volume missing the tile changes nothing");
-    mnavBakeVolume away = Volume(&far, -1, 1, mnav_volumeInclude, 0);
-    CHECK(mnavCarveVolumes(&f.memory, &f.compact, &away, 1) == mnav_success &&
-              Count(&f, mnav_areaWalkable, -1) == 0,
-          "an include volume missing the tile leaves nothing");
-    Release(&f);
 }
 
-// Carved before erosion, an excluded square widens by the agent's radius;
-// marked after, an area does not shrink.
-static void TestErosion(void)
+// Marked after erosion, an area does not shrink.
+static void TestErosion(mnavBaker* cells)
 {
-    Field f;
-    Build(&f);
     Square hole = MakeSquare(8, 8, 12, 12);
     mnavBakeVolume exclude = Volume(&hole, -1, 1, mnav_volumeExclude, 0);
-    CHECK(mnavCarveVolumes(&f.memory, &f.compact, &exclude, 1) == mnav_success &&
-              mnavErode(&f.memory, &f.compact, f.cells.agentRadius) == mnav_success,
-          "carved and eroded");
-    // 16 by 16 cells and the radius, 2 cells, along each side; the
-    // corners rounded at most.
-    int32_t gone = 0;
-    for (int32_t i = 0; i < f.compact.spanCount; ++i)
-    {
-        gone += f.compact.areas[i] == mnav_areaNone ? 1 : 0;
-    }
-    Release(&f);
-    Build(&f);
-    CHECK(mnavErode(&f.memory, &f.compact, f.cells.agentRadius) == mnav_success, "eroded");
-    int32_t edges = Count(&f, mnav_areaNone, -1);
-    mnavBakeVolume mark = Volume(&hole, -1, 1, mnav_volumeArea, 9);
-    CHECK(mnavMarkVolumes(&f.memory, &f.compact, &mark, 1) == mnav_success &&
-              Count(&f, 9, -1) == 256,
-          "an area keeps its size");
-    printf("erosion: %d spans gone with the hole, %d without\n", gone, edges);
-    CHECK(gone - edges >= 16 * 16 + 4 * 16 * 2 && gone - edges <= 20 * 20,
+    const Map* m = Bake(cells, &exclude, 1);
+    CHECK(Hole(m, 32, 32, 47, 47) && Count(m, GROUND, NO_POLYGON) == 20 * 20 - 4,
           "the hole widened by the radius");
-    Release(&f);
+    mnavBakeVolume mark = Volume(&hole, -1, 1, mnav_volumeArea, 9);
+    m = Bake(cells, &mark, 1);
+    CHECK(Count(m, GROUND, 9) == 16 * 16 && Cells(m, GROUND, 32, 32, 47, 47, 9) &&
+              Count(m, GROUND, NO_POLYGON) == 0,
+          "an area keeps its size");
+    // Erosion also starts where two walkable cells do not link: along x
+    // = 8 m from z = 8 to 12 m, cells 31 and 32 and 32 to 47. The radius
+    // takes one cell more on each side and at each end.
+    m = BakeMesh(cells, &s_low, nullptr, 0);
+    CHECK(Cells(m, GROUND, 30, 31, 33, 48, NO_POLYGON) && Count(m, GROUND, NO_POLYGON) == 4 * 18,
+          "erosion from cells too low to pass between");
 }
 
 static mnavBakeReport Refused(mnavBaker* baker, mnavBakeVolume volume, mnavResult result)
@@ -344,11 +421,18 @@ static void TestBake(mnavBaker* baker)
 
 int main(void)
 {
-    TestKinds();
-    TestErosion();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
+    // A baker of no edge error, for the maps.
+    mnavBakeDef exact = mnavDefaultBakeDef();
+    exact.maxEdgeError = 0.0f;
+    mnavBaker* cells = nullptr;
+    CHECK(mnavCreateBaker(&exact, &cells).result == mnav_success, "baker");
+    TestField(cells);
+    TestKinds(cells);
+    TestErosion(cells);
+    mnavDestroyBaker(cells);
     TestChecks(baker);
     TestBake(baker);
     mnavDestroyBaker(baker);
