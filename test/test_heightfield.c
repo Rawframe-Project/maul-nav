@@ -433,26 +433,35 @@ static void TestSoupDependsOnlyOnTheTriangleSet(void)
         }
         backwardAreas[r] = areas[t];
     }
-    // Baked exactly, and with the default def's border of 5 cells and
-    // erosion, which leaves no polygon of the soup.
-    const mnavBakeDef defs[2] = {Exact(), mnavDefaultBakeDef()};
-    for (int32_t d = 0; d < 2; ++d)
-    {
-        mnavBakeReport report;
-        const mnavTriangleMesh one = {vertices, SOUP_TRIANGLES * 3, forward, SOUP_TRIANGLES, areas};
-        CHECK(Bake(&defs[d], &one, 1, 0, 0, &report) == mnav_success, "baked forward");
-        uint64_t hash = DrawHash();
-        // The same set, reversed and split across two meshes.
-        int32_t half = SOUP_TRIANGLES / 2;
-        const mnavTriangleMesh two[2] = {
-            {vertices, SOUP_TRIANGLES * 3, backward, half, backwardAreas},
-            {vertices, SOUP_TRIANGLES * 3, backward + half * 3, SOUP_TRIANGLES - half,
-             backwardAreas + half},
-        };
-        CHECK(Bake(&defs[d], two, 2, 0, 0, nullptr) == mnav_success, "baked backward");
-        CHECK(DrawHash() == hash, "the same tile from the same set");
-        printf("soup: %d polygons\n", report.polygons);
-    }
+    mnavBakeDef def = Exact();
+    mnavBakeReport report;
+    const mnavTriangleMesh one = {vertices, SOUP_TRIANGLES * 3, forward, SOUP_TRIANGLES, areas};
+    CHECK(Bake(&def, &one, 1, 0, 0, &report) == mnav_success, "baked forward");
+    uint64_t hash = DrawHash();
+    // The same set, reversed and split across two meshes.
+    int32_t half = SOUP_TRIANGLES / 2;
+    const mnavTriangleMesh two[2] = {
+        {vertices, SOUP_TRIANGLES * 3, backward, half, backwardAreas},
+        {vertices, SOUP_TRIANGLES * 3, backward + half * 3, SOUP_TRIANGLES - half,
+         backwardAreas + half},
+    };
+    CHECK(Bake(&def, two, 2, 0, 0, nullptr) == mnav_success, "baked backward");
+    CHECK(report.polygons > 0 && DrawHash() == hash, "the same tile from the same set");
+}
+
+static void TestFloorToTheFrameEnd(void)
+{
+    // With the default def the tile and its border of 5 cells run from
+    // -1.25 to 33.25 m. A floor from -5 to 33.3 m covers them and a
+    // fifth of a cell past: its rows and columns end on the frame's
+    // last cell, and the whole tile is walkable.
+    const mnavVec3 vertices[4] = {{-5, 0, -5}, {-5, 0, 33.3f}, {33.3f, 0, 33.3f}, {33.3f, 0, -5}};
+    const mnavTriangleMesh mesh = {vertices, 4, s_floorIndices, 2, nullptr};
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBakeReport report;
+    CHECK(Bake(&def, &mesh, 1, 0, 0, &report) == mnav_success && report.polygons > 0 &&
+              Walkable(0, 0, 127, 127, 0.0) == 128 * 128,
+          "a floor to the frame's end");
 }
 
 int main(void)
@@ -467,6 +476,7 @@ int main(void)
     TestLimitsAreTyped();
     TestMemoryLimitAndRefusedMemory();
     TestSoupDependsOnlyOnTheTriangleSet();
+    TestFloorToTheFrameEnd();
     mnavDestroyNavmesh(s_navmesh);
     return s_failures == 0 ? 0 : 1;
 }
