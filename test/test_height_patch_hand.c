@@ -2,11 +2,12 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Floor heights under one polygon from hand-built fields and patches, for
-// what the public bakes do not reach: a vertex halfway between two spans,
-// a polygon whose region has no span under it, and a lookup outside the
-// patch. A baked vertex always lies at the height of a span at its
-// corner, a polygon is made from its region's own cells, and a sample
-// lies within its polygon, which the patch covers with a cell to spare.
+// what the public bakes do not reach. Two cannot be reached: a polygon
+// whose region has no span under it, as a polygon is made from its
+// region's own cells, and a lookup outside the patch, as a sample lies
+// within its polygon, which the patch covers with a cell to spare. One is
+// unreached: a vertex of a mixed polygon whose nearest spans round its
+// corner tie, one below and one above it. No scene finds it yet (#88).
 // test_height_patch.c bakes the cases bakes reach.
 
 #include "allocator.h"
