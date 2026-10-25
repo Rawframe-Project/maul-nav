@@ -4,7 +4,7 @@
 // Runtime tiers: what each tier allows, area changes and link
 // toggles through the commit. Hand cells are 0.25 m.
 
-#include "hand_tile.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -14,24 +14,16 @@
 
 #include <stdint.h>
 
-// A row of three squares from (5, 5) to (20, 10), and a fourth beyond a
-// gap, from (25, 5) to (30, 10).
-static const HandSquare s_row[4] = {{20, 20, 40, 40, {0}, 0},
-                                    {40, 20, 60, 40, {0}, 0},
-                                    {60, 20, 80, 40, {0}, 0},
-                                    {100, 20, 120, 40, {0}, 0}};
-
-static uint8_t s_bytes[8192];
-static size_t s_size;
-
+// s_handRowAndGap: a row of three squares from (5, 5) to (20, 10), and a
+// fourth beyond a gap, from (25, 5) to (30, 10).
 static mnavNavmesh* Load(mnavTier tier)
 {
-    s_size = HandTileBytes(s_bytes, 0, s_row, 4);
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tier = tier;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_bytes, s_size).result == mnav_success &&
+              mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success && mnavGetTier(navmesh) == tier,
           "loaded");
     return navmesh;
@@ -93,16 +85,17 @@ static void TestStatic(void)
     CHECK(mnavStageLink(navmesh, &jump, &link) == mnav_success &&
               mnavStageLinkEnabled(navmesh, link, false) == mnav_errorTier,
           "links load, but do not toggle");
-    CHECK(mnavStageTile(navmesh, s_bytes, s_size).result == mnav_errorTier,
+    CHECK(mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result == mnav_errorTier,
           "no tile replaced in place");
     CHECK(mnavStageTileRemoval(navmesh, 0, 0) == mnav_success &&
-              mnavStageTile(navmesh, s_bytes, s_size).result == mnav_errorTier,
+              mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result ==
+                  mnav_errorTier,
           "nor by a removal in the same commit");
     mnavTileId tile;
     CHECK(mnavCommit(navmesh) == mnav_success &&
               mnavGetTile(navmesh, 0, 0, &tile) == mnav_errorNotLoaded,
           "streamed out");
-    CHECK(mnavStageTile(navmesh, s_bytes, s_size).result == mnav_success &&
+    CHECK(mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success &&
               mnavGetTile(navmesh, 0, 0, &tile) == mnav_success,
           "and in again");
@@ -143,7 +136,7 @@ static void TestAreas(void)
               mnavStageArea(nullptr, middle.polygon, 1) == mnav_errorInvalid &&
               mnavGetArea(navmesh, middle.polygon, nullptr) == mnav_errorInvalid,
           "bad arguments");
-    CHECK(mnavStageTile(navmesh, s_bytes, s_size).result == mnav_errorTier,
+    CHECK(mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result == mnav_errorTier,
           "modifiers replace no tile");
     // A change staged on a tile the commit removes is dropped.
     CHECK(mnavStageArea(navmesh, middle.polygon, mnav_areaNone) == mnav_success &&
@@ -224,7 +217,8 @@ static void TestDynamic(void)
     mnavQuery* query = MakeQuery();
     mnavNearest middle = On(navmesh, 12.5, 7.5);
     CHECK(mnavStageArea(navmesh, middle.polygon, mnav_areaNone) == mnav_success &&
-              mnavStageTile(navmesh, s_bytes, s_size).result == mnav_success &&
+              mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "replaced in one commit");
     mnavNearest again = On(navmesh, 12.5, 7.5);

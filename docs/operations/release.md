@@ -18,6 +18,6 @@ Releases are made by release-please from the conventional commit titles on `main
 ## Notes
 
 - A change of results is never a patch release. A pull request that gives existing inputs a different result, or breaks the API or ABI, carries `!` in its title and a `BREAKING CHANGE:` footer naming what a host sees, whatever its type.
-- A change to the layout of tile or flight tile bytes bumps `MNAV_TILE_FORMAT` or `MNAV_FLIGHT_FORMAT`, so an older tile is refused with `mnav_errorVersion` instead of misread. The library reads only the formats it writes; the changelog tells hosts to rebake. The same pull request rewrites `test/stored_tiles.h` with `test_stored --write`.
+- A change to the layout of tile or flight tile bytes bumps `MNAV_TILE_FORMAT` or `MNAV_FLIGHT_FORMAT`, so an older tile is refused with `mnav_errorVersion` instead of misread. The library reads only the formats it writes; the changelog tells hosts to rebake. The same pull request rewrites `test/stored_tiles.h` with `test_stored --write` and `test/hand_tiles.h` with `test_hand_tiles --write`.
 - The shared family files must match their canonical copies in the organization's `.github` repository before a release.
 - A library that pins this one moves its pin in a pull request of its own.

@@ -4,7 +4,7 @@
 // Query filters: area costs and inclusion in the nearest point, the
 // path search and the raycast. Hand cells are 0.25 m.
 
-#include "hand_tile.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -15,22 +15,15 @@
 #include <math.h>
 #include <stdint.h>
 
-static uint8_t s_bytes[8192];
-
-// A bridge of area 2 from (10, 5) to (15, 10) between two squares, and a
-// way round it above, three squares of area 1, all clear of the tile's
-// sides.
-static const HandSquare s_bridge[6] = {{20, 20, 40, 40, {0}, 0}, {40, 20, 60, 40, {0}, 2},
-                                       {60, 20, 80, 40, {0}, 0}, {20, 40, 40, 60, {0}, 0},
-                                       {40, 40, 60, 60, {0}, 0}, {60, 40, 80, 60, {0}, 0}};
-
-static mnavNavmesh* Make(const HandSquare* squares, int32_t count)
+// s_handBridge: a bridge of area 2 from (10, 5) to (15, 10) between two
+// squares, and a way round it above, three squares of area 1, all clear of
+// the tile's sides.
+static mnavNavmesh* MakeBridge(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    size_t size = HandTileBytes(s_bytes, 0, squares, count);
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_bytes, size).result == mnav_success &&
+              mnavStageTile(navmesh, s_handBridge, sizeof(s_handBridge)).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "loaded");
     return navmesh;
@@ -66,7 +59,7 @@ static mnavQuery* MakeQuery(void)
 
 static void TestCostsChooseTheWay(void)
 {
-    mnavNavmesh* navmesh = Make(s_bridge, 6);
+    mnavNavmesh* navmesh = MakeBridge();
     mnavQuery* query = MakeQuery();
     mnavPath path = Walk(query, navmesh, nullptr);
     CHECK(path.end == mnav_pathFound && path.polygonCount == 3 && path.cost == 10.0 &&
@@ -99,7 +92,7 @@ static void TestCheapAreasKeepTheSearchExact(void)
 {
     // Every area at 0.25 per meter: an unscaled heuristic would overstate
     // the cost left; scaled, the search still finds the bridge.
-    mnavNavmesh* navmesh = Make(s_bridge, 6);
+    mnavNavmesh* navmesh = MakeBridge();
     mnavQuery* query = MakeQuery();
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     for (int32_t a = 0; a < MNAV_AREA_TYPES; ++a)
@@ -135,7 +128,7 @@ static void TestCheapAreasKeepTheSearchExact(void)
 
 static void TestExcludedAreasElsewhere(void)
 {
-    mnavNavmesh* navmesh = Make(s_bridge, 6);
+    mnavNavmesh* navmesh = MakeBridge();
     mnavQuery* query = MakeQuery();
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     filter.areas &= ~((uint64_t)1 << 2);
@@ -177,7 +170,7 @@ static void TestExcludedAreasElsewhere(void)
 
 static void TestFiltersAreChecked(void)
 {
-    mnavNavmesh* navmesh = Make(s_bridge, 6);
+    mnavNavmesh* navmesh = MakeBridge();
     mnavQuery* query = MakeQuery();
     mnavNearest a = On(navmesh, nullptr, 7.5, 7.5);
     mnavQueryFilter filter = mnavDefaultQueryFilter();

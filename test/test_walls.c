@@ -7,7 +7,7 @@
 // short buffer holds the nearest without writing past its capacity, and
 // the part of a tile side no polygon across covers is a wall.
 
-#include "hand_tile.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -21,13 +21,10 @@
 // its corners (0, 0), (0, 10), (10, 10), (10, 0) in that order.
 static mnavNavmesh* Square(mnavPolygonId* polygonOut)
 {
-    const HandSquare square = {0, 0, 40, 40, {0, 0, 0, 0}, 0};
-    static uint8_t bytes[2048];
-    size_t size = HandTileBytes(bytes, 0, &square, 1);
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+    CHECK(mnavStageTile(navmesh, s_handSquare, sizeof(s_handSquare)).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "committed");
     mnavNearest n;
@@ -105,16 +102,13 @@ static void TestPartlyLinkedSide(void)
     // two tiles is rebuilt), a square across the seam from z = 0 to 5 m
     // only. The seam's part from z = 5 to 10 m has nothing across it: a
     // wall, to the wall distance and the wall list alike.
-    const HandSquare west = {96, 0, 128, 40, {0, 0, 0, 0}, 0};
-    const HandSquare east = {0, 0, 32, 20, {0, 0, 0, 0}, 0};
-    static uint8_t bytes[2][2048];
-    size_t westSize = HandTileBytes(bytes[0], 0, &west, 1);
-    size_t eastSize = HandTileBytes(bytes[1], 1, &east, 1);
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, bytes[0], westSize).result == mnav_success &&
-              mnavStageTile(navmesh, bytes[1], eastSize).result == mnav_success &&
+              mnavStageTile(navmesh, s_handSeamWest, sizeof(s_handSeamWest)).result ==
+                  mnav_success &&
+              mnavStageTile(navmesh, s_handSeamSouth, sizeof(s_handSeamSouth)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "committed");
     mnavQueryDef queryDef = mnavDefaultQueryDef();
@@ -153,11 +147,11 @@ static void TestPartlyLinkedSide(void)
     // The square across from z = 5 to 10 m instead: along the side, from
     // z = 10 to 0 m, the linked part comes first and the open part after
     // it, from z = 5 to 0 m.
-    const HandSquare north = {0, 20, 32, 40, {0, 0, 0, 0}, 0};
-    eastSize = HandTileBytes(bytes[1], 1, &north, 1);
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, bytes[0], westSize).result == mnav_success &&
-              mnavStageTile(navmesh, bytes[1], eastSize).result == mnav_success &&
+              mnavStageTile(navmesh, s_handSeamWest, sizeof(s_handSeamWest)).result ==
+                  mnav_success &&
+              mnavStageTile(navmesh, s_handSeamNorth, sizeof(s_handSeamNorth)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "committed");
     CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){30.0, 0.0, 2.0},
