@@ -353,26 +353,30 @@ static bool EndsAtTheHighestFloor(const Scene* scene, int32_t count)
 static void TestCornersTakeTheHighestFloorAround(void)
 {
     // Floors 0 to 3 levels up, all within a step, with a notch at (4, 1),
-    // holes at (4, 4) and (2, 5), and area 7 from x = 5 on: every edge's
-    // end, on a wall or between the areas, is as high as the highest
-    // floor of the cells around it.
-    mnavBakeDef def = Exact();
-    UseDef(&def);
-    Scene scene = Flat(0, false);
-    for (int32_t z = 0; z < SIDE; ++z)
+    // holes at (4, 4) and (2, 5), and area 7 from x = 5 on, or where x + z
+    // is at least 9, a staircase: every edge's end, on a wall or between
+    // the areas, is as high as the highest floor of the cells around it.
+    for (int32_t pass = 0; pass < 2; ++pass)
     {
-        for (int32_t x = 0; x < SIDE; ++x)
+        mnavBakeDef def = Exact();
+        UseDef(&def);
+        Scene scene = Flat(0, false);
+        for (int32_t z = 0; z < SIDE; ++z)
         {
-            scene.level[z][x] = (3 * x + 5 * z) % 4;
-            scene.area[z][x] = x >= 5 ? 7 : mnav_areaWalkable;
+            for (int32_t x = 0; x < SIDE; ++x)
+            {
+                scene.level[z][x] = (3 * x + 5 * z) % 4;
+                bool seven = pass == 0 ? x >= 5 : x + z >= 9;
+                scene.area[z][x] = seven ? 7 : mnav_areaWalkable;
+            }
         }
+        scene.area[1][4] = mnav_areaNone;
+        scene.area[4][4] = mnav_areaNone;
+        scene.area[5][2] = mnav_areaNone;
+        Load(&scene);
+        CHECK(EndsAtTheHighestFloor(&scene, Lines(mnav_debugWall)), "walls");
+        CHECK(EndsAtTheHighestFloor(&scene, Lines(mnav_debugInnerEdge)), "inner edges");
     }
-    scene.area[1][4] = mnav_areaNone;
-    scene.area[4][4] = mnav_areaNone;
-    scene.area[5][2] = mnav_areaNone;
-    Load(&scene);
-    CHECK(EndsAtTheHighestFloor(&scene, Lines(mnav_debugWall)), "walls");
-    CHECK(EndsAtTheHighestFloor(&scene, Lines(mnav_debugInnerEdge)), "inner edges");
 }
 
 // Whether one of the lines read runs between two places of the tile, in
