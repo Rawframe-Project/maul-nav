@@ -23,7 +23,14 @@ Results are bit-identical on every platform, compiler and worker count, so a ser
 
 ## Quick start
 
-It builds with CMake 3.25 or newer and GCC 14 or newer, Clang 19 or newer, or Apple Clang. On Linux and macOS:
+It builds with CMake 3.25 or newer and GCC 14 or newer, Clang 19 or newer, or Apple Clang. Ubuntu 24.04's default compiler is GCC 13, which the build refuses, so there install GCC 14, with Git and CMake, and tell CMake to use it:
+
+```sh
+sudo apt install git cmake gcc-14
+export CC=gcc-14
+```
+
+Then, on Linux and macOS:
 
 ```sh
 git clone https://github.com/Rawframe-Project/maul-nav.git
@@ -34,11 +41,10 @@ ctest --test-dir build
 ./build/sample_walk
 ```
 
-Ubuntu 24.04's default compiler is GCC 13, which the build refuses ("GCC 14 or newer is required"). Install GCC 14 and configure again in a fresh build directory, since `build/` keeps the compiler it first found; then go on from `cmake --build build`:
+A `build/` that GCC 13 already configured keeps that compiler and fails again ("GCC 14 or newer is required"). Remove it and configure again, with `CC` exported as above, then carry on with the rest of the block from `cmake --build build`:
 
 ```sh
-sudo apt install gcc-14
-rm -rf build && CC=gcc-14 cmake -B build -DCMAKE_BUILD_TYPE=Release
+rm -rf build && cmake -B build -DCMAKE_BUILD_TYPE=Release
 ```
 
 On Windows the library builds with `clang-cl`, and on the web with Emscripten; [Getting started](docs/user/getting-started.md) lists what each needs.
