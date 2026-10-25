@@ -151,7 +151,10 @@ extern "C"
         // smaller islands away from a tile's edge are dropped.
         float minRegionArea;
         // How far a simplified wall may stray from the cells it follows, in
-        // meters, at least 0.
+        // meters, at least 0. Walls simplified a cell or more can cross
+        // themselves or each other, and a ring that then does not
+        // triangulate whole loses its area from the tile; the report
+        // counts it in partialRings.
         float maxEdgeError;
         // The longest wall edge, in meters, at least 0; 0 for no limit.
         float maxEdgeLength;
@@ -572,7 +575,8 @@ extern "C"
         // Holes that no bridge could join to their outline, polygon rings
         // and detail outlines whose triangulation stopped short, detail
         // samples that found no height and took the polygon's, and
-        // polygons whose detail reached its vertex cap.
+        // polygons whose detail reached its vertex cap. Rings cut short
+        // usually come from a large maxEdgeError.
         int32_t droppedHoles;
         int32_t partialRings;
         int32_t fallbackHeights;
