@@ -3,7 +3,7 @@
 //
 // Path corridors: loading paths, their corners, their checks.
 
-#include "hand_tile.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -216,22 +216,18 @@ static void TestAreaRuns(mnavQuery* query, const mnavNavmesh* navmesh, mnavCorri
           "a slanting path crosses into area 2 at (10, 7.5)");
 }
 
-// A U round a wall, the bottom middle square of area 2: one run into it
-// where the path leaves the wall's corner at (15, 5), not where it first
-// meets the line of that portal running down the wall's side, and one
-// out of it; the crossings between squares of one area add none.
+// A U round a wall (s_handRoundAWall), the bottom middle square of area
+// 2: one run into it where the path leaves the wall's corner at (15, 5),
+// not where it first meets the line of that portal running down the
+// wall's side, and one out of it; the crossings between squares of one
+// area add none.
 static void TestAreaRunsRoundAWall(void)
 {
-    const HandSquare squares[7] = {{20, 40, 40, 60, {0}, 0}, {40, 40, 60, 60, {0}, 0},
-                                   {60, 40, 80, 60, {0}, 0}, {60, 20, 80, 40, {0}, 0},
-                                   {60, 0, 80, 20, {0}, 0},  {40, 0, 60, 20, {0}, 2},
-                                   {20, 0, 40, 20, {0}, 0}};
-    static uint8_t bytes[8192];
-    size_t size = HandTileBytes(bytes, 0, squares, 7);
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavStageTile(navmesh, s_handRoundAWall, sizeof(s_handRoundAWall)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "the U loaded");
     mnavQuery* query = MakeQuery(64);
@@ -262,19 +258,15 @@ static void TestAreaRunsRoundAWall(void)
 
 static void TestFiltersAndLinks(void)
 {
-    // A row of squares, the middle one of area 2, and a jump across a gap.
-    const HandSquare squares[4] = {{20, 20, 40, 40, {0}, 0},
-                                   {40, 20, 60, 40, {0}, 2},
-                                   {60, 20, 80, 40, {0}, 0},
-                                   {100, 20, 120, 40, {0}, 0}};
-    static uint8_t bytes[8192];
-    size_t size = HandTileBytes(bytes, 0, squares, 4);
+    // A row of squares, the middle one of area 2, and a jump across a gap
+    // (s_handRowWithBridge).
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false, 0.0f};
     mnavLinkId id;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavStageTile(navmesh, s_handRowWithBridge, sizeof(s_handRowWithBridge)).result ==
+                  mnav_success &&
               mnavStageLink(navmesh, &jump, &id) == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "loaded");
@@ -340,18 +332,13 @@ static int32_t Indices(const mnavCorridor* corridor)
 
 static void TestMovingTheEnds(void)
 {
-    // A row of five squares from (5, 5) to (30, 10), 1 to 5 in Indices.
-    const HandSquare row[5] = {{20, 20, 40, 40, {0}, 0},
-                               {40, 20, 60, 40, {0}, 0},
-                               {60, 20, 80, 40, {0}, 0},
-                               {80, 20, 100, 40, {0}, 0},
-                               {100, 20, 120, 40, {0}, 0}};
-    static uint8_t bytes[8192];
-    size_t size = HandTileBytes(bytes, 0, row, 5);
+    // A row of five squares from (5, 5) to (30, 10), 1 to 5 in Indices
+    // (s_handRowOfFive).
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavStageTile(navmesh, s_handRowOfFive, sizeof(s_handRowOfFive)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "loaded");
     mnavQuery* query = MakeQuery(64);
@@ -498,23 +485,15 @@ static void TestFollowingCorridors(void)
 static void TestShortcuts(void)
 {
     // A 3 by 3 grid of squares from (5, 5) to (20, 20), its centre of
-    // area 2. Planned without the centre, the corridor goes round it; a
+    // area 2 (s_handGridWithCentre). Planned without the centre, the corridor goes round it; a
     // ray across the centre then shortens it.
-    HandSquare grid[9];
-    for (int32_t i = 0; i < 9; ++i)
-    {
-        int32_t x = 20 + (i % 3) * 20;
-        int32_t z = 20 + (i / 3) * 20;
-        grid[i] = (HandSquare){x, z, x + 20, z + 20, {0}, i == 4 ? 2 : 0};
-    }
-    static uint8_t bytes[8192];
-    size_t size = HandTileBytes(bytes, 0, grid, 9);
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavStageTile(navmesh, s_handGridWithCentre, sizeof(s_handGridWithCentre)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "loaded");
     mnavQuery* query = MakeQuery(64);
@@ -569,8 +548,8 @@ static void TestShortcuts(void)
           "planned from the corridor's own start");
     // A position off the navmesh with its polygon gone: found again
     // within the box, and the corridor starts on the navmesh.
-    size = HandTileBytes(bytes, 0, grid, 9);
-    CHECK(mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+    CHECK(mnavStageTile(navmesh, s_handGridWithCentre, sizeof(s_handGridWithCentre)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "the tile replaced");
     corridor.position = (mnavPos3){4.7, 0.0, 12.5};
