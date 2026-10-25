@@ -10,6 +10,7 @@
 
 #include "counting_allocator.h"
 #include "dense.h"
+#include "ramp_level.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -275,6 +276,37 @@ static void TestHoles(void)
     CHECK(s_held == 0, "nothing held");
 }
 
+// The ramp level, whose floor and ramp, two regions of one area, meet on
+// the tile's side: the bake removes their vertex there.
+static void TestBorderVertices(void)
+{
+    mnavVec3 vertices[RAMP_LEVEL_VERTICES];
+    int32_t indices[RAMP_LEVEL_INDICES];
+    const mnavTriangleMesh mesh = {vertices, RAMP_LEVEL_VERTICES, indices,
+                                   MakeRampLevel(vertices, indices, 0), nullptr};
+    mnavBakeDef def = BakeDef();
+    FailAfter(-1);
+    mnavBaker* baker = nullptr;
+    mnavBakeReport report;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTile(baker, &mesh, 1, 0, 0, &report) == mnav_success && report.regions == 2,
+          "the floor and the ramp");
+    // Counted on a baker that has baked before, as every bake below is.
+    FailAfter(-1);
+    CHECK(mnavBakeTile(baker, &mesh, 1, 0, 0, nullptr) == mnav_success, "again");
+    int32_t calls = s_calls;
+    bool refused = true;
+    for (int32_t k = 0; k < calls; ++k)
+    {
+        FailAfter(k);
+        refused = refused && mnavBakeTile(baker, &mesh, 1, 0, 0, nullptr) == mnav_errorCapacity;
+    }
+    CHECK(refused, "every failure round the removal refused");
+    FailAfter(-1);
+    mnavDestroyBaker(baker);
+    CHECK(s_held == 0, "nothing held");
+}
+
 // Stages the four tiles and a two-way link, and commits; committing
 // receives whether the commit was reached.
 static mnavResult Load(mnavNavmesh* navmesh, bool* committing)
@@ -465,6 +497,7 @@ int main(int argc, char** argv)
     TestBakes();
     TestCache();
     TestHoles();
+    TestBorderVertices();
     TestCommits();
     TestObjects();
     return s_failures == 0 ? 0 : 1;

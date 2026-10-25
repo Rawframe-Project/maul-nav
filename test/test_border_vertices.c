@@ -3,70 +3,31 @@
 //
 // Removing tile-border vertices, read from baked tiles: where a floor and
 // a ramp over it, two regions of one area, meet on the tile's side, their
-// vertex there goes, and the side is one edge across their meeting. The
-// scene is baked turned to each of the tile's four sides.
+// vertex there goes, the side is one edge across their meeting, and the
+// detail surface of the polygons that replace the vertex's follows both
+// regions. The scene is baked turned to each of the tile's four sides.
 // test_border_vertices_rings.c covers the cases no bake reaches.
 
-#include "soup.h"
+#include "ramp_level.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/debug.h"
 #include "maul-nav/navmesh.h"
+#include "maul-nav/query.h"
 
 #include <stdint.h>
 
 enum
 {
     TILE_ROOM = 1 << 20,
-    DRAW_ROOM = 1 << 14,
-    SCENE_VERTICES = 16,
-    SCENE_INDICES = 48
+    DRAW_ROOM = 1 << 14
 };
 
 static uint8_t s_tile[TILE_ROOM];
 static mnavDebugVertex s_drawVertices[DRAW_ROOM];
 static uint32_t s_drawLines[DRAW_ROOM];
-
-// A place on the ground turned a quarter turn round the tile's middle,
-// (16, 16) m, turns times.
-static void Turn(float* x, float* z, int32_t turns)
-{
-    for (int32_t t = 0; t < turns; ++t)
-    {
-        float nx = 32.0f - *z;
-        *z = *x;
-        *x = nx;
-    }
-}
-
-// A floor, and a ramp from it up to a deck 3 m high on a box, both
-// crossing the tile's +X side at x = 32 m: the floor and the ramp overlap,
-// so they are two regions, and their boundary meets the tile's side.
-// Turned a quarter turn turns times. Returns the number of triangles.
-static int32_t MakeRampLevel(mnavVec3* vertices, int32_t* indices, int32_t turns)
-{
-    const mnavVec3 corners[8] = {{-1.0f, 0.0f, -1.0f}, {-1.0f, 0.0f, 41.0f}, {41.0f, 0.0f, 41.0f},
-                                 {41.0f, 0.0f, -1.0f}, {28.0f, 0.0f, 10.0f}, {28.0f, 3.0f, 22.0f},
-                                 {36.0f, 3.0f, 22.0f}, {36.0f, 0.0f, 10.0f}};
-    const int32_t quads[12] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
-    for (int32_t k = 0; k < 8; ++k)
-    {
-        vertices[k] = corners[k];
-    }
-    for (int32_t k = 0; k < 12; ++k)
-    {
-        indices[k] = quads[k];
-    }
-    int32_t index = AddBox(vertices, indices, 8, 12, (mnavVec3){28.0f, 2.8f, 22.0f},
-                           (mnavVec3){36.0f, 3.0f, 30.0f});
-    for (int32_t k = 0; k < SCENE_VERTICES; ++k)
-    {
-        Turn(&vertices[k].x, &vertices[k].z, turns);
-    }
-    return index / 3;
-}
 
 // A tile side edge on the ground, turned back to the scene's frame.
 typedef struct Side
@@ -96,9 +57,9 @@ static void TestFloorAndRampMeetOnEachSide(void)
 {
     for (int32_t turns = 0; turns < 4; ++turns)
     {
-        mnavVec3 vertices[SCENE_VERTICES];
-        int32_t indices[SCENE_INDICES];
-        const mnavTriangleMesh mesh = {vertices, SCENE_VERTICES, indices,
+        mnavVec3 vertices[RAMP_LEVEL_VERTICES];
+        int32_t indices[RAMP_LEVEL_INDICES];
+        const mnavTriangleMesh mesh = {vertices, RAMP_LEVEL_VERTICES, indices,
                                        MakeRampLevel(vertices, indices, turns), nullptr};
         const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
         mnavBakeDef def = mnavDefaultBakeDef();
@@ -116,6 +77,24 @@ static void TestFloorAndRampMeetOnEachSide(void)
                   mnavCommit(navmesh) == mnav_success,
               "loaded");
         CHECK(report.regions == 2, "the floor and the ramp");
+        // Along the side, the detail surface of the polygons that replace
+        // the vertex's follows the floor, the ramp and the deck: their
+        // heights are sampled from both regions, as the polygons mix them.
+        bool follows = true;
+        for (int32_t k = 0; k < 59; ++k)
+        {
+            float x = 31.875f;
+            float z = 0.125f + 0.5f * (float)k;
+            float y = z < 10.0f ? 0.0f : (z > 22.0f ? 3.0f : (z - 10.0f) * 0.25f);
+            TurnOnTile(&x, &z, turns);
+            mnavNearest n;
+            CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){(double)x, (double)y, (double)z},
+                                  (mnavVec3){0.01f, 0.4f, 0.01f}, &n) == mnav_success,
+                  "nearest");
+            double off = n.point.y - (double)y;
+            follows = follows && n.over && off >= 0.0 && off <= 0.15;
+        }
+        CHECK(follows, "the surface on the floor, the ramp and the deck");
         mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
                              s_drawLines,     DRAW_ROOM,      0};
         // Polygon fills go uncounted into a buffer with no triangle room.
@@ -130,8 +109,8 @@ static void TestFloorAndRampMeetOnEachSide(void)
             if (p->kind == mnav_debugTileSide && count < 16)
             {
                 Side side = {p->x, p->z, q->x, q->z};
-                Turn(&side.x0, &side.z0, 4 - turns);
-                Turn(&side.x1, &side.z1, 4 - turns);
+                TurnOnTile(&side.x0, &side.z0, 4 - turns);
+                TurnOnTile(&side.x1, &side.z1, 4 - turns);
                 sides[count++] = side;
             }
         }

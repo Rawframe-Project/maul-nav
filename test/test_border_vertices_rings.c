@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Removing tile-border vertices from hand-built rings, for the cases no
-// bake reaches: a vertex inside the mesh, a lone polygon's tip, polygons
-// of two areas or touching only at the vertex, a slit, a corner of the
-// outline, the polygon limit, allocation failures, and the region of the
-// polygons that replace the vertex's. test_border_vertices.c bakes the
-// case bakes reach.
+// Removing tile-border vertices from hand-built rings, for what the
+// public bakes do not reach: a vertex inside the mesh, a lone polygon's
+// tip, polygons of two areas or touching only at the vertex, a slit, a
+// corner of the outline, the polygon limit, and a second vertex among the
+// polygons the first removal left. test_border_vertices.c bakes the case
+// bakes reach, and test_alloc_failures.c refuses its allocations.
 
 #include "allocator.h"
 #include "border_vertices.h"
 #include "contour.h"
-#include "counting_allocator.h"
 #include "poly_check.h"
 #include "polymesh.h"
 #include "test_harness.h"
@@ -83,27 +82,6 @@ static void Finish(mnavMemory* memory, mnavContourSet* set, mnavPolyMesh* mesh)
     CHECK(memory->used == 0, "everything released");
 }
 
-static void TestVertexBetweenTwoRegionsIsRemoved(void)
-{
-    // Two squares, regions 1 and 2, meeting at x = 5; (5, 0) lies on the
-    // tile's -Z side.
-    const int32_t points[16] = {0, 0, 0, 5, 5, 5, 5, 0, 5, 0, 5, 5, 10, 5, 10, 0};
-    const int32_t counts[2] = {4, 4};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = Rings(&memory, points, counts, 2);
-    Flag(&set, 5, 0);
-    mnavPolyMesh mesh;
-    CHECK(Run(&memory, &set, 100, &mesh) == mnav_success, "removed");
-    CHECK(mesh.vertexCount == 5 && !HasVertex(&mesh, 5, 0), "the vertex is gone");
-    CHECK(Valid(&mesh) && TwiceArea(&mesh) == 100, "valid, the same area");
-    for (int32_t p = 0; p < mesh.polygonCount; ++p)
-    {
-        CHECK(mesh.polygons[p].region == MNAV_MIXED_REGION && mesh.polygons[p].area == 1,
-              "mixed region, the area kept");
-    }
-    Finish(&memory, &set, &mesh);
-}
-
 static void TestNewPolygonsCountAgainstTheLimit(void)
 {
     const int32_t points[16] = {0, 0, 0, 5, 5, 5, 5, 0, 5, 0, 5, 5, 10, 5, 10, 0};
@@ -115,6 +93,29 @@ static void TestNewPolygonsCountAgainstTheLimit(void)
     CHECK(Run(&memory, &set, 1, &mesh) == mnav_errorLimit, "two polygons past a limit of one");
     mnavReleasePolyMesh(&memory, &mesh);
     CHECK(Run(&memory, &set, 2, &mesh) == mnav_success, "at the limit");
+    Finish(&memory, &set, &mesh);
+}
+
+static void TestSecondVertexAmongMixedPolygons(void)
+{
+    // Three squares in a row, (5, 0) and (10, 0) on the tile's side: the
+    // first removal leaves polygons of the mixed region round the second
+    // vertex, and the second removal keeps that region.
+    const int32_t points[24] = {0,  0, 0,  5, 5,  5, 5,  0, 5,  0, 5,  5,
+                                10, 5, 10, 0, 10, 0, 10, 5, 15, 5, 15, 0};
+    const int32_t counts[3] = {4, 4, 4};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = Rings(&memory, points, counts, 3);
+    Flag(&set, 5, 0);
+    Flag(&set, 10, 0);
+    mnavPolyMesh mesh;
+    CHECK(Run(&memory, &set, 100, &mesh) == mnav_success, "removed");
+    CHECK(!HasVertex(&mesh, 5, 0) && !HasVertex(&mesh, 10, 0), "both vertices gone");
+    CHECK(Valid(&mesh) && TwiceArea(&mesh) == 150, "valid, the same area");
+    for (int32_t p = 0; p < mesh.polygonCount; ++p)
+    {
+        CHECK(mesh.polygons[p].region == MNAV_MIXED_REGION, "the mixed region kept");
+    }
     Finish(&memory, &set, &mesh);
 }
 
@@ -139,60 +140,6 @@ static void TestVertexInsideTheMeshIsRemoved(void)
               PolygonIs(&mesh, 1, left, 3) && PolygonIs(&mesh, 2, right, 3),
           "the hole's polygons");
     Finish(&memory, &set, &mesh);
-}
-
-// An allocator that refuses once a count of allocations is spent, -1
-// for never.
-static int32_t s_left = -1;
-
-static void* Refusing(size_t size, size_t alignment, void* context)
-{
-    if (s_left == 0)
-    {
-        return nullptr;
-    }
-    s_left -= s_left > 0 ? 1 : 0;
-    return CountingAlloc(size, alignment, context);
-}
-
-static void TestAllocationFailuresAreTyped(void)
-{
-    // Three squares in a row, (5, 0) and (10, 0) on the tile's side: two
-    // vertices removed in one call, the second reusing the scratch the
-    // first grew. Every allocation of the removal refused in turn: a
-    // capacity error, and nothing held.
-    const int32_t points[24] = {0,  0, 0,  5, 5,  5, 5,  0, 5,  0, 5,  5,
-                                10, 5, 10, 0, 10, 0, 10, 5, 15, 5, 15, 0};
-    const int32_t counts[3] = {4, 4, 4};
-    int32_t refused = 0;
-    bool clean = true;
-    for (int32_t k = 0;; ++k)
-    {
-        s_left = -1;
-        mnavMemory memory =
-            mnavMakeMemory((mnavAllocator){Refusing, CountingFree, nullptr}, UINT64_MAX);
-        mnavContourSet set = Rings(&memory, points, counts, 3);
-        Flag(&set, 5, 0);
-        Flag(&set, 10, 0);
-        mnavPolyMesh mesh;
-        CHECK(mnavBuildPolyMesh(&memory, &set, 10, 100, 100, &mesh) == mnav_success, "built");
-        s_left = k;
-        mnavResult result = mnavRemoveBorderVertices(&memory, &mesh, 100);
-        s_left = -1;
-        if (result == mnav_success)
-        {
-            CHECK(!HasVertex(&mesh, 5, 0) && !HasVertex(&mesh, 10, 0) && Valid(&mesh) &&
-                      TwiceArea(&mesh) == 150,
-                  "both removed once every allocation is granted");
-            Finish(&memory, &set, &mesh);
-            break;
-        }
-        refused += 1;
-        clean = clean && result == mnav_errorCapacity;
-        Finish(&memory, &set, &mesh);
-    }
-    printf("border vertices: %d allocation failures refused\n", refused);
-    CHECK(refused > 0 && clean, "each a capacity error");
 }
 
 static void TestTipOfALonePolygonStays(void)
@@ -278,10 +225,9 @@ static void TestCornerOfTheOutlineStays(void)
 
 int main(void)
 {
-    TestVertexBetweenTwoRegionsIsRemoved();
     TestNewPolygonsCountAgainstTheLimit();
+    TestSecondVertexAmongMixedPolygons();
     TestVertexInsideTheMeshIsRemoved();
-    TestAllocationFailuresAreTyped();
     TestTipOfALonePolygonStays();
     TestDifferentAreasStay();
     TestPolygonsTouchingOnlyAtTheVertexStay();
