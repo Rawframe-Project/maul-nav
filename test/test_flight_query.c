@@ -959,17 +959,20 @@ static void TestEnds(const mnavFlightVolume* volume)
     mnavDestroyQuery(query);
 }
 
-// A path between far corners of the scene: the start and end voxels.
+// A path between far corners of the scene: the start and end voxels,
+// drawn from the suite's fixed generator until they lie far apart and
+// connect, 1000 draws at most; every run draws the same.
 static void FarEnds(int32_t a[3], int32_t b[3])
 {
-    int32_t tries = 0;
-    do
+    for (int32_t draw = 0; draw < 1000; ++draw)
     {
         RandomOpen(a);
         RandomOpen(b);
-        ++tries;
-    } while ((abs(a[0] - b[0]) + abs(a[2] - b[2]) < 80 || GridShortest(a, b) < 0.0) &&
-             tries < 1000);
+        if (abs(a[0] - b[0]) + abs(a[2] - b[2]) >= 80 && GridShortest(a, b) >= 0.0)
+        {
+            return;
+        }
+    }
 }
 
 static void TestLimits(const mnavFlightVolume* volume)
