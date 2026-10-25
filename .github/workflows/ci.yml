@@ -83,6 +83,12 @@ jobs:
           python3 tools/check_guide.py
       - name: The documentation site builds
         run: python3 tools/build_docs.py
+      - name: The hand tiles are what their writer writes
+        run: |
+          cmake -B out/hand -G Ninja -DCMAKE_C_COMPILER=clang-20 -D${PREFIX}_BUILD_BENCH=OFF \
+            -D${PREFIX}_BUILD_SAMPLES=OFF
+          cmake --build out/hand --target test_hand_tiles
+          out/hand/test_hand_tiles --check test/hand_tiles.h
       - name: clang-tidy
         run: |
           cmake -B out/tidy -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \

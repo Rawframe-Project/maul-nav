@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Tiles built by hand for white-box tests: up to HAND_SQUARES rectangular
-// polygons, each flat or sloped, their shared corners welded and the
-// polygons sharing a whole edge linked, encoded with the default def's
-// settings.
+// Tiles built by hand: up to HAND_SQUARES rectangular polygons, each flat
+// or sloped, their shared corners welded and the polygons sharing a whole
+// edge linked, encoded with the default def's settings. test_hand_tiles.c
+// writes the tiles of the suites that test through the public headers
+// into hand_tiles.h; the white-box suites build theirs here.
 
 #ifndef MAUL_NAV_TEST_HAND_TILE_H
 #define MAUL_NAV_TEST_HAND_TILE_H

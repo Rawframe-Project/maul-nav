@@ -140,6 +140,9 @@ done
 preset linux-clang-20-asan
 preset linux-gcc-14
 
+step "the hand tiles are what their writer writes"
+"$out/linux-gcc-14/test_hand_tiles" --check test/hand_tiles.h
+
 fuzz_seconds=10
 [ "$tier" = full ] && fuzz_seconds=60
 step "fuzzing, $fuzz_seconds seconds per target"

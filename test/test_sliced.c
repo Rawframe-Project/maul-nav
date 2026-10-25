@@ -4,7 +4,7 @@
 // Sliced path searches: any slicing gives the one search's
 // result; a commit makes a search stale; the filter is the search's own.
 
-#include "hand_tile.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -201,16 +201,12 @@ static void TestFinishingEarly(void)
 
 static void TestTheFilterIsTheSearchsOwn(void)
 {
-    // A bridge of area 2 between two squares, and a way round it.
-    const HandSquare squares[6] = {{20, 20, 40, 40, {0}, 0}, {40, 20, 60, 40, {0}, 2},
-                                   {60, 20, 80, 40, {0}, 0}, {20, 40, 40, 60, {0}, 0},
-                                   {40, 40, 60, 60, {0}, 0}, {60, 40, 80, 60, {0}, 0}};
-    static uint8_t bytes[8192];
-    size_t size = HandTileBytes(bytes, 0, squares, 6);
+    // A bridge of area 2 between two squares, and a way round it
+    // (s_handBridge).
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavStageTile(navmesh, s_handBridge, sizeof(s_handBridge)).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "loaded");
     mnavQuery* query = MakeQuery(256);
