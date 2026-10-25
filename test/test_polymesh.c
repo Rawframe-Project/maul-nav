@@ -1,294 +1,448 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Triangulating rings and merging them into a linked polygon mesh.
+// Triangulating rings and merging them into a linked polygon mesh, read
+// from bakes, mostly 2D: a floor over the tile is one quad on its four
+// sides, an L is two convex polygons linked, regions weld their shared
+// corners and link, stacked floors keep their own, the tile's vertex and
+// polygon limits are typed, and rings with holes bridged in, a pinch,
+// flat triangles or a diagonal through a vertex triangulate whole, with
+// polygons meeting corner to corner, while a ring cut short or left
+// unfinished is counted. Several scenes were found by a search of floors
+// with blocks cut out or of other areas.
 
-#include "allocator.h"
-#include "border_vertices.h"
-#include "compact.h"
-#include "contour.h"
-#include "erode.h"
-#include "filter.h"
-#include "heightfield.h"
-#include "holes.h"
-#include "poly_check.h"
-#include "polymesh.h"
-#include "region.h"
 #include "soup.h"
 #include "test_harness.h"
-#include "triangulate.h"
 
 #include "maul-nav/bake.h"
+#include "maul-nav/base.h"
+#include "maul-nav/debug.h"
+#include "maul-nav/navmesh.h"
+#include "maul-nav/query.h"
 
 #include <stdint.h>
 
-static void TestSquareIsOneQuadOnFourSides(void)
+enum
 {
-    const int32_t points[8] = {0, 0, 0, 10, 10, 10, 10, 0};
-    const int32_t counts[1] = {4};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = Rings(&memory, points, counts, 1);
-    mnavPolyMesh mesh;
-    CHECK(BuildLinked(&memory, &set, 10, 100, 100, &mesh) == mnav_success, "built");
-    CHECK(mesh.polygonCount == 1 && mesh.polygons[0].count == 4, "one quad");
-    CHECK(mesh.vertexCount == 4, "four vertices");
-    int32_t sides = 0;
-    for (int32_t k = 0; k < 4; ++k)
-    {
-        sides |= 1 << mesh.polygons[0].sides[k];
-    }
-    CHECK(sides == 0x1E, "an edge on each of the four sides");
-    CHECK(Valid(&mesh) && TwiceArea(&mesh) == 200, "valid, the square's area");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
-    CHECK(memory.used == 0, "everything released");
+    TILE_ROOM = 1 << 20,
+    // A floor's lowest corner, in cells of tile (0, 0).
+    AT = 8,
+    DRAW_ROOM = 1 << 16,
+    MOST_OUTLINES = 8,
+    MOST_POINTS = 16
+};
+
+static uint8_t s_tile[TILE_ROOM];
+static mnavNavmesh* s_navmesh;
+static mnavQuery* s_query;
+static mnavBakeReport s_report;
+static mnavDebugVertex s_drawVertices[DRAW_ROOM];
+static uint32_t s_drawIndices[DRAW_ROOM];
+
+// Outlines in cells from cell AT of tile (0, 0): points as x, z pairs.
+typedef struct Shape
+{
+    int32_t points[2 * MOST_POINTS];
+    int32_t count;
+    mnavAreaType area;
+} Shape;
+
+static float Meters(int32_t cells)
+{
+    return (float)(AT + cells) * 0.25f;
 }
+
+// The default def, but an agent of no radius, regions of any size and no
+// edge error, so that the polygons cover exactly the outlines' cells.
+static mnavBakeDef Exact(void)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.agent.radius = 0.0f;
+    def.minRegionArea = 0.0f;
+    def.maxEdgeError = 0.0f;
+    return def;
+}
+
+// Bakes the shapes in 2D with a def; on success loads the tile alone in
+// s_navmesh. Returns the bake's result.
+static mnavResult Load(const mnavBakeDef* def, const Shape* shapes, int32_t count)
+{
+    static mnavVec2 points[MOST_OUTLINES][MOST_POINTS];
+    mnavOutline outlines[MOST_OUTLINES];
+    for (int32_t o = 0; o < count; ++o)
+    {
+        for (int32_t k = 0; k < shapes[o].count; ++k)
+        {
+            points[o][k] =
+                (mnavVec2){Meters(shapes[o].points[2 * k]), Meters(shapes[o].points[2 * k + 1])};
+        }
+        outlines[o] = (mnavOutline){points[o], shapes[o].count, shapes[o].area};
+    }
+    mnavBaker* baker = nullptr;
+    size_t size = 0;
+    CHECK(mnavCreateBaker(def, &baker).result == mnav_success, "baker");
+    mnavResult result = mnavBakeTile2D(baker, outlines, count, 0, 0, &s_report);
+    if (result == mnav_success)
+    {
+        CHECK(mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success, "copied");
+        mnavDestroyNavmesh(s_navmesh);
+        s_navmesh = nullptr;
+        CHECK(mnavCreateNavmesh(def, &s_navmesh).result == mnav_success &&
+                  mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
+                  mnavCommit(s_navmesh) == mnav_success,
+              "loaded");
+    }
+    mnavDestroyBaker(baker);
+    return result;
+}
+
+// The polygon over the center of cell (x, z) of the floor, or none.
+static mnavNearest Over(int32_t x, int32_t z)
+{
+    mnavNearest n;
+    CHECK(mnavFindNearest(s_navmesh, nullptr,
+                          (mnavPos3){(double)Meters(x) + 0.125, 0.0, (double)Meters(z) + 0.125},
+                          (mnavVec3){0.01f, 1.0f, 0.01f}, &n) == mnav_success,
+          "nearest");
+    if (!n.over)
+    {
+        n.polygon.slot = 0;
+    }
+    return n;
+}
+
+// Whether a path leads from cell (x0, z0) to cell (x1, z1).
+static bool Reaches(int32_t x0, int32_t z0, int32_t x1, int32_t z1)
+{
+    mnavNearest a = Over(x0, z0);
+    mnavNearest b = Over(x1, z1);
+    mnavPath path;
+    CHECK(a.polygon.slot != 0 && b.polygon.slot != 0 &&
+              mnavFindPath(s_query, s_navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
+                           &path) == mnav_success,
+          "searched");
+    return path.end == mnav_pathFound;
+}
+
+// Twice the area of the tile's polygons, in square cells.
+static int64_t TwiceArea(void)
+{
+    mnavDebugBuffer b = {
+        {0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, s_drawIndices, DRAW_ROOM, 0, nullptr, 0, 0};
+    // The edges go uncounted into a buffer with no line room.
+    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the polygons fit");
+    int64_t area = 0;
+    for (int32_t t = 0; t < b.triangleCount / 3; ++t)
+    {
+        const mnavDebugVertex* p = &s_drawVertices[s_drawIndices[3 * t]];
+        const mnavDebugVertex* q = &s_drawVertices[s_drawIndices[3 * t + 1]];
+        const mnavDebugVertex* r = &s_drawVertices[s_drawIndices[3 * t + 2]];
+        if (p->kind != mnav_debugPolygon)
+        {
+            continue;
+        }
+        // Sixteenths of a cell, so 64 to the meter.
+        int64_t ax = (int64_t)(p->x * 64.0f);
+        int64_t az = (int64_t)(p->z * 64.0f);
+        int64_t bx = (int64_t)(q->x * 64.0f) - ax;
+        int64_t bz = (int64_t)(q->z * 64.0f) - az;
+        int64_t cx = (int64_t)(r->x * 64.0f) - ax;
+        int64_t cz = (int64_t)(r->z * 64.0f) - az;
+        int64_t twice = bx * cz - cx * bz;
+        area += twice < 0 ? -twice : twice;
+    }
+    return area / 256;
+}
+
+// Whether no end of a polygon edge lies inside another edge, between its
+// ends: the polygons meet corner to corner.
+static bool CornersMeet(void)
+{
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
+                         s_drawIndices,   DRAW_ROOM,      0};
+    // Polygon fills go uncounted into a buffer with no triangle room.
+    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    bool meet = true;
+    for (int32_t l = 0; l < b.lineCount / 2; ++l)
+    {
+        const mnavDebugVertex* p = &s_drawVertices[s_drawIndices[2 * l]];
+        const mnavDebugVertex* q = &s_drawVertices[s_drawIndices[2 * l + 1]];
+        for (int32_t m = 0; m < b.lineCount && p->kind != mnav_debugTileBounds; ++m)
+        {
+            const mnavDebugVertex* v = &s_drawVertices[s_drawIndices[m]];
+            // Sixteenths of a cell, so 64 to the meter.
+            int64_t ax = (int64_t)(p->x * 64.0f);
+            int64_t az = (int64_t)(p->z * 64.0f);
+            int64_t bx = (int64_t)(q->x * 64.0f);
+            int64_t bz = (int64_t)(q->z * 64.0f);
+            int64_t vx = (int64_t)(v->x * 64.0f);
+            int64_t vz = (int64_t)(v->z * 64.0f);
+            bool inLine = (bx - ax) * (vz - az) == (vx - ax) * (bz - az);
+            int64_t t = (vx - ax) * (bx - ax) + (vz - az) * (bz - az);
+            int64_t length = (bx - ax) * (bx - ax) + (bz - az) * (bz - az);
+            meet = meet && !(v->kind != mnav_debugTileBounds && inLine && t > 0 && t < length);
+        }
+    }
+    return meet;
+}
+
+// The tile-side edges, in cells of the tile, and their count.
+static int32_t s_sides[16][4];
+
+static int32_t Sides(void)
+{
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
+                         s_drawIndices,   DRAW_ROOM,      0};
+    // Polygon fills go uncounted into a buffer with no triangle room.
+    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    int32_t count = 0;
+    for (int32_t l = 0; l < b.lineCount / 2; ++l)
+    {
+        const mnavDebugVertex* p = &s_drawVertices[s_drawIndices[2 * l]];
+        const mnavDebugVertex* q = &s_drawVertices[s_drawIndices[2 * l + 1]];
+        if (p->kind == mnav_debugTileSide && count < 16)
+        {
+            s_sides[count][0] = (int32_t)(p->x * 4.0f);
+            s_sides[count][1] = (int32_t)(p->z * 4.0f);
+            s_sides[count][2] = (int32_t)(q->x * 4.0f);
+            s_sides[count][3] = (int32_t)(q->z * 4.0f);
+            count += 1;
+        }
+    }
+    return count;
+}
+
+static bool HasSide(int32_t count, int32_t x0, int32_t z0, int32_t x1, int32_t z1)
+{
+    for (int32_t s = 0; s < count; ++s)
+    {
+        const int32_t* d = s_sides[s];
+        if ((d[0] == x0 && d[1] == z0 && d[2] == x1 && d[3] == z1) ||
+            (d[0] == x1 && d[1] == z1 && d[2] == x0 && d[3] == z0))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void TestTileIsOneQuadOnFourSides(void)
+{
+    // A floor past the tile on every side: one quad, its edges the tile's
+    // four sides.
+    const Shape floor = {{-20, -20, -20, 150, 150, 150, 150, -20}, 4, mnav_areaWalkable};
+    mnavBakeDef def = Exact();
+    CHECK(Load(&def, &floor, 1) == mnav_success, "baked");
+    CHECK(s_report.polygons == 1 && s_report.vertices == 4, "one quad");
+    int32_t sides = Sides();
+    CHECK(sides == 4 && HasSide(sides, 0, 0, 128, 0) && HasSide(sides, 128, 0, 128, 128) &&
+              HasSide(sides, 128, 128, 0, 128) && HasSide(sides, 0, 128, 0, 0),
+          "an edge on each of the four sides");
+}
+
+// An L of 64 cells: no single convex polygon covers it.
+static const Shape s_l = {{0, 0, 0, 10, 4, 10, 4, 4, 10, 4, 10, 0}, 6, mnav_areaWalkable};
 
 static void TestConcaveRingBecomesLinkedConvexPolygons(void)
 {
-    // An L: no single convex polygon covers it.
-    const int32_t points[12] = {0, 0, 0, 10, 4, 10, 4, 4, 10, 4, 10, 0};
-    const int32_t counts[1] = {6};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = Rings(&memory, points, counts, 1);
-    mnavPolyMesh mesh;
-    CHECK(BuildLinked(&memory, &set, 20, 100, 100, &mesh) == mnav_success, "built");
-    CHECK(mesh.polygonCount == 2, "two convex pieces");
-    CHECK(Valid(&mesh), "convex and linked both ways");
-    CHECK(mesh.polygons[0].neighbors[0] != MNAV_NO_INDEX ||
-              mesh.polygons[0].neighbors[1] != MNAV_NO_INDEX ||
-              mesh.polygons[0].neighbors[2] != MNAV_NO_INDEX ||
-              mesh.polygons[0].neighbors[3] != MNAV_NO_INDEX,
-          "the pieces are linked");
-    CHECK(TwiceArea(&mesh) == 2 * 64, "the L's area");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
+    mnavBakeDef def = Exact();
+    CHECK(Load(&def, &s_l, 1) == mnav_success, "baked");
+    CHECK(s_report.polygons == 2 && s_report.vertices == 6, "two convex pieces");
+    CHECK(Reaches(1, 9, 9, 1), "linked, from one arm to the other");
+    CHECK(TwiceArea() == 2 * 64 && CornersMeet(), "the L's area, corner to corner");
 }
 
 static void TestRingsWeldAndLinkAcrossRegions(void)
 {
-    // Two squares side by side, each its own region, sharing x = 5.
-    const int32_t points[16] = {0, 0, 0, 5, 5, 5, 5, 0, 5, 0, 5, 5, 10, 5, 10, 0};
-    const int32_t counts[2] = {4, 4};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = Rings(&memory, points, counts, 2);
-    mnavPolyMesh mesh;
-    CHECK(BuildLinked(&memory, &set, 20, 100, 100, &mesh) == mnav_success, "built");
-    CHECK(mesh.vertexCount == 6, "the shared edge's ends welded");
-    CHECK(mesh.polygonCount == 2, "one quad per region");
-    CHECK(mesh.polygons[0].region != mesh.polygons[1].region, "the regions are kept");
-    CHECK(Valid(&mesh), "linked both ways across the regions");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
+    // Two squares side by side, of two areas, so two regions, sharing
+    // x = 5: the shared edge's ends weld, and the quads link.
+    const Shape squares[2] = {{{0, 0, 0, 5, 5, 5, 5, 0}, 4, mnav_areaWalkable},
+                              {{5, 0, 5, 5, 10, 5, 10, 0}, 4, 7}};
+    mnavBakeDef def = Exact();
+    CHECK(Load(&def, squares, 2) == mnav_success, "baked");
+    CHECK(s_report.regions == 2 && s_report.polygons == 2 && s_report.vertices == 6,
+          "one quad per region, the shared edge's ends welded");
+    CHECK(Reaches(1, 2, 8, 2) && Reaches(8, 2, 1, 2), "linked both ways across the regions");
+    mnavAreaType left = 0;
+    mnavAreaType right = 0;
+    CHECK(mnavGetArea(s_navmesh, Over(1, 2).polygon, &left) == mnav_success &&
+              mnavGetArea(s_navmesh, Over(8, 2).polygon, &right) == mnav_success &&
+              left == mnav_areaWalkable && right == 7,
+          "each quad its ring's area");
+}
+
+static void TestStackedFloorsKeepTheirCorners(void)
+{
+    // A floor and a deck 3 m over it, of the same square from 2 m to 4 m:
+    // their corners share ground places 24 cell heights apart, too far to
+    // weld, so each quad keeps four corners of its own.
+    const mnavVec3 vertices[8] = {{2, 0, 2}, {2, 0, 4}, {4, 0, 4}, {4, 0, 2},
+                                  {2, 3, 2}, {2, 3, 4}, {4, 3, 4}, {4, 3, 2}};
+    const int32_t indices[12] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+    const mnavTriangleMesh mesh = {vertices, 8, indices, 4, nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    mnavBakeDef def = Exact();
+    mnavBaker* baker = nullptr;
+    mnavBakeReport report;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success,
+          "baked");
+    CHECK(report.regions == 2 && report.polygons == 2 && report.vertices == 8,
+          "two quads of four corners each");
+    mnavDestroyBaker(baker);
 }
 
 static void TestLimitsAreTyped(void)
 {
-    const int32_t points[12] = {0, 0, 0, 10, 4, 10, 4, 4, 10, 4, 10, 0};
-    const int32_t counts[1] = {6};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = Rings(&memory, points, counts, 1);
-    mnavPolyMesh mesh;
-    // A refused mesh holds what it built so far until released, as after
-    // success.
-    CHECK(BuildLinked(&memory, &set, 20, 5, 100, &mesh) == mnav_errorLimit, "vertices");
-    mnavReleasePolyMesh(&memory, &mesh);
-    CHECK(BuildLinked(&memory, &set, 20, 100, 1, &mesh) == mnav_errorLimit, "polygons");
-    mnavReleasePolyMesh(&memory, &mesh);
-    CHECK(BuildLinked(&memory, &set, 20, 6, 2, &mesh) == mnav_success, "at the limits");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
-    CHECK(memory.used == 0, "nothing held after the refusals");
-}
-
-static void TestTangledRingIsCounted(void)
-{
-    // A ring whose edges cross: no ear can be cut to the end.
-    const int32_t points[12] = {0, 0, 0, 10, 10, 0, 10, 10, 4, 12, 2, 8};
-    const int32_t counts[1] = {6};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = Rings(&memory, points, counts, 1);
-    mnavPolyMesh mesh;
-    CHECK(BuildLinked(&memory, &set, 20, 100, 100, &mesh) == mnav_success, "built");
-    CHECK(mesh.failedRings == 1, "counted");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
-}
-
-static void TestFlatTrianglesAreDropped(void)
-{
-    // A square, and a ring of three points in a line along its top side,
-    // as a sliver region simplified to nothing leaves one: its only
-    // triangle has no area, and a loader refuses such a polygon.
-    const int32_t points[14] = {0, 0, 0, 10, 10, 10, 10, 0, 2, 10, 4, 10, 6, 10};
-    const int32_t counts[2] = {4, 3};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = Rings(&memory, points, counts, 2);
-    mnavPolyMesh mesh;
-    CHECK(BuildLinked(&memory, &set, 10, 100, 100, &mesh) == mnav_success, "built");
-    CHECK(mesh.polygonCount == 1 && Valid(&mesh) && TwiceArea(&mesh) == 200,
-          "the square alone, valid");
-    CHECK(mesh.failedRings == 0, "nothing of area lost");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(
-        &memory, &set); // A triangle wound the wrong way is dropped too, and its ring counted
-    // as cut short.
-    const int32_t wrong[6] = {0, 0, 10, 0, 0, 10};
-    const int32_t three[1] = {3};
-    set = Rings(&memory, wrong, three, 1);
-    CHECK(BuildLinked(&memory, &set, 10, 100, 100, &mesh) == mnav_success &&
-              mesh.polygonCount == 0 && mesh.failedRings == 1,
-          "a ring wound the wrong way, counted");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
+    // The L needs six vertices and two polygons.
+    mnavBakeDef def = Exact();
+    def.limits.tileVertices = 5;
+    CHECK(Load(&def, &s_l, 1) == mnav_errorLimit, "vertices");
+    def = Exact();
+    def.limits.tilePolygons = 1;
+    CHECK(Load(&def, &s_l, 1) == mnav_errorLimit, "polygons");
+    def.limits.tileVertices = 6;
+    def.limits.tilePolygons = 2;
+    CHECK(Load(&def, &s_l, 1) == mnav_success, "at the limits");
 }
 
 static void TestBridgedRingWithAHiddenVertex(void)
 {
-    // A square of 20 with three holes bridged in, found by searching
-    // random holes. Vertex (9, 12) lies inside the ear (0, 20), (20, 20),
-    // (9, 10), but both its edges run to the positions of that ear's
-    // diagonal (one to the other copy of (0, 20)), so the edge test alone
-    // let the ear through and the rest of the ring was lost.
-    const int32_t points[44] = {8,  6, 6,  6, 6,  4,  0,  0,  0,  20, 1, 14, 3, 14, 3,
-                                16, 1, 16, 1, 14, 0,  20, 20, 20, 20, 0, 0,  0, 6,  4,
-                                8,  4, 8,  6, 7,  10, 9,  10, 9,  12, 7, 12, 7, 10};
-    const int32_t counts[1] = {22};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = Rings(&memory, points, counts, 1);
-    mnavPolyMesh mesh;
-    CHECK(BuildLinked(&memory, &set, 20, 100, 100, &mesh) == mnav_success, "built");
-    CHECK(mesh.failedRings == 0, "the ring is complete");
-    CHECK(Valid(&mesh) && TwiceArea(&mesh) == 776, "the square less three holes");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
+    // A floor of 20 cells with three holes of 2 by 2 bridged in, found by
+    // searching random holes: one hole's corner lies inside an ear whose
+    // diagonal runs to a corner the ring passes twice, which the edge test
+    // alone let through, losing the rest of the ring.
+    const Shape shapes[4] = {{{0, 0, 0, 20, 20, 20, 20, 0}, 4, mnav_areaWalkable},
+                             {{1, 14, 1, 16, 3, 16, 3, 14}, 4, mnav_areaNone},
+                             {{6, 4, 6, 6, 8, 6, 8, 4}, 4, mnav_areaNone},
+                             {{7, 10, 7, 12, 9, 12, 9, 10}, 4, mnav_areaNone}};
+    mnavBakeDef def = Exact();
+    CHECK(Load(&def, shapes, 4) == mnav_success, "baked");
+    CHECK(s_report.partialRings == 0 && s_report.droppedHoles == 0, "the ring is complete");
+    CHECK(TwiceArea() == 776 && CornersMeet(), "the floor less three holes, corner to corner");
 }
 
 static void TestPinchedRingNeedsTheLooseTest(void)
 {
-    // Two loops touching at (3, 2), as a region touching itself at a
-    // corner traces: only a diagonal that touches the pinch finishes it.
-    const int32_t points[12] = {4, 0, 3, 2, 2, 1, 0, 1, 5, 5, 3, 2};
-    const int32_t counts[1] = {6};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = Rings(&memory, points, counts, 1);
-    mnavPolyMesh mesh;
-    CHECK(BuildLinked(&memory, &set, 20, 100, 100, &mesh) == mnav_success, "built");
-    CHECK(mesh.failedRings == 0, "the ring is complete");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
+    // Found by a search of floors with single cells cut out or of area 7:
+    // a floor of 8 by 8 with cells of area 7 at (0, 5) and (5, 3) and an
+    // unwalkable one at (4, 4), within a cell of edge error. The cells at
+    // (4, 4) and (5, 3) touch at a corner, and the floor's simplified ring
+    // passes a corner twice: no strict ear finishes it, only a diagonal
+    // that touches the pinch.
+    const Shape shapes[4] = {{{0, 0, 0, 8, 8, 8, 8, 0}, 4, mnav_areaWalkable},
+                             {{0, 5, 0, 6, 1, 6, 1, 5}, 4, 7},
+                             {{4, 4, 4, 5, 5, 5, 5, 4}, 4, mnav_areaNone},
+                             {{5, 3, 5, 4, 6, 4, 6, 3}, 4, 7}};
+    mnavBakeDef def = Exact();
+    def.maxEdgeError = 0.25f;
+    CHECK(Load(&def, shapes, 4) == mnav_success, "baked");
+    CHECK(s_report.partialRings == 0 && CornersMeet(), "every ring complete, corner to corner");
 }
 
-static int64_t Cross(const mnavContourVertex* o, const mnavContourVertex* a,
-                     const mnavContourVertex* b)
+static void TestFlatTrianglesAreDropped(void)
 {
-    return (int64_t)(a->x - o->x) * (b->z - o->z) - (int64_t)(a->z - o->z) * (b->x - o->x);
+    // Found by a search of floors with blocks cut out or of other areas:
+    // within a cell of edge error, a ring of this floor of 4 by 4 leaves
+    // triangles with no area. They cover nothing and a loader refuses
+    // them, so they are dropped, and the ring still counts as whole.
+    const Shape shapes[7] = {{{0, 0, 0, 4, 4, 4, 4, 0}, 4, mnav_areaWalkable},
+                             {{1, 1, 1, 2, 3, 2, 3, 1}, 4, mnav_areaNone},
+                             {{1, 3, 1, 5, 2, 5, 2, 3}, 4, 8},
+                             {{1, 0, 1, 3, 4, 3, 4, 0}, 4, 8},
+                             {{1, 0, 1, 2, 2, 2, 2, 0}, 4, 7},
+                             {{3, 1, 3, 2, 4, 2, 4, 1}, 4, mnav_areaNone},
+                             {{2, 2, 2, 5, 4, 5, 4, 2}, 4, mnav_areaNone}};
+    mnavBakeDef def = Exact();
+    def.maxEdgeError = 0.25f;
+    CHECK(Load(&def, shapes, 7) == mnav_success, "baked and loaded");
+    CHECK(s_report.partialRings == 0 && CornersMeet(), "every ring whole, corner to corner");
 }
 
-// Whether p lies on the segment from a to b, between its ends.
-static bool Inside(const mnavContourVertex* p, const mnavContourVertex* a,
-                   const mnavContourVertex* b)
+static void TestRingCutShortIsCounted(void)
 {
-    bool end = (p->x == a->x && p->z == a->z) || (p->x == b->x && p->z == b->z);
-    return !end && Cross(a, b, p) == 0 && p->x >= (a->x < b->x ? a->x : b->x) &&
-           p->x <= (a->x > b->x ? a->x : b->x) && p->z >= (a->z < b->z ? a->z : b->z) &&
-           p->z <= (a->z > b->z ? a->z : b->z);
+    // Found by the same search: within 4 cells of edge error, a ring of
+    // this floor of 7 by 7 is simplified so far that one of its triangles
+    // turns the wrong way. It is dropped, and the bake counts the ring as
+    // cut short.
+    const Shape shapes[5] = {{{0, 0, 0, 7, 7, 7, 7, 0}, 4, mnav_areaWalkable},
+                             {{2, 3, 2, 4, 5, 4, 5, 3}, 4, mnav_areaNone},
+                             {{2, 2, 2, 5, 4, 5, 4, 2}, 4, 9},
+                             {{2, 1, 2, 4, 4, 4, 4, 1}, 4, 9},
+                             {{4, 0, 4, 2, 5, 2, 5, 0}, 4, 7}};
+    mnavBakeDef def = Exact();
+    def.maxEdgeError = 1.0f;
+    CHECK(Load(&def, shapes, 5) == mnav_success, "baked and loaded");
+    CHECK(s_report.partialRings == 1, "one ring cut short, counted");
 }
 
 static void TestEarDiagonalThroughAVertex(void)
 {
-    // Three of the ring's points lie in a row, (9, 11), (10, 11) and
-    // (11, 11). A diagonal that touches another vertex is no strict ear:
-    // cut, one gives a flat triangle and a vertex inside another
-    // triangle's edge. Every triangle must have area and no vertex may lie
-    // inside an edge. (Found by triangulating 200,000 random rings with
-    // points in a row; the touching test changed 1,763 of them.)
-    mnavContourVertex ring[5] = {{9, 0, 11, 0, 0},
-                                 {10, 0, 11, 0, 0},
-                                 {11, 0, 12, 0, 0},
-                                 {11, 0, 11, 0, 0},
-                                 {12, 0, 10, 0, 0}};
-    int32_t indices[5];
-    uint8_t ears[5];
-    int32_t triangles[9];
-    bool complete = false;
-    int32_t count = mnavTriangulate(ring, 5, (mnavEarScratch){indices, ears}, triangles, &complete);
-    bool clean = complete && count == 3;
-    for (int32_t k = 0; clean && k < count; ++k)
-    {
-        const mnavContourVertex* c[3] = {&ring[triangles[3 * k]], &ring[triangles[3 * k + 1]],
-                                         &ring[triangles[3 * k + 2]]};
-        clean = Cross(c[0], c[1], c[2]) != 0;
-        for (int32_t e = 0; clean && e < 3; ++e)
-        {
-            for (int32_t v = 0; v < 5; ++v)
-            {
-                clean = clean && !Inside(&ring[v], c[e], c[(e + 1) % 3]);
-            }
-        }
-    }
-    CHECK(clean, "no flat triangle and no vertex inside an edge");
+    // Found by the same search: a floor of 9 by 9 with a cell of area 8
+    // at (8, 4) and an unwalkable block from (5, 4), 2 cells by 3. One
+    // strict ear's diagonal runs through a vertex of the ring; cut, it
+    // would leave a flat triangle and the vertex inside an edge. The
+    // strict test refuses a diagonal that touches a vertex: the polygons
+    // meet corner to corner and cover the floor exactly.
+    const Shape shapes[3] = {{{0, 0, 0, 9, 9, 9, 9, 0}, 4, mnav_areaWalkable},
+                             {{8, 4, 8, 5, 9, 5, 9, 4}, 4, 8},
+                             {{5, 4, 5, 7, 7, 7, 7, 4}, 4, mnav_areaNone}};
+    mnavBakeDef def = Exact();
+    CHECK(Load(&def, shapes, 3) == mnav_success, "baked and loaded");
+    CHECK(s_report.partialRings == 0 && TwiceArea() == 2 * 75, "the floor covered exactly");
+    CHECK(CornersMeet(), "corner to corner");
 }
 
-static void TestLevelMeshIsValid(void)
+static void TestUnfinishedRingIsCounted(void)
+{
+    // Found by the same search: a floor of 5 by 5 with a strip of area 7
+    // from (3, 1), 3 cells by 1, and an unwalkable cell at (2, 1), within
+    // 4 cells of edge error. A simplified ring has no ear left, strict or
+    // loose, before it is done, and the bake counts it.
+    const Shape shapes[3] = {{{0, 0, 0, 5, 5, 5, 5, 0}, 4, mnav_areaWalkable},
+                             {{3, 1, 3, 2, 6, 2, 6, 1}, 4, 7},
+                             {{2, 1, 2, 2, 3, 2, 3, 1}, 4, mnav_areaNone}};
+    mnavBakeDef def = Exact();
+    def.maxEdgeError = 1.0f;
+    CHECK(Load(&def, shapes, 3) == mnav_success, "baked and loaded");
+    CHECK(s_report.partialRings == 1, "one ring unfinished, counted");
+}
+
+static void TestLevelRingsAreComplete(void)
 {
     static mnavVec3 vertices[LEVEL_VERTICES];
     static int32_t indices[LEVEL_TRIANGLES * 3];
     MakeLevel(vertices, indices);
-    mnavTriangleMesh input = {vertices, LEVEL_VERTICES, indices, LEVEL_TRIANGLES, nullptr};
+    const mnavTriangleMesh mesh = {vertices, LEVEL_VERTICES, indices, LEVEL_TRIANGLES, nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
     mnavBakeDef def = mnavDefaultBakeDef();
-    mnavBakeCells cells;
-    CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
-    mnavMemory memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
-    mnavHeightfield heightfield;
-    CHECK(mnavBuildHeightfieldInput(&memory, &def, &cells,
-                                    &(mnavBakeInput){&input, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
-                                    0, &heightfield) == mnav_success,
-          "rasterized");
-    mnavFilterWalkable(&heightfield, cells.agentHeight, cells.agentStep);
-    mnavCompactField compact;
-    CHECK(mnavBuildCompactField(&memory, &heightfield, cells.agentHeight, cells.agentStep,
-                                &compact) == mnav_success,
-          "compacted");
-    CHECK(mnavErode(&memory, &compact, cells.agentRadius) == mnav_success, "eroded");
-    mnavRegionMap regions;
-    CHECK(mnavBuildRegions(&memory, &compact, cells.border, cells.minRegion, &regions) ==
-              mnav_success,
-          "regions");
-    mnavContourSet set;
-    CHECK(mnavBuildContours(&memory, &compact, &regions, cells.border, cells.edgeError,
-                            cells.edgeLength, &set) == mnav_success,
-          "contours");
-    CHECK(mnavMergeHoles(&memory, &set, regions.count) == mnav_success, "merged");
-    mnavPolyMesh mesh;
-    CHECK(mnavBuildPolyMesh(&memory, &set, def.tileCells, def.limits.tileVertices,
-                            def.limits.tilePolygons, &mesh) == mnav_success,
-          "polygons");
-    int32_t before = mesh.vertexCount;
-    CHECK(mnavRemoveBorderVertices(&memory, &mesh, def.limits.tilePolygons) == mnav_success,
-          "border vertices removed");
-    CHECK(mnavLinkPolyMesh(&memory, &mesh) == mnav_success, "linked");
-    CHECK(Valid(&mesh) && mesh.failedRings == 0, "convex, linked, every ring complete");
-    CHECK(mesh.vertexCount <= before, "removing border vertices never adds one");
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
-    mnavReleaseRegions(&memory, &regions);
-    mnavReleaseCompactField(&memory, &compact);
-    mnavReleaseHeightfield(&memory, &heightfield);
-    CHECK(memory.used == 0, "everything released");
+    mnavBaker* baker = nullptr;
+    mnavBakeReport report;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success,
+          "baked");
+    CHECK(report.partialRings == 0 && report.polygons > 0, "every ring complete");
+    mnavDestroyBaker(baker);
 }
 
 int main(void)
 {
-    TestSquareIsOneQuadOnFourSides();
+    mnavQueryDef queryDef = mnavDefaultQueryDef();
+    CHECK(mnavCreateQuery(&queryDef, &s_query) == mnav_success, "query");
+    TestTileIsOneQuadOnFourSides();
     TestConcaveRingBecomesLinkedConvexPolygons();
     TestRingsWeldAndLinkAcrossRegions();
+    TestStackedFloorsKeepTheirCorners();
     TestLimitsAreTyped();
-    TestTangledRingIsCounted();
-    TestFlatTrianglesAreDropped();
     TestBridgedRingWithAHiddenVertex();
     TestPinchedRingNeedsTheLooseTest();
+    TestFlatTrianglesAreDropped();
+    TestRingCutShortIsCounted();
     TestEarDiagonalThroughAVertex();
-    TestLevelMeshIsValid();
+    TestUnfinishedRingIsCounted();
+    TestLevelRingsAreComplete();
+    mnavDestroyNavmesh(s_navmesh);
+    mnavDestroyQuery(s_query);
     return s_failures == 0 ? 0 : 1;
 }
