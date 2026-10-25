@@ -252,8 +252,7 @@ static void TestHoles(void)
     const int32_t i[] = {0, 1, 2,  0, 2,  3, 8, 11, 10, 8, 10, 9, 4, 8,  9, 4, 9, 5,
                          5, 9, 10, 5, 10, 6, 6, 10, 11, 6, 11, 7, 7, 11, 8, 7, 8, 4};
     const mnavTriangleMesh mesh = {v, 12, i, (int32_t)(sizeof(i) / sizeof(i[0]) / 3), nullptr};
-    mnavBakeDef def = mnavDefaultBakeDef();
-    def.allocator = Allocator();
+    mnavBakeDef def = BakeDef();
     FailAfter(-1);
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
@@ -298,8 +297,8 @@ static mnavResult Load(mnavNavmesh* navmesh, bool* committing)
 
 static void TestCommits(void)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
-    def.allocator = Allocator();
+    // The tiles TestBakes baked, so its def.
+    mnavBakeDef def = BakeDef();
     def.tier = mnav_tierDynamic;
     FailAfter(-1);
     mnavNavmesh* navmesh = nullptr;

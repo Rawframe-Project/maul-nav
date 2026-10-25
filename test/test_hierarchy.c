@@ -599,9 +599,10 @@ static void TestChangeAcrossASide(void)
     filter.areas &= ~((uint64_t)1 << 4);
     int32_t agreed = 0;
     int32_t tried = 0;
-    // Every 12 m along the side; outside the dense form every 48 m, a
-    // place in each of the side's clusters.
-    for (double z = 6.0; z < 250.0; z += s_dense ? 12.0 : 48.0)
+    // Every 12 m along the side; outside the dense form every 24 m from
+    // 18 m, half the places, among them three of the four where an update
+    // that misses a transition's inclusion changing gives another graph.
+    for (double z = s_dense ? 6.0 : 18.0; z < 250.0; z += s_dense ? 12.0 : 24.0)
     {
         mnavNavmesh* navmesh = Load(false);
         mnavQuery* query = Query(1024);
