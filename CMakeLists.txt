@@ -159,7 +159,10 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(hand_tiles WHITEBOX MANUAL)
     maul_add_test(bake)
     maul_add_test(baker)
-    maul_add_test(border_vertices WHITEBOX)
+    maul_add_test(border_vertices)
+    # Hand-built rings for the removals no bake reaches
+    # (test_border_vertices_rings.c).
+    maul_add_test(border_vertices_rings WHITEBOX)
     maul_add_test(compact)
     maul_add_test(contour)
     maul_add_test(delaunay)
