@@ -2,12 +2,10 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Off-mesh links: staging, removal, snapping at each commit, and
-// the attachments the search will follow. Hand cells are 0.25 m.
+// the ways across them the search follows. Hand cells are 0.25 m.
 
 #include "counting_allocator.h"
-#include "hand_tile.h"
-#include "navmesh.h"
-#include "offmesh.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -19,18 +17,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// Two squares apart in tile (0, 0): (5, 5) to (10, 10) and (15, 5) to
-// (20, 10); one in tile (1, 0): (37, 5) to (42, 10).
-static const HandSquare s_apart[2] = {{20, 20, 40, 40, {0}, 0}, {60, 20, 80, 40, {0}, 0}};
-static const HandSquare s_beyond[1] = {{20, 20, 40, 40, {0}, 0}};
-static uint8_t s_bytes[2][4096];
-static size_t s_sizes[2];
-
+// Tile (0, 0) holds two squares apart (s_handApartPair): (5, 5) to
+// (10, 10) and (15, 5) to (20, 10); tile (1, 0) one (s_handSquareEast):
+// (37, 5) to (42, 10).
 static mnavNavmesh* Make(mnavBakeDef def)
 {
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(mnavStageTile(navmesh, s_bytes[0], s_sizes[0]).result == mnav_success &&
+    CHECK(mnavStageTile(navmesh, s_handApartPair, sizeof(s_handApartPair)).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "tile (0, 0)");
     return navmesh;
@@ -55,6 +49,37 @@ static mnavLinkState Get(const mnavNavmesh* navmesh, mnavLinkId id)
     return state;
 }
 
+static bool SameLink(mnavLinkId a, mnavLinkId b)
+{
+    return a.slot == b.slot && a.generation == b.generation;
+}
+
+// The path from (x0, z0) to (x1, z1), both on the squares.
+static mnavPath Across(mnavQuery* query, const mnavNavmesh* navmesh, double x0, double z0,
+                       double x1, double z1)
+{
+    mnavNearest a;
+    mnavNearest b;
+    const mnavVec3 box = {1.0f, 2.0f, 1.0f};
+    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x0, 0.0, z0}, box, &a) == mnav_success &&
+              mnavFindNearest(navmesh, nullptr, (mnavPos3){x1, 0.0, z1}, box, &b) == mnav_success &&
+              a.polygon.slot != 0 && b.polygon.slot != 0,
+          "both ends on a square");
+    mnavPath path;
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
+              mnav_success,
+          "searched");
+    return path;
+}
+
+static mnavQuery* MakeQuery(void)
+{
+    mnavQueryDef def = mnavDefaultQueryDef();
+    mnavQuery* query = nullptr;
+    CHECK(mnavCreateQuery(&def, &query) == mnav_success, "a query");
+    return query;
+}
+
 static void TestLinksAttachAtTheCommit(void)
 {
     mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
@@ -68,10 +93,14 @@ static void TestLinksAttachAtTheCommit(void)
               state.start.x == 7.5 && state.start.z == 7.5 && state.end.x == 17.5 &&
               state.start.y == 0.0,
           "both ends on their squares");
-    int32_t first = -1;
-    CHECK(mnavAttachmentsFrom(navmesh, 0, 0, &first) == 1 &&
-              mnavAttachmentsFrom(navmesh, 0, 1, &first) == 0,
-          "one way: from the first square only");
+    // One way: a path crosses it from the first square, and none comes
+    // back from the second.
+    mnavQuery* query = MakeQuery();
+    mnavPath there = Across(query, navmesh, 7.5, 7.5, 17.5, 7.5);
+    CHECK(there.end == mnav_pathFound && there.linkCount == 1 && SameLink(there.links[0].link, id),
+          "across from the first square");
+    mnavPath back = Across(query, navmesh, 17.5, 7.5, 7.5, 7.5);
+    CHECK(back.end == mnav_pathNone && back.linkCount == 0, "not back from the second");
     // An end 0.4 m off a square's edge snaps onto it; 0.6 m off does not.
     mnavLinkId near = Stage(navmesh, Link(7.5, 7.5, 14.6, 7.5, 0.5f));
     mnavLinkId far = Stage(navmesh, Link(7.5, 7.5, 14.4, 7.5, 0.5f));
@@ -91,14 +120,20 @@ static void TestLinksAttachAtTheCommit(void)
               mnavCommit(navmesh) == mnav_success,
           "removed again");
     // The two-way link starts on the second square: it leaves the second
-    // forward and the first in reverse, after the first's two links.
-    CHECK(Get(navmesh, both).attached && mnavAttachmentsFrom(navmesh, 0, 1, &first) == 1 &&
-              !mnavAttachmentOf(navmesh->attachments[first]).reverse,
+    // forward, from its start, and the first in reverse, from its end,
+    // which is cheaper there than the first square's two other links.
+    CHECK(Get(navmesh, both).attached, "the two-way link attached");
+    mnavPath forward = Across(query, navmesh, 17.5, 9.0, 7.5, 9.0);
+    CHECK(forward.end == mnav_pathFound && forward.linkCount == 1 &&
+              SameLink(forward.links[0].link, both) &&
+              forward.points[forward.links[0].point].x == 17.5,
           "forward from the second square");
-    CHECK(mnavAttachmentsFrom(navmesh, 0, 0, &first) == 3, "three from the first square");
-    mnavAttachment a = mnavAttachmentOf(navmesh->attachments[first + 2]);
-    CHECK(a.slot == 0 && a.polygon == 0 && a.link == (int32_t)both.slot - 1 && a.reverse,
+    mnavPath reverse = Across(query, navmesh, 7.5, 9.0, 17.5, 9.0);
+    CHECK(reverse.end == mnav_pathFound && reverse.linkCount == 1 &&
+              SameLink(reverse.links[0].link, both) &&
+              reverse.points[reverse.links[0].point].x == 7.5,
           "the two-way link crosses back to the first square");
+    mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
 
@@ -149,7 +184,8 @@ static void TestLinksFollowTheTiles(void)
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 39.5, 7.5, 0.5f));
     CHECK(mnavCommit(navmesh) == mnav_success && !Get(navmesh, id).attached,
           "detached while tile (1, 0) is not loaded");
-    CHECK(mnavStageTile(navmesh, s_bytes[1], s_sizes[1]).result == mnav_success &&
+    CHECK(mnavStageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "tile (1, 0) loaded");
     mnavLinkState state = Get(navmesh, id);
@@ -160,6 +196,27 @@ static void TestLinksFollowTheTiles(void)
     CHECK(mnavStageTileRemoval(navmesh, 1, 0) == mnav_success &&
               mnavCommit(navmesh) == mnav_success && !Get(navmesh, id).attached,
           "detached again when it leaves");
+    mnavDestroyNavmesh(navmesh);
+}
+
+// A link leaves only the polygon it starts on: one from the second square
+// to tile (1, 0) gives the first square no way there, though the two
+// share a tile.
+static void TestLinksLeaveTheirOwnPolygon(void)
+{
+    mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
+    mnavLinkId id = Stage(navmesh, Link(17.5, 7.5, 39.5, 7.5, 0.5f));
+    CHECK(mnavStageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
+                  mnav_success &&
+              mnavCommit(navmesh) == mnav_success && Get(navmesh, id).attached,
+          "attached");
+    mnavQuery* query = MakeQuery();
+    mnavPath from = Across(query, navmesh, 17.5, 7.5, 39.5, 7.5);
+    CHECK(from.end == mnav_pathFound && from.linkCount == 1 && SameLink(from.links[0].link, id),
+          "across from the second square");
+    CHECK(Across(query, navmesh, 7.5, 7.5, 39.5, 7.5).end == mnav_pathNone,
+          "no way from the first");
+    mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
 
@@ -176,8 +233,9 @@ static void TestRemovalAndIds(void)
               mnavGetLink(navmesh, id, &state) == mnav_errorStale &&
               mnavStageLinkRemoval(navmesh, id) == mnav_errorStale,
           "gone, the id stale");
-    int32_t first = -1;
-    CHECK(mnavAttachmentsFrom(navmesh, 0, 0, &first) == 0, "no attachment left");
+    mnavQuery* query = MakeQuery();
+    CHECK(Across(query, navmesh, 7.5, 7.5, 17.5, 7.5).end == mnav_pathNone, "no way across left");
+    mnavDestroyQuery(query);
     // The slot is reused under a new generation; a link removed before
     // its commit goes at once.
     mnavLinkId next = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
@@ -192,10 +250,7 @@ static void TestRemovalAndIds(void)
           "no such slot");
     bad = (mnavLinkId){next.slot, next.generation + 1};
     CHECK(mnavGetLink(navmesh, bad, &state) == mnav_errorInvalid, "a generation not yet given");
-    // A slot at its last generation is never reused.
-    navmesh->links[next.slot - 1].generation = UINT32_MAX;
-    mnavLinkId fresh = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
-    CHECK(fresh.slot != next.slot && fresh.generation == 1, "a new slot past a worn one");
+    // A slot at its last generation is never reused: test_link_slots.c.
     mnavDestroyNavmesh(navmesh);
 }
 
@@ -264,7 +319,8 @@ static void TestFailedCommitKeepsLinksStaged(void)
     def.limits.tiles = 1;
     mnavNavmesh* navmesh = Make(def);
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
-    CHECK(mnavStageTile(navmesh, s_bytes[1], s_sizes[1]).result == mnav_success &&
+    CHECK(mnavStageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_errorLimit,
           "past the tiles limit");
     mnavLinkState state;
@@ -292,11 +348,10 @@ static void TestDestroyGivesLinksBack(void)
 
 int main(void)
 {
-    s_sizes[0] = HandTileBytes(s_bytes[0], 0, s_apart, 2);
-    s_sizes[1] = HandTileBytes(s_bytes[1], 1, s_beyond, 1);
     TestLinksAttachAtTheCommit();
     TestLinksFollowTheTiles();
     TestLinkBackToItsOwnPolygon();
+    TestLinksLeaveTheirOwnPolygon();
     TestRemovalAndIds();
     TestDefsAndLimits();
     TestFailedCommitKeepsLinksStaged();

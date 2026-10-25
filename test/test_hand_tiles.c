@@ -309,6 +309,20 @@ static const HandTile s_tiles[] = {
      -1,
      2,
      {{10, 10, 30, 30, {0}, 0}, {60, 60, 90, 90, {0}, 0}}},
+    {"s_handApartPair",
+     "Two squares 5 m apart in tile (0, 0), from (5, 5) to (10, 10) and from (15, 5) to (20, 10), "
+     "joined by nothing: only an off-mesh link crosses between them.",
+     0,
+     -1,
+     2,
+     {{20, 20, 40, 40, {0}, 0}, {60, 20, 80, 40, {0}, 0}}},
+    {"s_handSquareEast",
+     "Tile (1, 0): one square from (37, 5) to (42, 10), where a link from s_handApartPair "
+     "lands once the tile is loaded.",
+     1,
+     -1,
+     1,
+     {{20, 20, 40, 40, {0}, 0}}},
 };
 
 // path_rules' layouts (HandLayout, hand_tile.h): the layouts stored are
