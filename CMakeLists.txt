@@ -176,7 +176,10 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_dense(path_rules WHITEBOX)
     maul_add_test(raycast)
     maul_add_test(query_filter)
-    maul_add_test(offmesh WHITEBOX)
+    maul_add_test(offmesh)
+    # A link slot at its last generation, which the API reaches only after
+    # 2^32 links (test_link_slots.c).
+    maul_add_test(link_slots WHITEBOX)
     maul_add_test(path_links)
     maul_add_test(shortest WHITEBOX)
     maul_add_test(flight WHITEBOX)
