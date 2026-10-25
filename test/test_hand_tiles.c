@@ -308,15 +308,16 @@ static const HandTile s_tiles[] = {
 // square i at (i % 4, i / 4) kept unless a draw of the generator below
 // falls on 0 modulo 4. The generator runs from LAYOUT_SEED through every
 // layout in turn, 16 draws a layout, and the layouts stored are those
-// LAYOUTS names: of the first 60, the smallest set found to fail every
-// mutant of the funnel and the search's ties that all 60 fail.
+// LAYOUTS names: of the first 60, the set a greedy choice found to fail
+// every mutant of the funnel and the path search that all 60 fail, and to
+// reach every line and branch of funnel.c and path.c that all 60 reach.
 enum
 {
     LAYOUT_SEED = 9,
     LAYOUT_COUNT = 60
 };
 
-static const int32_t LAYOUTS[] = {0, 10};
+static const int32_t LAYOUTS[] = {0, 10, 31};
 
 // The squares of layout k, the mask of those kept; returns their count.
 static int32_t Layout(int32_t k, HandSquare* squares, uint32_t* maskOut)

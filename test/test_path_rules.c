@@ -202,21 +202,23 @@ static void TestTiesGoToTheNodeMadeFirst(void)
 }
 
 // The hash of the straight paths through the stored layouts.
-#define LAYOUTS_HASH 0x35f2554de1bd2123ull
+#define LAYOUTS_HASH 0x31ed5521849ea3e4ull
 
 static void TestLayoutsArePinned(void)
 {
     // Grids of 4 by 4 squares with some left out (test_hand_tiles.c),
     // walked between square centers: corners fall exactly on the lines
-    // between other corners, on both sides of the funnel. Layouts 0 and 10
-    // of the generator fail every funnel and tie mutant its first 60 fail.
-    const uint8_t* const layouts[2] = {s_handLayout0, s_handLayout10};
-    const size_t sizes[2] = {sizeof(s_handLayout0), sizeof(s_handLayout10)};
-    const uint16_t kept[2] = {s_handLayout0Squares, s_handLayout10Squares};
+    // between other corners, on both sides of the funnel. Layouts 0, 10
+    // and 31 of the generator fail every funnel and search mutant its first
+    // 60 fail, and reach every line and branch of the funnel and the search
+    // they reach.
+    const uint8_t* const layouts[3] = {s_handLayout0, s_handLayout10, s_handLayout31};
+    const size_t sizes[3] = {sizeof(s_handLayout0), sizeof(s_handLayout10), sizeof(s_handLayout31)};
+    const uint16_t kept[3] = {s_handLayout0Squares, s_handLayout10Squares, s_handLayout31Squares};
     uint64_t hash = MNAV_HASH_INIT;
     int32_t found = 0;
     mnavQuery* query = MakeQuery(256);
-    for (int32_t layout = 0; layout < 2; ++layout)
+    for (int32_t layout = 0; layout < 3; ++layout)
     {
         // The centers of the squares kept, in the order of their bits.
         double centers[16][2];
