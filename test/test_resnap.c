@@ -59,21 +59,29 @@ static bool Enabled(const mnavNavmesh* navmesh, mnavLinkId id)
 }
 
 // How many polygons a committed tile has: the first index whose id names
-// none (mnavCheckCorridor counts a one-polygon corridor of it as 0).
+// none, as mnavCheckCorridor counts a corridor of that one polygon, under
+// a filter that includes every area, mnav_areaNone too. Tiles hold fewer
+// than 65,536 polygons, so the count ends there at the latest.
 static uint32_t PolygonCount(const mnavNavmesh* navmesh, mnavTileId tile)
 {
+    mnavQueryFilter filter = mnavDefaultQueryFilter();
+    filter.areas = ~(uint64_t)0;
     mnavPolygonId buffer[1];
     mnavCorridor corridor;
-    uint32_t count = 0;
-    for (int32_t valid = 1; valid == 1; count += valid == 1 ? 1u : 0u)
+    for (uint32_t count = 0; count < 65536u; ++count)
     {
+        int32_t valid = 0;
         CHECK(mnavResetCorridor(&corridor, buffer, 1,
                                 (mnavPolygonId){tile.slot, tile.generation, count},
                                 (mnavPos3){0.0, 0.0, 0.0}) == mnav_success &&
-                  mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success,
+                  mnavCheckCorridor(navmesh, &filter, &corridor, &valid) == mnav_success,
               "checked");
+        if (valid != 1)
+        {
+            return count;
+        }
     }
-    return count;
+    return 65536u;
 }
 
 static void TestOnlyChangedPlacesResnap(void)
