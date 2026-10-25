@@ -165,7 +165,7 @@ static int32_t SameAsOneThread(const mnavBakeDef* def, const mnavTriangleMesh* m
         for (int32_t t = 0; t < TILES * TILES; ++t)
         {
             size_t size = 0;
-            same += mnavBakeTile(baker, &(mnavBakeInput){mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+            same += mnavBakeTile(baker, &(mnavBakeInput){mesh, 1, NULL, 0, NULL, 0, NULL},
                                  t % TILES, t / TILES, NULL) == mnav_success &&
                             mnavCopyBakedTile(baker, bytes, TILE_ROOM, &size) == mnav_success &&
                             size == s_sizes[t] && memcmp(bytes, s_tiles[t], size) == 0
