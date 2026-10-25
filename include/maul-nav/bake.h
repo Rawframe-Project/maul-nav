@@ -153,8 +153,8 @@ extern "C"
         // How far a simplified wall may stray from the cells it follows, in
         // meters, at least 0. Walls simplified a cell or more can cross
         // themselves or each other, and a ring that then does not
-        // triangulate whole loses its area from the tile; the report
-        // counts it in partialRings.
+        // triangulate whole loses the area it did not triangulate; the
+        // report counts it in partialRings.
         float maxEdgeError;
         // The longest wall edge, in meters, at least 0; 0 for no limit.
         float maxEdgeLength;
