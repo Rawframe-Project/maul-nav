@@ -185,7 +185,10 @@ if(MAUL_NAV_BUILD_TESTS)
     # 2^32 links (test_link_slots.c).
     maul_add_test(link_slots WHITEBOX)
     maul_add_test(path_links)
-    maul_add_test(shortest WHITEBOX)
+    maul_add_test(shortest)
+    # The nodes the exact search makes, which no public call reports
+    # (test_shortest_work.c).
+    maul_add_test(shortest_work WHITEBOX)
     maul_add_test(flight WHITEBOX)
     maul_add_test(flight_volume)
     # The octree the tiles hold, the walk and the payload's structure,
