@@ -37,7 +37,7 @@ static inline mnavContourSet Rings(mnavMemory* memory, const int32_t* points, co
         for (int32_t k = 0; k < counts[r]; ++k)
         {
             const int32_t* p = &points[2 * (set.vertexCount)];
-            set.vertices[set.vertexCount++] = (mnavContourVertex){p[0], 100, p[1], 0, 0};
+            set.vertices[set.vertexCount++] = (mnavContourVertex){p[0], 100, p[1], 0};
         }
     }
     return set;
