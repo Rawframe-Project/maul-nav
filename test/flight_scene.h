@@ -33,10 +33,6 @@ enum
 static uint8_t s_bytes[4][TILE_MOST];
 static size_t s_sizes[4];
 static uint64_t s_fingerprints[4];
-
-static uint8_t s_bytes[4][TILE_MOST];
-static size_t s_sizes[4];
-static uint64_t s_fingerprints[4];
 static uint8_t s_bad[TILE_MOST];
 
 // The def the tests bake with: 0.5 m voxels, tiles of 64 (32 m, as the
