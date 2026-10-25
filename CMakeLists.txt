@@ -168,7 +168,10 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(height_patch WHITEBOX)
     maul_add_test(heightfield WHITEBOX)
     maul_add_test(holes WHITEBOX)
-    maul_add_test(navmesh WHITEBOX)
+    maul_add_test(navmesh)
+    # The navmesh's link and slot tables, which no public call shows
+    # (test_navmesh_tables.c).
+    maul_add_test(navmesh_tables WHITEBOX)
     maul_add_test(nearest)
     maul_add_test(nearest_rules)
     maul_add_test(path)
