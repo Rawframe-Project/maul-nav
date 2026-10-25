@@ -3,7 +3,17 @@
 //
 // The path's rules on hand-built tiles: the funnel's corners, and
 // the search's ties. Cells are 0.25 m; heights are 0.
+//
+// The suite reads its tiles stored (hand_tiles.h). Its dense form,
+// test_path_rules_dense (TEST_DENSE_WHITEBOX), builds every layout of
+// HandLayout with hand_tile.h, which reaches src/.
 
+#if defined(TEST_DENSE_WHITEBOX)
+#include "dense.h"
+#include "hand_tile.h"
+
+#include <stdlib.h>
+#endif
 #include "hand_tiles.h"
 #include "test_harness.h"
 
@@ -201,66 +211,149 @@ static void TestTiesGoToTheNodeMadeFirst(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// The layouts hand_tiles.h stores, of the first HAND_LAYOUT_COUNT of
+// HandLayout (hand_tile.h). Layouts 0, 10 and 31 fail every funnel and
+// search mutant the first 60 fail, and reach every line and branch of the
+// funnel and the search they reach.
+typedef struct StoredLayout
+{
+    int32_t layout;
+    const uint8_t* bytes;
+    size_t size;
+    // Bit i for the square at (i % 4, i / 4).
+    uint32_t kept;
+} StoredLayout;
+
+static const StoredLayout s_layouts[3] = {
+    {0, s_handLayout0, sizeof(s_handLayout0), s_handLayout0Squares},
+    {10, s_handLayout10, sizeof(s_handLayout10), s_handLayout10Squares},
+    {31, s_handLayout31, sizeof(s_handLayout31), s_handLayout31Squares}};
+
+// Walks a layout's tile between every pair of centers of the squares kept,
+// in the order of their bits: corners fall exactly on the lines between
+// other corners, on both sides of the funnel. Hashes the straight paths
+// into hash and counts those found.
+static void WalkLayout(mnavQuery* query, const uint8_t* tile, size_t size, uint32_t kept,
+                       uint64_t* hash, int32_t* found)
+{
+    double centers[16][2];
+    int32_t count = 0;
+    for (int32_t i = 0; i < 16; ++i)
+    {
+        if ((kept >> i & 1u) != 0)
+        {
+            centers[count][0] = (i % 4) * 5.0 + 2.5;
+            centers[count][1] = (i / 4) * 5.0 + 2.5;
+            count += 1;
+        }
+    }
+    mnavNavmesh* navmesh = Make(tile, size, nullptr, 0);
+    for (int32_t a = 0; a < count; ++a)
+    {
+        for (int32_t b = 0; b < count; ++b)
+        {
+            mnavNearest from = On(navmesh, centers[a][0], centers[a][1]);
+            mnavNearest to = On(navmesh, centers[b][0], centers[b][1]);
+            mnavPath path = {0};
+            CHECK(mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon,
+                               to.point, &path) == mnav_success,
+                  "searched");
+            *found += path.end == mnav_pathFound ? 1 : 0;
+            *hash = mnavHash64(*hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));
+        }
+    }
+    mnavDestroyNavmesh(navmesh);
+}
+
 // The hash of the straight paths through the stored layouts.
 #define LAYOUTS_HASH 0x31ed5521849ea3e4ull
 
 static void TestLayoutsArePinned(void)
 {
-    // Grids of 4 by 4 squares with some left out (test_hand_tiles.c),
-    // walked between square centers: corners fall exactly on the lines
-    // between other corners, on both sides of the funnel. Layouts 0, 10
-    // and 31 of the generator fail every funnel and search mutant its first
-    // 60 fail, and reach every line and branch of the funnel and the search
-    // they reach.
-    const uint8_t* const layouts[3] = {s_handLayout0, s_handLayout10, s_handLayout31};
-    const size_t sizes[3] = {sizeof(s_handLayout0), sizeof(s_handLayout10), sizeof(s_handLayout31)};
-    const uint16_t kept[3] = {s_handLayout0Squares, s_handLayout10Squares, s_handLayout31Squares};
     uint64_t hash = MNAV_HASH_INIT;
     int32_t found = 0;
     mnavQuery* query = MakeQuery(256);
-    for (int32_t layout = 0; layout < 3; ++layout)
+    for (int32_t l = 0; l < 3; ++l)
     {
-        // The centers of the squares kept, in the order of their bits.
-        double centers[16][2];
-        int32_t count = 0;
-        for (int32_t i = 0; i < 16; ++i)
-        {
-            if ((kept[layout] >> i & 1u) != 0)
-            {
-                centers[count][0] = (i % 4) * 5.0 + 2.5;
-                centers[count][1] = (i / 4) * 5.0 + 2.5;
-                count += 1;
-            }
-        }
-        mnavNavmesh* navmesh = Make(layouts[layout], sizes[layout], nullptr, 0);
-        for (int32_t a = 0; a < count; ++a)
-        {
-            for (int32_t b = 0; b < count; ++b)
-            {
-                mnavNearest from = On(navmesh, centers[a][0], centers[a][1]);
-                mnavNearest to = On(navmesh, centers[b][0], centers[b][1]);
-                mnavPath path = {0};
-                CHECK(mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon,
-                                   to.point, &path) == mnav_success,
-                      "searched");
-                found += path.end == mnav_pathFound ? 1 : 0;
-                hash = mnavHash64(hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));
-            }
-        }
-        mnavDestroyNavmesh(navmesh);
+        WalkLayout(query, s_layouts[l].bytes, s_layouts[l].size, s_layouts[l].kept, &hash, &found);
     }
     printf("LAYOUTS_HASH=%016llx found=%d\n", (unsigned long long)hash, found);
     CHECK(hash == LAYOUTS_HASH, "the pinned hash");
     mnavDestroyQuery(query);
 }
 
-int main(void)
+#if defined(TEST_DENSE_WHITEBOX)
+// The hash of the straight paths through all HAND_LAYOUT_COUNT layouts, as
+// the suite pinned it while it built them all.
+#define EVERY_LAYOUT_HASH 0x3fa695aa6c894494ull
+
+static void TestEveryLayoutIsPinned(void)
 {
+    // Every layout built as test_hand_tiles.c builds the stored ones, and
+    // those stored the same byte for byte: the plain form's layouts are a
+    // subset of these.
+    static uint8_t bytes[1 << 16];
+    uint64_t hash = MNAV_HASH_INIT;
+    int32_t found = 0;
+    int32_t stored = 0;
+    mnavQuery* query = MakeQuery(256);
+    for (int32_t k = 0; k < HAND_LAYOUT_COUNT; ++k)
+    {
+        HandSquare squares[HAND_SQUARES];
+        uint32_t kept = 0;
+        int32_t count = HandLayout(k, squares, &kept);
+        size_t size = HandTileBytes(bytes, 0, squares, count);
+        for (int32_t l = 0; l < 3; ++l)
+        {
+            if (s_layouts[l].layout == k)
+            {
+                CHECK(size == s_layouts[l].size && memcmp(bytes, s_layouts[l].bytes, size) == 0 &&
+                          kept == s_layouts[l].kept,
+                      "the stored layout");
+                stored += 1;
+            }
+        }
+        // Staged from a copy of exactly its length, so AddressSanitizer
+        // sees an overread.
+        uint8_t* tile = malloc(size);
+        CHECK(tile != nullptr, "allocated");
+        memcpy(tile, bytes, size);
+        WalkLayout(query, tile, size, kept, &hash, &found);
+        free(tile);
+    }
+    printf("EVERY_LAYOUT_HASH=%016llx found=%d\n", (unsigned long long)hash, found);
+    CHECK(stored == 3, "every stored layout among them");
+    CHECK(hash == EVERY_LAYOUT_HASH, "the pinned hash");
+    mnavDestroyQuery(query);
+}
+#endif
+
+int main(int argc, char** argv)
+{
+#if defined(TEST_DENSE_WHITEBOX)
+    if (!ReadDense(argc, argv))
+    {
+        return 2;
+    }
+#else
+    if (argc > 1)
+    {
+        printf("unknown arguments: none; the dense form is test_path_rules_dense\n");
+        return 2;
+    }
+    (void)argv;
+#endif
     TestStraightWhereTheCorridorAllows();
     TestAroundAnObstacle();
     TestAcrossATileSide();
     TestShortOfTheEnd();
     TestTiesGoToTheNodeMadeFirst();
     TestLayoutsArePinned();
+#if defined(TEST_DENSE_WHITEBOX)
+    if (s_dense)
+    {
+        TestEveryLayoutIsPinned();
+    }
+#endif
     return s_failures == 0 ? 0 : 1;
 }

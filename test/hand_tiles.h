@@ -647,7 +647,7 @@
     0x02, 0x03, 0x00, 0x02, 0x03, 0x06, 0x00, 0x01, 0x02, 0x03, 0x00, 0x02, 0x03, 0x06,
 };
 
-// path_rules' layout 0 (test_hand_tiles.c), its squares kept as
+// path_rules' layout 0 (HandLayout, hand_tile.h), its squares kept as
 // s_handLayout0Squares, bit i for the square at (i % 4, i / 4).
 [[maybe_unused]] static const uint16_t s_handLayout0Squares = 0x6bcf;
 [[maybe_unused]] static const uint8_t s_handLayout0[594] = {
@@ -691,7 +691,7 @@
     0x03, 0x06,
 };
 
-// path_rules' layout 10 (test_hand_tiles.c), its squares kept as
+// path_rules' layout 10 (HandLayout, hand_tile.h), its squares kept as
 // s_handLayout10Squares, bit i for the square at (i % 4, i / 4).
 [[maybe_unused]] static const uint16_t s_handLayout10Squares = 0xf89d;
 [[maybe_unused]] static const uint8_t s_handLayout10[568] = {
@@ -733,7 +733,7 @@
     0x00, 0x01, 0x02, 0x03, 0x00, 0x02, 0x03, 0x06,
 };
 
-// path_rules' layout 31 (test_hand_tiles.c), its squares kept as
+// path_rules' layout 31 (HandLayout, hand_tile.h), its squares kept as
 // s_handLayout31Squares, bit i for the square at (i % 4, i / 4).
 [[maybe_unused]] static const uint16_t s_handLayout31Squares = 0xb6ff;
 [[maybe_unused]] static const uint8_t s_handLayout31[670] = {

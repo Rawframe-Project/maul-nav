@@ -157,6 +157,44 @@ static inline size_t HandTileBytesWith(uint8_t* out, int32_t place, const HandSq
 }
 
 // Encodes the squares as the tile at (place, 0) into out; returns its size.
+// path_rules' layouts: grids of 4 by 4 squares of 5 m with some left out,
+// square i at (i % 4, i / 4) kept unless a draw of the generator falls on
+// 0 modulo 4. The generator runs from HAND_LAYOUT_SEED through every
+// layout in turn, 16 draws a layout. hand_tiles.h stores a few of the
+// first HAND_LAYOUT_COUNT (test_hand_tiles.c); path_rules_dense builds
+// them all.
+enum
+{
+    HAND_LAYOUT_SEED = 9,
+    HAND_LAYOUT_COUNT = 60
+};
+
+// The squares of layout k, the mask of those kept; returns their count.
+static inline int32_t HandLayout(int32_t k, HandSquare* squares, uint32_t* maskOut)
+{
+    uint32_t state = HAND_LAYOUT_SEED;
+    int32_t count = 0;
+    uint32_t mask = 0;
+    for (int32_t layout = 0; layout <= k; ++layout)
+    {
+        count = 0;
+        mask = 0;
+        for (int32_t i = 0; i < 16; ++i)
+        {
+            state = state * 1664525u + 1013904223u;
+            if ((state >> 16) % 4u != 0u)
+            {
+                int32_t x = (i % 4) * 20;
+                int32_t z = (i / 4) * 20;
+                squares[count++] = (HandSquare){x, z, x + 20, z + 20, {0}, 0};
+                mask |= 1u << i;
+            }
+        }
+    }
+    *maskOut = mask;
+    return count;
+}
+
 static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare* squares,
                                    int32_t count)
 {

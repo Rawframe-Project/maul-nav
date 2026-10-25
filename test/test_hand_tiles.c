@@ -304,46 +304,12 @@ static const HandTile s_tiles[] = {
       {60, 60, 80, 80, {0}, 0}}},
 };
 
-// path_rules' layouts: grids of 4 by 4 squares of 5 m with some left out,
-// square i at (i % 4, i / 4) kept unless a draw of the generator below
-// falls on 0 modulo 4. The generator runs from LAYOUT_SEED through every
-// layout in turn, 16 draws a layout, and the layouts stored are those
-// LAYOUTS names: of the first 60, the set a greedy choice found to fail
-// every mutant of the funnel and the path search that all 60 fail, and to
-// reach every line and branch of funnel.c and path.c that all 60 reach.
-enum
-{
-    LAYOUT_SEED = 9,
-    LAYOUT_COUNT = 60
-};
-
+// path_rules' layouts (HandLayout, hand_tile.h): the layouts stored are
+// those LAYOUTS names: of the first 60, the set a greedy choice found to
+// fail every mutant of the funnel and the path search that all 60 fail,
+// and to reach every line and branch of funnel.c and path.c that all 60
+// reach. path_rules_dense builds all 60.
 static const int32_t LAYOUTS[] = {0, 10, 31};
-
-// The squares of layout k, the mask of those kept; returns their count.
-static int32_t Layout(int32_t k, HandSquare* squares, uint32_t* maskOut)
-{
-    uint32_t state = LAYOUT_SEED;
-    int32_t count = 0;
-    uint32_t mask = 0;
-    for (int32_t layout = 0; layout <= k; ++layout)
-    {
-        count = 0;
-        mask = 0;
-        for (int32_t i = 0; i < 16; ++i)
-        {
-            state = state * 1664525u + 1013904223u;
-            if ((state >> 16) % 4u != 0u)
-            {
-                int32_t x = (i % 4) * 20;
-                int32_t z = (i / 4) * 20;
-                squares[count++] = (HandSquare){x, z, x + 20, z + 20, {0}, 0};
-                mask |= 1u << i;
-            }
-        }
-    }
-    *maskOut = mask;
-    return count;
-}
 
 enum
 {
@@ -425,12 +391,12 @@ static void Write(void)
         HandSquare squares[16];
         uint32_t mask = 0;
         int32_t k = LAYOUTS[l];
-        CHECK(k >= 0 && k < LAYOUT_COUNT, "a layout of the first 60");
-        int32_t count = Layout(k, squares, &mask);
+        CHECK(k >= 0 && k < HAND_LAYOUT_COUNT, "a layout of the first 60");
+        int32_t count = HandLayout(k, squares, &mask);
         size_t size = HandTileBytes(bytes, 0, squares, count);
         char name[64];
         snprintf(name, sizeof(name), "s_handLayout%d", k);
-        Emit("// path_rules' layout %d (test_hand_tiles.c), its squares kept as\n"
+        Emit("// path_rules' layout %d (HandLayout, hand_tile.h), its squares kept as\n"
              "// s_handLayout%dSquares, bit i for the square at (i %% 4, i / 4).\n",
              k, k);
         Emit("[[maybe_unused]] static const uint16_t s_handLayout%dSquares = 0x%04x;\n", k, mask);
