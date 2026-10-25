@@ -110,14 +110,9 @@ night)
     # fuzz_flight), a time that grows with the corpus. 1500 s leaves those
     # steps more than twice that, so the run is never killed before its
     # corpus is merged and saved. libFuzzer reads a negative
-    # -max_total_time as no limit at all.
-    case $seconds in
-    '' | *[!0-9]* | 0*)
-        echo "::error::fuzz seconds must be a whole number from 1 to 1500, not '$seconds'" >&2
-        exit 2
-        ;;
-    esac
-    if [ "$seconds" -gt 1500 ]; then
+    # -max_total_time as no limit at all. At most four digits are matched
+    # before the range test, since bash's integers overflow past 19.
+    if ! [[ $seconds =~ ^[1-9][0-9]{0,3}$ ]] || ((seconds > 1500)); then
         echo "::error::fuzz seconds must be a whole number from 1 to 1500, not '$seconds'" >&2
         exit 2
     fi
