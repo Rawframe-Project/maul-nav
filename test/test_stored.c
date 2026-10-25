@@ -13,6 +13,7 @@
 // that adds a scene's tiles while the existing tiles stay byte-identical,
 // and only then.
 
+#include "doorway.h"
 #include "float_hosts.h"
 #include "stored_format1.h"
 #include "stored_tiles.h"
@@ -87,8 +88,9 @@ static void PrintBytes(const char* name, const uint8_t* bytes, size_t size)
 }
 
 // Writes stored_tiles.h to stdout: test/world.h's four tiles, tile (0, 0)
-// of test/terrain.h's terrain, test/trench.h's two tiles and the world's
-// four flight tiles, baked with GroundDef and FlightDef.
+// of test/terrain.h's terrain and test/trench.h's two tiles, baked with
+// GroundDef; test/doorway.h's two tiles, baked with DoorwayDef; and the
+// world's four flight tiles, baked with FlightDef.
 static int Write(void)
 {
     static uint8_t bytes[1 << 20];
@@ -104,6 +106,8 @@ static int Write(void)
            "//   baked with the same def.\n"
            "// - s_trench0 and s_trench1: test/trench.h's two tiles, baked with the\n"
            "//   same def.\n"
+           "// - s_doorway0 and s_doorway1: test/doorway.h's two tiles, baked with\n"
+           "//   its DoorwayDef.\n"
            "// - s_flight0 to s_flight3: the world's four flight tiles, baked with\n"
            "//   test_stored.c's FlightDef.\n"
            "\n"
@@ -155,6 +159,24 @@ static int Write(void)
         snprintf(name, sizeof(name), "s_trench%d", t);
         PrintBytes(name, bytes, size);
     }
+    mnavBakeDef doorwayDef = DoorwayDef();
+    mnavBaker* doorwayBaker = nullptr;
+    const mnavTriangleMesh doorway = Doorway();
+    if (mnavCreateBaker(&doorwayDef, &doorwayBaker).result != mnav_success)
+    {
+        return 1;
+    }
+    for (int32_t t = 0; t < 2; ++t)
+    {
+        if (mnavBakeTile(doorwayBaker, &doorway, 1, t, 0, nullptr) != mnav_success ||
+            mnavCopyBakedTile(doorwayBaker, bytes, sizeof(bytes), &size) != mnav_success)
+        {
+            return 1;
+        }
+        snprintf(name, sizeof(name), "s_doorway%d", t);
+        PrintBytes(name, bytes, size);
+    }
+    mnavDestroyBaker(doorwayBaker);
     for (int32_t t = 0; t < 4; ++t)
     {
         if (mnavBakeFlightTile(flightBaker, &input, t & 1, t >> 1, nullptr) != mnav_success ||
