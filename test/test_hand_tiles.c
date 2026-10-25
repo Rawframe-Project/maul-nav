@@ -302,6 +302,13 @@ static const HandTile s_tiles[] = {
       {20, 60, 40, 80, {0}, 0},
       {40, 60, 60, 80, {0}, 0},
       {60, 60, 80, 80, {0}, 0}}},
+    {"s_handApartSquares",
+     "Two squares inside one tile, from (2.5, 2.5) to (7.5, 7.5) and from (15, 15) to (22.5, "
+     "22.5), apart and touching none of its sides: a search between them ends with no path.",
+     0,
+     -1,
+     2,
+     {{10, 10, 30, 30, {0}, 0}, {60, 60, 90, 90, {0}, 0}}},
 };
 
 // path_rules' layouts (HandLayout, hand_tile.h): the layouts stored are

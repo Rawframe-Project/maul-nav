@@ -5,8 +5,7 @@
 // named limits.
 
 #include "counting_allocator.h"
-#include "hand_tile.h"
-#include "navmesh.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -79,38 +78,19 @@ static bool SameId(mnavPolygonId a, mnavPolygonId b)
     return a.slot == b.slot && a.generation == b.generation && a.polygon == b.polygon;
 }
 
-// Whether two polygons share an edge in a tile or a link across tiles.
-static bool Adjacent(const mnavNavmesh* navmesh, mnavPolygonId a, mnavPolygonId b)
-{
-    const mnavTile* tile = nullptr;
-    const mnavPolygon* polygon = mnavPolygonOf(navmesh, a, &tile);
-    for (int32_t k = 0; polygon != nullptr && k < polygon->count; ++k)
-    {
-        if (a.slot == b.slot && polygon->neighbors[k] == b.polygon)
-        {
-            return true;
-        }
-    }
-    for (int32_t l = tile->firstLink[a.polygon]; l < tile->firstLink[a.polygon + 1]; ++l)
-    {
-        if (SameId(tile->links[l].target, b))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
+// Whether each of the path's polygons is joined to the one before by an
+// edge or a link: mnavCheckCorridor counts them all.
 static bool Connected(const mnavNavmesh* navmesh, const mnavPath* path)
 {
-    for (int32_t i = 0; i + 1 < path->polygonCount; ++i)
-    {
-        if (!Adjacent(navmesh, path->polygons[i], path->polygons[i + 1]))
-        {
-            return false;
-        }
-    }
-    return true;
+    static mnavPolygonId buffer[8192];
+    mnavCorridor corridor;
+    int32_t valid = -1;
+    CHECK(mnavResetCorridor(&corridor, buffer, 8192, path->polygons[0], path->points[0]) ==
+                  mnav_success &&
+              mnavSetCorridor(&corridor, path) == mnav_success &&
+              mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success,
+          "checked");
+    return valid == path->polygonCount;
 }
 
 static double Length(mnavPos3 a, mnavPos3 b)
@@ -260,14 +240,11 @@ static void TestUnloadedPlacesAreNamed(void)
 static void TestUnreachableIsNone(void)
 {
     // Two squares inside one tile, apart, touching none of its sides.
-    const HandSquare squares[2] = {{10, 10, 30, 30, {0, 0, 0, 0}, 0},
-                                   {60, 60, 90, 90, {0, 0, 0, 0}, 0}};
-    static uint8_t bytes[2048];
-    size_t size = HandTileBytes(bytes, 0, squares, 2);
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavStageTile(navmesh, s_handApartSquares, sizeof(s_handApartSquares)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "loaded");
     mnavQuery* query = MakeQuery(8192, 1000.0f);

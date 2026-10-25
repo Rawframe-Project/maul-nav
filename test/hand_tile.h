@@ -156,7 +156,6 @@ static inline size_t HandTileBytesWith(uint8_t* out, int32_t place, const HandSq
     return size;
 }
 
-// Encodes the squares as the tile at (place, 0) into out; returns its size.
 // path_rules' layouts: grids of 4 by 4 squares of 5 m with some left out,
 // square i at (i % 4, i / 4) kept unless a draw of the generator falls on
 // 0 modulo 4. The generator runs from HAND_LAYOUT_SEED through every
@@ -195,6 +194,7 @@ static inline int32_t HandLayout(int32_t k, HandSquare* squares, uint32_t* maskO
     return count;
 }
 
+// Encodes the squares as the tile at (place, 0) into out; returns its size.
 static inline size_t HandTileBytes(uint8_t* out, int32_t place, const HandSquare* squares,
                                    int32_t count)
 {
