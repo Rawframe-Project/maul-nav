@@ -338,7 +338,9 @@ static void TestLevelMergesEveryHole(void)
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
     mnavMemory memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
     mnavHeightfield heightfield;
-    CHECK(mnavBuildHeightfield(&memory, &def, &cells, &mesh, 1, 0, 0, &heightfield) == mnav_success,
+    CHECK(mnavBuildHeightfieldInput(&memory, &def, &cells,
+                                    &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
+                                    0, &heightfield) == mnav_success,
           "rasterized");
     mnavFilterWalkable(&heightfield, cells.agentHeight, cells.agentStep);
     mnavCompactField compact;

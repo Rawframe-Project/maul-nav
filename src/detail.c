@@ -557,11 +557,7 @@ mnavResult mnavBuildDetailMesh(mnavMemory* memory, const mnavCompactField* field
                 alignof(Candidate));
     mnavRelease(memory, builder.part, 1, sizeof(Part), alignof(Part));
     mnavReleaseHeightPatch(memory, &builder.patch);
-    if (result != mnav_success)
-    {
-        mnavReleaseDetailMesh(memory, detail);
-    }
-    else if (MNAV_INVARIANTS)
+    if (result == mnav_success && MNAV_INVARIANTS)
     {
         CheckDetailMesh(mesh, detail);
     }

@@ -701,10 +701,6 @@ mnavResult mnavBuildPolyMesh(mnavMemory* memory, const mnavContourSet* set, int3
     mnavRelease(memory, builder.chain, (size_t)mesh->vertexCapacity, sizeof(int32_t),
                 alignof(int32_t));
     mnavRelease(memory, builder.buckets, BUCKETS, sizeof(int32_t), alignof(int32_t));
-    if (result != mnav_success)
-    {
-        mnavReleasePolyMesh(memory, mesh);
-    }
     return result;
 }
 

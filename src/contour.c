@@ -532,11 +532,7 @@ mnavResult mnavBuildContours(mnavMemory* memory, const mnavCompactField* field,
     mnavRelease(memory, work.raw, (size_t)work.rawCapacity, sizeof(mnavContourVertex),
                 alignof(mnavContourVertex));
     mnavRelease(memory, tracer.edges, (size_t)field->spanCount, sizeof(uint8_t), alignof(uint8_t));
-    if (result != mnav_success)
-    {
-        mnavReleaseContours(memory, set);
-    }
-    else if (MNAV_INVARIANTS)
+    if (result == mnav_success && MNAV_INVARIANTS)
     {
         CheckContours(set, regions, field->frame.width - 2 * border);
     }

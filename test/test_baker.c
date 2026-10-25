@@ -329,6 +329,37 @@ static void TestStagesAreTimedAndMeasured(void)
     mnavDestroyBaker(plain);
 }
 
+// Along each axis from tile (0, 0), the last tile within the input's
+// extent, found by bisection: it bakes, and the next one is refused. Each
+// bake's stages make the same tile frame the baker checked first.
+static void TestTilesToTheExtent(void)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBaker* baker = nullptr;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
+    const int32_t dx[4] = {1, -1, 0, 0};
+    const int32_t dz[4] = {0, 0, 1, -1};
+    for (int32_t d = 0; d < 4; ++d)
+    {
+        int32_t in = 0;
+        int32_t out = 1 << 20;
+        CHECK(mnavBakeTile(baker, nullptr, 0, out * dx[d], out * dz[d], nullptr) == mnav_errorRange,
+              "far past the extent");
+        while (out - in > 1)
+        {
+            int32_t mid = in + (out - in) / 2;
+            mnavResult result = mnavBakeTile(baker, nullptr, 0, mid * dx[d], mid * dz[d], nullptr);
+            CHECK(result == mnav_success || result == mnav_errorRange, "baked or refused");
+            in = result == mnav_success ? mid : in;
+            out = result == mnav_success ? out : mid;
+        }
+        // 4,194,304 cells of extent and a tile's most, 1,024, in tiles of
+        // 128 cells less the border.
+        CHECK(in == (dx[d] + dz[d] > 0 ? 32776 : 32775), "the last tile within the extent");
+    }
+    mnavDestroyBaker(baker);
+}
+
 int main(void)
 {
     TestCreateChecksTheDef();
@@ -340,5 +371,6 @@ int main(void)
     TestBadInputIsNamed();
     TestLimitsEndInAStage();
     TestStagesAreTimedAndMeasured();
+    TestTilesToTheExtent();
     return s_failures == 0 ? 0 : 1;
 }

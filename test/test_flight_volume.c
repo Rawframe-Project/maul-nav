@@ -585,6 +585,35 @@ static void InputRefusals(mnavFlightBaker* baker, const mnavBakeInput* input)
           "a tile past the extent");
 }
 
+// Along each axis from tile (0, 0), the last tile within the input's
+// extent, found by bisection: it bakes, and the next one is refused. Each
+// bake's heightfield makes the same tile frame the baker checked first.
+static void TilesToTheExtent(mnavFlightBaker* baker)
+{
+    const mnavBakeInput none = {nullptr, 0, nullptr, 0, nullptr, 0, nullptr};
+    const int32_t dx[4] = {1, -1, 0, 0};
+    const int32_t dz[4] = {0, 0, 1, -1};
+    for (int32_t d = 0; d < 4; ++d)
+    {
+        int32_t in = 0;
+        int32_t out = 1 << 20;
+        CHECK(mnavBakeFlightTile(baker, &none, out * dx[d], out * dz[d], nullptr) ==
+                  mnav_errorRange,
+              "far past the extent");
+        while (out - in > 1)
+        {
+            int32_t mid = in + (out - in) / 2;
+            mnavResult result = mnavBakeFlightTile(baker, &none, mid * dx[d], mid * dz[d], nullptr);
+            CHECK(result == mnav_success || result == mnav_errorRange, "baked or refused");
+            in = result == mnav_success ? mid : in;
+            out = result == mnav_success ? out : mid;
+        }
+        // 4,194,304 cells of extent and a tile's most, 1,024, in tiles of
+        // 64 voxels less the border.
+        CHECK(in == (dx[d] + dz[d] > 0 ? 65552 : 65551), "the last tile within the extent");
+    }
+}
+
 // A bake of tile (0, 0) with a def.
 static mnavResult BakeLimited(mnavFlightDef def, const mnavBakeInput* input)
 {
@@ -604,6 +633,7 @@ static void TestBakerRefusals(void)
     mnavBakeInput input = {&world, 1, nullptr, 0, nullptr, 0, nullptr};
     CopyRefusals(baker, &input);
     InputRefusals(baker, &input);
+    TilesToTheExtent(baker);
     mnavDestroyFlightBaker(baker);
     mnavDestroyFlightBaker(nullptr);
     mnavFlightDef leaves = def;
