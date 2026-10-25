@@ -14,10 +14,10 @@
 
 // A hole from (5, 5) to (7, 7) of region 1, with no outline.
 static const mnavContourVertex s_vertices[4] = {
-    {5, 0, 5, 0, 0},
-    {7, 0, 5, 0, 0},
-    {7, 0, 7, 0, 0},
-    {5, 0, 7, 0, 0},
+    {5, 0, 5, 0},
+    {7, 0, 5, 0},
+    {7, 0, 7, 0},
+    {5, 0, 7, 0},
 };
 
 static void TestHoleWithoutOutlineIsDropped(void)

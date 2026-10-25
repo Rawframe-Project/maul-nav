@@ -248,7 +248,7 @@ static void TriangulateOutline(Builder* builder)
     for (int32_t h = 0; h < part->hullCount; ++h)
     {
         const mnavDetailVertex* v = &part->vertices[part->hull[h]];
-        part->ring[h] = (mnavContourVertex){v->x, v->y, v->z, 0, 0};
+        part->ring[h] = (mnavContourVertex){v->x, v->y, v->z, 0};
     }
     bool complete = true;
     mnavEarScratch scratch = {part->indices, part->ears};

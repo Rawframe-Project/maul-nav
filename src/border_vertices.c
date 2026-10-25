@@ -253,7 +253,7 @@ static bool Chain(Work* work)
 static mnavContourVertex Ground(const mnavPolyMesh* mesh, uint16_t index)
 {
     const mnavMeshVertex* v = &mesh->vertices[index];
-    return (mnavContourVertex){v->x, v->y, v->z, 0, 0};
+    return (mnavContourVertex){v->x, v->y, v->z, 0};
 }
 
 // Whether the hole keeps the outline's shape: a closed chain lies round
