@@ -1,128 +1,139 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The detail mesh's outline: edge samples and their triangulation.
+// The detail mesh: edge samples and their triangulation, read from baked
+// tiles. Each polygon's detail triangles are drawn alone and read in
+// sixteenths of a cell on the ground and whole cell heights up.
 
-#include "allocator.h"
-#include "border_vertices.h"
-#include "compact.h"
-#include "contour.h"
-#include "detail.h"
-#include "erode.h"
-#include "filter.h"
-#include "hand_field.h"
-#include "heightfield.h"
-#include "holes.h"
-#include "polymesh.h"
-#include "region.h"
 #include "soup.h"
+#include "squares.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
+#include "maul-nav/debug.h"
 
 #include <stdint.h>
+#include <stdio.h>
 
-// Sixteenths of a cell per cell.
-#define SUBCELLS 16
+// The bytes of the tile with a bump on its edge, the same on every
+// platform.
+#define BUMP_HASH 0xa66f564a7b20c654ull
 
-// A hand field compacted, every span in region 1.
-typedef struct Setup
+enum
 {
-    mnavMemory memory;
-    mnavCompactField field;
-    uint32_t ids[WIDTH * WIDTH * MAX_SPANS];
-    mnavRegionMap regions;
-} Setup;
+    DRAW_ROOM = 1 << 14
+};
 
-static void Prepare(Setup* setup, Field* hand)
+static mnavDebugVertex s_drawVertices[DRAW_ROOM];
+static uint32_t s_drawTriangles[DRAW_ROOM];
+
+// A corner of a detail triangle: x and z in sixteenths of a cell of the
+// scene, y in cell heights.
+typedef struct Corner
 {
-    setup->memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    CHECK(mnavBuildCompactField(&setup->memory, Pack(hand), HEIGHT, STEP, &setup->field) ==
-              mnav_success,
-          "compacted");
-    for (int32_t i = 0; i < setup->field.spanCount; ++i)
-    {
-        setup->ids[i] = 1;
-    }
-    setup->regions = (mnavRegionMap){setup->ids, setup->field.spanCount, 1, 0};
+    int64_t x;
+    int64_t y;
+    int64_t z;
+} Corner;
+
+static Corner At16(uint32_t i)
+{
+    const mnavDebugVertex* v = &s_drawVertices[i];
+    return (Corner){(int64_t)(v->x * 64.0f) - AT * 16, (int64_t)(v->y * 8.0f),
+                    (int64_t)(v->z * 64.0f) - AT * 16};
 }
 
-// A floor at height 4, and at height top in cell (bx, bz).
-static void Bumped(Field* hand, int32_t bx, int32_t bz, int32_t top)
+static bool SamePlace(Corner a, Corner b)
 {
-    *hand = (Field){0};
-    for (int32_t z = 0; z < WIDTH; ++z)
+    return a.x == b.x && a.z == b.z;
+}
+
+// One polygon's detail: its triangles, its distinct corners and the
+// triangle edges with no triangle across.
+typedef struct Part
+{
+    int32_t triangles;
+    int32_t vertices;
+    int32_t outline;
+    // Every triangle wound like the polygons, and each edge once.
+    bool sound;
+    int64_t twiceArea;
+} Part;
+
+static Part Read(mnavPolygonId polygon)
+{
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0},
+                         s_drawVertices,
+                         DRAW_ROOM,
+                         0,
+                         s_drawTriangles,
+                         DRAW_ROOM,
+                         0,
+                         nullptr,
+                         0,
+                         0};
+    CHECK(mnavDebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
+    Part part = {b.triangleCount / 3, 0, 0, true, 0};
+    for (int32_t i = 0; i < b.vertexCount; ++i)
     {
-        for (int32_t x = 0; x < WIDTH; ++x)
+        bool first = true;
+        for (int32_t j = 0; j < i && first; ++j)
         {
-            int32_t h = x == bx && z == bz ? top : 4;
-            AddSpan(hand, x, z, h - 1, h, mnav_areaWalkable);
+            first = !SamePlace(At16((uint32_t)i), At16((uint32_t)j));
+        }
+        part.vertices += first ? 1 : 0;
+    }
+    for (int32_t t = 0; t < part.triangles; ++t)
+    {
+        const uint32_t* c = &s_drawTriangles[3 * t];
+        Corner a = At16(c[0]);
+        Corner p = At16(c[1]);
+        Corner q = At16(c[2]);
+        int64_t twice = (p.x - a.x) * (q.z - a.z) - (q.x - a.x) * (p.z - a.z);
+        part.sound = part.sound && twice < 0;
+        part.twiceArea -= twice;
+        for (int32_t k = 0; k < 3; ++k)
+        {
+            Corner u = At16(c[k]);
+            Corner v = At16(c[(k + 1) % 3]);
+            int32_t same = 0;
+            int32_t across = 0;
+            for (int32_t n = 0; n < part.triangles; ++n)
+            {
+                for (int32_t j = 0; j < 3; ++j)
+                {
+                    Corner s = At16(s_drawTriangles[3 * n + j]);
+                    Corner e = At16(s_drawTriangles[3 * n + (j + 1) % 3]);
+                    same += SamePlace(s, u) && SamePlace(e, v) ? 1 : 0;
+                    across += SamePlace(s, v) && SamePlace(e, u) ? 1 : 0;
+                }
+            }
+            part.sound = part.sound && same == 1 && across <= 1;
+            part.outline += across == 0 ? 1 : 0;
         }
     }
+    return part;
 }
 
-// Up to two rectangles at height 4 in region 1, sharing vertices where
-// they meet.
-typedef struct Rects
+// Whether the polygon's detail has a corner at (x, y, z), x and z in
+// sixteenths of a cell of the scene, y in cell heights.
+static bool HasCorner(mnavPolygonId polygon, int64_t x, int64_t y, int64_t z)
 {
-    mnavMeshVertex vertices[8];
-    mnavPolygon polygons[2];
-    mnavPolyMesh mesh;
-} Rects;
-
-static void AddRect(Rects* rects, int32_t x0, int32_t z0, int32_t x1, int32_t z1)
-{
-    mnavPolyMesh* mesh = &rects->mesh;
-    const int32_t corners[8] = {x0, z0, x0, z1, x1, z1, x1, z0};
-    mnavPolygon* polygon = &rects->polygons[mesh->polygonCount++];
-    *polygon = (mnavPolygon){{0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF}, {0}, {0}, 4, 1, 1};
-    for (int32_t k = 0; k < 4; ++k)
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0},
+                         s_drawVertices,
+                         DRAW_ROOM,
+                         0,
+                         s_drawTriangles,
+                         DRAW_ROOM,
+                         0,
+                         nullptr,
+                         0,
+                         0};
+    CHECK(mnavDebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
+    for (int32_t i = 0; i < b.vertexCount; ++i)
     {
-        int32_t found = -1;
-        for (int32_t v = 0; v < mesh->vertexCount; ++v)
-        {
-            found =
-                rects->vertices[v].x == corners[2 * k] && rects->vertices[v].z == corners[2 * k + 1]
-                    ? v
-                    : found;
-        }
-        if (found < 0)
-        {
-            found = mesh->vertexCount++;
-            rects->vertices[found] =
-                (mnavMeshVertex){(uint16_t)corners[2 * k], BASE + 4, (uint16_t)corners[2 * k + 1]};
-        }
-        polygon->vertices[k] = (uint16_t)found;
-    }
-}
-
-static void InitRects(Rects* rects)
-{
-    *rects = (Rects){0};
-    rects->mesh.vertices = rects->vertices;
-    rects->mesh.polygons = rects->polygons;
-    rects->mesh.tileCells = WIDTH;
-}
-
-static int32_t OutlineEdges(const mnavDetailMesh* detail, int32_t p)
-{
-    int32_t count = 0;
-    const mnavDetailPart* part = &detail->parts[p];
-    for (int32_t t = 0; t < part->triangleCount; ++t)
-    {
-        uint8_t outline = detail->triangles[part->firstTriangle + t].outline;
-        count += (outline & 1) + ((outline >> 1) & 1) + ((outline >> 2) & 1);
-    }
-    return count;
-}
-
-static bool HasVertex(const mnavDetailMesh* detail, int32_t p, int32_t x, int32_t y, int32_t z)
-{
-    const mnavDetailPart* part = &detail->parts[p];
-    for (int32_t v = 0; v < part->vertexCount; ++v)
-    {
-        const mnavDetailVertex* d = &detail->vertices[part->firstVertex + v];
-        if (d->x == x && d->y == y && d->z == z)
+        Corner c = At16((uint32_t)i);
+        if (c.x == x && c.y == y && c.z == z)
         {
             return true;
         }
@@ -130,328 +141,252 @@ static bool HasVertex(const mnavDetailMesh* detail, int32_t p, int32_t x, int32_
     return false;
 }
 
-// The part's vertices on the line x = lineX, or z = lineZ when lineX is
-// negative.
-static int32_t OnLine(const mnavDetailMesh* detail, int32_t p, int32_t lineX, int32_t lineZ)
+// The polygon's detail corners on the line x = lineX, or z = lineZ when
+// lineX is negative, in sixteenths of a cell of the scene.
+static int32_t OnLine(mnavPolygonId polygon, int64_t lineX, int64_t lineZ)
 {
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0},
+                         s_drawVertices,
+                         DRAW_ROOM,
+                         0,
+                         s_drawTriangles,
+                         DRAW_ROOM,
+                         0,
+                         nullptr,
+                         0,
+                         0};
+    CHECK(mnavDebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
     int32_t count = 0;
-    const mnavDetailPart* part = &detail->parts[p];
-    for (int32_t v = 0; v < part->vertexCount; ++v)
+    for (int32_t i = 0; i < b.vertexCount; ++i)
     {
-        const mnavDetailVertex* d = &detail->vertices[part->firstVertex + v];
-        count += (lineX >= 0 ? d->x == lineX : d->z == lineZ) ? 1 : 0;
+        Corner c = At16((uint32_t)i);
+        bool first = true;
+        for (int32_t j = 0; j < i && first; ++j)
+        {
+            first = !SamePlace(c, At16((uint32_t)j));
+        }
+        count += first && (lineX >= 0 ? c.x == lineX : c.z == lineZ) ? 1 : 0;
     }
     return count;
 }
 
-static bool Sound(const mnavDetailMesh* detail, const mnavPolyMesh* mesh);
+// The polygon over the center of cell (x, z) of the scene within a meter
+// of a level.
+static mnavPolygonId Over(int32_t x, int32_t z, int32_t level)
+{
+    mnavPos3 center = {(AT + x + 0.5) * 0.25, level * 0.125, (AT + z + 0.5) * 0.25};
+    mnavNearest n;
+    CHECK(mnavFindNearest(s_navmesh, nullptr, center, (mnavVec3){0.01f, 1.0f, 0.01f}, &n) ==
+                  mnav_success &&
+              n.polygon.slot != 0 && n.over,
+          "a polygon over the cell");
+    return n.polygon;
+}
+
+// The exact def with detail samples every sample cells within error cell
+// heights, both in sixteenths.
+static void UseDetail(int32_t sample, int32_t error)
+{
+    mnavBakeDef def = Exact();
+    def.detailSampleDistance = 0.25f * (float)sample / 16.0f;
+    def.detailMaxError = 0.125f * (float)error / 16.0f;
+    UseDef(&def);
+}
+
+// The scene's floor with cell (x, z) raised to a level.
+static Scene Bumped(int32_t x, int32_t z, int32_t level)
+{
+    Scene scene = Flat(0, false);
+    if (x >= 0)
+    {
+        scene.level[z][x] = level;
+    }
+    return scene;
+}
 
 static void TestFlatSquare(void)
 {
-    static Field hand;
-    Bumped(&hand, -1, -1, 0);
-    static Setup setup;
-    Prepare(&setup, &hand);
-    Rects rects;
-    InitRects(&rects);
-    AddRect(&rects, 0, 0, 6, 6);
-    mnavDetailMesh detail;
-    mnavDetailSettings none = {0, 16, 1, 0};
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh, none,
-                              &detail) == mnav_success,
-          "built");
-    CHECK(detail.parts[0].vertexCount == 4 && detail.parts[0].triangleCount == 2,
+    // Inside the ledge ring the floor's cells are 1 to 7, one quad from
+    // (1, 1) to (8, 8), its top at level 1.
+    UseDetail(0, 16);
+    Scene scene = Bumped(-1, -1, 0);
+    Load(&scene);
+    Part part = Read(Over(4, 4, 0));
+    CHECK(part.sound && part.vertices == 4 && part.triangles == 2 && part.outline == 4,
           "no samples: the polygon's two triangles");
-    CHECK(OutlineEdges(&detail, 0) == 4, "four outline edges");
-    CHECK(HasVertex(&detail, 0, 96, BASE + 4, 0), "vertices in sixteenths");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
-    mnavDetailSettings every = {16, 16, 1, 0};
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh, every,
-                              &detail) == mnav_success,
-          "built");
-    CHECK(detail.parts[0].vertexCount == 4, "flat samples are dropped");
-    CHECK(detail.fallbackHeights == 0, "every sample found a height");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
-    mnavReleaseCompactField(&setup.memory, &setup.field);
-    CHECK(setup.memory.used == 0, "everything released");
+    CHECK(HasCorner(Over(4, 4, 0), 8 * 16, 1, 16), "corners in sixteenths, at the top");
+    UseDetail(16, 16);
+    Load(&scene);
+    part = Read(Over(4, 4, 0));
+    CHECK(part.vertices == 4, "flat samples are dropped");
+    CHECK(s_report.fallbackHeights == 0, "every sample found a height");
 }
 
 static void TestBumpOnAnEdgeIsSampled(void)
 {
-    static Field hand;
-    Bumped(&hand, 3, 0, 8);
-    static Setup setup;
-    Prepare(&setup, &hand);
-    Rects rects;
-    InitRects(&rects);
-    AddRect(&rects, 0, 0, 6, 6);
-    mnavDetailMesh detail;
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
-                              (mnavDetailSettings){16, 16, 1, 0}, &detail) == mnav_success,
-          "built");
+    // Cell (4, 1), on the quad's -Z edge, 4 levels up.
+    Scene scene = Bumped(4, 1, 4);
+    UseDetail(16, 16);
+    Load(&scene);
+    mnavPolygonId polygon = Over(2, 4, 0);
     // Samples fall every cell; the bump's and, to hold its sides within
     // the error, its two neighbors are kept.
-    CHECK(OnLine(&detail, 0, -1, 0) == 5 && HasVertex(&detail, 0, 48, BASE + 8, 0) &&
-              HasVertex(&detail, 0, 32, BASE + 4, 0) && HasVertex(&detail, 0, 64, BASE + 4, 0),
+    CHECK(OnLine(polygon, -1, 16) == 5 && HasCorner(polygon, 64, 5, 16) &&
+              HasCorner(polygon, 48, 1, 16) && HasCorner(polygon, 80, 1, 16),
           "on the edge, the bump and its neighbors, nothing else");
-    CHECK(OutlineEdges(&detail, 0) == 7, "seven outline edges");
-    CHECK(detail.parts[0].vertexCount > 7, "samples inside hold the floor round the bump");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
+    Part part = Read(polygon);
+    CHECK(part.sound && part.outline == 7, "seven outline edges");
+    CHECK(part.vertices > 7, "samples inside hold the floor round the bump");
+    // The tile also keeps, per detail triangle, which of its edges lie on
+    // the polygon's outline; nothing reads them back, so the bytes are
+    // pinned.
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_tile, (int32_t)s_tileSize);
+    printf("BUMP_HASH=%016llx\n", (unsigned long long)hash);
+    CHECK(hash == BUMP_HASH, "the pinned bytes");
     // Within the maximum error the bump is dropped.
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
-                              (mnavDetailSettings){16, 64, 1, 0}, &detail) == mnav_success,
-          "built");
-    CHECK(detail.parts[0].vertexCount == 4, "4 cell heights is within 64 sixteenths");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
-    mnavReleaseCompactField(&setup.memory, &setup.field);
+    UseDetail(16, 64);
+    Load(&scene);
+    CHECK(Read(Over(2, 4, 0)).vertices == 4, "4 cell heights is within 64 sixteenths");
 }
 
 static void TestHillInsideIsSampled(void)
 {
-    // A hill in the middle of the square; the edges stay flat.
-    static Field hand;
-    Bumped(&hand, 3, 3, 9);
-    static Setup setup;
-    Prepare(&setup, &hand);
-    Rects rects;
-    InitRects(&rects);
-    AddRect(&rects, 0, 0, 6, 6);
-    mnavDetailMesh detail;
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
-                              (mnavDetailSettings){16, 16, 1, 0}, &detail) == mnav_success,
-          "built");
-    CHECK(OutlineEdges(&detail, 0) == 4, "the outline unsampled");
-    CHECK(HasVertex(&detail, 0, 48, BASE + 9, 48), "the hilltop added first");
-    CHECK(detail.cappedPolygons == 0 && Sound(&detail, &rects.mesh), "sound");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
-    mnavReleaseCompactField(&setup.memory, &setup.field);
+    // A hill at cell (5, 5), 5 levels up; the edges stay flat.
+    Scene scene = Bumped(5, 5, 5);
+    UseDetail(16, 16);
+    Load(&scene);
+    mnavPolygonId polygon = Over(2, 2, 0);
+    Part part = Read(polygon);
+    CHECK(part.sound && part.outline == 4, "the outline unsampled");
+    CHECK(HasCorner(polygon, 80, 6, 80), "the hilltop added");
+    CHECK(s_report.cappedDetail == 0, "within the cap");
     // A hill exactly the maximum error tall is within it.
-    Bumped(&hand, 3, 3, 5);
-    Prepare(&setup, &hand);
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
-                              (mnavDetailSettings){16, 16, 1, 0}, &detail) == mnav_success,
-          "built");
-    CHECK(detail.parts[0].vertexCount == 4, "one cell height is within 16 sixteenths");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
-    mnavReleaseCompactField(&setup.memory, &setup.field);
-    Bumped(&hand, 3, 3, 9);
-    Prepare(&setup, &hand);
-    // With samples twice as far apart the grid misses the hill's cell.
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
-                              (mnavDetailSettings){32, 16, 1, 0}, &detail) == mnav_success,
-          "built");
-    CHECK(detail.parts[0].vertexCount == 4, "nothing to add");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
-    mnavReleaseCompactField(&setup.memory, &setup.field);
+    scene = Bumped(5, 5, 1);
+    Load(&scene);
+    CHECK(Read(Over(2, 2, 0)).vertices == 4, "one cell height is within 16 sixteenths");
+    // With samples twice as far apart the grid, every second cell of the
+    // tile, misses the hill's cell.
+    scene = Bumped(5, 5, 5);
+    UseDetail(32, 16);
+    Load(&scene);
+    CHECK(Read(Over(2, 2, 0)).vertices == 4, "nothing to add");
 }
 
 static void TestSharedEdgeIsSampledAlike(void)
 {
-    static Field hand;
-    Bumped(&hand, 3, 2, 8);
-    static Setup setup;
-    Prepare(&setup, &hand);
-    Rects rects;
-    InitRects(&rects);
-    AddRect(&rects, 0, 0, 3, 6);
-    AddRect(&rects, 3, 0, 6, 6);
-    mnavDetailMesh detail;
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
-                              (mnavDetailSettings){16, 16, 1, 0}, &detail) == mnav_success,
-          "built");
-    CHECK(HasVertex(&detail, 0, 48, BASE + 8, 32) && HasVertex(&detail, 1, 48, BASE + 8, 32),
-          "both sides hold the bump's sample");
-    int32_t onEdge[2] = {0, 0};
-    for (int32_t p = 0; p < 2; ++p)
+    // Area 7 from x = 4 on: two quads sharing x = 4, and a bump at (4, 3)
+    // on the shared edge.
+    Scene scene = Bumped(4, 3, 4);
+    for (int32_t z = 0; z < SIDE; ++z)
     {
-        for (int32_t v = 0; v < detail.parts[p].vertexCount; ++v)
+        for (int32_t x = 4; x < SIDE; ++x)
         {
-            onEdge[p] += detail.vertices[detail.parts[p].firstVertex + v].x == 48 ? 1 : 0;
+            scene.area[z][x] = 7;
         }
     }
-    CHECK(onEdge[0] == 5 && onEdge[1] == 5, "five points on the shared edge each side");
-    bool alike = true;
-    for (int32_t v = 0; v < detail.parts[0].vertexCount; ++v)
-    {
-        const mnavDetailVertex* d = &detail.vertices[detail.parts[0].firstVertex + v];
-        alike = alike && (d->x != 48 || HasVertex(&detail, 1, d->x, d->y, d->z));
-    }
-    CHECK(alike, "the same points");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
-    mnavReleaseCompactField(&setup.memory, &setup.field);
+    UseDetail(16, 16);
+    Load(&scene);
+    mnavPolygonId left = Over(2, 3, 0);
+    mnavPolygonId right = Over(6, 3, 0);
+    CHECK(HasCorner(left, 64, 5, 48) && HasCorner(right, 64, 5, 48),
+          "both sides hold the bump's sample");
+    CHECK(OnLine(left, 64, -1) == 5 && OnLine(right, 64, -1) == 5,
+          "five points on the shared edge each side");
 }
 
 static void TestTiesKeepTheFirstFromTheLexicalEnd(void)
 {
-    // A ridge two cells long on the square's +X edge, which runs from
-    // (3, 3) to (3, 0) in polygon order: its two samples stray equally
-    // far, and once one is kept the other is within the error. The edge
-    // is sampled from its lexically first end, (3, 0), so the sample
-    // nearer it is kept, whichever polygon samples the edge.
-    static Field hand;
-    hand = (Field){0};
-    for (int32_t z = 0; z < WIDTH; ++z)
+    // Area 7 from x = 4 on, and a ridge two cells long on the shared edge
+    // x = 4, at (4, 2) and (4, 3), 2 levels up. Its two samples stray
+    // equally far, and once one is kept the other is within the error.
+    // The edge is sampled from its lexically first end, (4, 1), so both
+    // polygons keep the sample nearer it, whichever way each runs it.
+    Scene scene = Flat(0, false);
+    for (int32_t z = 0; z < SIDE; ++z)
     {
-        for (int32_t x = 0; x < WIDTH; ++x)
+        for (int32_t x = 4; x < SIDE; ++x)
         {
-            int32_t h = x == 3 && (z == 1 || z == 2) ? 6 : 4;
-            AddSpan(&hand, x, z, h - 1, h, mnav_areaWalkable);
+            scene.area[z][x] = 7;
         }
     }
-    static Setup setup;
-    Prepare(&setup, &hand);
-    Rects rects;
-    InitRects(&rects);
-    AddRect(&rects, 0, 0, 3, 3);
-    mnavDetailMesh detail;
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
-                              (mnavDetailSettings){16, 16, 1, 0}, &detail) == mnav_success,
-          "built");
-    CHECK(OnLine(&detail, 0, 48, -1) == 3 && HasVertex(&detail, 0, 48, BASE + 6, 16),
-          "the sample nearer (3, 0)");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
-    mnavReleaseCompactField(&setup.memory, &setup.field);
+    scene.level[2][4] = 2;
+    scene.level[3][4] = 2;
+    UseDetail(16, 16);
+    Load(&scene);
+    mnavPolygonId left = Over(2, 5, 0);
+    mnavPolygonId right = Over(6, 5, 0);
+    CHECK(HasCorner(left, 64, 3, 32) && HasCorner(right, 64, 3, 32) &&
+              !HasCorner(left, 64, 3, 48) && !HasCorner(right, 64, 3, 48),
+          "the sample nearer (4, 1)");
 }
 
 static void TestNoHeightsFallBackAndCount(void)
 {
-    static Field hand;
-    hand = (Field){0};
-    static Setup setup;
-    Prepare(&setup, &hand);
-    Rects rects;
-    InitRects(&rects);
-    AddRect(&rects, 0, 0, 6, 6);
-    mnavDetailMesh detail;
-    CHECK(mnavBuildDetailMesh(&setup.memory, &setup.field, &setup.regions, &rects.mesh,
-                              (mnavDetailSettings){16, 16, 1, 0}, &detail) == mnav_success,
-          "built");
-    CHECK(detail.fallbackHeights == 4 * 5 + 5 * 5, "every edge and grid sample counted");
-    CHECK(detail.parts[0].vertexCount == 4, "the polygon's own heights, nothing kept");
-    mnavReleaseDetailMesh(&setup.memory, &detail);
-    mnavReleaseCompactField(&setup.memory, &setup.field);
-}
-
-// Twice a triangle's signed area on the ground, in sixteenths squared.
-static int64_t TriangleArea2(const mnavDetailMesh* detail, const mnavDetailPart* part,
-                             const mnavDetailTriangle* t)
-{
-    const mnavDetailVertex* a = &detail->vertices[part->firstVertex + t->corners[0]];
-    const mnavDetailVertex* b = &detail->vertices[part->firstVertex + t->corners[1]];
-    const mnavDetailVertex* c = &detail->vertices[part->firstVertex + t->corners[2]];
-    return (int64_t)(b->x - a->x) * (c->z - a->z) - (int64_t)(c->x - a->x) * (b->z - a->z);
-}
-
-// Every part within its caps with an outline, every triangle wound like
-// the polygons, and the triangles of each part covering its polygon to
-// within the rounding of edge samples.
-static bool Sound(const mnavDetailMesh* detail, const mnavPolyMesh* mesh)
-{
-    for (int32_t p = 0; p < detail->partCount; ++p)
+    // Found by a search of 2D floors: a floor of 17 by 17 cells from 2 m,
+    // less a block from cell (4, 16), 5 cells by 4, that cuts a notch one
+    // cell deep into its +Z side. Within a cell of edge error the notch is
+    // simplified away, and a sample over it, 1.5 m apart, finds no floor
+    // within the search: it takes the polygon's own height and is
+    // counted. Within no detail error a sample off that height would be
+    // kept, but the surface stays flat.
+    const mnavVec2 floor[4] = {{2.0f, 2.0f}, {2.0f, 6.25f}, {6.25f, 6.25f}, {6.25f, 2.0f}};
+    const mnavVec2 block[4] = {{3.0f, 6.0f}, {3.0f, 7.0f}, {4.25f, 7.0f}, {4.25f, 6.0f}};
+    const mnavOutline outlines[2] = {{floor, 4, mnav_areaWalkable}, {block, 4, mnav_areaNone}};
+    mnavBakeDef def = Exact();
+    def.maxEdgeError = 0.25f;
+    def.detailSampleDistance = 1.5f;
+    def.detailMaxError = 0.0f;
+    UseDef(&def);
+    size_t size = 0;
+    CHECK(mnavBakeTile2D(s_baker, outlines, 2, 0, 0, &s_report) == mnav_success &&
+              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
+          "baked");
+    mnavDestroyNavmesh(s_navmesh);
+    s_navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
+              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavCommit(s_navmesh) == mnav_success,
+          "loaded");
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0},
+                         s_drawVertices,
+                         DRAW_ROOM,
+                         0,
+                         s_drawTriangles,
+                         DRAW_ROOM,
+                         0,
+                         nullptr,
+                         0,
+                         0};
+    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    bool level = b.vertexCount > 0;
+    for (int32_t i = 0; i < b.vertexCount; ++i)
     {
-        const mnavDetailPart* part = &detail->parts[p];
-        const mnavPolygon* polygon = &mesh->polygons[p];
-        if (part->vertexCount > MNAV_DETAIL_VERTICES ||
-            part->triangleCount > 2 * MNAV_DETAIL_VERTICES || OutlineEdges(detail, p) < 3)
-        {
-            return false;
-        }
-        int64_t area = 0;
-        for (int32_t t = 0; t < part->triangleCount; ++t)
-        {
-            int64_t a = TriangleArea2(detail, part, &detail->triangles[part->firstTriangle + t]);
-            if (a > 0)
-            {
-                return false;
-            }
-            area += a;
-        }
-        int64_t polygonArea = 0;
-        for (int32_t i = 0, j = polygon->count - 1; i < polygon->count; j = i++)
-        {
-            const mnavMeshVertex* a = &mesh->vertices[polygon->vertices[i]];
-            const mnavMeshVertex* b = &mesh->vertices[polygon->vertices[j]];
-            polygonArea += (int64_t)a->x * b->z - (int64_t)b->x * a->z;
-        }
-        // Each rounded sample moves the outline by at most half a
-        // sixteenth across an edge of at most the tile's side.
-        int64_t slack = (int64_t)(part->vertexCount - polygon->count) * mesh->tileCells * SUBCELLS;
-        int64_t difference = -area - polygonArea * 256;
-        difference = difference < 0 ? -difference : difference;
-        if (difference > slack)
-        {
-            return false;
-        }
+        level = level && s_drawVertices[i].y == s_drawVertices[0].y;
     }
-    return true;
+    CHECK(s_report.fallbackHeights > 0 && level, "counted, the surface flat");
 }
 
-static void TestLevelDetailIsSound(void)
+static void TestSearchTakesTheHeightNearestTheMean(void)
 {
-    static mnavVec3 vertices[LEVEL_VERTICES];
-    static int32_t indices[LEVEL_TRIANGLES * 3];
-    MakeLevel(vertices, indices);
-    mnavTriangleMesh input = {vertices, LEVEL_VERTICES, indices, LEVEL_TRIANGLES, nullptr};
-    mnavBakeDef def = mnavDefaultBakeDef();
-    mnavBakeCells cells;
-    CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
-    mnavMemory memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
-    mnavHeightfield heightfield;
-    CHECK(mnavBuildHeightfieldInput(&memory, &def, &cells,
-                                    &(mnavBakeInput){&input, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
-                                    0, &heightfield) == mnav_success,
-          "rasterized");
-    mnavFilterWalkable(&heightfield, cells.agentHeight, cells.agentStep);
-    mnavCompactField compact;
-    CHECK(mnavBuildCompactField(&memory, &heightfield, cells.agentHeight, cells.agentStep,
-                                &compact) == mnav_success,
-          "compacted");
-    CHECK(mnavErode(&memory, &compact, cells.agentRadius) == mnav_success, "eroded");
-    mnavRegionMap regions;
-    CHECK(mnavBuildRegions(&memory, &compact, cells.border, cells.minRegion, &regions) ==
-              mnav_success,
-          "regions");
-    mnavContourSet set;
-    CHECK(mnavBuildContours(&memory, &compact, &regions, cells.border, cells.edgeError,
-                            cells.edgeLength, &set) == mnav_success,
-          "contours");
-    CHECK(mnavMergeHoles(&memory, &set, regions.count) == mnav_success, "merged");
-    mnavPolyMesh mesh;
-    CHECK(mnavBuildPolyMesh(&memory, &set, def.tileCells, def.limits.tileVertices,
-                            def.limits.tilePolygons, &mesh) == mnav_success,
-          "polygons");
-    CHECK(mnavRemoveBorderVertices(&memory, &mesh, def.limits.tilePolygons) == mnav_success,
-          "border vertices");
-    CHECK(mnavLinkPolyMesh(&memory, &mesh) == mnav_success, "linked");
-    mnavDetailSettings settings = {cells.detailSample, cells.detailError, 1, cells.border};
-    mnavDetailMesh detail;
-    CHECK(mnavBuildDetailMesh(&memory, &compact, &regions, &mesh, settings, &detail) ==
-              mnav_success,
-          "detail");
-    CHECK(Sound(&detail, &mesh) && detail.failedPolygons == 0, "sound");
-    mnavReleaseDetailMesh(&memory, &detail);
-    // Samples every cell meet the per-edge cap on the longest edges.
-    settings.sample = SUBCELLS;
-    settings.error = 0;
-    CHECK(mnavBuildDetailMesh(&memory, &compact, &regions, &mesh, settings, &detail) ==
-              mnav_success,
-          "dense detail");
-    CHECK(Sound(&detail, &mesh) && detail.failedPolygons == 0, "sound when dense");
-    int32_t most = 0;
-    for (int32_t p = 0; p < detail.partCount; ++p)
-    {
-        int32_t samples = detail.parts[p].vertexCount - mesh.polygons[p].count;
-        most = samples > most ? samples : most;
-    }
-    printf("dense: vertices=%d triangles=%d most samples in a part=%d\n", detail.vertexCount,
-           detail.triangleCount, most);
-    mnavReleaseDetailMesh(&memory, &detail);
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
-    mnavReleaseRegions(&memory, &regions);
-    mnavReleaseCompactField(&memory, &compact);
-    mnavReleaseHeightfield(&memory, &heightfield);
-    CHECK(memory.used == 0, "everything released");
+    // Found by a search of scenes: a hole at (4, 8) cuts its neighbor
+    // (4, 7) as a ledge, and within a cell of edge error the polygon
+    // still covers it. The sample at the corner (4, 7) has no floor of its
+    // own, and the cells round it hold the floor's top, 1, and at (5, 7)
+    // a step's, 2. Two cells at level 2, (1, 7) and (7, 7), raise the
+    // polygon's mean height, and the search takes the height nearest it:
+    // the step's, kept within no error.
+    Scene scene = Flat(0, false);
+    scene.level[7][1] = 2;
+    scene.level[7][5] = 1;
+    scene.level[7][7] = 2;
+    scene.level[8][4] = NO_FLOOR;
+    mnavBakeDef def = Exact();
+    def.maxEdgeError = 0.25f;
+    def.detailSampleDistance = 0.25f;
+    def.detailMaxError = 0.0f;
+    UseDef(&def);
+    Load(&scene);
+    CHECK(HasCorner(Over(4, 4, 0), 64, 2, 112), "the step's height at (4, 7)");
 }
 
 enum
@@ -495,52 +430,46 @@ static void TestBumpyGroundReachesTheCap(void)
     static mnavVec3 vertices[TERRAIN_VERTICES];
     static int32_t indices[TERRAIN_TRIANGLES * 3];
     MakeTerrain(vertices, indices);
-    mnavTriangleMesh input = {vertices, TERRAIN_VERTICES, indices, TERRAIN_TRIANGLES, nullptr};
+    const mnavTriangleMesh mesh = {vertices, TERRAIN_VERTICES, indices, TERRAIN_TRIANGLES, nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    // Samples every cell within no error.
     mnavBakeDef def = mnavDefaultBakeDef();
-    mnavBakeCells cells;
-    CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
-    mnavMemory memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
-    mnavHeightfield heightfield;
-    CHECK(mnavBuildHeightfieldInput(&memory, &def, &cells,
-                                    &(mnavBakeInput){&input, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
-                                    0, &heightfield) == mnav_success,
-          "rasterized");
-    mnavFilterWalkable(&heightfield, cells.agentHeight, cells.agentStep);
-    mnavCompactField compact;
-    CHECK(mnavBuildCompactField(&memory, &heightfield, cells.agentHeight, cells.agentStep,
-                                &compact) == mnav_success,
-          "compacted");
-    CHECK(mnavErode(&memory, &compact, cells.agentRadius) == mnav_success, "eroded");
-    mnavRegionMap regions;
-    CHECK(mnavBuildRegions(&memory, &compact, cells.border, cells.minRegion, &regions) ==
-              mnav_success,
-          "regions");
-    mnavContourSet set;
-    CHECK(mnavBuildContours(&memory, &compact, &regions, cells.border, cells.edgeError,
-                            cells.edgeLength, &set) == mnav_success,
-          "contours");
-    CHECK(mnavMergeHoles(&memory, &set, regions.count) == mnav_success, "merged");
-    mnavPolyMesh mesh;
-    CHECK(mnavBuildPolyMesh(&memory, &set, def.tileCells, def.limits.tileVertices,
-                            def.limits.tilePolygons, &mesh) == mnav_success,
-          "polygons");
-    CHECK(mnavLinkPolyMesh(&memory, &mesh) == mnav_success, "linked");
-    mnavDetailSettings settings = {SUBCELLS, 0, 1, cells.border};
-    mnavDetailMesh detail;
-    CHECK(mnavBuildDetailMesh(&memory, &compact, &regions, &mesh, settings, &detail) ==
-              mnav_success,
-          "detail");
-    CHECK(detail.cappedPolygons > 0, "some polygons reach the cap");
-    CHECK(Sound(&detail, &mesh) && detail.failedPolygons == 0, "sound at the cap");
-    printf("terrain: polygons=%d vertices=%d triangles=%d capped=%d\n", mesh.polygonCount,
-           detail.vertexCount, detail.triangleCount, detail.cappedPolygons);
-    mnavReleaseDetailMesh(&memory, &detail);
-    mnavReleasePolyMesh(&memory, &mesh);
-    mnavReleaseContours(&memory, &set);
-    mnavReleaseRegions(&memory, &regions);
-    mnavReleaseCompactField(&memory, &compact);
-    mnavReleaseHeightfield(&memory, &heightfield);
-    CHECK(memory.used == 0, "everything released");
+    def.detailSampleDistance = 0.25f;
+    def.detailMaxError = 0.0f;
+    mnavBaker* baker = nullptr;
+    mnavBakeReport report;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success,
+          "baked");
+    mnavDestroyBaker(baker);
+    CHECK(report.cappedDetail > 0 && report.partialRings == 0, "some polygons reach the cap");
+}
+
+static void TestLevelDetailIsSound(void)
+{
+    static mnavVec3 vertices[LEVEL_VERTICES];
+    static int32_t indices[LEVEL_TRIANGLES * 3];
+    MakeLevel(vertices, indices);
+    const mnavTriangleMesh mesh = {vertices, LEVEL_VERTICES, indices, LEVEL_TRIANGLES, nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    for (int32_t pass = 0; pass < 2; ++pass)
+    {
+        // The default def, then samples every cell within no error.
+        mnavBakeDef def = mnavDefaultBakeDef();
+        if (pass == 1)
+        {
+            def.detailSampleDistance = 0.25f;
+            def.detailMaxError = 0.0f;
+        }
+        mnavBakeReport report;
+        mnavBaker* baker = nullptr;
+        CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+                  mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success,
+              "baked");
+        mnavDestroyBaker(baker);
+        CHECK(report.partialRings == 0 && report.detailTriangles >= report.polygons,
+              "every polygon's detail whole");
+    }
 }
 
 int main(void)
@@ -551,7 +480,9 @@ int main(void)
     TestSharedEdgeIsSampledAlike();
     TestTiesKeepTheFirstFromTheLexicalEnd();
     TestNoHeightsFallBackAndCount();
+    TestSearchTakesTheHeightNearestTheMean();
     TestLevelDetailIsSound();
     TestBumpyGroundReachesTheCap();
+    Done();
     return s_failures == 0 ? 0 : 1;
 }

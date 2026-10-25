@@ -98,6 +98,8 @@ static mnavNavmesh* s_navmesh;
 // The report of the last scene baked.
 static mnavBakeReport s_report;
 static uint8_t s_tile[TILE_ROOM];
+// The bytes of the last scene's tile in s_tile.
+static size_t s_tileSize;
 static mnavVec3 s_vertices[4 * MOST];
 static int32_t s_indices[6 * MOST];
 static mnavAreaType s_areas[2 * MOST];
@@ -147,14 +149,13 @@ static inline void Load(const Scene* scene)
     }
     const mnavTriangleMesh mesh = {s_vertices, 4 * n, s_indices, 2 * n, s_areas};
     const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
-    size_t size = 0;
     CHECK(mnavBakeTileInput(s_baker, &input, 0, 0, &s_report) == mnav_success &&
-              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
+              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &s_tileSize) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavStageTile(s_navmesh, s_tile, s_tileSize).result == mnav_success &&
               mnavCommit(s_navmesh) == mnav_success,
           "loaded");
 }
