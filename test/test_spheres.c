@@ -4,6 +4,11 @@
 // The spheres near a flier: found through the obstacle grid,
 // they are those a look at every sphere finds, in the same order, for
 // shared spots, repeated ids, fast spheres and cells of any size.
+//
+// White-box: the spheres near a flier are read from the sphere grid,
+// whose reach widens with the fastest sphere's speed; the public
+// avoidance suites hold no sphere fast enough to need it, and a reach
+// that leaves it out lives through them.
 
 #include "avoidance.h"
 #include "test_harness.h"

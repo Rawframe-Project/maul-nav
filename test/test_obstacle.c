@@ -4,6 +4,11 @@
 // Avoidance obstacles: the lines a grid of agents gets from
 // concave polygons and segments, touching them included, pinned; which
 // obstacles count as near.
+//
+// White-box: which obstacle vertices count as near, and their order
+// among equals, which decides those kept under the limit, are read from
+// the obstacle grid; the velocities of the public avoidance suites do not
+// tell those orders apart.
 
 #include "obstacle.h"
 #include "test_harness.h"
