@@ -127,13 +127,29 @@ endif()
 
 if(MAUL_NAV_BUILD_TESTS)
     enable_testing()
-    # maul_add_dense(<name>): test_<name> with the argument dense, as
-    # <name>_dense, the suite's sweeps in full (test/dense.h). Labeled
-    # dense: every cell runs it but the AddressSanitizer one, the pull
-    # request's slowest, and the dense-asan preset runs it there at night.
+    # maul_add_dense(<name> [WHITEBOX]): test_<name> with the argument
+    # dense, as <name>_dense, the suite's sweeps in full (test/dense.h).
+    # Labeled dense: every cell runs it but the AddressSanitizer one, the
+    # pull request's slowest, and the dense-asan preset runs it there at
+    # night. WHITEBOX: only the dense form reaches src/, so it is built
+    # apart as test_<name>_dense with TEST_DENSE_WHITEBOX defined, and left
+    # out of shared builds like every white-box suite.
     function(maul_add_dense name)
-        if(TARGET test_${name})
-            add_test(NAME ${name}_dense COMMAND test_${name} dense)
+        cmake_parse_arguments(ARG "WHITEBOX" "" "" ${ARGN})
+        set(target test_${name})
+        if(ARG_WHITEBOX)
+            if(MAUL_NAV_BUILD_SHARED)
+                return()
+            endif()
+            set(target test_${name}_dense)
+            add_executable(${target} ${PROJECT_SOURCE_DIR}/test/test_${name}.c)
+            target_link_libraries(${target} PRIVATE ${PROJECT_NAME})
+            target_include_directories(${target} PRIVATE ${PROJECT_SOURCE_DIR}/src)
+            target_compile_definitions(${target} PRIVATE TEST_DENSE_WHITEBOX)
+            maul_apply_flags(${target})
+        endif()
+        if(TARGET ${target})
+            add_test(NAME ${name}_dense COMMAND ${target} dense)
             set_tests_properties(${name}_dense PROPERTIES LABELS "${name};dense")
         endif()
     endfunction()
@@ -156,7 +172,8 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(nearest)
     maul_add_test(nearest_rules)
     maul_add_test(path WHITEBOX)
-    maul_add_test(path_rules WHITEBOX)
+    maul_add_test(path_rules)
+    maul_add_dense(path_rules WHITEBOX)
     maul_add_test(raycast)
     maul_add_test(query_filter)
     maul_add_test(offmesh WHITEBOX)
