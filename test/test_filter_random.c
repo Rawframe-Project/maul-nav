@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The walkable filters on random heightfields against the plain ledge
-// filter, run alone and as mnavFilterWalkable runs them in one pass, and
-// the field's edge as a ledge. White-box: the filters run alone have no
-// public form, a bake shows only the spans walkable at its end, and the
-// field's edge lies in the tile's border, which no tile holds. The
-// filters' cases on scenes a host can bake are in test_filter.c.
+// The walkable filters as mnavFilterWalkable runs them in one pass, on
+// random heightfields against the three filters written plainly, and the
+// field's edge as a ledge. White-box: a bake shows only the spans
+// walkable at its end, through the stages after it, and the field's edge
+// lies in the tile's border, which no tile holds. The filters' cases on
+// scenes a host can bake are in test_filter.c.
 
 #include "filter.h"
 #include "hand_field.h"
@@ -23,15 +23,55 @@ static void TestFieldEdgeIsALedge(void)
     static Field field;
     field = (Field){0};
     Floor(&field, 100);
-    mnavFilterLedges(Pack(&field), HEIGHT, STEP);
+    mnavFilterWalkable(Pack(&field), HEIGHT, STEP);
     CHECK(Area(&field, 0, 3, 0) == mnav_areaNone, "the edge column");
     CHECK(Area(&field, 6, 6, 0) == mnav_areaNone, "the corner column");
     CHECK(Area(&field, 1, 1, 0) == 1, "one cell in");
     CHECK(Area(&field, 3, 3, 0) == 1, "the middle");
 }
 
+// The low obstacle filter the plain way: a span not walkable takes the
+// area of the span below it when that one was walkable and its top lies
+// within a step.
+static void PlainLowObstacles(mnavHeightfield* f)
+{
+    static mnavAreaType given[WIDTH * WIDTH * MAX_SPANS];
+    for (int32_t i = 0; i < f->spanCount; ++i)
+    {
+        given[i] = f->spans[i].area;
+    }
+    for (int32_t c = 0; c < WIDTH * WIDTH; ++c)
+    {
+        for (uint32_t i = f->columns[c] + 1; i < f->columns[c + 1]; ++i)
+        {
+            if (given[i] == mnav_areaNone && given[i - 1] != mnav_areaNone &&
+                f->spans[i].top - f->spans[i - 1].top <= STEP)
+            {
+                f->spans[i].area = given[i - 1];
+            }
+        }
+    }
+}
+
+// The low height filter the plain way: a span with less than the agent's
+// height free above it is not walkable.
+static void PlainLowHeight(mnavHeightfield* f)
+{
+    for (int32_t c = 0; c < WIDTH * WIDTH; ++c)
+    {
+        for (uint32_t i = f->columns[c]; i < f->columns[c + 1]; ++i)
+        {
+            int32_t ceiling = i + 1 < f->columns[c + 1] ? (int32_t)f->spans[i + 1].bottom : 65535;
+            if (ceiling - f->spans[i].top < HEIGHT)
+            {
+                f->spans[i].area = mnav_areaNone;
+            }
+        }
+    }
+}
+
 // The ledge filter the plain way: every walkable span against its four
-// neighbors' spans, by the rule mnavFilterLedges keeps.
+// neighbors' spans, by the rule mnavFilterWalkable keeps.
 static bool PlainLedge(const mnavHeightfield* f, int32_t x, int32_t z, uint32_t i)
 {
     const int32_t dx[4] = {-1, 0, 1, 0};
@@ -102,28 +142,22 @@ static void RandomField(Field* field, int32_t base)
     }
 }
 
-// mnavFilterWalkable, and the three filters run alone, against the low
-// obstacle filter, the plain ledge filter and the low height filter in
-// turn, on random fields, some near the top of the heights, where a span
-// alone in its column has too little room above.
-static void TestOnePassAsThreeAndPlain(void)
+// mnavFilterWalkable against the low obstacle filter, the ledge filter
+// and the low height filter written plainly and run in turn, on random
+// fields, some near the top of the heights, where a span alone in its
+// column has too little room above.
+static void TestOnePassAsPlain(void)
 {
     int32_t wrong = 0;
     for (int32_t run = 0; run < 2000; ++run)
     {
         static Field field;
-        static Field alone;
         static Field plain;
         RandomField(&field, run % 5 == 0 ? 32767 - HEIGHT / 2 - Random(HEIGHT) : 100);
-        alone = field;
         plain = field;
         mnavFilterWalkable(Pack(&field), HEIGHT, STEP);
-        mnavHeightfield* f = Pack(&alone);
-        mnavFilterLowObstacles(f, STEP);
-        mnavFilterLedges(f, HEIGHT, STEP);
-        mnavFilterLowHeight(f, HEIGHT);
-        f = Pack(&plain);
-        mnavFilterLowObstacles(f, STEP);
+        mnavHeightfield* f = Pack(&plain);
+        PlainLowObstacles(f);
         static bool ledges[WIDTH * WIDTH * MAX_SPANS];
         for (int32_t c = 0; c < WIDTH * WIDTH; ++c)
         {
@@ -137,19 +171,18 @@ static void TestOnePassAsThreeAndPlain(void)
         {
             f->spans[i].area = ledges[i] ? mnav_areaNone : f->spans[i].area;
         }
-        mnavFilterLowHeight(f, HEIGHT);
+        PlainLowHeight(f);
         for (int32_t i = 0; i < f->spanCount; ++i)
         {
             wrong += field.spans[i].area != plain.spans[i].area ? 1 : 0;
-            wrong += alone.spans[i].area != plain.spans[i].area ? 1 : 0;
         }
     }
-    CHECK(wrong == 0, "one pass and the filters alone as the plain filters");
+    CHECK(wrong == 0, "one pass as the plain filters");
 }
 
 int main(void)
 {
     TestFieldEdgeIsALedge();
-    TestOnePassAsThreeAndPlain();
+    TestOnePassAsPlain();
     return s_failures == 0 ? 0 : 1;
 }
