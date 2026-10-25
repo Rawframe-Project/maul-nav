@@ -5,6 +5,12 @@
 // passes it over, as on a seam; a start on a portal's line beyond its
 // ends does not, and the path turns at the near end; a start at a vertex
 // several portals meet at passes them all over.
+//
+// White-box: the portals are written by hand, since no hand tile gives
+// the second case. Hand tiles link squares only along whole shared
+// edges, so a start beyond a portal's end shares that end with an
+// earlier portal, and the funnel turns there whether or not the start's
+// projection onto the portal is clamped. Here it is the only portal.
 
 #include "funnel.h"
 #include "query.h"
