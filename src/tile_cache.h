@@ -18,14 +18,27 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+enum
+{
+    MNAV_SETTINGS_WORDS = 21
+};
+
+// A baker's settings for one tile as words: the bake generator, the
+// origin, the cells, the agent, the region, edge and detail settings,
+// and the tile's place. The fingerprint starts from their hash.
+typedef struct mnavBakeSettings
+{
+    uint32_t words[MNAV_SETTINGS_WORDS];
+} mnavBakeSettings;
+
 // What the cache holds for one tile.
 typedef struct mnavCachedTile
 {
     int32_t tileX;
     int32_t tileZ;
-    // The hash of the baker's settings for the tile, so that a rebuild by
-    // a baker of another def is refused.
-    uint64_t settings;
+    // The baker's settings for the tile, compared in full so that a
+    // rebuild by a baker of another def is refused.
+    mnavBakeSettings settings;
     // The fingerprint after the triangles, before the volumes.
     uint64_t geometry;
     int32_t triangles;
