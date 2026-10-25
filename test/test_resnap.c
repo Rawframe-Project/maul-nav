@@ -4,7 +4,6 @@
 // Off-mesh links snapped again only near the places a commit
 // changes, yet always as if snapped from scratch.
 
-#include "navmesh.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -16,18 +15,19 @@
 #include <stdint.h>
 #include <string.h>
 
-// Whether a link's committed state is what snapping it now would give.
-static bool SnappedNow(const mnavNavmesh* navmesh, const mnavOffLink* link)
+// Whether a link's committed state is what snapping its def now would
+// give, step the agent's step height in meters.
+static bool SnappedNow(const mnavNavmesh* navmesh, const mnavLinkDef* def, mnavLinkId id,
+                       float step)
 {
-    float step = (float)((double)navmesh->cells.agentStep * (double)navmesh->def.cellHeight);
-    mnavPos3 ends[2] = {link->def.start, link->def.end};
+    mnavPos3 ends[2] = {def->start, def->end};
     mnavPolygonId polygons[2] = {{0}, {0}};
     mnavPos3 points[2] = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}};
     bool attached = true;
     for (int32_t k = 0; k < 2 && attached; ++k)
     {
         mnavNearest n;
-        float r = link->def.radius;
+        float r = def->radius;
         attached = mnavFindNearest(navmesh, nullptr, ends[k], (mnavVec3){r, step, r}, &n) ==
                        mnav_success &&
                    n.polygon.slot != 0;
@@ -37,7 +37,9 @@ static bool SnappedNow(const mnavNavmesh* navmesh, const mnavOffLink* link)
         polygons[k] = n.polygon;
         points[k] = n.point;
     }
-    const mnavLinkState* s = &link->state;
+    mnavLinkState state;
+    CHECK(mnavGetLink(navmesh, id, &state) == mnav_success, "read");
+    const mnavLinkState* s = &state;
     if (!attached)
     {
         return !s->attached;
@@ -46,6 +48,32 @@ static bool SnappedNow(const mnavNavmesh* navmesh, const mnavOffLink* link)
            memcmp(&s->endPolygon, &polygons[1], sizeof(mnavPolygonId)) == 0 &&
            memcmp(&s->start, &points[0], sizeof(mnavPos3)) == 0 &&
            memcmp(&s->end, &points[1], sizeof(mnavPos3)) == 0;
+}
+
+// Whether a link is enabled as committed.
+static bool Enabled(const mnavNavmesh* navmesh, mnavLinkId id)
+{
+    mnavLinkState state;
+    CHECK(mnavGetLink(navmesh, id, &state) == mnav_success, "read");
+    return state.enabled;
+}
+
+// How many polygons a committed tile has: the first index whose id names
+// none (mnavCheckCorridor counts a one-polygon corridor of it as 0).
+static uint32_t PolygonCount(const mnavNavmesh* navmesh, mnavTileId tile)
+{
+    mnavPolygonId buffer[1];
+    mnavCorridor corridor;
+    uint32_t count = 0;
+    for (int32_t valid = 1; valid == 1; count += valid == 1 ? 1u : 0u)
+    {
+        CHECK(mnavResetCorridor(&corridor, buffer, 1,
+                                (mnavPolygonId){tile.slot, tile.generation, count},
+                                (mnavPos3){0.0, 0.0, 0.0}) == mnav_success &&
+                  mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success,
+              "checked");
+    }
+    return count;
 }
 
 static void TestOnlyChangedPlacesResnap(void)
@@ -58,9 +86,15 @@ static void TestOnlyChangedPlacesResnap(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavBakeCells cells;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+              mnavValidateBakeDef(&def, &cells).result == mnav_success,
+          "created");
+    float stepHeight = (float)((double)cells.agentStep * (double)def.cellHeight);
     uint32_t state = 21;
     mnavLinkId ids[120];
+    mnavLinkDef defs[120];
+    bool enabled[120];
     for (int32_t l = 0; l < 120; ++l)
     {
         double p[4];
@@ -70,9 +104,10 @@ static void TestOnlyChangedPlacesResnap(void)
             p[k] = (double)(state >> 8 & 0xFFFFu) / 65536.0 * 64.0;
         }
         float radius = 0.25f + (float)(l % 12);
-        mnavLinkDef def2 = {{p[0], 0.0, p[1]}, {p[2], 0.0, p[3]}, radius, 2.0f,
-                            mnav_linkJump,     (l & 1) != 0,      0.0f};
-        CHECK(mnavStageLink(navmesh, &def2, &ids[l]) == mnav_success, "staged");
+        defs[l] = (mnavLinkDef){{p[0], 0.0, p[1]}, {p[2], 0.0, p[3]}, radius, 2.0f,
+                                mnav_linkJump,     (l & 1) != 0,      0.0f};
+        enabled[l] = true;
+        CHECK(mnavStageLink(navmesh, &defs[l], &ids[l]) == mnav_success, "staged");
     }
     bool loaded[4] = {false, false, false, false};
     bool matched = true;
@@ -95,23 +130,26 @@ static void TestOnlyChangedPlacesResnap(void)
         }
         else if (what < 7 && mnavGetTile(navmesh, t & 1, t >> 1, &tile) == mnav_success)
         {
-            uint32_t count = (uint32_t)navmesh->slots[tile.slot - 1].tile->mesh.polygonCount;
+            uint32_t count = PolygonCount(navmesh, tile);
             mnavPolygonId polygon = {tile.slot, tile.generation, (state >> 16) % count};
             mnavAreaType area = (state >> 20 & 1u) != 0 ? mnav_areaNone : mnav_areaWalkable;
             CHECK(mnavStageArea(navmesh, polygon, area) == mnav_success, "area");
         }
         else
         {
+            enabled[state >> 16 & 63u] = (state >> 22 & 1u) != 0;
             CHECK(mnavStageLinkEnabled(navmesh, ids[state >> 16 & 63u], (state >> 22 & 1u) != 0) ==
                       mnav_success,
                   "toggled");
         }
         CHECK(mnavCommit(navmesh) == mnav_success, "committed");
-        for (int32_t s = 0; s < navmesh->linkSlots; ++s)
+        for (int32_t l = 0; l < 120; ++l)
         {
-            const mnavOffLink* link = &navmesh->links[s];
-            matched = matched && SnappedNow(navmesh, link) && link->state.enabled == link->enabled;
-            attachedSeen += link->state.attached ? 1 : 0;
+            mnavLinkState link;
+            CHECK(mnavGetLink(navmesh, ids[l], &link) == mnav_success, "read");
+            matched = matched && SnappedNow(navmesh, &defs[l], ids[l], stepHeight) &&
+                      Enabled(navmesh, ids[l]) == enabled[l];
+            attachedSeen += link.attached ? 1 : 0;
         }
     }
     CHECK(matched, "every link as if snapped from scratch");
