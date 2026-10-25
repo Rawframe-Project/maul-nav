@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       fuzz-seconds:
-        description: Seconds each target runs in fuzz-night (the night's run is 600)
+        description: Seconds each target runs in fuzz-night, 1 to 1500 (the night's run is 600)
         type: number
         default: 600
 
