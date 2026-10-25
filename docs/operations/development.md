@@ -36,7 +36,7 @@ ctest --preset linux-clang-20-asan -L corridor
 ./out/linux-clang-20-asan/test_corridor
 ```
 
-The test presets leave out the tests labeled `nightly`, the large scenes; `ctest --preset nightly` runs them in the `linux-clang-20` build. `linux-clang-20`, `linux-shared`, `macos-clang` and `windows-clang-cl` also run the `package` test (`MAUL_NAV_TEST_PACKAGE`, `cmake/PackageTest.cmake`), which installs the build and builds `samples/minimal` against it.
+The test presets leave out the tests labeled `nightly`, the large scenes; `ctest --preset nightly` runs them in the `linux-clang-20` build. `linux-clang-20-asan` also leaves out the tests labeled `dense`, the slow suites' full sweeps, which `ctest --preset dense-asan` runs in its build. `linux-clang-20`, `linux-shared`, `macos-clang` and `windows-clang-cl` also run the `package` test (`MAUL_NAV_TEST_PACKAGE`, `cmake/PackageTest.cmake`), which installs the build and builds `samples/minimal` against it.
 
 A suite prints one line per failed check with its file and line. Suites marked `WHITEBOX` in `CMakeLists.txt` include `src/` and are not built in shared builds, where internal symbols are hidden. `test_guide.c` runs the C snippets of `docs/user/` as written; `tools/check_guide.py` fails when a snippet and its copy differ.
 

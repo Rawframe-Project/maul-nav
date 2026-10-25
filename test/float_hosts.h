@@ -16,9 +16,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
-// Whether compute gives want under every host setting, each run leaving
-// the setting as it found it; the thread's own setting is put back after.
-static inline bool EveryFloatHost(uint64_t (*compute)(void), uint64_t want)
+// Whether compute gives want under every step-th host setting from the
+// first, each run leaving the setting as it found it; the thread's own
+// setting is put back after.
+static inline bool FloatHosts(uint64_t (*compute)(void), uint64_t want, int step)
 {
     static bool said = false;
     if (!TEST_HAS_FLUSH && !said)
@@ -28,7 +29,7 @@ static inline bool EveryFloatHost(uint64_t (*compute)(void), uint64_t want)
     }
     TestFloatSetting saved = TestFloatGet();
     bool same = true;
-    for (int i = 0; i < TestFloatHostileCount(); ++i)
+    for (int i = 0; i < TestFloatHostileCount(); i += step)
     {
         TestFloatSetting host = TestFloatHostileAt(i);
         TestFloatSet(host);
@@ -43,6 +44,12 @@ static inline bool EveryFloatHost(uint64_t (*compute)(void), uint64_t want)
         }
     }
     return same;
+}
+
+// Whether compute gives want under every host setting.
+static inline bool EveryFloatHost(uint64_t (*compute)(void), uint64_t want)
+{
+    return FloatHosts(compute, want, 1);
 }
 
 #endif // MAUL_NAV_TEST_FLOAT_HOSTS_H
