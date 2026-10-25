@@ -81,7 +81,8 @@ static mnavResult Load(const mnavBakeDef* def, const Shape* shapes, int32_t coun
     mnavBaker* baker = nullptr;
     size_t size = 0;
     CHECK(mnavCreateBaker(def, &baker).result == mnav_success, "baker");
-    mnavResult result = mnavBakeTile2D(baker, outlines, count, 0, 0, &s_report);
+    mnavResult result =
+        mnavBakeTile2D(baker, &(mnavBake2DInput){outlines, count, nullptr}, 0, 0, &s_report);
     if (result == mnav_success)
     {
         CHECK(mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success, "copied");
@@ -286,7 +287,7 @@ static void TestStackedFloorsKeepTheirCorners(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success,
+              mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
     CHECK(report.regions == 2 && report.polygons == 2 && report.vertices == 8,
           "two quads of four corners each");
@@ -420,7 +421,7 @@ static void TestLevelRingsAreComplete(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success,
+              mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
     CHECK(report.partialRings == 0 && report.polygons > 0, "every ring complete");
     mnavDestroyBaker(baker);

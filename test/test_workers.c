@@ -59,7 +59,8 @@ static mnavTriangleMesh s_world;
 
 static bool BakeOne(mnavBaker* baker, int32_t t, uint8_t* bytes, size_t* size)
 {
-    return mnavBakeTile(baker, &s_world, 1, t % SIDE - 1, t / SIDE - 1, nullptr) == mnav_success &&
+    return mnavBakeTile(baker, &(mnavBakeInput){&s_world, 1, nullptr, 0, nullptr, 0, nullptr},
+                        t % SIDE - 1, t / SIDE - 1, nullptr) == mnav_success &&
            mnavCopyBakedTile(baker, bytes, ROOM, size) == mnav_success;
 }
 

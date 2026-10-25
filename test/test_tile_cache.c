@@ -82,7 +82,7 @@ static bool Alike(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput* i
     mnavBakeReport rebuilt;
     size_t expected = 0;
     size_t size = 0;
-    if (mnavBakeTileInput(baker, &full, tileX, tileZ, &baked) != mnav_success ||
+    if (mnavBakeTile(baker, &full, tileX, tileZ, &baked) != mnav_success ||
         mnavCopyBakedTile(baker, s_expected, TILE_CAPACITY, &expected) != mnav_success ||
         mnavRebuildTile(baker, cache, tileX, tileZ, obstacles, count, &rebuilt) != mnav_success ||
         mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &size) != mnav_success)
@@ -155,7 +155,7 @@ static int32_t Scene(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput
     {
         size_t size = 0;
         size_t cached = 0;
-        CHECK(mnavBakeTileInput(baker, input, t & 1, t >> 1, nullptr) == mnav_success &&
+        CHECK(mnavBakeTile(baker, input, t & 1, t >> 1, nullptr) == mnav_success &&
                   mnavCopyBakedTile(baker, s_expected, TILE_CAPACITY, &size) == mnav_success &&
                   mnavBakeTileCached(baker, cache, input, t & 1, t >> 1, nullptr) == mnav_success &&
                   mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &cached) == mnav_success &&

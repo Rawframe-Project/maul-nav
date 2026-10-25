@@ -62,7 +62,8 @@ static mnavNavmesh* LoadSmall(void)
     for (int32_t t = 0; t < 100; ++t)
     {
         size_t* size = &s_smallSizes[t];
-        CHECK(mnavBakeTile(baker, &world, 1, t % 10 - 1, t / 10 - 1, nullptr) == mnav_success &&
+        CHECK(mnavBakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr},
+                           t % 10 - 1, t / 10 - 1, nullptr) == mnav_success &&
                   mnavCopyBakedTile(baker, s_small[t], SMALL_ROOM, size) == mnav_success &&
                   mnavStageTile(navmesh, s_small[t], *size).result == mnav_success,
               "a small tile");
@@ -271,7 +272,7 @@ static void TestAreas(mnavNavFlow* field)
     for (int32_t t = 0; t < 100; ++t)
     {
         size_t size = 0;
-        CHECK(mnavBakeTileInput(baker, &input, t % 10 - 1, t / 10 - 1, nullptr) == mnav_success &&
+        CHECK(mnavBakeTile(baker, &input, t % 10 - 1, t / 10 - 1, nullptr) == mnav_success &&
                   mnavCopyBakedTile(baker, s_small[t], SMALL_ROOM, &size) == mnav_success &&
                   mnavStageTile(navmesh, s_small[t], size).result == mnav_success,
               "a small tile");

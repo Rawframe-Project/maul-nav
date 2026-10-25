@@ -401,7 +401,8 @@ static void TestTileSides(void)
     mnavBakeDef def = Exact();
     UseDef(&def);
     size_t size = 0;
-    CHECK(mnavBakeTile2D(s_baker, outlines, 4, 0, 0, &s_report) == mnav_success &&
+    CHECK(mnavBakeTile2D(s_baker, &(mnavBake2DInput){outlines, 4, nullptr}, 0, 0, &s_report) ==
+                  mnav_success &&
               mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);
@@ -440,7 +441,7 @@ static void TestRegionsOfOneAreaMeetOnTheSide(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     UseDef(&def);
     size_t size = 0;
-    CHECK(mnavBakeTileInput(s_baker, &input, 0, 0, &s_report) == mnav_success &&
+    CHECK(mnavBakeTile(s_baker, &input, 0, 0, &s_report) == mnav_success &&
               mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);

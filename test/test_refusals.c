@@ -61,7 +61,9 @@ static void TestMaking(void)
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "a height of a quarter cell");
     mnavTriangleMesh world = World();
-    CHECK(mnavBakeTile(baker, &world, 1, 0, 0, nullptr) == mnav_success, "baked");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       nullptr) == mnav_success,
+          "baked");
     mnavDestroyBaker(baker);
     // An include volume over a tile with no ground: nothing to keep.
     def = mnavDefaultBakeDef();
@@ -70,8 +72,7 @@ static void TestMaking(void)
     const mnavBakeInput input = {&world, 1, nullptr, 0, &include, 1, nullptr};
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTileInput(baker, &input, 9, 9, &report) == mnav_success &&
-              report.polygons == 0,
+              mnavBakeTile(baker, &input, 9, 9, &report) == mnav_success && report.polygons == 0,
           "an include volume over empty ground");
     mnavDestroyBaker(baker);
 }
@@ -103,7 +104,8 @@ static void TestInput(void)
     const mnavOutline outline = {square, 4, mnav_areaWalkable};
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &outline, 1, 1 << 20, 0, nullptr) == mnav_errorRange,
+              mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 1 << 20, 0,
+                             nullptr) == mnav_errorRange,
           "a 2D tile past the extent");
     mnavDestroyBaker(baker);
 }

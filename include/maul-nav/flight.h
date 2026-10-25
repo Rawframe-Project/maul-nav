@@ -270,12 +270,12 @@ extern "C"
     ///
     /// @param baker     The baker; the tile it held before is dropped.
     /// @param input     The meshes, terrains and volumes, as
-    ///                  mnavBakeTileInput reads them.
+    ///                  mnavBakeTile reads them.
     /// @param tileX     The tile's column.
     /// @param tileZ     The tile's row.
     /// @param reportOut Receives the report. May be NULL.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or
-    /// input or input mnavBakeTileInput refuses, the mesh named in the
+    /// input or input mnavBakeTile refuses, the mesh named in the
     /// report; `mnav_errorRange` for input or a tile past the extent;
     /// `mnav_errorLimit` past a limit; `mnav_errorCapacity` when the
     /// allocator fails.

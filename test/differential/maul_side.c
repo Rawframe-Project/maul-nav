@@ -66,7 +66,8 @@ static bool Load(mnavNavmesh* navmesh, const DiffScene* scene, int64_t* bytes)
         {
             size_t size = 0;
             good =
-                mnavBakeTile(baker, &mesh, 1, x, z, nullptr) == mnav_success &&
+                mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, x,
+                             z, nullptr) == mnav_success &&
                 mnavCopyBakedTile(baker, tile, TILE_ROOM, &size) == mnav_success &&
                 (navmesh == nullptr || mnavStageTile(navmesh, tile, size).result == mnav_success);
             total += (int64_t)size;

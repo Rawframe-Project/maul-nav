@@ -79,7 +79,7 @@ static void Bake(const mnavBakeDef* def, const Quad* quads, int32_t count)
     mnavBaker* baker = nullptr;
     size_t size = 0;
     CHECK(mnavCreateBaker(def, &baker).result == mnav_success &&
-              mnavBakeTileInput(baker, &input, 0, 0, &s_report) == mnav_success &&
+              mnavBakeTile(baker, &input, 0, 0, &s_report) == mnav_success &&
               mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
@@ -280,7 +280,7 @@ static void TestLevelRegionsAreOneLayer(void)
     mnavBaker* baker = nullptr;
     size_t size = 0;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTileInput(baker, &input, 0, 0, &s_report) == mnav_success &&
+              mnavBakeTile(baker, &input, 0, 0, &s_report) == mnav_success &&
               mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);

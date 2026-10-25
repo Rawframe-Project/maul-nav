@@ -149,7 +149,7 @@ static inline void Load(const Scene* scene)
     }
     const mnavTriangleMesh mesh = {s_vertices, 4 * n, s_indices, 2 * n, s_areas};
     const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
-    CHECK(mnavBakeTileInput(s_baker, &input, 0, 0, &s_report) == mnav_success &&
+    CHECK(mnavBakeTile(s_baker, &input, 0, 0, &s_report) == mnav_success &&
               mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &s_tileSize) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);

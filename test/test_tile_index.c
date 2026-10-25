@@ -145,12 +145,12 @@ static bool BakesAlike(mnavBaker* baker, const mnavBakeInput* input, int32_t x, 
     mnavBakeReport b;
     size_t first = 0;
     size_t second = 0;
-    mnavResult ra = mnavBakeTileInput(baker, &plain, x, z, &a);
+    mnavResult ra = mnavBakeTile(baker, &plain, x, z, &a);
     if (ra == mnav_success && mnavCopyBakedTile(baker, s_plain, TILE_ROOM, &first) != mnav_success)
     {
         return false;
     }
-    mnavResult rb = mnavBakeTileInput(baker, &indexed, x, z, &b);
+    mnavResult rb = mnavBakeTile(baker, &indexed, x, z, &b);
     if (rb == mnav_success &&
         mnavCopyBakedTile(baker, s_indexed, TILE_ROOM, &second) != mnav_success)
     {
@@ -207,7 +207,7 @@ static void TestOneTileInside(void)
               mnavCreateTileIndex(&def, &mesh, 1, &index, &report) == mnav_success,
           "made");
     const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, index};
-    CHECK(mnavBakeTileInput(baker, &input, 2, 1, &report) == mnav_success && report.polygons > 0 &&
+    CHECK(mnavBakeTile(baker, &input, 2, 1, &report) == mnav_success && report.polygons > 0 &&
               BakesAlike(baker, &input, 2, 1),
           "a tile holding all the input, the index's first, bakes alike");
     mnavDestroyTileIndex(index);
@@ -276,34 +276,26 @@ static void MakeOutlines(const mnavBakeDef* def, Place place)
     }
 }
 
-// Bakes a 2D tile by mnavBakeTile2D, and by mnavBakeTile2DInput without
-// and with the index; whether all three agree.
+// Bakes a 2D tile without and with the index; whether both agree.
 static bool Bakes2DAlike(mnavBaker* baker, const mnavTileIndex* index, int32_t x, int32_t z)
 {
-    static uint8_t third[TILE_ROOM];
-    uint8_t* out[3] = {s_plain, s_indexed, third};
-    size_t sizes[3] = {0, 0, 0};
-    mnavResult results[3];
-    mnavBakeReport reports[3];
-    for (int32_t k = 0; k < 3; ++k)
+    uint8_t* out[2] = {s_plain, s_indexed};
+    size_t sizes[2] = {0, 0};
+    mnavResult results[2];
+    mnavBakeReport reports[2];
+    for (int32_t k = 0; k < 2; ++k)
     {
-        const mnavBake2DInput input = {s_outlines, OUTLINES, k == 2 ? index : nullptr};
-        results[k] = k == 0 ? mnavBakeTile2D(baker, s_outlines, OUTLINES, x, z, &reports[k])
-                            : mnavBakeTile2DInput(baker, &input, x, z, &reports[k]);
+        const mnavBake2DInput input = {s_outlines, OUTLINES, k == 1 ? index : nullptr};
+        results[k] = mnavBakeTile2D(baker, &input, x, z, &reports[k]);
         if (results[k] == mnav_success &&
             mnavCopyBakedTile(baker, out[k], TILE_ROOM, &sizes[k]) != mnav_success)
         {
             return false;
         }
     }
-    bool same = true;
-    for (int32_t k = 1; k < 3; ++k)
-    {
-        same = same && results[k] == results[0] && reports[k].triangles == reports[0].triangles &&
-               reports[k].fingerprint == reports[0].fingerprint && sizes[k] == sizes[0] &&
-               memcmp(out[k], out[0], sizes[0]) == 0;
-    }
-    return same;
+    return results[1] == results[0] && reports[1].triangles == reports[0].triangles &&
+           reports[1].fingerprint == reports[0].fingerprint && sizes[1] == sizes[0] &&
+           memcmp(out[1], out[0], sizes[0]) == 0;
 }
 
 static void TestSameBytes2D(const mnavBakeDef* def, Place place, const char* where)
@@ -346,10 +338,10 @@ static void TestRefusals2D(void)
               mnavCreateBaker(&def, &baker).result == mnav_success,
           "made");
     mnavBake2DInput flat = {s_outlines, OUTLINES, triangles};
-    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
+    CHECK(mnavBakeTile2D(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
           "an index of meshes refused by a 2D bake");
     const mnavBakeInput solid = {meshes, MESHES, nullptr, 0, nullptr, 0, outlines};
-    CHECK(mnavBakeTileInput(baker, &solid, 1, 1, &report) == mnav_errorInvalid,
+    CHECK(mnavBakeTile(baker, &solid, 1, 1, &report) == mnav_errorInvalid,
           "an index of outlines refused by a 3D bake");
     // The kind is checked even where the counts agree: one outline of 4
     // points, one mesh of 4 triangles.
@@ -359,24 +351,24 @@ static void TestRefusals2D(void)
     four.triangleCount = 4;
     const mnavBakeInput alike = {&four, 1, nullptr, 0, nullptr, 0, square};
     CHECK(s_outlines[1].pointCount == 4 &&
-              mnavBakeTileInput(baker, &alike, 0, 0, &report) == mnav_errorInvalid,
+              mnavBakeTile(baker, &alike, 0, 0, &report) == mnav_errorInvalid,
           "an index of outlines refused where the counts agree");
     mnavDestroyTileIndex(square);
     flat.index = outlines;
     flat.outlineCount = OUTLINES - 1;
-    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
+    CHECK(mnavBakeTile2D(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
           "another number of outlines refused");
     flat.outlineCount = OUTLINES;
     s_outlines[3].pointCount -= 1;
-    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
+    CHECK(mnavBakeTile2D(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
           "another number of points refused");
     s_outlines[3].pointCount += 1;
-    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_success &&
-              mnavBakeTile2DInput(baker, nullptr, 1, 1, &report) == mnav_errorInvalid,
+    CHECK(mnavBakeTile2D(baker, &flat, 1, 1, &report) == mnav_success &&
+              mnavBakeTile2D(baker, nullptr, 1, 1, &report) == mnav_errorInvalid,
           "fits again; a NULL input refused");
     // An outline changed since is checked as it is read.
     s_points[0][1].x = NAN;
-    CHECK(mnavBakeTile2DInput(baker, &flat, 1, 1, &report) == mnav_errorInvalid && report.mesh == 0,
+    CHECK(mnavBakeTile2D(baker, &flat, 1, 1, &report) == mnav_errorInvalid && report.mesh == 0,
           "a point not finite, refused as read");
     mnavTileIndex* none = nullptr;
     mnavBakeDef tight = def;
@@ -461,28 +453,28 @@ static void TestRefusals(void)
     for (int32_t k = 0; k < 3; ++k)
     {
         CHECK(mnavCreateBaker(others[k], &baker).result == mnav_success &&
-                  mnavBakeTileInput(baker, &input, 1, 1, &report) == mnav_errorInvalid,
+                  mnavBakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid,
               "another grid refused");
         mnavDestroyBaker(baker);
     }
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     input.meshCount = MESHES - 1;
-    CHECK(mnavBakeTileInput(baker, &input, 1, 1, &report) == mnav_errorInvalid,
+    CHECK(mnavBakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid,
           "another number of meshes refused");
     input.meshCount = MESHES;
     meshes[1].triangleCount -= 1;
-    CHECK(mnavBakeTileInput(baker, &input, 1, 1, &report) == mnav_errorInvalid,
+    CHECK(mnavBakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid,
           "another number of triangles refused");
     meshes[1].triangleCount += 1;
 
     // A triangle changed since is checked as it is read.
-    CHECK(mnavBakeTileInput(baker, &input, 1, 1, &report) == mnav_success && report.triangles > 0,
+    CHECK(mnavBakeTile(baker, &input, 1, 1, &report) == mnav_success && report.triangles > 0,
           "baked");
     for (int32_t t = 0; t < TRIANGLES; ++t)
     {
         s_indices[0][t * 3] = -1;
     }
-    mnavResult result = mnavBakeTileInput(baker, &input, 1, 1, &report);
+    mnavResult result = mnavBakeTile(baker, &input, 1, 1, &report);
     CHECK(result == mnav_errorInvalid && report.mesh == 0 &&
               report.input.element == mnav_elementTriangle,
           "a corner out of range, refused as read");
@@ -496,8 +488,8 @@ static void TestRefusals(void)
     {
         s_vertices[2][v].y = NAN;
     }
-    CHECK(mnavBakeTileInput(baker, &input, 1, 1, &report) == mnav_errorInvalid &&
-              report.mesh == 2 && report.input.element == mnav_elementVertex,
+    CHECK(mnavBakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid && report.mesh == 2 &&
+              report.input.element == mnav_elementVertex,
           "a vertex not finite, refused as read");
     memcpy(s_vertices[2], kept, sizeof(kept));
     // Only each triangle's third vertex past the extent: every corner is
@@ -506,11 +498,11 @@ static void TestRefusals(void)
     {
         s_vertices[2][v].x = 1e30f;
     }
-    CHECK(mnavBakeTileInput(baker, &input, 1, 1, &report) == mnav_errorRange && report.mesh == 2 &&
+    CHECK(mnavBakeTile(baker, &input, 1, 1, &report) == mnav_errorRange && report.mesh == 2 &&
               report.input.element == mnav_elementVertex,
           "a third corner past the extent, refused as read");
     memcpy(s_vertices[2], kept, sizeof(kept));
-    CHECK(mnavBakeTileInput(baker, &input, 1, 1, &report) == mnav_success, "restored");
+    CHECK(mnavBakeTile(baker, &input, 1, 1, &report) == mnav_success, "restored");
     mnavDestroyBaker(baker);
     mnavDestroyTileIndex(index);
 }

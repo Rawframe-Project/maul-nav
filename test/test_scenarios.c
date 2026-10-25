@@ -88,7 +88,8 @@ static void Bake(const mnavBakeDef* def, const Quads* q, int32_t x0, int32_t z0,
     {
         for (int32_t x = x0; x <= x1; ++x, ++n)
         {
-            CHECK(mnavBakeTile(baker, &mesh, 1, x, z, nullptr) == mnav_success &&
+            CHECK(mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                               x, z, nullptr) == mnav_success &&
                       mnavCopyBakedTile(baker, s_tiles[n], TILE_ROOM, &s_sizes[n]) == mnav_success,
                   "baked");
         }
@@ -376,7 +377,7 @@ static uint64_t TerrainHash(void)
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t t = 0; t < 16; ++t)
     {
-        CHECK(mnavBakeTileInput(baker, &input, t % 4, t / 4, nullptr) == mnav_success &&
+        CHECK(mnavBakeTile(baker, &input, t % 4, t / 4, nullptr) == mnav_success &&
                   mnavCopyBakedTile(baker, s_tiles[t], TILE_ROOM, &s_sizes[t]) == mnav_success,
               "baked");
         hash = mnavHash64(hash, s_tiles[t], (int32_t)s_sizes[t]);

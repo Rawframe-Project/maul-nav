@@ -132,7 +132,8 @@ static int Write(void)
     size_t size = 0;
     for (int32_t t = 0; t < 4; ++t)
     {
-        if (mnavBakeTile(baker, &world, 1, t & 1, t >> 1, nullptr) != mnav_success ||
+        if (mnavBakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr}, t & 1,
+                         t >> 1, nullptr) != mnav_success ||
             mnavCopyBakedTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
         {
             return 1;
@@ -142,7 +143,7 @@ static int Write(void)
     }
     const mnavTerrain terrain = Terrain();
     const mnavBakeInput terrainInput = {nullptr, 0, &terrain, 1, nullptr, 0, nullptr};
-    if (mnavBakeTileInput(baker, &terrainInput, 0, 0, nullptr) != mnav_success ||
+    if (mnavBakeTile(baker, &terrainInput, 0, 0, nullptr) != mnav_success ||
         mnavCopyBakedTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
     {
         return 1;
@@ -151,7 +152,8 @@ static int Write(void)
     const mnavTriangleMesh trench = Trench();
     for (int32_t t = 0; t < 2; ++t)
     {
-        if (mnavBakeTile(baker, &trench, 1, t, 0, nullptr) != mnav_success ||
+        if (mnavBakeTile(baker, &(mnavBakeInput){&trench, 1, nullptr, 0, nullptr, 0, nullptr}, t, 0,
+                         nullptr) != mnav_success ||
             mnavCopyBakedTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
         {
             return 1;
@@ -168,7 +170,9 @@ static int Write(void)
     }
     for (int32_t t = 0; t < 2; ++t)
     {
-        if (mnavBakeTile(doorwayBaker, &doorway, 1, t, 0, nullptr) != mnav_success ||
+        if (mnavBakeTile(doorwayBaker,
+                         &(mnavBakeInput){&doorway, 1, nullptr, 0, nullptr, 0, nullptr}, t, 0,
+                         nullptr) != mnav_success ||
             mnavCopyBakedTile(doorwayBaker, bytes, sizeof(bytes), &size) != mnav_success)
         {
             return 1;

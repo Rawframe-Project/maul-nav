@@ -64,9 +64,10 @@ static void GuideBake(void)
     // made.result; on mnav_errorInvalid, made.setting names the bad setting.
 
     mnavTriangleMesh mesh = {vertices, vertexCount, indices, triangleCount, NULL};
+    mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};   // meshes, terrains, volumes, index
     mnavBakeReport report;
     size_t size = 0;
-    mnavResult baked = mnavBakeTile(baker, &mesh, 1, tileX, tileZ, &report);
+    mnavResult baked = mnavBakeTile(baker, &input, tileX, tileZ, &report);
     if (baked == mnav_success)
     {
         baked = mnavCopyBakedTile(baker, bytes, capacity, &size);   // the tile's bytes

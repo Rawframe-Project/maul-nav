@@ -43,7 +43,8 @@ static mnavNavmesh* Load(void)
     for (int32_t t = 0; t < SIDE * SIDE; ++t)
     {
         size_t size = 0;
-        CHECK(mnavBakeTile(baker, &world, 1, t % SIDE - 1, t / SIDE - 1, nullptr) == mnav_success &&
+        CHECK(mnavBakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr},
+                           t % SIDE - 1, t / SIDE - 1, nullptr) == mnav_success &&
                   mnavCopyBakedTile(baker, s_small[t], ROOM, &size) == mnav_success &&
                   mnavStageTile(navmesh, s_small[t], size).result == mnav_success,
               "a tile");

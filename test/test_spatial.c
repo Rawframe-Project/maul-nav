@@ -81,7 +81,8 @@ static mnavNavmesh* Load(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavBakeTile(baker, &world, 1, t & 1, t >> 1, nullptr) == mnav_success &&
+        CHECK(mnavBakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr},
+                           t & 1, t >> 1, nullptr) == mnav_success &&
                   mnavCopyBakedTile(baker, s_slopeTiles[t], CAPACITY, &s_slopeSizes[t]) ==
                       mnav_success &&
                   mnavStageTile(navmesh, s_slopeTiles[t], s_slopeSizes[t]).result == mnav_success,

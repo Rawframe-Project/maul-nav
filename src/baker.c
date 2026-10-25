@@ -572,26 +572,9 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
     return result;
 }
 
-static MNAV_NOINLINE mnavResult BakeTileWork(mnavBaker* baker, const mnavTriangleMesh* meshes,
-                                             int32_t meshCount, int32_t tileX, int32_t tileZ,
+static MNAV_NOINLINE mnavResult BakeTileWork(mnavBaker* baker, const mnavBakeInput* input,
+                                             int32_t tileX, int32_t tileZ,
                                              mnavBakeReport* reportOut)
-{
-    Input in = {{meshes, meshCount, nullptr, 0, nullptr, 0, nullptr}, nullptr, 0, nullptr, false};
-    return Bake(baker, &in, tileX, tileZ, nullptr, reportOut);
-}
-
-mnavResult mnavBakeTile(mnavBaker* baker, const mnavTriangleMesh* meshes, int32_t meshCount,
-                        int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
-{
-    uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = BakeTileWork(baker, meshes, meshCount, tileX, tileZ, reportOut);
-    mnavFloatEnvLeave(env);
-    return result;
-}
-
-static MNAV_NOINLINE mnavResult BakeTileInputWork(mnavBaker* baker, const mnavBakeInput* input,
-                                                  int32_t tileX, int32_t tileZ,
-                                                  mnavBakeReport* reportOut)
 {
     if (input == nullptr)
     {
@@ -602,36 +585,18 @@ static MNAV_NOINLINE mnavResult BakeTileInputWork(mnavBaker* baker, const mnavBa
     return Bake(baker, &in, tileX, tileZ, nullptr, reportOut);
 }
 
-mnavResult mnavBakeTileInput(mnavBaker* baker, const mnavBakeInput* input, int32_t tileX,
-                             int32_t tileZ, mnavBakeReport* reportOut)
+mnavResult mnavBakeTile(mnavBaker* baker, const mnavBakeInput* input, int32_t tileX, int32_t tileZ,
+                        mnavBakeReport* reportOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = BakeTileInputWork(baker, input, tileX, tileZ, reportOut);
+    mnavResult result = BakeTileWork(baker, input, tileX, tileZ, reportOut);
     mnavFloatEnvLeave(env);
     return result;
 }
 
-static MNAV_NOINLINE mnavResult BakeTile2DWork(mnavBaker* baker, const mnavOutline* outlines,
-                                               int32_t outlineCount, int32_t tileX, int32_t tileZ,
+static MNAV_NOINLINE mnavResult BakeTile2DWork(mnavBaker* baker, const mnavBake2DInput* input,
+                                               int32_t tileX, int32_t tileZ,
                                                mnavBakeReport* reportOut)
-{
-    Input in = {
-        {nullptr, 0, nullptr, 0, nullptr, 0, nullptr}, outlines, outlineCount, nullptr, true};
-    return Bake(baker, &in, tileX, tileZ, nullptr, reportOut);
-}
-
-mnavResult mnavBakeTile2D(mnavBaker* baker, const mnavOutline* outlines, int32_t outlineCount,
-                          int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
-{
-    uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = BakeTile2DWork(baker, outlines, outlineCount, tileX, tileZ, reportOut);
-    mnavFloatEnvLeave(env);
-    return result;
-}
-
-static MNAV_NOINLINE mnavResult BakeTile2DInputWork(mnavBaker* baker, const mnavBake2DInput* input,
-                                                    int32_t tileX, int32_t tileZ,
-                                                    mnavBakeReport* reportOut)
 {
     const mnavBake2DInput none = {nullptr, -1, nullptr};
     const mnavBake2DInput* in2 = input != nullptr ? input : &none;
@@ -643,11 +608,11 @@ static MNAV_NOINLINE mnavResult BakeTile2DInputWork(mnavBaker* baker, const mnav
     return Bake(baker, &in, tileX, tileZ, nullptr, reportOut);
 }
 
-mnavResult mnavBakeTile2DInput(mnavBaker* baker, const mnavBake2DInput* input, int32_t tileX,
-                               int32_t tileZ, mnavBakeReport* reportOut)
+mnavResult mnavBakeTile2D(mnavBaker* baker, const mnavBake2DInput* input, int32_t tileX,
+                          int32_t tileZ, mnavBakeReport* reportOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = BakeTile2DInputWork(baker, input, tileX, tileZ, reportOut);
+    mnavResult result = BakeTile2DWork(baker, input, tileX, tileZ, reportOut);
     mnavFloatEnvLeave(env);
     return result;
 }

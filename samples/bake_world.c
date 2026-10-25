@@ -100,7 +100,7 @@ static void BakeTiles(Worker* w)
     w->result = mnavCreateBaker(w->def, &baker).result;
     for (int32_t t = w->first; t < TILES * TILES && w->result == mnav_success; t += WORKERS)
     {
-        w->result = mnavBakeTileInput(baker, w->input, t % TILES, t / TILES, NULL);
+        w->result = mnavBakeTile(baker, w->input, t % TILES, t / TILES, NULL);
         if (w->result == mnav_success)
         {
             s_tiles[t] = malloc(TILE_ROOM);
@@ -165,7 +165,8 @@ static int32_t SameAsOneThread(const mnavBakeDef* def, const mnavTriangleMesh* m
         for (int32_t t = 0; t < TILES * TILES; ++t)
         {
             size_t size = 0;
-            same += mnavBakeTile(baker, mesh, 1, t % TILES, t / TILES, NULL) == mnav_success &&
+            same += mnavBakeTile(baker, &(mnavBakeInput){mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                                 t % TILES, t / TILES, NULL) == mnav_success &&
                             mnavCopyBakedTile(baker, bytes, TILE_ROOM, &size) == mnav_success &&
                             size == s_sizes[t] && memcmp(bytes, s_tiles[t], size) == 0
                         ? 1

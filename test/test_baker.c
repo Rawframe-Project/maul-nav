@@ -33,7 +33,8 @@ static mnavResult BakeCopy(mnavBaker* baker, const mnavTriangleMesh* meshes, int
                            int32_t x, int32_t z, uint8_t* bytes, size_t* size,
                            mnavBakeReport* report)
 {
-    mnavResult result = mnavBakeTile(baker, meshes, count, x, z, report);
+    mnavResult result = mnavBakeTile(
+        baker, &(mnavBakeInput){meshes, count, nullptr, 0, nullptr, 0, nullptr}, x, z, report);
     if (result == mnav_success)
     {
         CHECK(mnavCopyBakedTile(baker, bytes, TILE_CAPACITY, size) == mnav_success, "copied");
@@ -67,7 +68,9 @@ static void TestLevelBakesAndCopies(void)
     CHECK(mnavCopyBakedTile(baker, nullptr, 0, &size) == mnav_errorInvalid, "nothing baked yet");
     mnavTriangleMesh level = Level();
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &level, 1, 0, 0, &report) == mnav_success, "baked");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success,
+          "baked");
     CHECK(report.result == mnav_success && report.stage == mnav_stageDone && report.mesh == -1,
           "done");
     CHECK(report.triangles > 0 && report.spans > 0 && report.regions == 3 &&
@@ -103,7 +106,9 @@ static void TestFlatFloorAtNoSlope(void)
     const int32_t quad[6] = {0, 1, 2, 0, 2, 3};
     const mnavTriangleMesh mesh = {floor, 4, quad, 2, nullptr};
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &mesh, 1, 0, 0, &report) == mnav_success && report.polygons > 0,
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success &&
+              report.polygons > 0,
           "a flat floor is walkable at a slope of 0");
     mnavDestroyBaker(baker);
 }
@@ -121,11 +126,14 @@ static void TestBakesDoNotDependOnWhatCameBefore(void)
     mnavBakeReport report;
     CHECK(BakeCopy(baker, &level, 1, 0, 0, first, &firstSize, &report) == mnav_success, "first");
     uint64_t peak = report.memoryPeak;
-    CHECK(mnavBakeTile(baker, &level, 1, 1, 0, &report) == mnav_success, "a neighbor between");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 1, 0,
+                       &report) == mnav_success,
+          "a neighbor between");
     CHECK(BakeCopy(baker, &level, 1, 0, 0, again, &againSize, &report) == mnav_success, "again");
     CHECK(againSize == firstSize && memcmp(first, again, firstSize) == 0, "the same bytes");
     CHECK(report.memoryPeak == peak, "the same memory, nothing kept from before");
-    CHECK(mnavBakeTile(baker, nullptr, 0, 0, 0, &report) == mnav_success &&
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){nullptr, 0, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success &&
               report.memoryPeak < peak,
           "an empty tile's peak is its own");
     mnavBaker* other = nullptr;
@@ -143,36 +151,47 @@ static void TestFingerprintFollowsTheTilesInput(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
     mnavTriangleMesh level = Level();
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &level, 1, 0, 0, &report) == mnav_success, "baked");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success,
+          "baked");
     uint64_t base = report.fingerprint;
     int32_t triangles = report.triangles;
     // A triangle far beyond the tile and its border.
     mnavVec3 far[3] = {{200.0f, 0.0f, 200.0f}, {200.0f, 0.0f, 201.0f}, {201.0f, 0.0f, 200.0f}};
     const int32_t one[3] = {0, 1, 2};
     mnavTriangleMesh meshes[2] = {level, {far, 3, one, 1, nullptr}};
-    CHECK(mnavBakeTile(baker, meshes, 2, 0, 0, &report) == mnav_success, "baked");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){meshes, 2, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success,
+          "baked");
     CHECK(report.fingerprint == base && report.triangles == triangles,
           "far geometry leaves the fingerprint");
     // The same triangle on the tile.
     mnavVec3 near[3] = {{10.0f, 0.5f, 10.0f}, {10.0f, 0.5f, 11.0f}, {11.0f, 0.5f, 10.0f}};
     meshes[1].vertices = near;
-    CHECK(mnavBakeTile(baker, meshes, 2, 0, 0, &report) == mnav_success, "baked");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){meshes, 2, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success,
+          "baked");
     CHECK(report.fingerprint != base && report.triangles == triangles + 1,
           "geometry on the tile moves it");
     uint64_t withNear = report.fingerprint;
     // The same triangle with another area type.
     const mnavAreaType kind[1] = {2};
     meshes[1].areas = kind;
-    CHECK(mnavBakeTile(baker, meshes, 2, 0, 0, &report) == mnav_success, "baked");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){meshes, 2, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success,
+          "baked");
     CHECK(report.fingerprint != withNear && report.fingerprint != base, "its area type moves it");
     // Another setting.
     mnavBakeDef coarse = def;
     coarse.detailMaxError = 0.25f;
     mnavBaker* other = nullptr;
     CHECK(mnavCreateBaker(&coarse, &other).result == mnav_success, "created");
-    CHECK(mnavBakeTile(other, &level, 1, 0, 0, &report) == mnav_success, "baked");
+    CHECK(mnavBakeTile(other, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success,
+          "baked");
     CHECK(report.fingerprint != base, "a setting moves it");
-    CHECK(mnavBakeTile(other, &level, 1, 1, 0, &report) == mnav_success &&
+    CHECK(mnavBakeTile(other, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 1, 0,
+                       &report) == mnav_success &&
               report.fingerprint != base,
           "so does the tile's place");
     mnavDestroyBaker(other);
@@ -190,7 +209,9 @@ static void TestDetailSearchesAsFarAsWallsStray(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
     mnavTriangleMesh level = Level();
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &level, 1, 0, 0, &report) == mnav_success, "baked");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success,
+          "baked");
     CHECK(report.fallbackHeights == 0, "every sample found a height");
     mnavDestroyBaker(baker);
 }
@@ -205,21 +226,33 @@ static void TestBadInputIsNamed(void)
     const int32_t one[3] = {0, 1, 2};
     mnavTriangleMesh meshes[2] = {level, {bad, 3, one, 1, nullptr}};
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &level, 1, 0, 0, &report) == mnav_success, "a good tile first");
-    CHECK(mnavBakeTile(baker, meshes, 2, 0, 0, &report) == mnav_errorInvalid, "refused");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success,
+          "a good tile first");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){meshes, 2, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_errorInvalid,
+          "refused");
     CHECK(report.stage == mnav_stageInput && report.mesh == 1 &&
               report.input.element == mnav_elementVertex && report.input.index == 1,
           "the second mesh's second vertex");
     size_t size = 0;
     CHECK(mnavCopyBakedTile(baker, nullptr, 0, &size) == mnav_errorInvalid,
           "no tile held after a failure");
-    CHECK(mnavBakeTile(baker, meshes, -1, 0, 0, &report) == mnav_errorInvalid, "a negative count");
-    CHECK(mnavBakeTile(baker, nullptr, 1, 0, 0, &report) == mnav_errorInvalid, "no meshes");
-    CHECK(mnavBakeTile(baker, nullptr, 0, 0, 0, &report) == mnav_success && report.polygons == 0,
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){meshes, -1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_errorInvalid,
+          "a negative count");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){nullptr, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_errorInvalid,
+          "no meshes");
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){nullptr, 0, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_success &&
+              report.polygons == 0,
           "no meshes, an empty tile");
-    CHECK(mnavBakeTile(baker, &level, 1, 1 << 20, 0, &report) == mnav_errorRange,
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 1 << 20,
+                       0, &report) == mnav_errorRange,
           "a tile past the extent");
-    CHECK(mnavBakeTile(nullptr, &level, 1, 0, 0, &report) == mnav_errorInvalid &&
+    CHECK(mnavBakeTile(nullptr, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_errorInvalid &&
               report.result == mnav_errorInvalid,
           "no baker");
     mnavDestroyBaker(baker);
@@ -233,17 +266,20 @@ static void TestLimitsEndInAStage(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
     mnavTriangleMesh level = Level();
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &level, 1, 0, 0, &report) == mnav_errorLimit &&
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_errorLimit &&
               report.stage == mnav_stagePolygons,
           "the polygon limit, in the polygon stage");
     mnavDestroyBaker(baker);
     def = mnavDefaultBakeDef();
     def.limits.memoryBytes = 65536;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
-    CHECK(mnavBakeTile(baker, &level, 1, 0, 0, &report) == mnav_errorLimit &&
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_errorLimit &&
               report.stage == mnav_stageRasterize && report.memoryPeak <= 65536,
           "the memory limit, early");
-    CHECK(mnavBakeTile(baker, nullptr, 0, 0, 0, &report) == mnav_errorLimit,
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){nullptr, 0, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_errorLimit,
           "even an empty tile's columns do not fit");
     mnavDestroyBaker(baker);
     def = mnavDefaultBakeDef();
@@ -252,7 +288,8 @@ static void TestLimitsEndInAStage(void)
     mnavTriangleMesh meshes[2] = {level, level};
     meshes[0].triangleCount = 6;
     meshes[1].triangleCount = 6;
-    CHECK(mnavBakeTile(baker, meshes, 2, 0, 0, &report) == mnav_errorLimit &&
+    CHECK(mnavBakeTile(baker, &(mnavBakeInput){meshes, 2, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &report) == mnav_errorLimit &&
               report.stage == mnav_stageInput,
           "the input limit counts every mesh");
     mnavDestroyBaker(baker);
@@ -315,7 +352,8 @@ static void TestStagesAreTimedAndMeasured(void)
     def.limits.tilePolygons = 10;
     CHECK(mnavCreateBaker(&def, &timed).result == mnav_success, "created");
     reads = 0;
-    CHECK(mnavBakeTile(timed, &level, 1, 0, 0, &b) == mnav_errorLimit &&
+    CHECK(mnavBakeTile(timed, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                       &b) == mnav_errorLimit &&
               b.stage == mnav_stagePolygons,
           "ended in the polygon stage");
     bool upTo = true;
@@ -343,12 +381,15 @@ static void TestTilesToTheExtent(void)
     {
         int32_t in = 0;
         int32_t out = 1 << 20;
-        CHECK(mnavBakeTile(baker, nullptr, 0, out * dx[d], out * dz[d], nullptr) == mnav_errorRange,
+        CHECK(mnavBakeTile(baker, &(mnavBakeInput){nullptr, 0, nullptr, 0, nullptr, 0, nullptr},
+                           out * dx[d], out * dz[d], nullptr) == mnav_errorRange,
               "far past the extent");
         while (out - in > 1)
         {
             int32_t mid = in + (out - in) / 2;
-            mnavResult result = mnavBakeTile(baker, nullptr, 0, mid * dx[d], mid * dz[d], nullptr);
+            mnavResult result =
+                mnavBakeTile(baker, &(mnavBakeInput){nullptr, 0, nullptr, 0, nullptr, 0, nullptr},
+                             mid * dx[d], mid * dz[d], nullptr);
             CHECK(result == mnav_success || result == mnav_errorRange, "baked or refused");
             in = result == mnav_success ? mid : in;
             out = result == mnav_success ? out : mid;

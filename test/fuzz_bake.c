@@ -160,8 +160,10 @@ static size_t BakeTwice(mnavBaker* baker, const Input* in, bool flat, int32_t ou
                         const mnavBakeInput* input, int32_t tileX, int32_t tileZ, uint8_t* tile)
 {
     mnavBakeReport report;
-    mnavResult result = flat ? mnavBakeTile2D(baker, in->outlines, outlines, tileX, tileZ, &report)
-                             : mnavBakeTileInput(baker, input, tileX, tileZ, &report);
+    mnavResult result =
+        flat ? mnavBakeTile2D(baker, &(mnavBake2DInput){in->outlines, outlines, nullptr}, tileX,
+                              tileZ, &report)
+             : mnavBakeTile(baker, input, tileX, tileZ, &report);
     Expect(result == report.result);
     if (result != mnav_success)
     {
@@ -172,8 +174,10 @@ static size_t BakeTwice(mnavBaker* baker, const Input* in, bool flat, int32_t ou
     size_t size = 0;
     Expect(mnavCopyBakedTile(baker, tile, TILE_ROOM, &size) == mnav_success && size > 0);
     mnavBakeReport again;
-    mnavResult second = flat ? mnavBakeTile2D(baker, in->outlines, outlines, tileX, tileZ, &again)
-                             : mnavBakeTileInput(baker, input, tileX, tileZ, &again);
+    mnavResult second =
+        flat ? mnavBakeTile2D(baker, &(mnavBake2DInput){in->outlines, outlines, nullptr}, tileX,
+                              tileZ, &again)
+             : mnavBakeTile(baker, input, tileX, tileZ, &again);
     static uint8_t copy[TILE_ROOM];
     size_t copySize = 0;
     Expect(second == mnav_success && again.fingerprint == report.fingerprint &&
@@ -268,8 +272,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         indexed.index = index;
         const mnavBake2DInput flatIndexed = {in.outlines, outlines, index};
         mnavBakeReport report;
-        mnavResult result = flat ? mnavBakeTile2DInput(baker, &flatIndexed, tileX, tileZ, &report)
-                                 : mnavBakeTileInput(baker, &indexed, tileX, tileZ, &report);
+        mnavResult result = flat ? mnavBakeTile2D(baker, &flatIndexed, tileX, tileZ, &report)
+                                 : mnavBakeTile(baker, &indexed, tileX, tileZ, &report);
         static uint8_t copy[TILE_ROOM];
         size_t copySize = 0;
         Expect((result == mnav_success) == (tileSize > 0));
