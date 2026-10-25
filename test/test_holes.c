@@ -1,240 +1,207 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Merging hole contours into their outlines.
+// Merging hole contours into their outlines, read from 2D bakes of a
+// square floor with square holes cut out: every hole is joined, and the
+// tile's polygons cover the floor's cells and no hole's, exactly once.
 
-#include "allocator.h"
-#include "compact.h"
-#include "contour.h"
-#include "erode.h"
-#include "filter.h"
-#include "hand_field.h"
-#include "heightfield.h"
-#include "holes.h"
-#include "region.h"
 #include "soup.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
+#include "maul-nav/base.h"
+#include "maul-nav/debug.h"
+#include "maul-nav/navmesh.h"
+#include "maul-nav/query.h"
 
 #include <stdint.h>
 
-static int64_t TwiceArea(const mnavContourSet* set, int32_t contour)
+enum
 {
-    const mnavContourVertex* v = set->vertices + set->contours[contour].first;
-    int32_t count = set->contours[contour].count;
-    int64_t area = 0;
-    for (int32_t i = 0, j = count - 1; i < count; j = i++)
-    {
-        area += (int64_t)v[i].x * v[j].z - (int64_t)v[j].x * v[i].z;
-    }
-    return area;
-}
-
-// Builds the contours of a hand field's regions and merges their holes.
-static void Build(Field* field, mnavMemory* memory, mnavCompactField* compact,
-                  mnavRegionMap* regions, mnavContourSet* set)
-{
-    *memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    CHECK(mnavBuildCompactField(memory, Pack(field), HEIGHT, STEP, compact) == mnav_success,
-          "compact field");
-    CHECK(mnavBuildRegions(memory, compact, 1, 0, regions) == mnav_success, "regions");
-    CHECK(mnavBuildContours(memory, compact, regions, 1, 0.5f, 0, set) == mnav_success, "contours");
-    CHECK(mnavMergeHoles(memory, set, regions->count) == mnav_success, "merged");
-}
-
-static void TestHolesMergeIntoOneContour(void)
-{
-    // The inside floor of 25 cells less a hole of 4, then less two holes
-    // of 1.
-    for (int32_t pass = 0; pass < 2; ++pass)
-    {
-        static Field field;
-        field = (Field){0};
-        for (int32_t z = 1; z <= 5; ++z)
-        {
-            for (int32_t x = 1; x <= 5; ++x)
-            {
-                bool hole = pass == 0 ? (x >= 3 && x <= 4 && z >= 3 && z <= 4)
-                                      : ((x == 2 && z == 2) || (x == 4 && z == 4));
-                if (!hole)
-                {
-                    AddSpan(&field, x, z, 99, 100, 1);
-                }
-            }
-        }
-        mnavMemory memory;
-        mnavCompactField compact;
-        mnavRegionMap regions;
-        mnavContourSet set;
-        Build(&field, &memory, &compact, &regions, &set);
-        CHECK(set.count == 1, "one contour left");
-        CHECK(!set.contours[0].hole && set.droppedHoles == 0, "no hole left or dropped");
-        int32_t holes = pass == 0 ? 1 : 2;
-        CHECK(set.contours[0].count == 4 + 6 * holes, "four corners and a bridged ring per hole");
-        CHECK(TwiceArea(&set, 0) == 2 * (pass == 0 ? 21 : 23), "the area less the holes");
-        mnavReleaseContours(&memory, &set);
-        mnavReleaseRegions(&memory, &regions);
-        mnavReleaseCompactField(&memory, &compact);
-        CHECK(memory.used == 0, "everything released");
-    }
-}
-
-// A contour set built by hand: an outline from (0, 0) to (10, 10) and a
-// hole from (5, 5) to (7, 7), both of region 1.
-static mnavContourVertex s_vertices[8] = {
-    {0, 0, 0, 0, 0}, {0, 0, 10, 0, 0}, {10, 0, 10, 0, 0}, {10, 0, 0, 0, 0},
-    {5, 0, 5, 0, 0}, {7, 0, 5, 0, 0},  {7, 0, 7, 0, 0},   {5, 0, 7, 0, 0},
+    TILE_ROOM = 1 << 20,
+    // The floor's lowest corner, in cells of tile (0, 0).
+    AT = 8,
+    MOST_HOLES = 25,
+    DRAW_ROOM = 1 << 16
 };
 
-static mnavContourSet HandSet(mnavMemory* memory, bool withOutline)
+static uint8_t s_tile[TILE_ROOM];
+static mnavNavmesh* s_navmesh;
+static mnavBakeReport s_report;
+static mnavDebugVertex s_drawVertices[DRAW_ROOM];
+static uint32_t s_drawTriangles[DRAW_ROOM];
+
+// A floor of side cells with square holes of 2 by 2 cells, each by its
+// lowest corner, in cells of the floor.
+typedef struct Floor
 {
-    mnavContourSet set = {0};
-    CHECK(mnavReserve(memory, (void**)&set.vertices, &set.vertexCapacity, 0, 8,
-                      sizeof(mnavContourVertex), alignof(mnavContourVertex)) == mnav_success,
-          "vertices");
-    CHECK(mnavReserve(memory, (void**)&set.contours, &set.capacity, 0, 2, sizeof(mnavContour),
-                      alignof(mnavContour)) == mnav_success,
-          "contours");
-    for (int32_t i = 0; i < 8; ++i)
-    {
-        set.vertices[i] = s_vertices[i];
-    }
-    set.vertexCount = 8;
-    if (withOutline)
-    {
-        set.contours[set.count++] = (mnavContour){0, 4, 1, 1, false};
-    }
-    set.contours[set.count++] = (mnavContour){4, 4, 1, 1, true};
-    return set;
+    int32_t side;
+    int32_t corners[2 * MOST_HOLES];
+    int32_t holes;
+} Floor;
+
+static float Meters(int32_t cells)
+{
+    return (float)(AT + cells) * 0.25f;
 }
 
-static void TestTiedBridgesTakeTheLowestOutlineVertex(void)
+static bool InHole(const Floor* floor, int32_t x, int32_t z)
 {
-    // The hole's lowest-left vertex (5, 5) is 50 squared cells from all
-    // four outline corners; the bridge goes to the first, (0, 0).
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = HandSet(&memory, true);
-    CHECK(TwiceArea(&set, 0) > 0 && TwiceArea(&set, 1) < 0, "an outline and a hole");
-    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
-    CHECK(set.count == 1 && set.contours[0].count == 10, "one contour of 10");
-    const mnavContourVertex* v = set.vertices + set.contours[0].first;
-    CHECK(v[0].x == 0 && v[0].z == 0 && v[4].x == 0 && v[4].z == 0, "bridged at (0, 0)");
-    CHECK(v[5].x == 5 && v[5].z == 5 && v[9].x == 5 && v[9].z == 5, "to (5, 5)");
-    CHECK(TwiceArea(&set, 0) == 200 - 8, "the outline less the hole");
-    mnavReleaseContours(&memory, &set);
-    CHECK(memory.used == 0, "everything released");
-}
-
-// A set from an outline square of side size and the given holes, each a
-// square of side 2 by its lowest-left corner, all of region 1.
-static mnavContourSet SquareWithHoles(mnavMemory* memory, int32_t size, const int32_t* corners,
-                                      int32_t holeCount)
-{
-    mnavContourSet set = {0};
-    int32_t vertexCount = 4 + 4 * holeCount;
-    CHECK(mnavReserve(memory, (void**)&set.vertices, &set.vertexCapacity, 0, vertexCount,
-                      sizeof(mnavContourVertex), alignof(mnavContourVertex)) == mnav_success,
-          "vertices");
-    CHECK(mnavReserve(memory, (void**)&set.contours, &set.capacity, 0, 1 + holeCount,
-                      sizeof(mnavContour), alignof(mnavContour)) == mnav_success,
-          "contours");
-    const int32_t outline[8] = {0, 0, 0, size, size, size, size, 0};
-    for (int32_t k = 0; k < 4; ++k)
+    for (int32_t h = 0; h < floor->holes; ++h)
     {
-        set.vertices[k] = (mnavContourVertex){outline[2 * k], 0, outline[2 * k + 1], 0, 0};
-    }
-    set.contours[set.count++] = (mnavContour){0, 4, 1, 1, false};
-    for (int32_t h = 0; h < holeCount; ++h)
-    {
-        int32_t x = corners[2 * h];
-        int32_t z = corners[2 * h + 1];
-        // Wound the other way from the outline.
-        const int32_t ring[8] = {x, z, x + 2, z, x + 2, z + 2, x, z + 2};
-        for (int32_t k = 0; k < 4; ++k)
+        int32_t hx = floor->corners[2 * h];
+        int32_t hz = floor->corners[2 * h + 1];
+        if (x >= hx && x < hx + 2 && z >= hz && z < hz + 2)
         {
-            set.vertices[4 + 4 * h + k] =
-                (mnavContourVertex){ring[2 * k], 0, ring[2 * k + 1], 0, 0};
-        }
-        set.contours[set.count++] = (mnavContour){4 + 4 * h, 4, 1, 1, true};
-    }
-    set.vertexCount = vertexCount;
-    return set;
-}
-
-// Pairs of edges of a contour that cross at a point inside both.
-static int32_t ProperCrossings(const mnavContourSet* set, int32_t contour)
-{
-    const mnavContourVertex* v = set->vertices + set->contours[contour].first;
-    int32_t n = set->contours[contour].count;
-    int32_t crossings = 0;
-    for (int32_t i = 0; i < n; ++i)
-    {
-        for (int32_t j = i + 1; j < n; ++j)
-        {
-            const mnavContourVertex* a = &v[i];
-            const mnavContourVertex* b = &v[(i + 1) % n];
-            const mnavContourVertex* c = &v[j];
-            const mnavContourVertex* d = &v[(j + 1) % n];
-            int64_t abc =
-                (int64_t)(b->x - a->x) * (c->z - a->z) - (int64_t)(c->x - a->x) * (b->z - a->z);
-            int64_t abd =
-                (int64_t)(b->x - a->x) * (d->z - a->z) - (int64_t)(d->x - a->x) * (b->z - a->z);
-            int64_t cda =
-                (int64_t)(d->x - c->x) * (a->z - c->z) - (int64_t)(a->x - c->x) * (d->z - c->z);
-            int64_t cdb =
-                (int64_t)(d->x - c->x) * (b->z - c->z) - (int64_t)(b->x - c->x) * (d->z - c->z);
-            crossings += ((abc < 0 && abd > 0) || (abc > 0 && abd < 0)) &&
-                         ((cda < 0 && cdb > 0) || (cda > 0 && cdb < 0));
+            return true;
         }
     }
-    return crossings;
+    return false;
+}
+
+// Bakes the floor in 2D with no agent radius, smallest region or edge
+// error, and loads its tile alone in s_navmesh.
+static void Load(const Floor* floor)
+{
+    static mnavVec2 points[4 * (1 + MOST_HOLES)];
+    static mnavOutline outlines[1 + MOST_HOLES];
+    for (int32_t o = 0; o <= floor->holes; ++o)
+    {
+        int32_t x = o == 0 ? 0 : floor->corners[2 * (o - 1)];
+        int32_t z = o == 0 ? 0 : floor->corners[2 * (o - 1) + 1];
+        int32_t side = o == 0 ? floor->side : 2;
+        mnavVec2* p = &points[4 * o];
+        p[0] = (mnavVec2){Meters(x), Meters(z)};
+        p[1] = (mnavVec2){Meters(x), Meters(z + side)};
+        p[2] = (mnavVec2){Meters(x + side), Meters(z + side)};
+        p[3] = (mnavVec2){Meters(x + side), Meters(z)};
+        outlines[o] = (mnavOutline){p, 4, o == 0 ? mnav_areaWalkable : mnav_areaNone};
+    }
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.agent.radius = 0.0f;
+    def.minRegionArea = 0.0f;
+    def.maxEdgeError = 0.0f;
+    mnavBaker* baker = nullptr;
+    size_t size = 0;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTile2D(baker, outlines, 1 + floor->holes, 0, 0, &s_report) == mnav_success &&
+              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+          "baked");
+    mnavDestroyBaker(baker);
+    mnavDestroyNavmesh(s_navmesh);
+    s_navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success &&
+              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavCommit(s_navmesh) == mnav_success,
+          "loaded");
+}
+
+// Whether a polygon lies over the center of cell (x, z) of the floor.
+static bool Covered(int32_t x, int32_t z)
+{
+    mnavNearest n;
+    CHECK(mnavFindNearest(s_navmesh, nullptr,
+                          (mnavPos3){(double)Meters(x) + 0.125, 0.0, (double)Meters(z) + 0.125},
+                          (mnavVec3){0.01f, 1.0f, 0.01f}, &n) == mnav_success,
+          "nearest");
+    return n.polygon.slot != 0 && n.over;
+}
+
+// Twice the area of the tile's polygons, in square cells.
+static int64_t TwiceArea(void)
+{
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0},
+                         s_drawVertices,
+                         DRAW_ROOM,
+                         0,
+                         s_drawTriangles,
+                         DRAW_ROOM,
+                         0,
+                         nullptr,
+                         0,
+                         0};
+    // The edges go uncounted into a buffer with no line room.
+    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the polygons fit");
+    int64_t area = 0;
+    for (int32_t t = 0; t < b.triangleCount / 3; ++t)
+    {
+        const mnavDebugVertex* p = &s_drawVertices[s_drawTriangles[3 * t]];
+        const mnavDebugVertex* q = &s_drawVertices[s_drawTriangles[3 * t + 1]];
+        const mnavDebugVertex* r = &s_drawVertices[s_drawTriangles[3 * t + 2]];
+        if (p->kind != mnav_debugPolygon)
+        {
+            continue;
+        }
+        // Sixteenths of a cell, so 64 to the meter.
+        int64_t ax = (int64_t)(p->x * 64.0f);
+        int64_t az = (int64_t)(p->z * 64.0f);
+        int64_t bx = (int64_t)(q->x * 64.0f) - ax;
+        int64_t bz = (int64_t)(q->z * 64.0f) - az;
+        int64_t cx = (int64_t)(r->x * 64.0f) - ax;
+        int64_t cz = (int64_t)(r->z * 64.0f) - az;
+        int64_t twice = bx * cz - cx * bz;
+        area += twice < 0 ? -twice : twice;
+    }
+    return area / 256;
+}
+
+// Bakes a floor and checks that every hole joined its outline: none
+// dropped, every ring triangulated whole, a polygon over every floor
+// cell and none over a hole's, and the polygons' area the floor's.
+static bool Merged(const Floor* floor)
+{
+    Load(floor);
+    bool covered = s_report.droppedHoles == 0 && s_report.partialRings == 0;
+    int32_t cells = 0;
+    for (int32_t z = 0; z < floor->side; ++z)
+    {
+        for (int32_t x = 0; x < floor->side; ++x)
+        {
+            bool hole = InHole(floor, x, z);
+            covered = covered && Covered(x, z) == !hole;
+            cells += hole ? 0 : 1;
+        }
+    }
+    return covered && TwiceArea() == 2 * (int64_t)cells;
+}
+
+static void TestHolesMergeIntoTheOutline(void)
+{
+    // A floor of 25 cells less a hole of 4, and less two of 4.
+    Floor one = {5, {2, 2}, 1};
+    CHECK(Merged(&one), "one hole");
+    Floor two = {7, {1, 1, 4, 4}, 2};
+    CHECK(Merged(&two), "two holes");
 }
 
 static void TestBridgeAvoidsAWaitingHole(void)
 {
     // The first hole's nearest corner, (20, 0), lies behind the second
     // hole; the bridge must go elsewhere and nothing may cross.
-    const int32_t corners[4] = {14, 4, 16, 1};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = SquareWithHoles(&memory, 20, corners, 2);
-    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
-    CHECK(set.count == 1 && set.droppedHoles == 0, "both holes bridged");
-    CHECK(ProperCrossings(&set, 0) == 0, "no edges cross");
-    CHECK(TwiceArea(&set, 0) == 800 - 16, "the square less both holes");
-    mnavReleaseContours(&memory, &set);
+    Floor floor = {20, {14, 4, 16, 1}, 2};
+    CHECK(Merged(&floor), "both holes joined");
 }
 
 static void TestManyHolesNeverCross(void)
 {
     // A grid of 25 holes: later bridges must not cross earlier ones,
     // which are part of the outline by then.
-    int32_t corners[50];
+    Floor floor = {30, {0}, 25};
     for (int32_t i = 0; i < 25; ++i)
     {
-        corners[2 * i] = 2 + 5 * (i % 5) + (i / 5) % 2;
-        corners[2 * i + 1] = 2 + 5 * (i / 5) + (i % 5) % 3;
+        floor.corners[2 * i] = 2 + 5 * (i % 5) + (i / 5) % 2;
+        floor.corners[2 * i + 1] = 2 + 5 * (i / 5) + (i % 5) % 3;
     }
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = SquareWithHoles(&memory, 30, corners, 25);
-    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
-    CHECK(set.count == 1 && set.droppedHoles == 0, "every hole bridged");
-    CHECK(ProperCrossings(&set, 0) == 0, "no edges cross");
-    CHECK(TwiceArea(&set, 0) == 1800 - 25 * 8, "the square less every hole");
-    mnavReleaseContours(&memory, &set);
+    CHECK(Merged(&floor), "every hole joined");
 }
 
 static void TestBridgeNeverCrossesAnEarlierBridge(void)
 {
     // Found by a search: the last hole's nearest candidate lies across a
     // bridge made earlier, which is part of the outline by then.
-    const int32_t corners[6] = {16, 5, 15, 1, 12, 9};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = SquareWithHoles(&memory, 20, corners, 3);
-    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
-    CHECK(set.count == 1 && set.droppedHoles == 0, "every hole bridged");
-    CHECK(ProperCrossings(&set, 0) == 0, "no edges cross");
-    mnavReleaseContours(&memory, &set);
+    Floor floor = {20, {16, 5, 15, 1, 12, 9}, 3};
+    CHECK(Merged(&floor), "every hole joined");
 }
 
 static void TestSecondBridgeTakesTheCopyFacingIt(void)
@@ -243,88 +210,19 @@ static void TestSecondBridgeTakesTheCopyFacingIt(void)
     // nearer than to each other: after the first bridge (0, 0) appears
     // twice, and the second hole, below that bridge, must leave from the
     // copy between the -Z wall and the bridge.
-    const int32_t corners[4] = {1, 8, 8, 1};
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = SquareWithHoles(&memory, 40, corners, 2);
-    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
-    CHECK(set.count == 1 && set.droppedHoles == 0, "both holes bridged");
-    const mnavContourVertex* v = set.vertices + set.contours[0].first;
-    int32_t n = set.contours[0].count;
-    bool facing = false;
-    for (int32_t k = 0; k < n; ++k)
-    {
-        const mnavContourVertex* prev = &v[(k + n - 1) % n];
-        const mnavContourVertex* next = &v[(k + 1) % n];
-        if (v[k].x == 0 && v[k].z == 0 && next->x == 8 && next->z == 1)
-        {
-            facing = prev->x == 40 && prev->z == 0;
-        }
-    }
-    CHECK(facing, "the bridge to (8, 1) leaves after the -Z wall");
-    mnavReleaseContours(&memory, &set);
-}
-
-// A 20 m square with two holes touching at their least corner, (4, 4),
-// as two blocked areas meeting diagonally do: a 2 m square above it and a
-// triangle below. Holes merge in order of that corner, then of their
-// contour: the result is the same whichever order the set lists them in.
-static mnavContourSet TiedHoles(mnavMemory* memory, bool swapped)
-{
-    const int32_t square[8] = {4, 4, 6, 4, 6, 6, 4, 6};
-    const int32_t triangle[6] = {4, 4, 6, 1, 8, 2};
-    const int32_t* holes[2] = {swapped ? triangle : square, swapped ? square : triangle};
-    const int32_t sizes[2] = {swapped ? 3 : 4, swapped ? 4 : 3};
-    mnavContourSet set = {0};
-    CHECK(mnavReserve(memory, (void**)&set.vertices, &set.vertexCapacity, 0, 11,
-                      sizeof(mnavContourVertex), alignof(mnavContourVertex)) == mnav_success &&
-              mnavReserve(memory, (void**)&set.contours, &set.capacity, 0, 3, sizeof(mnavContour),
-                          alignof(mnavContour)) == mnav_success,
-          "room");
-    const int32_t outline[8] = {0, 0, 0, 20, 20, 20, 20, 0};
-    for (int32_t k = 0; k < 4; ++k)
-    {
-        set.vertices[k] = (mnavContourVertex){outline[2 * k], 0, outline[2 * k + 1], 0, 0};
-    }
-    set.contours[set.count++] = (mnavContour){0, 4, 1, 1, false};
-    int32_t first = 4;
-    for (int32_t h = 0; h < 2; ++h)
-    {
-        for (int32_t k = 0; k < sizes[h]; ++k)
-        {
-            set.vertices[first + k] =
-                (mnavContourVertex){holes[h][2 * k], 0, holes[h][2 * k + 1], 0, 0};
-        }
-        set.contours[set.count++] = (mnavContour){first, sizes[h], 1, 1, true};
-        first += sizes[h];
-    }
-    set.vertexCount = first;
-    return set;
+    Floor floor = {40, {1, 8, 8, 1}, 2};
+    CHECK(Merged(&floor), "both holes joined");
 }
 
 static void TestHolesTiedOnTheirCornerMerge(void)
 {
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    int64_t areas[2] = {0, 0};
-    for (int32_t pass = 0; pass < 2; ++pass)
-    {
-        mnavContourSet set = TiedHoles(&memory, pass == 1);
-        CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
-        CHECK(set.count == 1 && set.droppedHoles == 0 && ProperCrossings(&set, 0) == 0,
-              "both bridged, nothing crossing");
-        areas[pass] = TwiceArea(&set, 0);
-        mnavReleaseContours(&memory, &set);
-    }
-    // 800 for the square, less 8 for each hole.
-    CHECK(areas[0] == 784 && areas[1] == 784, "the square less both holes, either order");
-}
-
-static void TestHoleWithoutOutlineIsDropped(void)
-{
-    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
-    mnavContourSet set = HandSet(&memory, false);
-    CHECK(mnavMergeHoles(&memory, &set, 1) == mnav_success, "merged");
-    CHECK(set.count == 0 && set.droppedHoles == 1, "dropped and counted");
-    mnavReleaseContours(&memory, &set);
+    // Two holes touching at a corner, (4, 4), one above it and one to its
+    // +X side below, and the same mirrored: their lowest-left corners tie
+    // or nearly, and both join.
+    Floor floor = {12, {2, 4, 4, 2}, 2};
+    CHECK(Merged(&floor), "touching at a corner");
+    Floor mirrored = {12, {4, 4, 2, 2}, 2};
+    CHECK(Merged(&mirrored), "touching at the other corner");
 }
 
 static void TestLevelMergesEveryHole(void)
@@ -332,55 +230,27 @@ static void TestLevelMergesEveryHole(void)
     static mnavVec3 vertices[LEVEL_VERTICES];
     static int32_t indices[LEVEL_TRIANGLES * 3];
     MakeLevel(vertices, indices);
-    mnavTriangleMesh mesh = {vertices, LEVEL_VERTICES, indices, LEVEL_TRIANGLES, nullptr};
+    const mnavTriangleMesh mesh = {vertices, LEVEL_VERTICES, indices, LEVEL_TRIANGLES, nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
     mnavBakeDef def = mnavDefaultBakeDef();
-    mnavBakeCells cells;
-    CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success, "def");
-    mnavMemory memory = mnavMakeMemory(def.allocator, def.limits.memoryBytes);
-    mnavHeightfield heightfield;
-    CHECK(mnavBuildHeightfieldInput(&memory, &def, &cells,
-                                    &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
-                                    0, &heightfield) == mnav_success,
-          "rasterized");
-    mnavFilterWalkable(&heightfield, cells.agentHeight, cells.agentStep);
-    mnavCompactField compact;
-    CHECK(mnavBuildCompactField(&memory, &heightfield, cells.agentHeight, cells.agentStep,
-                                &compact) == mnav_success,
-          "compacted");
-    CHECK(mnavErode(&memory, &compact, cells.agentRadius) == mnav_success, "eroded");
-    mnavRegionMap regions;
-    CHECK(mnavBuildRegions(&memory, &compact, cells.border, cells.minRegion, &regions) ==
-              mnav_success,
-          "regions");
-    mnavContourSet set;
-    CHECK(mnavBuildContours(&memory, &compact, &regions, cells.border, cells.edgeError,
-                            cells.edgeLength, &set) == mnav_success,
-          "contours");
-    CHECK(mnavMergeHoles(&memory, &set, regions.count) == mnav_success, "merged");
-    bool noHoles = set.droppedHoles == 0;
-    for (int32_t c = 0; c < set.count; ++c)
-    {
-        noHoles = noHoles && !set.contours[c].hole && TwiceArea(&set, c) > 0;
-    }
-    CHECK(noHoles, "every hole merged into an outline");
-    // Field by field: the struct's padding is not part of the result.
-    mnavReleaseContours(&memory, &set);
-    mnavReleaseRegions(&memory, &regions);
-    mnavReleaseCompactField(&memory, &compact);
-    mnavReleaseHeightfield(&memory, &heightfield);
-    CHECK(memory.used == 0, "everything released");
+    mnavBaker* baker = nullptr;
+    mnavBakeReport report;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+              mnavBakeTileInput(baker, &input, 0, 0, &report) == mnav_success,
+          "baked");
+    CHECK(report.droppedHoles == 0 && report.partialRings == 0, "every hole joined");
+    mnavDestroyBaker(baker);
 }
 
 int main(void)
 {
-    TestHolesMergeIntoOneContour();
-    TestTiedBridgesTakeTheLowestOutlineVertex();
+    TestHolesMergeIntoTheOutline();
     TestHolesTiedOnTheirCornerMerge();
-    TestHoleWithoutOutlineIsDropped();
     TestBridgeAvoidsAWaitingHole();
     TestSecondBridgeTakesTheCopyFacingIt();
     TestManyHolesNeverCross();
     TestBridgeNeverCrossesAnEarlierBridge();
     TestLevelMergesEveryHole();
+    mnavDestroyNavmesh(s_navmesh);
     return s_failures == 0 ? 0 : 1;
 }
