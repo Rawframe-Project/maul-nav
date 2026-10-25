@@ -3,7 +3,7 @@
 //
 // Paths across off-mesh links. Hand cells are 0.25 m.
 
-#include "hand_tile.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -14,15 +14,13 @@
 #include <math.h>
 #include <stdint.h>
 
-static uint8_t s_bytes[8192];
-
-static mnavNavmesh* Make(const HandSquare* squares, int32_t count)
+// A navmesh of one hand tile (hand_tiles.h).
+static mnavNavmesh* Make(const uint8_t* bytes, size_t size)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    size_t size = HandTileBytes(s_bytes, 0, squares, count);
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_bytes, size).result == mnav_success &&
+              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "loaded");
     return navmesh;
@@ -68,12 +66,12 @@ static mnavQuery* MakeQuery(void)
     return query;
 }
 
-// Two squares 5 m apart: (5, 5) to (10, 10) and (15, 5) to (20, 10).
-static const HandSquare s_apart[2] = {{20, 20, 40, 40, {0}, 0}, {60, 20, 80, 40, {0}, 2}};
+// s_handApartBridge: two squares 5 m apart, (5, 5) to (10, 10) and (15, 5)
+// to (20, 10), the second of area 2.
 
 static void TestJumpingAGap(void)
 {
-    mnavNavmesh* navmesh = Make(s_apart, 2);
+    mnavNavmesh* navmesh = Make(s_handApartBridge, sizeof(s_handApartBridge));
     mnavQuery* query = MakeQuery();
     mnavPath path = Walk(query, navmesh, nullptr, 6.0, 6.0, 19.0, 9.0);
     CHECK(path.end == mnav_pathNone && path.linkCount == 0, "no way without a link");
@@ -110,7 +108,7 @@ static void TestJumpingAGap(void)
 
 static void TestTwoWaysAndDetached(void)
 {
-    mnavNavmesh* navmesh = Make(s_apart, 2);
+    mnavNavmesh* navmesh = Make(s_handApartBridge, sizeof(s_handApartBridge));
     mnavQuery* query = MakeQuery();
     (void)AddLink(navmesh, 9.0, 16.0, 4.0f, mnav_linkLadder, true);
     mnavPath path = Walk(query, navmesh, nullptr, 19.0, 9.0, 6.0, 6.0);
@@ -119,7 +117,7 @@ static void TestTwoWaysAndDetached(void)
           "back over a two-way link, its ends swapped");
     mnavDestroyNavmesh(navmesh);
     // A link whose end does not snap is not crossed.
-    navmesh = Make(s_apart, 2);
+    navmesh = Make(s_handApartBridge, sizeof(s_handApartBridge));
     (void)AddLink(navmesh, 9.0, 12.5, 1.0f, mnav_linkJump, false);
     path = Walk(query, navmesh, nullptr, 6.0, 6.0, 19.0, 9.0);
     CHECK(path.end == mnav_pathNone, "a detached link");
@@ -127,12 +125,7 @@ static void TestTwoWaysAndDetached(void)
     mnavDestroyNavmesh(navmesh);
 }
 
-// A row of five squares from (5, 5) to (30, 10).
-static const HandSquare s_row[5] = {{20, 20, 40, 40, {0}, 0},
-                                    {40, 20, 60, 40, {0}, 0},
-                                    {60, 20, 80, 40, {0}, 0},
-                                    {80, 20, 100, 40, {0}, 0},
-                                    {100, 20, 120, 40, {0}, 0}};
+// s_handRowOfFive: a row of five squares from (5, 5) to (30, 10).
 
 // The fewest nodes with which a walk is found.
 static int32_t FewestNodes(const mnavNavmesh* navmesh, const mnavQueryFilter* filter, double x0,
@@ -160,7 +153,7 @@ static void TestCheapTeleportsKeepTheSearchExact(void)
     // teleport to 29.5 at a cost of 1 costs 5 + 1 + 4.5 = 10.5. Scaled by
     // area costs alone, the heuristic would count the 19.5 m left from the
     // takeoff in full and settle for the walk.
-    mnavNavmesh* navmesh = Make(s_row, 5);
+    mnavNavmesh* navmesh = Make(s_handRowOfFive, sizeof(s_handRowOfFive));
     mnavQuery* query = MakeQuery();
     (void)AddLink(navmesh, 5.5, 29.5, 1.0f, mnav_linkTeleport, false);
     mnavPath path = Walk(query, navmesh, nullptr, 10.5, 7.5, 25.0, 7.5);
@@ -171,7 +164,7 @@ static void TestCheapTeleportsKeepTheSearchExact(void)
           "its takeoff and landing");
     // Dearer than the walk, it is left alone.
     mnavDestroyNavmesh(navmesh);
-    navmesh = Make(s_row, 5);
+    navmesh = Make(s_handRowOfFive, sizeof(s_handRowOfFive));
     (void)AddLink(navmesh, 5.5, 29.5, 6.0f, mnav_linkTeleport, false);
     path = Walk(query, navmesh, nullptr, 10.5, 7.5, 25.0, 7.5);
     CHECK(path.end == mnav_pathFound && path.linkCount == 0 && path.cost == 14.5 &&
@@ -179,7 +172,7 @@ static void TestCheapTeleportsKeepTheSearchExact(void)
           "the walk");
     // A teleport of cost 0 still leaves an exact search.
     mnavDestroyNavmesh(navmesh);
-    navmesh = Make(s_row, 5);
+    navmesh = Make(s_handRowOfFive, sizeof(s_handRowOfFive));
     (void)AddLink(navmesh, 5.5, 29.5, 0.0f, mnav_linkTeleport, false);
     path = Walk(query, navmesh, nullptr, 10.5, 7.5, 25.0, 7.5);
     CHECK(path.end == mnav_pathFound && path.linkCount == 1 && path.cost == 9.5, "for free");
@@ -190,22 +183,15 @@ static void TestCheapTeleportsKeepTheSearchExact(void)
 static void TestLeftOutKindsDoNotWeakenTheSearch(void)
 {
     // Corner to corner across a 4 by 4 grid of squares from (5, 5) to
-    // (25, 25): a heuristic scaled near 0 would open nearly every portal.
+    // (25, 25) (s_handGrid4): a heuristic scaled near 0 would open nearly every portal.
     // A teleport of cost 0.01 the agent may not use leaves the search as
     // narrow as without it.
-    HandSquare grid[16];
-    for (int32_t i = 0; i < 16; ++i)
-    {
-        int32_t x = 20 + (i % 4) * 20;
-        int32_t z = 20 + (i / 4) * 20;
-        grid[i] = (HandSquare){x, z, x + 20, z + 20, {0}, 0};
-    }
     mnavQueryFilter walker = mnavDefaultQueryFilter();
     walker.kinds &= ~((uint64_t)1 << mnav_linkTeleport);
-    mnavNavmesh* navmesh = Make(grid, 16);
+    mnavNavmesh* navmesh = Make(s_handGrid4, sizeof(s_handGrid4));
     int32_t without = FewestNodes(navmesh, &walker, 6.0, 6.0, 24.0, 24.0);
     mnavDestroyNavmesh(navmesh);
-    navmesh = Make(grid, 16);
+    navmesh = Make(s_handGrid4, sizeof(s_handGrid4));
     mnavLinkDef def = {
         {24.0, 0.0, 6.0}, {6.0, 0.0, 24.0}, 0.5f, 0.01f, mnav_linkTeleport, false, 0.0f};
     mnavLinkId id;

@@ -5,7 +5,7 @@
 // the agent's step over a polygon, the distance beside one; and the detail
 // surface's height where its triangles meet or one is degenerate.
 
-#include "hand_tile.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -20,15 +20,11 @@
 // platform.
 #define DIAGONAL_HASH 0x940dc166358b0af7ull
 
-// A navmesh of one hand tile at (0, 0): a low floor from x = 0 to 40 and a
-// high one from 41 to 80, both from z = 0 to 40, the high one high cell
-// heights up.
-static mnavNavmesh* TwoFloors(int32_t high)
+// A navmesh of one hand tile at (0, 0): a low floor from cell x = 0 to 40
+// and a high one from 41 to 80, both from z = 0 to 40, the high one some
+// cell heights up (s_handTwoFloors8, 10 and 24).
+static mnavNavmesh* TwoFloors(const uint8_t* bytes, size_t size)
 {
-    const HandSquare squares[2] = {{0, 0, 40, 40, {0, 0, 0, 0}, 0},
-                                   {41, 0, 80, 40, {high, high, high, high}, 0}};
-    static uint8_t bytes[2048];
-    size_t size = HandTileBytes(bytes, 0, squares, 2);
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
@@ -51,7 +47,7 @@ static void TestStepDecidesOverAgainstBeside(void)
 {
     // Cells of 0.25 m and 0.125 m; the step is 0.75 m. The low floor ends
     // at x = 10 m, the high one begins at 10.25 m.
-    mnavNavmesh* navmesh = TwoFloors(24);
+    mnavNavmesh* navmesh = TwoFloors(s_handTwoFloors24, sizeof(s_handTwoFloors24));
     // At the high floor's height (3 m), over the low floor 0.35 m from the
     // high one's edge: the low floor scores (3 - 0.75)^2, the high one
     // 0.35^2 by distance.
@@ -64,7 +60,7 @@ static void TestStepDecidesOverAgainstBeside(void)
     // high floor's edge: the low floor scores (1 - 0.75)^2 = 0.0625 and
     // wins over the high floor's 0.65^2, though its plain distance of 1 m
     // would lose.
-    navmesh = TwoFloors(8);
+    navmesh = TwoFloors(s_handTwoFloors8, sizeof(s_handTwoFloors8));
     CHECK(NearestPolygon(navmesh, 9.6, 1.0) == 0, "the step, not the distance, scores over");
     // 1.6 m over the low floor, 0.35 m from the high one's edge and 0.6 m
     // above it: (1.6 - 0.75)^2 = 0.7225 loses to 0.35^2 + 0.6^2 = 0.4825.
@@ -74,16 +70,14 @@ static void TestStepDecidesOverAgainstBeside(void)
     // the low floor scores (1.25 - 0.75)^2 = 0.25 and the high one 0.5^2,
     // exactly; the tie goes to the nearer, the high floor at 0.5 m, not
     // the low one 1.25 m below.
-    navmesh = TwoFloors(10);
+    navmesh = TwoFloors(s_handTwoFloors10, sizeof(s_handTwoFloors10));
     CHECK(NearestPolygon(navmesh, 9.75, 1.25) == 1, "a tie in score goes to the nearer");
     mnavDestroyNavmesh(navmesh);
 }
 
 // A navmesh of one hand tile holding one square, and its polygon.
-static mnavNavmesh* OneSquare(HandSquare square, bool degenerate, mnavPolygonId* polygonOut)
+static mnavNavmesh* OneSquare(const uint8_t* bytes, size_t size, mnavPolygonId* polygonOut)
 {
-    static uint8_t bytes[2048];
-    size_t size = HandTileBytesWith(bytes, 0, &square, 1, degenerate ? 0 : -1);
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
@@ -106,7 +100,7 @@ static void TestHeightsOnADiagonal(void)
     // triangle's, also where rounding puts it a hair inside the second:
     // the same heights, bit for bit, as scanning every triangle gives.
     mnavPolygonId polygon;
-    mnavNavmesh* navmesh = OneSquare((HandSquare){0, 0, 80, 48, {3, 9, 1, 7}, 0}, false, &polygon);
+    mnavNavmesh* navmesh = OneSquare(s_handSlopedSquare, sizeof(s_handSlopedSquare), &polygon);
     uint64_t hash = MNAV_HASH_INIT;
     int32_t off = 0;
     for (int32_t i = 0; i <= 1000; ++i)
@@ -129,7 +123,8 @@ static void TestDegenerateTriangle(void)
     // A detail triangle of no area, as a tile from elsewhere may hold,
     // gives no height: a point on its line takes the next triangle's.
     mnavPolygonId polygon;
-    mnavNavmesh* navmesh = OneSquare((HandSquare){0, 0, 40, 40, {0, 4, 8, 16}, 0}, true, &polygon);
+    mnavNavmesh* navmesh =
+        OneSquare(s_handDegenerateSquare, sizeof(s_handDegenerateSquare), &polygon);
     int32_t off = 0;
     for (int32_t i = 0; i <= 100; ++i)
     {

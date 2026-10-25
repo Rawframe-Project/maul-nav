@@ -4,7 +4,7 @@
 // Raycasts on hand-built tiles and the baked world. Hand cells are
 // 0.25 m.
 
-#include "hand_tile.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -19,22 +19,20 @@
 // The hash of the world's rays, the same on every platform.
 #define WORLD_RAYS_HASH 0x5a68f1b0a587706full
 
-static uint8_t s_bytes[2][8192];
-
-static mnavNavmesh* Make(const HandSquare* first, int32_t firstCount, const HandSquare* second,
-                         int32_t secondCount)
+// A navmesh of one hand tile (hand_tiles.h), and a second at (1, 0) when
+// second is not NULL.
+static mnavNavmesh* Make(const uint8_t* first, size_t firstSize, const uint8_t* second,
+                         size_t secondSize)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    size_t size = HandTileBytes(s_bytes[0], 0, first, firstCount);
-    CHECK(mnavStageTile(navmesh, s_bytes[0], size).result == mnav_success, "first staged");
+    CHECK(mnavStageTile(navmesh, first, firstSize).result == mnav_success, "first staged");
     if (second != nullptr)
     {
-        size = HandTileBytes(s_bytes[1], 1, second, secondCount);
-        CHECK(mnavStageTile(navmesh, s_bytes[1], size).result == mnav_success, "second staged");
+        CHECK(mnavStageTile(navmesh, second, secondSize).result == mnav_success, "second staged");
     }
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     return navmesh;
@@ -64,16 +62,9 @@ static mnavRay Cast(mnavQuery* query, const mnavNavmesh* navmesh, double x0, dou
     return ray;
 }
 
-static const HandSquare s_row[4] = {{0, 0, 20, 20, {0}, 0},
-                                    {20, 0, 40, 20, {0}, 0},
-                                    {40, 0, 60, 20, {0}, 0},
-                                    {60, 0, 80, 20, {0}, 0}};
-static const HandSquare s_ell[3] = {
-    {0, 0, 20, 20, {0}, 0}, {20, 0, 40, 20, {0}, 0}, {20, 20, 40, 40, {0}, 0}};
-
 static void TestReachAndWalls(void)
 {
-    mnavNavmesh* navmesh = Make(s_row, 4, nullptr, 0);
+    mnavNavmesh* navmesh = Make(s_handRowFromOrigin, sizeof(s_handRowFromOrigin), nullptr, 0);
     mnavQuery* query = MakeQuery(64);
     mnavRay ray = Cast(query, navmesh, 1.0, 2.5, 19.0, 2.5);
     CHECK(ray.end == mnav_rayReached && ray.t == 1.0 && ray.polygonCount == 4 &&
@@ -104,7 +95,7 @@ static void TestReachAndWalls(void)
 
 static void TestCorners(void)
 {
-    mnavNavmesh* navmesh = Make(s_ell, 3, nullptr, 0);
+    mnavNavmesh* navmesh = Make(s_handEll, sizeof(s_handEll), nullptr, 0);
     mnavQuery* query = MakeQuery(64);
     // Toward (6, 9) the ray meets the first square's top at z = 5.
     mnavRay ray = Cast(query, navmesh, 1.0, 1.0, 6.0, 9.0);
@@ -124,9 +115,8 @@ static void TestTileSides(void)
 {
     // A tall square on tile (0, 0)'s +X side, world z 0 to 20, and one on
     // tile (1, 0)'s -X side, z 0 to 10: the link covers z 0 to 10.
-    const HandSquare left[1] = {{100, 0, 128, 80, {0}, 0}};
-    const HandSquare right[1] = {{0, 0, 20, 40, {0}, 0}};
-    mnavNavmesh* navmesh = Make(left, 1, right, 1);
+    mnavNavmesh* navmesh =
+        Make(s_handTallWest, sizeof(s_handTallWest), s_handShortEast, sizeof(s_handShortEast));
     mnavQuery* query = MakeQuery(64);
     mnavRay ray = Cast(query, navmesh, 26.0, 1.0, 36.0, 7.0);
     CHECK(ray.end == mnav_rayReached && ray.polygonCount == 2, "across the link");
@@ -141,7 +131,7 @@ static void TestTileSides(void)
           "the link's end counts");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
-    navmesh = Make(left, 1, nullptr, 0);
+    navmesh = Make(s_handTallWest, sizeof(s_handTallWest), nullptr, 0);
     query = MakeQuery(64);
     ray = Cast(query, navmesh, 26.0, 1.0, 36.0, 7.0);
     CHECK(ray.end == mnav_rayNotLoaded && ray.t == 0.6 && ray.polygonCount == 1 &&
@@ -153,7 +143,7 @@ static void TestTileSides(void)
 
 static void TestArgumentsAreChecked(void)
 {
-    mnavNavmesh* navmesh = Make(s_row, 4, nullptr, 0);
+    mnavNavmesh* navmesh = Make(s_handRowFromOrigin, sizeof(s_handRowFromOrigin), nullptr, 0);
     mnavQuery* query = MakeQuery(64);
     mnavNearest a;
     CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){1.0, 0.0, 1.0}, (mnavVec3){0.1f, 1.0f, 0.1f},
@@ -177,8 +167,8 @@ static void TestArgumentsAreChecked(void)
     bad.slot = 9;
     CHECK(mnavRaycast(query, navmesh, nullptr, bad, a.point, a.point, &ray) == mnav_errorInvalid,
           "no such slot");
-    size_t size = HandTileBytes(s_bytes[0], 0, s_row, 4);
-    CHECK(mnavStageTile(navmesh, s_bytes[0], size).result == mnav_success &&
+    CHECK(mnavStageTile(navmesh, s_handRowFromOrigin, sizeof(s_handRowFromOrigin)).result ==
+                  mnav_success &&
               mnavCommit(navmesh) == mnav_success &&
               mnavRaycast(query, navmesh, nullptr, a.polygon, a.point, a.point, &ray) ==
                   mnav_errorStale,
