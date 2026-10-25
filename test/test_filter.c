@@ -5,160 +5,16 @@
 // the baked tile: a step within reach takes the floor's area, too little
 // headroom, also below the top of the heights, ledges at drops, holes,
 // gaps and steep neighbors, space too low to enter, and the filters'
-// order. The ledge cases run in the open,
-// where most columns hold one span, and again under a roof over the
-// scene, where every column holds two.
+// order. The ledge cases run in the open, where most columns hold one
+// span, and again under a roof over the scene, where every column holds
+// two.
 
+#include "squares.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
-#include "maul-nav/base.h"
-#include "maul-nav/navmesh.h"
-#include "maul-nav/query.h"
 
 #include <stdint.h>
-
-// The default agent in cells of 0.125 m: 2 m tall, a step of 0.75 m.
-enum
-{
-    HEIGHT = 16,
-    STEP = 6,
-    SIDE = 9,
-    AT = 40,
-    ROOF = 40,
-    MORE = 6,
-    MOST = SIDE * SIDE + MORE + 1,
-    NO_FLOOR = -100,
-    NO_POLYGON = 0xFF,
-    TILE_ROOM = 1 << 20
-};
-
-// A square of SIDE by SIDE cells at cell AT of tile (0, 0), a flat square
-// of one cell at each cell's level, a few more squares, and a roof at
-// level ROOF over them all, or none. A square at level k fills its cells
-// from height k to k + 1, so a span's top is its level plus 1. Squares of
-// mnav_areaNone are solid but not walkable.
-typedef struct Square
-{
-    int32_t x;
-    int32_t z;
-    int32_t level;
-    mnavAreaType area;
-} Square;
-
-typedef struct Scene
-{
-    int32_t level[SIDE][SIDE];
-    mnavAreaType area[SIDE][SIDE];
-    Square more[MORE];
-    int32_t moreCount;
-    bool roof;
-} Scene;
-
-// Every cell's floor at a level, walkable, under a roof or not.
-static Scene Flat(int32_t level, bool roof)
-{
-    Scene scene = {0};
-    scene.roof = roof;
-    for (int32_t z = 0; z < SIDE; ++z)
-    {
-        for (int32_t x = 0; x < SIDE; ++x)
-        {
-            scene.level[z][x] = level;
-            scene.area[z][x] = mnav_areaWalkable;
-        }
-    }
-    return scene;
-}
-
-static void Add(Scene* scene, int32_t x, int32_t z, int32_t level, mnavAreaType area)
-{
-    scene->more[scene->moreCount++] = (Square){x, z, level, area};
-}
-
-static mnavBakeDef s_def;
-static mnavBaker* s_baker;
-static mnavNavmesh* s_navmesh;
-static uint8_t s_tile[TILE_ROOM];
-static mnavVec3 s_vertices[4 * MOST];
-static int32_t s_indices[6 * MOST];
-static mnavAreaType s_areas[2 * MOST];
-
-// Puts square n of cells sides by sides from a cell.
-static void Put(int32_t n, Square s, int32_t sides)
-{
-    float x0 = (float)(AT + s.x) * 0.25f;
-    float z0 = (float)(AT + s.z) * 0.25f;
-    float x1 = (float)(AT + s.x + sides) * 0.25f;
-    float z1 = (float)(AT + s.z + sides) * 0.25f;
-    float y = (float)s.level * 0.125f;
-    s_vertices[4 * n + 0] = (mnavVec3){x0, y, z0};
-    s_vertices[4 * n + 1] = (mnavVec3){x1, y, z0};
-    s_vertices[4 * n + 2] = (mnavVec3){x1, y, z1};
-    s_vertices[4 * n + 3] = (mnavVec3){x0, y, z1};
-    const int32_t corners[6] = {0, 3, 2, 0, 2, 1};
-    for (int32_t k = 0; k < 6; ++k)
-    {
-        s_indices[6 * n + k] = 4 * n + corners[k];
-    }
-    s_areas[2 * n] = s.area;
-    s_areas[2 * n + 1] = s.area;
-}
-
-// Bakes the scene and loads its tile in a fresh navmesh.
-static void Load(const Scene* scene)
-{
-    int32_t n = 0;
-    for (int32_t z = 0; z < SIDE; ++z)
-    {
-        for (int32_t x = 0; x < SIDE; ++x)
-        {
-            if (scene->level[z][x] != NO_FLOOR)
-            {
-                Put(n++, (Square){x, z, scene->level[z][x], scene->area[z][x]}, 1);
-            }
-        }
-    }
-    for (int32_t k = 0; k < scene->moreCount; ++k)
-    {
-        Put(n++, scene->more[k], 1);
-    }
-    if (scene->roof)
-    {
-        Put(n++, (Square){0, 0, ROOF, mnav_areaNone}, SIDE);
-    }
-    const mnavTriangleMesh mesh = {s_vertices, 4 * n, s_indices, 2 * n, s_areas};
-    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
-    size_t size = 0;
-    CHECK(mnavBakeTileInput(s_baker, &input, 0, 0, nullptr) == mnav_success &&
-              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
-          "baked");
-    mnavDestroyNavmesh(s_navmesh);
-    s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
-          "loaded");
-}
-
-// The area of the polygon over cell (x, z) of the scene within a meter
-// of a level, or NO_POLYGON. A column of these scenes holds one walkable
-// span at most, and a polygon's surface over a single raised or lowered
-// cell may lie nearer its neighbors' height.
-static mnavAreaType At(int32_t x, int32_t z, int32_t level)
-{
-    mnavPos3 center = {(AT + x + 0.5) * 0.25, level * 0.125, (AT + z + 0.5) * 0.25};
-    mnavNearest n;
-    mnavAreaType area = NO_POLYGON;
-    CHECK(mnavFindNearest(s_navmesh, nullptr, center, (mnavVec3){0.01f, 1.0f, 0.01f}, &n) ==
-              mnav_success,
-          "nearest");
-    if (n.polygon.slot != 0 && n.over)
-    {
-        CHECK(mnavGetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
-    }
-    return area;
-}
 
 static void TestLowObstacleWithinAStepTakesTheArea(void)
 {
@@ -330,14 +186,8 @@ static void TestLedgeBoundariesAreTheStep(bool roof)
 
 int main(void)
 {
-    // An agent of no radius, regions of any size and no edge error, so
-    // that the polygons cover exactly the cells the filters leave
-    // walkable.
-    s_def = mnavDefaultBakeDef();
-    s_def.agent.radius = 0.0f;
-    s_def.minRegionArea = 0.0f;
-    s_def.maxEdgeError = 0.0f;
-    CHECK(mnavCreateBaker(&s_def, &s_baker).result == mnav_success, "baker");
+    mnavBakeDef def = Exact();
+    UseDef(&def);
     TestLowObstacleWithinAStepTakesTheArea();
     TestLowHeadroomIsUnwalkable();
     TestRoomBelowTheTopOfHeights();
@@ -352,7 +202,6 @@ int main(void)
         TestLedgeIgnoresSpaceTooLow(roof == 1);
         TestLedgeBoundariesAreTheStep(roof == 1);
     }
-    mnavDestroyNavmesh(s_navmesh);
-    mnavDestroyBaker(s_baker);
+    Done();
     return s_failures == 0 ? 0 : 1;
 }
