@@ -7,6 +7,7 @@
 // corners take the highest floor around them, and the tile's sides split
 // where what lies inside or beyond them changes.
 
+#include "ramp_level.h"
 #include "squares.h"
 #include "test_harness.h"
 
@@ -424,6 +425,35 @@ static void TestTileSides(void)
           "the cut's walls");
 }
 
+static void TestRegionsOfOneAreaMeetOnTheSide(void)
+{
+    // The ramp level: the floor and the ramp over it are two regions of
+    // one area, meeting on the tile's +X side under the ramp's foot,
+    // 12.75 m in. The corner there is marked, and the polygons lose it:
+    // the ramp's region runs along the side from the tile's corner to the
+    // deck's end at 29.5 m as one edge.
+    mnavVec3 vertices[RAMP_LEVEL_VERTICES];
+    int32_t indices[RAMP_LEVEL_INDICES];
+    const mnavTriangleMesh mesh = {vertices, RAMP_LEVEL_VERTICES, indices,
+                                   MakeRampLevel(vertices, indices, 0), nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    mnavBakeDef def = mnavDefaultBakeDef();
+    UseDef(&def);
+    size_t size = 0;
+    CHECK(mnavBakeTileInput(s_baker, &input, 0, 0, &s_report) == mnav_success &&
+              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
+          "baked");
+    mnavDestroyNavmesh(s_navmesh);
+    s_navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
+              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavCommit(s_navmesh) == mnav_success,
+          "loaded");
+    int32_t sides = Lines(mnav_debugTileSide);
+    CHECK(s_report.regions == 2 && HasTileLine(sides, 128, 0, 128, 118),
+          "one edge across where the regions meet");
+}
+
 int main(void)
 {
     mnavBakeDef def = Exact();
@@ -438,6 +468,7 @@ int main(void)
     TestLongWallsAreSplit();
     TestCornersTakeTheHighestFloorAround();
     TestTileSides();
+    TestRegionsOfOneAreaMeetOnTheSide();
     Done();
     return s_failures == 0 ? 0 : 1;
 }
