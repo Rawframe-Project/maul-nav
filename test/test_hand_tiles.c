@@ -236,7 +236,113 @@ static const HandTile s_tiles[] = {
       {40, 80, 60, 100, {0}, 0},
       {60, 80, 80, 100, {0}, 0},
       {80, 80, 100, 100, {0}, 0}}},
+    {"s_handEllMirrored",
+     "The L of s_handEll mirrored, (5, 0) to (15, 5) and (5, 5) to (10, 10), so the corner (10, 5) "
+     "falls on the funnel's other side.",
+     0,
+     -1,
+     3,
+     {{40, 0, 60, 20, {0}, 0}, {20, 0, 40, 20, {0}, 0}, {20, 20, 40, 40, {0}, 0}}},
+    {"s_handU",
+     "A U of five squares round the cells (20, 0) to (40, 20), an obstacle from (5, 0) to (10, 5): "
+     "a way across it turns at two corners.",
+     0,
+     -1,
+     5,
+     {{0, 0, 20, 20, {0}, 0},
+      {0, 20, 20, 40, {0}, 0},
+      {20, 20, 40, 40, {0}, 0},
+      {40, 20, 60, 40, {0}, 0},
+      {40, 0, 60, 20, {0}, 0}}},
+    {"s_handN",
+     "The U of s_handU mirrored, the obstacle above, from (5, 5) to (10, 10): the corners change "
+     "sides.",
+     0,
+     -1,
+     5,
+     {{0, 20, 20, 40, {0}, 0},
+      {0, 0, 20, 20, {0}, 0},
+      {20, 0, 40, 20, {0}, 0},
+      {40, 0, 60, 20, {0}, 0},
+      {40, 20, 60, 40, {0}, 0}}},
+    {"s_handSideWest",
+     "Tile 0's east side: a square from x = 25 to 32 m and z = 0 to 10 m, its east edge on the "
+     "seam with tile 1.",
+     0,
+     -1,
+     1,
+     {{100, 0, 128, 40, {0}, 0}}},
+    {"s_handSideEastPair",
+     "Tile 1's west side: two squares across the seam, z = 0 to 10 m and 10 to 20 m, the second "
+     "reaching past s_handSideWest's end, so a way across bends at its corner on the seam, (32, "
+     "10).",
+     1,
+     -1,
+     2,
+     {{0, 0, 20, 40, {0}, 0}, {0, 40, 20, 80, {0}, 0}}},
+    {"s_handGrid4FromOrigin",
+     "A 4 by 4 grid of squares of 5 m from the origin: from corner to corner many ways cost the "
+     "same, and the search's ties decide the work and the corridor.",
+     0,
+     -1,
+     16,
+     {{0, 0, 20, 20, {0}, 0},
+      {20, 0, 40, 20, {0}, 0},
+      {40, 0, 60, 20, {0}, 0},
+      {60, 0, 80, 20, {0}, 0},
+      {0, 20, 20, 40, {0}, 0},
+      {20, 20, 40, 40, {0}, 0},
+      {40, 20, 60, 40, {0}, 0},
+      {60, 20, 80, 40, {0}, 0},
+      {0, 40, 20, 60, {0}, 0},
+      {20, 40, 40, 60, {0}, 0},
+      {40, 40, 60, 60, {0}, 0},
+      {60, 40, 80, 60, {0}, 0},
+      {0, 60, 20, 80, {0}, 0},
+      {20, 60, 40, 80, {0}, 0},
+      {40, 60, 60, 80, {0}, 0},
+      {60, 60, 80, 80, {0}, 0}}},
 };
+
+// path_rules' layouts: grids of 4 by 4 squares of 5 m with some left out,
+// square i at (i % 4, i / 4) kept unless a draw of the generator below
+// falls on 0 modulo 4. The generator runs from LAYOUT_SEED through every
+// layout in turn, 16 draws a layout, and the layouts stored are those
+// LAYOUTS names: of the first 60, the smallest set found to fail every
+// mutant of the funnel and the search's ties that all 60 fail.
+enum
+{
+    LAYOUT_SEED = 9,
+    LAYOUT_COUNT = 60
+};
+
+static const int32_t LAYOUTS[] = {0, 10};
+
+// The squares of layout k, the mask of those kept; returns their count.
+static int32_t Layout(int32_t k, HandSquare* squares, uint32_t* maskOut)
+{
+    uint32_t state = LAYOUT_SEED;
+    int32_t count = 0;
+    uint32_t mask = 0;
+    for (int32_t layout = 0; layout <= k; ++layout)
+    {
+        count = 0;
+        mask = 0;
+        for (int32_t i = 0; i < 16; ++i)
+        {
+            state = state * 1664525u + 1013904223u;
+            if ((state >> 16) % 4u != 0u)
+            {
+                int32_t x = (i % 4) * 20;
+                int32_t z = (i / 4) * 20;
+                squares[count++] = (HandSquare){x, z, x + 20, z + 20, {0}, 0};
+                mask |= 1u << i;
+            }
+        }
+    }
+    *maskOut = mask;
+    return count;
+}
 
 enum
 {
@@ -312,6 +418,22 @@ static void Write(void)
             HandTileBytesWith(bytes, tile->place, tile->squares, tile->count, tile->degenerate);
         EmitComment(tile->about);
         EmitBytes(tile->name, bytes, size);
+    }
+    for (size_t l = 0; l < sizeof(LAYOUTS) / sizeof(LAYOUTS[0]); ++l)
+    {
+        HandSquare squares[16];
+        uint32_t mask = 0;
+        int32_t k = LAYOUTS[l];
+        CHECK(k >= 0 && k < LAYOUT_COUNT, "a layout of the first 60");
+        int32_t count = Layout(k, squares, &mask);
+        size_t size = HandTileBytes(bytes, 0, squares, count);
+        char name[64];
+        snprintf(name, sizeof(name), "s_handLayout%d", k);
+        Emit("// path_rules' layout %d (test_hand_tiles.c), its squares kept as\n"
+             "// s_handLayout%dSquares, bit i for the square at (i %% 4, i / 4).\n",
+             k, k);
+        Emit("[[maybe_unused]] static const uint16_t s_handLayout%dSquares = 0x%04x;\n", k, mask);
+        EmitBytes(name, bytes, size);
     }
     Emit("#endif // MAUL_NAV_TEST_HAND_TILES_H\n");
 }

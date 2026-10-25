@@ -4,7 +4,7 @@
 // The path's rules on hand-built tiles: the funnel's corners, and
 // the search's ties. Cells are 0.25 m; heights are 0.
 
-#include "hand_tile.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -14,21 +14,17 @@
 
 #include <stdint.h>
 
-static uint8_t s_bytes[2][8192];
-
-// A navmesh of hand tiles at (0, 0) and, when given, (1, 0).
-static mnavNavmesh* Make(const HandSquare* first, int32_t firstCount, const HandSquare* second,
-                         int32_t secondCount)
+// A navmesh of hand tiles (hand_tiles.h) at (0, 0) and, when given, (1, 0).
+static mnavNavmesh* Make(const uint8_t* first, size_t firstSize, const uint8_t* second,
+                         size_t secondSize)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    size_t size = HandTileBytes(s_bytes[0], 0, first, firstCount);
-    CHECK(mnavStageTile(navmesh, s_bytes[0], size).result == mnav_success, "first staged");
+    CHECK(mnavStageTile(navmesh, first, firstSize).result == mnav_success, "first staged");
     if (second != nullptr)
     {
-        size = HandTileBytes(s_bytes[1], 1, second, secondCount);
-        CHECK(mnavStageTile(navmesh, s_bytes[1], size).result == mnav_success, "second staged");
+        CHECK(mnavStageTile(navmesh, second, secondSize).result == mnav_success, "second staged");
     }
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     return navmesh;
@@ -75,20 +71,14 @@ static mnavQuery* MakeQuery(int32_t nodes)
 static void TestStraightWhereTheCorridorAllows(void)
 {
     // A row of four squares, then an L whose line clears its corner.
-    const HandSquare row[4] = {{0, 0, 20, 20, {0}, 0},
-                               {20, 0, 40, 20, {0}, 0},
-                               {40, 0, 60, 20, {0}, 0},
-                               {60, 0, 80, 20, {0}, 0}};
-    mnavNavmesh* navmesh = Make(row, 4, nullptr, 0);
+    mnavNavmesh* navmesh = Make(s_handRowFromOrigin, sizeof(s_handRowFromOrigin), nullptr, 0);
     mnavQuery* query = MakeQuery(256);
     mnavPath path = Walk(query, navmesh, 1.0, 2.5, 19.0, 2.5);
     CHECK(path.polygonCount == 4 && path.pointCount == 2 && At(&path, 0, 1.0, 2.5) &&
               At(&path, 1, 19.0, 2.5),
           "a straight line down the row");
     mnavDestroyNavmesh(navmesh);
-    const HandSquare ell[3] = {
-        {0, 0, 20, 20, {0}, 0}, {20, 0, 40, 20, {0}, 0}, {20, 20, 40, 40, {0}, 0}};
-    navmesh = Make(ell, 3, nullptr, 0);
+    navmesh = Make(s_handEll, sizeof(s_handEll), nullptr, 0);
     path = Walk(query, navmesh, 1.0, 1.0, 9.0, 6.0);
     CHECK(path.polygonCount == 3 && path.pointCount == 2, "the line clears the corner");
     // Toward (6, 9) the line would cross the wall at x = 5 above z = 5.
@@ -100,9 +90,7 @@ static void TestStraightWhereTheCorridorAllows(void)
     CHECK(path.pointCount == 3 && At(&path, 1, 5.0, 5.0), "the same corner back");
     mnavDestroyNavmesh(navmesh);
     // The L mirrored, so the corner falls on the funnel's other side.
-    const HandSquare mirrored[3] = {
-        {40, 0, 60, 20, {0}, 0}, {20, 0, 40, 20, {0}, 0}, {20, 20, 40, 40, {0}, 0}};
-    navmesh = Make(mirrored, 3, nullptr, 0);
+    navmesh = Make(s_handEllMirrored, sizeof(s_handEllMirrored), nullptr, 0);
     path = Walk(query, navmesh, 14.0, 1.0, 9.0, 9.0);
     CHECK(path.pointCount == 3 && At(&path, 1, 10.0, 5.0), "the mirrored corner");
     path = Walk(query, navmesh, 9.0, 9.0, 14.0, 1.0);
@@ -114,12 +102,7 @@ static void TestStraightWhereTheCorridorAllows(void)
 static void TestAroundAnObstacle(void)
 {
     // A U round the cells (20, 0) to (40, 20): two corners, both ways.
-    const HandSquare u[5] = {{0, 0, 20, 20, {0}, 0},
-                             {0, 20, 20, 40, {0}, 0},
-                             {20, 20, 40, 40, {0}, 0},
-                             {40, 20, 60, 40, {0}, 0},
-                             {40, 0, 60, 20, {0}, 0}};
-    mnavNavmesh* navmesh = Make(u, 5, nullptr, 0);
+    mnavNavmesh* navmesh = Make(s_handU, sizeof(s_handU), nullptr, 0);
     mnavQuery* query = MakeQuery(256);
     mnavPath path = Walk(query, navmesh, 2.5, 1.0, 12.5, 1.0);
     CHECK(path.polygonCount == 5 && path.pointCount == 4 && At(&path, 1, 5.0, 5.0) &&
@@ -129,12 +112,7 @@ static void TestAroundAnObstacle(void)
     CHECK(path.pointCount == 4 && At(&path, 1, 10.0, 5.0) && At(&path, 2, 5.0, 5.0), "and back");
     mnavDestroyNavmesh(navmesh);
     // The U mirrored, the obstacle above: the corners change sides.
-    const HandSquare n[5] = {{0, 20, 20, 40, {0}, 0},
-                             {0, 0, 20, 20, {0}, 0},
-                             {20, 0, 40, 20, {0}, 0},
-                             {40, 0, 60, 20, {0}, 0},
-                             {40, 20, 60, 40, {0}, 0}};
-    navmesh = Make(n, 5, nullptr, 0);
+    navmesh = Make(s_handN, sizeof(s_handN), nullptr, 0);
     path = Walk(query, navmesh, 2.5, 9.0, 12.5, 9.0);
     CHECK(path.pointCount == 4 && At(&path, 1, 5.0, 5.0) && At(&path, 2, 10.0, 5.0),
           "under the obstacle's two near corners");
@@ -150,9 +128,8 @@ static void TestAcrossATileSide(void)
     // A square on tile (0, 0)'s +X side meets two on tile (1, 0)'s -X side;
     // the second of them reaches past the first's end, so the way bends at
     // the first's corner on the side, (32, 10).
-    const HandSquare left[1] = {{100, 0, 128, 40, {0}, 0}};
-    const HandSquare right[2] = {{0, 0, 20, 40, {0}, 0}, {0, 40, 20, 80, {0}, 0}};
-    mnavNavmesh* navmesh = Make(left, 1, right, 2);
+    mnavNavmesh* navmesh = Make(s_handSideWest, sizeof(s_handSideWest), s_handSideEastPair,
+                                sizeof(s_handSideEastPair));
     mnavQuery* query = MakeQuery(256);
     mnavPath path = Walk(query, navmesh, 26.0, 1.0, 33.0, 18.0);
     CHECK(path.polygonCount == 3 && path.pointCount == 3 && At(&path, 1, 32.0, 10.0),
@@ -167,12 +144,7 @@ static void TestShortOfTheEnd(void)
 {
     // Out of nodes in the U, the path ends at the midpoint of the last edge
     // crossed.
-    const HandSquare u[5] = {{0, 0, 20, 20, {0}, 0},
-                             {0, 20, 20, 40, {0}, 0},
-                             {20, 20, 40, 40, {0}, 0},
-                             {40, 20, 60, 40, {0}, 0},
-                             {40, 0, 60, 20, {0}, 0}};
-    mnavNavmesh* navmesh = Make(u, 5, nullptr, 0);
+    mnavNavmesh* navmesh = Make(s_handU, sizeof(s_handU), nullptr, 0);
     mnavQuery* query = MakeQuery(3);
     mnavNearest a = On(navmesh, 2.5, 1.0);
     mnavNearest b = On(navmesh, 12.5, 1.0);
@@ -214,14 +186,7 @@ static void TestTiesGoToTheNodeMadeFirst(void)
 {
     // A 4 by 4 grid of squares: from corner to corner, many ways cost the
     // same, and the ties decide the work and the corridor.
-    HandSquare grid[16];
-    for (int32_t i = 0; i < 16; ++i)
-    {
-        int32_t x = (i % 4) * 20;
-        int32_t z = (i / 4) * 20;
-        grid[i] = (HandSquare){x, z, x + 20, z + 20, {0}, 0};
-    }
-    mnavNavmesh* navmesh = Make(grid, 16, nullptr, 0);
+    mnavNavmesh* navmesh = Make(s_handGrid4FromOrigin, sizeof(s_handGrid4FromOrigin), nullptr, 0);
     int32_t diagonal = FewestNodes(navmesh, 2.5, 2.5, 17.5, 17.5);
     int32_t across = FewestNodes(navmesh, 2.5, 2.5, 17.5, 2.5);
     mnavQuery* query = MakeQuery(256);
@@ -236,41 +201,42 @@ static void TestTiesGoToTheNodeMadeFirst(void)
     mnavDestroyNavmesh(navmesh);
 }
 
-// The hash of the straight paths through grids with holes.
-#define LAYOUTS_HASH 0x3fa695aa6c894494ull
+// The hash of the straight paths through the stored layouts.
+#define LAYOUTS_HASH 0x35f2554de1bd2123ull
 
 static void TestLayoutsArePinned(void)
 {
-    // Grids of 4 by 4 squares with some left out, from a fixed generator,
+    // Grids of 4 by 4 squares with some left out (test_hand_tiles.c),
     // walked between square centers: corners fall exactly on the lines
-    // between other corners, on both sides of the funnel.
-    uint32_t state = 9;
+    // between other corners, on both sides of the funnel. Layouts 0 and 10
+    // of the generator fail every funnel and tie mutant its first 60 fail.
+    const uint8_t* const layouts[2] = {s_handLayout0, s_handLayout10};
+    const size_t sizes[2] = {sizeof(s_handLayout0), sizeof(s_handLayout10)};
+    const uint16_t kept[2] = {s_handLayout0Squares, s_handLayout10Squares};
     uint64_t hash = MNAV_HASH_INIT;
     int32_t found = 0;
     mnavQuery* query = MakeQuery(256);
-    for (int32_t layout = 0; layout < 60; ++layout)
+    for (int32_t layout = 0; layout < 2; ++layout)
     {
-        HandSquare squares[16];
+        // The centers of the squares kept, in the order of their bits.
+        double centers[16][2];
         int32_t count = 0;
         for (int32_t i = 0; i < 16; ++i)
         {
-            state = state * 1664525u + 1013904223u;
-            if ((state >> 16) % 4u != 0u)
+            if ((kept[layout] >> i & 1u) != 0)
             {
-                int32_t x = (i % 4) * 20;
-                int32_t z = (i / 4) * 20;
-                squares[count++] = (HandSquare){x, z, x + 20, z + 20, {0}, 0};
+                centers[count][0] = (i % 4) * 5.0 + 2.5;
+                centers[count][1] = (i / 4) * 5.0 + 2.5;
+                count += 1;
             }
         }
-        mnavNavmesh* navmesh = Make(squares, count, nullptr, 0);
+        mnavNavmesh* navmesh = Make(layouts[layout], sizes[layout], nullptr, 0);
         for (int32_t a = 0; a < count; ++a)
         {
             for (int32_t b = 0; b < count; ++b)
             {
-                mnavNearest from =
-                    On(navmesh, squares[a].x0 * 0.25 + 2.5, squares[a].z0 * 0.25 + 2.5);
-                mnavNearest to =
-                    On(navmesh, squares[b].x0 * 0.25 + 2.5, squares[b].z0 * 0.25 + 2.5);
+                mnavNearest from = On(navmesh, centers[a][0], centers[a][1]);
+                mnavNearest to = On(navmesh, centers[b][0], centers[b][1]);
                 mnavPath path = {0};
                 CHECK(mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon,
                                    to.point, &path) == mnav_success,
