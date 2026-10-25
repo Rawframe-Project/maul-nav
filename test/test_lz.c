@@ -6,6 +6,10 @@
 // offsets at the window's end; codings cut, padded or bent are refused
 // without reading or writing out of range. Packed fields whose planes
 // do not add up are refused.
+//
+// White-box: the tile cache codes its fields only for itself; no public
+// call takes or gives coded bytes, so no public input reaches the coder
+// or its refusals.
 
 #include "allocator.h"
 #include "compact.h"

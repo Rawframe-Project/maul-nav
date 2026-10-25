@@ -5,6 +5,10 @@
 // voxel grid made the plain way from the same heightfield, on the test
 // world's floor and boxes and on boxes floating in the air; the octree
 // the same on every platform; the memory given back.
+//
+// White-box: the plain grid it is checked against comes from the same
+// heightfield the bake rasterizes (mnavBuildHeightfieldInput), and only
+// the rasterizer gives that heightfield.
 
 #include "flight.h"
 #include "flight_def.h"

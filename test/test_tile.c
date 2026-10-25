@@ -5,6 +5,12 @@
 // also writes the level's tile, the fuzz target's seed. The level's bytes
 // hold under every host floating-point setting, baked inside the
 // library's environment as a public bake runs.
+//
+// White-box: it encodes and decodes tiles with the format's own codec
+// (mnavEncodeTile, mnavDecodeTile), and builds meshes with one flaw each
+// that only that encoder can wrap in otherwise well-formed bytes. The
+// loader's refusals are public (mnavStageTile); the inputs that reach
+// each of them are not.
 
 // The seed writer uses fopen, which the Microsoft C library deprecates.
 #define _CRT_SECURE_NO_WARNINGS
