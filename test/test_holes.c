@@ -4,6 +4,7 @@
 // Merging hole contours into their outlines, read from 2D bakes of a
 // square floor with square holes cut out: every hole is joined, and the
 // tile's polygons cover the floor's cells and no hole's, exactly once.
+// test_holes_rings.c covers dropping a hole, which no bake reaches.
 
 #include "soup.h"
 #include "test_harness.h"
@@ -15,6 +16,10 @@
 #include "maul-nav/query.h"
 
 #include <stdint.h>
+#include <stdio.h>
+
+// The bridge floors' tile bytes, the same on every platform.
+#define BRIDGES_HASH 0xc5074b3f6ddfc159ull
 
 enum
 {
@@ -26,6 +31,7 @@ enum
 };
 
 static uint8_t s_tile[TILE_ROOM];
+static size_t s_size;
 static mnavNavmesh* s_navmesh;
 static mnavBakeReport s_report;
 static mnavDebugVertex s_drawVertices[DRAW_ROOM];
@@ -82,16 +88,15 @@ static void Load(const Floor* floor)
     def.minRegionArea = 0.0f;
     def.maxEdgeError = 0.0f;
     mnavBaker* baker = nullptr;
-    size_t size = 0;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBakeTile2D(baker, outlines, 1 + floor->holes, 0, 0, &s_report) == mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &s_size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavStageTile(s_navmesh, s_tile, s_size).result == mnav_success &&
               mnavCommit(s_navmesh) == mnav_success,
           "loaded");
 }
@@ -175,6 +180,26 @@ static void TestHolesMergeIntoTheOutline(void)
     CHECK(Merged(&two), "two holes");
 }
 
+static void TestBridgesTakeTheNearestCorner(void)
+{
+    // A bridge goes from the hole's lowest-left corner to the nearest
+    // outline corner in its cone, the outline's first of equally near
+    // ones. Another choice covers the floor alike and moves only the
+    // order of the polygons and their edges, so the tiles' bytes are
+    // pinned: a hole at (2, 2), nearest to (0, 0); one at (1, 5), nearer
+    // to (0, 8) than (0, 0) though as far along X; and one at (5, 5), as
+    // far from all four corners, bridged to the lowest-left.
+    const Floor floors[3] = {{5, {2, 2}, 1}, {8, {1, 5}, 1}, {10, {5, 5}, 1}};
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t f = 0; f < 3; ++f)
+    {
+        CHECK(Merged(&floors[f]), "joined");
+        hash = mnavHash64(hash, s_tile, (int32_t)s_size);
+    }
+    printf("BRIDGES_HASH=%016llx\n", (unsigned long long)hash);
+    CHECK(hash == BRIDGES_HASH, "the pinned bytes");
+}
+
 static void TestBridgeAvoidsAWaitingHole(void)
 {
     // The first hole's nearest corner, (20, 0), lies behind the second
@@ -246,6 +271,7 @@ int main(void)
 {
     TestHolesMergeIntoTheOutline();
     TestHolesTiedOnTheirCornerMerge();
+    TestBridgesTakeTheNearestCorner();
     TestBridgeAvoidsAWaitingHole();
     TestSecondBridgeTakesTheCopyFacingIt();
     TestManyHolesNeverCross();

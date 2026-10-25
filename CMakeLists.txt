@@ -169,6 +169,9 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(height_patch WHITEBOX)
     maul_add_test(heightfield)
     maul_add_test(holes)
+    # Hand-built contour sets for dropping a hole, which no bake reaches
+    # (test_holes_rings.c).
+    maul_add_test(holes_rings WHITEBOX)
     maul_add_test(navmesh)
     # The navmesh's link and slot tables, which no public call shows
     # (test_navmesh_tables.c).
