@@ -2,7 +2,9 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // A suite's dense form. A suite with sweeps or trials too slow for a unit
-// test runs them on a smaller grid, a subset of the dense one; with the
+// test runs less of them: a subset of the dense form's (flight_query,
+// hierarchy, scenarios, tile_cache), or a coarser bake of the same scene
+// that reaches the same allocation stacks (alloc_failures). With the
 // argument `dense` it runs them all. The dense test (`<suite>_dense`,
 // labeled dense) runs on every cell but AddressSanitizer's on a pull
 // request, and under AddressSanitizer at night.

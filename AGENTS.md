@@ -50,7 +50,7 @@ Follow the [repository standard's Tests section](https://github.com/Rawframe-Pro
 - Test through the public headers. A suite that reaches `src/` is `WHITEBOX` and needs a reason the public API cannot give, such as an internal format's exact bytes.
 - Golden hashes pin a few scenes; a new behavior gets an exact check of its own, not another hash. A query golden runs on stored tiles (`LoadWorldTiles`, or a scene of `test/stored_tiles.h`), never on a fresh bake; a scene a suite bakes itself gets exact checks only.
 - A large scene (thousands of agents, many tiles) is labeled `nightly` beside its suite's label and runs only at night.
-- A sweep too slow for a unit test runs a subset of its dense form, which `maul_add_dense` registers as `<suite>_dense` (`test/dense.h`); keep the subset one the dense form contains.
+- A sweep too slow for a unit test keeps a dense form, which `maul_add_dense` registers as `<suite>_dense` (`test/dense.h`); the plain form is a subset of the dense one, or a coarser bake of the same scene that reaches the same allocation stacks (`alloc_failures`).
 - Inputs a reader could run past go in a heap allocation of exactly their length, so AddressSanitizer sees an overread.
 - Every C snippet of `docs/user/` appears unchanged in `test/test_guide.c`; `tools/check_guide.py` enforces it.
 - A fuzz finding becomes a test in its module's suite with the minimized input.
