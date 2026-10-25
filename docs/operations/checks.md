@@ -8,11 +8,11 @@ What verifies a change, locally and in CI, and the time each may take.
 
 | Tier | Runs | Budget |
 |---|---|---|
-| `changed` | The source, module, length, API documentation and snippet rules, the organization's documentation check, `clang-format` on the changed C files, and the `linux-clang-20-asan` preset (assertions on) with the suites the changes reach: a suite's own file reaches its suite, library code reaches every suite. | under 2 minutes |
+| `changed` | The source, module, length, API documentation and snippet rules, test hygiene, the organization's documentation check, `clang-format` on the changed C files, and the `linux-clang-20-asan` preset (assertions on) with the suites the changes reach: a suite's own file reaches its suite, library code reaches every suite. | under 2 minutes |
 | `pr` | Every rule on every file, clang-tidy, the `linux-clang-20-asan` and `linux-gcc-14` presets (the Recast differential with the latter), the hand tiles' check, and 10 seconds of fuzzing per target. | under 10 minutes |
 | `full` | Also the other Linux presets (ThreadSanitizer, Clang Release with the package test, the shared library), the large scenes, the dense forms under AddressSanitizer, and 60 seconds per fuzz target. | under 20 minutes |
 
-Run `changed` before every push. On the shared development machine, run `pr` and `full` through the workspace's heavy-job wrapper. Builds go to `out/<preset>` and the other trees to `out/check-*`, each with its log beside it.
+Run `changed` before every push. On the shared development machine, run `pr` and `full` through the workspace's heavy-job wrapper. Builds go to `out/<preset>` and the other trees to `out/check-*`, each with its log beside it. After each preset's configure, the test hygiene check reads its CTest registrations.
 
 ## In CI
 
@@ -21,9 +21,9 @@ Run `changed` before every push. On the shared development machine, run `pr` and
 | Job | What it guards |
 |---|---|
 | `changes` | Whether a pull request changes anything beyond documentation; when it does not, the build jobs are skipped. |
-| `docs` | The organization's documentation check: allowed files, the em dash, record numbers in docs and code, page sizes, links. |
+| `docs` | The organization's documentation check, run from the commit of `.github` the workflow pins: allowed files, the em dash, record numbers in docs and code, page sizes, links. |
 | `zizmor` | The workflows: injection, persisted credentials, permissions, unpinned actions. |
-| `checks` | `clang-format`, the family's source rules, the module graph, lengths, API documentation, documentation snippets, that the documentation site builds, that `test/hand_tiles.h` is what `test_hand_tiles` writes, and clang-tidy. It runs on documentation changes too. |
+| `checks` | `clang-format`, the family's source rules, the module graph, lengths, API documentation, documentation snippets, test hygiene (no sleep, wall clock, retry or unexplained skip in a test, and every registered test labeled, in the default and the shared configurations), that the documentation site builds, that `test/hand_tiles.h` is what `test_hand_tiles` writes, and clang-tidy. It runs on documentation changes too. |
 | `build` | One call of the organization's `cpp.yml` per preset: GCC 14 in Release building every part (tests, samples, benchmark, and the Recast differential, which it runs and whose log also reports costs against Detour, read as [development.md](development.md#the-differential-harness) explains); Clang 20 in Release with the package test; Clang with AddressSanitizer and UBSan, each test repeated up to three times on a pull request so a flaky one fails before it merges; Clang with ThreadSanitizer; the shared library with the package test; GCC 14 on arm64; macOS and `clang-cl` on Windows, both with the package test. All build with warnings as errors and check the golden values; a skipped or missing test fails the cell. ccache is restored on every run and saved only from `main`. |
 | `msvc-headers` | Every public header compiled by MSVC's `cl` as C17 and C++17 with `/W4 /WX`. |
 | `web` | The library and its tests under Emscripten and Node, and the static library's size. The image has no Emscripten, so this job uses the runner and the emsdk action. |
@@ -37,7 +37,7 @@ Only the `build` cells cache with ccache. The other jobs compile too little for 
 
 ## Tests
 
-Each suite in `test/` is one executable, registered with CTest under its name and labeled with it. The white-box suites include `src/` and are not built in shared builds. Golden values pin a few scenes: the bake goldens hash tile bytes, and every query golden runs on tiles read from `test/stored_tiles.h` (the test world, the terrain, the link generation trench, the doorway crowd's rooms), so a change to the bake leaves them alone. Suites that bake scenes of their own (the hierarchy's large world, the world in 8 m tiles, the building) check them exactly, not by hash. Large scenes carry the label `nightly`, and every test preset but `nightly` leaves them out. A suite whose sweeps or trials are too slow for a unit test (`alloc_failures`, `flight_query`, `hierarchy`, `scenarios`, `tile_cache`) runs less of them, a subset (or, for `alloc_failures`, a coarser bake of the same scene that reaches the same allocation stacks), and with the argument `dense` all of them, as the test `<suite>_dense`, labeled `dense` (`test/dense.h`). Every cell runs the dense tests on a pull request but the AddressSanitizer one, the pull request check's slowest job, which leaves them to `dense-asan` at night.
+Each suite in `test/` is one executable, registered with CTest under its name and labeled with it; the samples run as tests labeled `samples`. The white-box suites include `src/` and are not built in shared builds. Golden values pin a few scenes: the bake goldens hash tile bytes, and every query golden runs on tiles read from `test/stored_tiles.h` (the test world, the terrain, the link generation trench, the doorway crowd's rooms), so a change to the bake leaves them alone. Suites that bake scenes of their own (the hierarchy's large world, the world in 8 m tiles, the building) check them exactly, not by hash. Large scenes carry the label `nightly`, and every test preset but `nightly` leaves them out. A suite whose sweeps or trials are too slow for a unit test (`alloc_failures`, `flight_query`, `hierarchy`, `scenarios`, `tile_cache`) runs less of them, a subset (or, for `alloc_failures`, a coarser bake of the same scene that reaches the same allocation stacks), and with the argument `dense` all of them, as the test `<suite>_dense`, labeled `dense` (`test/dense.h`). Every cell runs the dense tests on a pull request but the AddressSanitizer one, the pull request check's slowest job, which leaves them to `dense-asan` at night.
 
 ## Budgets
 

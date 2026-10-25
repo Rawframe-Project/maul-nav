@@ -10,5 +10,6 @@ foreach(sample walk crowd navcrowd flight obstacles bake_world)
     # sample that stops working fails the suite.
     if(MAUL_NAV_BUILD_TESTS)
         add_test(NAME sample_${sample} COMMAND sample_${sample})
+        set_tests_properties(sample_${sample} PROPERTIES LABELS samples)
     endif()
 endforeach()
