@@ -4,6 +4,11 @@
 // ORCA's linear programs in space: planes laid out by hand,
 // parallel ones included, and random ones against a search of sampled
 // velocities.
+//
+// White-box: through mnavAvoid3D the planes come from fliers' positions
+// and velocities, which cannot lay out a given plane; a plane program
+// that wrongly finds parallel or infeasible planes feasible lives through
+// the public avoidance suites.
 
 #include "orca3.h"
 #include "test_harness.h"

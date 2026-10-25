@@ -5,6 +5,12 @@
 // space, its neighbours are those a search of every agent finds, ties and
 // shared spots included, and agents an agent ignores neither found nor
 // counted against the limit.
+//
+// White-box: the grid's cells adapt between calls, from two to six to
+// the neighbour range. The suite sets each size, to show every one finds
+// the same neighbours, and checks how they adapt, which changes only the
+// work; mnavDebugAvoidance shows the neighbours found but cannot choose
+// the cells.
 
 #include "crowd.h"
 #include "test_harness.h"
