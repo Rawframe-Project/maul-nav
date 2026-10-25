@@ -455,6 +455,26 @@ static void TestFastSphere(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+static void TestFastSphereFarOff(void)
+{
+    // A sphere 13 m off coming at 8 m/s: past the grid's cells of 10 m
+    // that the flier's own speed reaches within the horizon of 2 s, yet
+    // closing 16 m in it. Only a reach widened by the sphere's speed sees
+    // it in time: the flier moves off at once and is never touched.
+    mnavAvoidance* avoidance = Make(16, 10, 2.0);
+    mnavAgent3D agents[1] = {Agent(0.0, 0.0, 0.0, 1)};
+    const mnavPos3 goals[1] = {{0.0, 0.0, 0.0}};
+    mnavSphere spheres[1] = {{{14.0, 0.3, 0.0}, 1.0, {-8.0, 0.0, 0.0}, 9, 0}};
+    mnavPos3 velocities[1];
+    CHECK(mnavAvoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
+          "stepped");
+    CHECK(Length(velocities[0]) > 0.1, "it moves off at once");
+    Scene s = {avoidance, agents, goals, 1, spheres, 1, 0.0, 0.0, 0.0};
+    Run(&s, 40);
+    CHECK(s.closestSphere > -1e-6, "it is never touched");
+    mnavDestroyAvoidance(avoidance);
+}
+
 static void TestSphereTie(void)
 {
     // Room for one sphere and two at the same distance, the lower id
@@ -590,6 +610,7 @@ int main(void)
     TestSpheres();
     TestSphereKept();
     TestFastSphere();
+    TestFastSphereFarOff();
     TestSphereTie();
     TestChecks();
     TestSubnormalSpeed();
