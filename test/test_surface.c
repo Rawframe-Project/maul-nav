@@ -5,8 +5,7 @@
 // world, and the node table a move leaves empty. Hand cells are 0.25 m by
 // 0.125 m.
 
-#include "hand_tile.h"
-#include "query.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -21,22 +20,19 @@
 // The hash of the world's moves, the same on every platform.
 #define WORLD_MOVES_HASH 0x0a1f6e7a2f2b8f5aull
 
-static uint8_t s_bytes[2][8192];
-
-static mnavNavmesh* Make(const HandSquare* first, int32_t firstCount, const HandSquare* second,
-                         int32_t secondCount)
+// A navmesh of hand tiles (hand_tiles.h) at (0, 0) and, when given, (1, 0).
+static mnavNavmesh* Make(const uint8_t* first, size_t firstSize, const uint8_t* second,
+                         size_t secondSize)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    size_t size = HandTileBytes(s_bytes[0], 0, first, firstCount);
-    CHECK(mnavStageTile(navmesh, s_bytes[0], size).result == mnav_success, "first");
+    CHECK(mnavStageTile(navmesh, first, firstSize).result == mnav_success, "first");
     if (second != nullptr)
     {
-        size = HandTileBytes(s_bytes[1], 1, second, secondCount);
-        CHECK(mnavStageTile(navmesh, s_bytes[1], size).result == mnav_success, "second");
+        CHECK(mnavStageTile(navmesh, second, secondSize).result == mnav_success, "second");
     }
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     return navmesh;
@@ -71,16 +67,12 @@ static bool At(const mnavMove* move, double x, double z)
     return move->point.x == x && move->point.z == z;
 }
 
-// A row of five squares from (5, 5) to (30, 10).
-static const HandSquare s_row[5] = {{20, 20, 40, 40, {0}, 0},
-                                    {40, 20, 60, 40, {0}, 0},
-                                    {60, 20, 80, 40, {0}, 2},
-                                    {80, 20, 100, 40, {0}, 0},
-                                    {100, 20, 120, 40, {0}, 0}};
+// A row of five squares from (5, 5) to (30, 10), the middle one of area 2.
+#define ROW s_handRowMiddleArea2, sizeof(s_handRowMiddleArea2)
 
 static void TestAlongARow(void)
 {
-    mnavNavmesh* navmesh = Make(s_row, 5, nullptr, 0);
+    mnavNavmesh* navmesh = Make(ROW, nullptr, 0);
     mnavQuery* query = MakeQuery(64);
     mnavMove move = Move(query, navmesh, nullptr, 6.0, 7.5, 18.0, 7.5);
     CHECK(move.end == mnav_moveReached && At(&move, 18.0, 7.5) && move.point.y == 0.0 &&
@@ -117,11 +109,11 @@ static void TestAlongARow(void)
 
 static void TestTileSides(void)
 {
-    // A square on tile (0, 0)'s +X side, z 0 to 20 m, and one on tile
-    // (1, 0)'s -X side, z 0 to 10 m: the side above z = 10 is wall.
-    const HandSquare left[1] = {{100, 0, 128, 80, {0}, 0}};
-    const HandSquare right[1] = {{0, 0, 20, 40, {0}, 0}};
-    mnavNavmesh* navmesh = Make(left, 1, right, 1);
+    // A square on tile (0, 0)'s +X side, z 0 to 20 m (s_handTallWest), and
+    // one on tile (1, 0)'s -X side, z 0 to 10 m (s_handShortEast): the
+    // side above z = 10 is wall.
+    mnavNavmesh* navmesh =
+        Make(s_handTallWest, sizeof(s_handTallWest), s_handShortEast, sizeof(s_handShortEast));
     mnavQuery* query = MakeQuery(64);
     mnavMove move = Move(query, navmesh, nullptr, 31.0, 5.0, 33.0, 5.0);
     CHECK(move.end == mnav_moveReached && move.polygonCount == 2, "across the link");
@@ -132,7 +124,7 @@ static void TestTileSides(void)
     move = Move(query, navmesh, nullptr, 31.0, 15.0, 34.0, 12.0);
     CHECK(move.end == mnav_moveWall && At(&move, 32.0, 12.0), "to the wall beside the link");
     mnavDestroyNavmesh(navmesh);
-    navmesh = Make(left, 1, nullptr, 0);
+    navmesh = Make(s_handTallWest, sizeof(s_handTallWest), nullptr, 0);
     move = Move(query, navmesh, nullptr, 31.0, 5.0, 34.0, 5.0);
     CHECK(move.end == mnav_moveNotLoaded && At(&move, 32.0, 5.0), "nothing loaded beyond");
     mnavDestroyQuery(query);
@@ -142,8 +134,7 @@ static void TestTileSides(void)
 static void TestHeights(void)
 {
     // A square rising 1 m across 5 m of x.
-    const HandSquare slope[1] = {{20, 20, 40, 40, {0, 0, 8, 8}, 0}};
-    mnavNavmesh* navmesh = Make(slope, 1, nullptr, 0);
+    mnavNavmesh* navmesh = Make(s_handSlopeAlongX, sizeof(s_handSlopeAlongX), nullptr, 0);
     mnavQuery* query = MakeQuery(64);
     mnavMove move = Move(query, navmesh, nullptr, 5.5, 7.5, 7.5, 7.5);
     CHECK(move.end == mnav_moveReached && move.point.y == 0.5, "halfway up");
@@ -155,7 +146,7 @@ static void TestHeights(void)
 
 static void TestArguments(void)
 {
-    mnavNavmesh* navmesh = Make(s_row, 5, nullptr, 0);
+    mnavNavmesh* navmesh = Make(ROW, nullptr, 0);
     mnavQuery* query = MakeQuery(64);
     mnavNearest a;
     CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){6.0, 0.0, 7.5}, (mnavVec3){0.1f, 1, 0.1f},
@@ -176,8 +167,7 @@ static void TestArguments(void)
     CHECK(mnavMoveAlongSurface(query, navmesh, &filter, a.polygon, a.point, a.point, &move) ==
               mnav_errorInvalid,
           "a filter not from the default");
-    size_t size = HandTileBytes(s_bytes[0], 0, s_row, 5);
-    CHECK(mnavStageTile(navmesh, s_bytes[0], size).result == mnav_success &&
+    CHECK(mnavStageTile(navmesh, ROW).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success &&
               mnavMoveAlongSurface(query, navmesh, nullptr, a.polygon, a.point, a.point, &move) ==
                   mnav_errorStale,
@@ -253,53 +243,11 @@ static void TestWorldMoves(void)
     mnavDestroyNavmesh(navmesh);
 }
 
-static void TestTableLeftEmpty(void)
-{
-    // A move takes its nodes out of the context's node table again, so
-    // that the next search has nothing to clear: in a table of 64 cells,
-    // where keys often share a probe chain, every cell is empty after
-    // each move that says so.
-    mnavNavmesh* navmesh = WorldNavmesh();
-    mnavQuery* query = MakeQuery(32);
-    int32_t clean = 0;
-    int32_t left = 0;
-    for (int32_t i = 0; i < 64; ++i)
-    {
-        mnavNearest a;
-        CHECK(mnavFindNearest(navmesh, nullptr,
-                              (mnavPos3){4.0 + (i % 8) * 7.5, 0.0, 4.0 + (i / 8) * 7.5},
-                              (mnavVec3){3.0f, 2.0f, 3.0f}, &a) == mnav_success,
-              "start");
-        for (int32_t k = 0; k < 16 && a.polygon.slot != 0; ++k)
-        {
-            mnavPos3 wanted = {a.point.x + s_fan[k][0], 0.0, a.point.z + s_fan[k][1]};
-            mnavMove move = {0};
-            CHECK(mnavMoveAlongSurface(query, navmesh, nullptr, a.polygon, a.point, wanted,
-                                       &move) == mnav_success,
-                  "moved");
-            if (!query->tableClean)
-            {
-                continue;
-            }
-            clean += 1;
-            for (uint32_t c = 0; c <= query->tableMask; ++c)
-            {
-                left += query->table[c] != MNAV_NO_NODE ? 1 : 0;
-            }
-        }
-    }
-    printf("table: %d moves left it clean, %d cells left\n", clean, left);
-    CHECK(clean > 500, "most moves leave it clean");
-    CHECK(left == 0, "every cell empty");
-    mnavDestroyQuery(query);
-    mnavDestroyNavmesh(navmesh);
-}
-
 static void TestSlicedSearchEnded(void)
 {
     // A move takes the node table a sliced search was using, so the
     // search ends: going on with it would read the move's nodes.
-    mnavNavmesh* navmesh = Make(s_row, 5, nullptr, 0);
+    mnavNavmesh* navmesh = Make(ROW, nullptr, 0);
     mnavQuery* query = MakeQuery(64);
     mnavNearest a;
     mnavNearest b;
@@ -328,7 +276,6 @@ int main(void)
     TestHeights();
     TestArguments();
     TestWorldMoves();
-    TestTableLeftEmpty();
     TestSlicedSearchEnded();
     return s_failures == 0 ? 0 : 1;
 }

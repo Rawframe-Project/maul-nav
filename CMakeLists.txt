@@ -190,7 +190,10 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(flight_query)
     maul_add_dense(flight_query)
     maul_add_test(sliced)
-    maul_add_test(surface WHITEBOX)
+    maul_add_test(surface)
+    # The node table a move leaves clean, which no result shows
+    # (test_query_table.c).
+    maul_add_test(query_table WHITEBOX)
     maul_add_test(walls)
     maul_add_test(corridor)
     maul_add_test(tiers)
