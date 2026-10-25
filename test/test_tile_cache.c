@@ -236,6 +236,66 @@ static mnavBakeReport Rebuilt(mnavBaker* baker, mnavTileCache* cache, int32_t ti
     return report;
 }
 
+enum
+{
+    OTHER_SETTINGS = 15
+};
+
+// The default def with one setting the bake reads changed.
+static mnavBakeDef OtherSettings(int32_t setting)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    switch (setting)
+    {
+    case 0:
+        def.origin.x += 1.0;
+        break;
+    case 1:
+        def.origin.y += 1.0;
+        break;
+    case 2:
+        def.origin.z += 1.0;
+        break;
+    case 3:
+        def.cellSize *= 2.0f;
+        break;
+    case 4:
+        def.cellHeight *= 2.0f;
+        break;
+    case 5:
+        def.tileCells *= 2;
+        break;
+    case 6:
+        def.agent.radius *= 2.0f;
+        break;
+    case 7:
+        def.agent.height += 0.5f;
+        break;
+    case 8:
+        def.agent.stepHeight -= 0.25f;
+        break;
+    case 9:
+        def.agent.maxSlopeDegrees -= 5.0f;
+        break;
+    case 10:
+        def.minRegionArea += 1.0f;
+        break;
+    case 11:
+        def.maxEdgeError += 0.25f;
+        break;
+    case 12:
+        def.maxEdgeLength += 1.0f;
+        break;
+    case 13:
+        def.detailSampleDistance += 0.5f;
+        break;
+    default:
+        def.detailMaxError += 0.125f;
+        break;
+    }
+    return def;
+}
+
 static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
 {
     mnavTriangleMesh world = World();
@@ -264,14 +324,17 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
     CHECK(r.mesh == 1 && r.input.element == mnav_elementPoint && r.input.index == 2,
           "an obstacle's NaN point");
     Rebuilt(baker, cache, 0, obstacles, 1, mnav_success);
-    // A baker of other settings is refused; one of other limits is not.
-    mnavBakeDef def = mnavDefaultBakeDef();
-    def.agent.radius *= 2.0f;
+    // A baker that differs in any one setting the tile was baked with is
+    // refused; one of other limits is not.
     mnavBaker* other = nullptr;
-    CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "another baker");
-    Rebuilt(other, cache, 0, nullptr, 0, mnav_errorInvalid);
-    mnavDestroyBaker(other);
-    def = mnavDefaultBakeDef();
+    for (int32_t setting = 0; setting < OTHER_SETTINGS; ++setting)
+    {
+        mnavBakeDef def = OtherSettings(setting);
+        CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "another baker");
+        Rebuilt(other, cache, 0, nullptr, 0, mnav_errorInvalid);
+        mnavDestroyBaker(other);
+    }
+    mnavBakeDef def = mnavDefaultBakeDef();
     def.limits.inputTriangles = cached.triangles + 4;
     CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "a baker of other limits");
     Rebuilt(other, cache, 0, obstacles, 1, mnav_success);

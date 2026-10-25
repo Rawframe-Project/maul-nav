@@ -220,9 +220,8 @@ static mnavResult CheckInput(const mnavBaker* baker, const Input* in, int32_t ti
                                &report->input);
 }
 
-// The hash of the generator, the settings that shape the tile and its
-// place.
-static uint64_t HashSettings(const mnavBakeDef* def, int32_t tileX, int32_t tileZ)
+// The generator, the settings that shape the tile and its place.
+static mnavBakeSettings Settings(const mnavBakeDef* def, int32_t tileX, int32_t tileZ)
 {
     uint64_t origin[3] = {mnavDoubleBits(def->origin.x), mnavDoubleBits(def->origin.y),
                           mnavDoubleBits(def->origin.z)};
@@ -249,7 +248,15 @@ static uint64_t HashSettings(const mnavBakeDef* def, int32_t tileX, int32_t tile
         (uint32_t)tileX,
         (uint32_t)tileZ,
     };
-    return mnavHashWords(MNAV_HASH_INIT, words, (int32_t)(sizeof(words) / sizeof(words[0])));
+    static_assert(sizeof(words) == sizeof(mnavBakeSettings), "every settings word");
+    mnavBakeSettings settings;
+    memcpy(settings.words, words, sizeof(words));
+    return settings;
+}
+
+static uint64_t HashSettings(const mnavBakeSettings* settings)
+{
+    return mnavHashWords(MNAV_HASH_INIT, settings->words, MNAV_SETTINGS_WORDS);
 }
 
 // Adds every outline that reaches the tile to the fingerprint, after a
@@ -524,19 +531,19 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
         result = mnav_errorRange;
     }
     Stages stages = {0};
-    uint64_t settings = HashSettings(&baker->def, tileX, tileZ);
+    const mnavBakeSettings settings = Settings(&baker->def, tileX, tileZ);
     uint64_t geometry = 0;
     if (result == mnav_success)
     {
         if (in->flat)
         {
             report.fingerprint =
-                HashOutlines(&frame, in, tileX, tileZ, settings, &report.triangles);
+                HashOutlines(&frame, in, tileX, tileZ, HashSettings(&settings), &report.triangles);
         }
         else
         {
             geometry = mnavFingerprintGeometry(&frame, baker->cells.cosMaxSlope, &in->solid, tileX,
-                                               tileZ, settings, &report.triangles);
+                                               tileZ, HashSettings(&settings), &report.triangles);
             report.fingerprint =
                 mnavFingerprintVolumes(&frame, in->solid.volumes, in->solid.volumeCount, geometry);
         }
@@ -706,9 +713,10 @@ static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache*
     Stages stages = {0};
     const mnavCachedTile* tile =
         cache != nullptr ? mnavFindCachedTile(cache, tileX, tileZ) : nullptr;
+    const mnavBakeSettings settings = Settings(&baker->def, tileX, tileZ);
     mnavResult result = cache == nullptr  ? mnav_errorInvalid
                         : tile == nullptr ? mnav_errorNotLoaded
-                        : tile->settings != HashSettings(&baker->def, tileX, tileZ)
+                        : memcmp(&tile->settings, &settings, sizeof(settings)) != 0
                             ? mnav_errorInvalid
                             : CheckObstacles(baker, tile, obstacles, obstacleCount, &report);
     // The cached volumes, then the obstacles, in the baker's memory.
