@@ -104,6 +104,23 @@ run)
 night)
     target=${3:?target}
     seconds=${4:?seconds}
+    # fuzz-night gives each target 30 minutes. Setting up, starting the
+    # image and building take about 40 s, and unpacking the seeds and the
+    # merge after the run up to 120 s on the largest corpora (fuzz_bake,
+    # fuzz_flight), a time that grows with the corpus. 1500 s leaves those
+    # steps more than twice that, so the run is never killed before its
+    # corpus is merged and saved. libFuzzer reads a negative
+    # -max_total_time as no limit at all.
+    case $seconds in
+    '' | *[!0-9]* | 0*)
+        echo "::error::fuzz seconds must be a whole number from 1 to 1500, not '$seconds'" >&2
+        exit 2
+        ;;
+    esac
+    if [ "$seconds" -gt 1500 ]; then
+        echo "::error::fuzz seconds must be a whole number from 1 to 1500, not '$seconds'" >&2
+        exit 2
+    fi
     corpus=out/corpus/$target
     rm -rf "out/seeds/$target"
     mkdir -p "$corpus"
