@@ -1,140 +1,215 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Rasterizing triangles into a tile's heightfield.
+// Rasterizing triangles into a tile's heightfield, read from the baked
+// tile: the cells a floor fills, slopes and facing, stacked floors, the
+// area of merged spans, cell and tile edges, limits, refused memory, and
+// one tile from one triangle set in any order.
 
-#include "allocator.h"
-#include "heightfield.h"
-#include "raster.h"
+#include "counting_allocator.h"
 #include "soup.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
+#include "maul-nav/base.h"
+#include "maul-nav/debug.h"
+#include "maul-nav/navmesh.h"
+#include "maul-nav/query.h"
 
 #include <math.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
-typedef struct Bake
+enum
 {
-    mnavBakeDef def;
-    mnavBakeCells cells;
-    mnavMemory memory;
-    mnavHeightfield field;
-} Bake;
+    TILE_ROOM = 1 << 20,
+    DRAW_ROOM = 1 << 18,
+    NO_POLYGON = 0xFF
+};
 
-static Bake MakeBake(void)
+static uint8_t s_tile[TILE_ROOM];
+static mnavNavmesh* s_navmesh;
+
+// The default def, but an agent of no radius, regions of any size and no
+// edge error: the polygons cover exactly the cells the heightfield leaves
+// walkable, less ledges.
+static mnavBakeDef Exact(void)
 {
-    Bake bake = {0};
-    bake.def = mnavDefaultBakeDef();
-    return bake;
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.agent.radius = 0.0f;
+    def.minRegionArea = 0.0f;
+    def.maxEdgeError = 0.0f;
+    return def;
 }
 
-static mnavResult Build(Bake* bake, const mnavTriangleMesh* meshes, int32_t count, int32_t tileX,
-                        int32_t tileZ)
+// Bakes tile (tileX, tileZ) of the meshes with a baker of the def and, on
+// success, loads it in a fresh navmesh; returns the first failing call's
+// result.
+static mnavResult Bake(const mnavBakeDef* def, const mnavTriangleMesh* meshes, int32_t count,
+                       int32_t tileX, int32_t tileZ, mnavBakeReport* report)
 {
-    if (mnavValidateBakeDef(&bake->def, &bake->cells).result != mnav_success)
+    mnavDestroyNavmesh(s_navmesh);
+    s_navmesh = nullptr;
+    mnavBaker* baker = nullptr;
+    mnavResult result = mnavCreateBaker(def, &baker).result;
+    if (result != mnav_success)
     {
-        return mnav_errorInvalid;
+        return result;
     }
-    bake->memory = mnavMakeMemory(bake->def.allocator, bake->def.limits.memoryBytes);
-    return mnavBuildHeightfield(&bake->memory, &bake->def, &bake->cells, meshes, count, tileX,
-                                tileZ, &bake->field);
-}
-
-static void Release(Bake* bake)
-{
-    mnavReleaseHeightfield(&bake->memory, &bake->field);
-}
-
-static int32_t ColumnSpans(const mnavHeightfield* field, int32_t x, int32_t z)
-{
-    int32_t column = x + z * field->frame.width;
-    return (int32_t)(field->columns[column + 1] - field->columns[column]);
-}
-
-static const mnavSpan* ColumnSpan(const mnavHeightfield* field, int32_t x, int32_t z, int32_t k)
-{
-    return &field->spans[field->columns[x + z * field->frame.width] + (uint32_t)k];
-}
-
-// A 64-bit FNV-1a over the heightfield's columns and spans, field by field.
-static uint64_t HashField(const mnavHeightfield* field)
-{
-    uint64_t hash = 0xCBF29CE484222325ull;
-    int32_t columnCount = field->frame.width * field->frame.width;
-    for (int32_t c = 0; c <= columnCount; ++c)
+    const mnavBakeInput input = {meshes, count, nullptr, 0, nullptr, 0, nullptr};
+    result = mnavBakeTileInput(baker, &input, tileX, tileZ, report);
+    if (result == mnav_success)
     {
-        uint32_t value = field->columns[c];
-        for (int32_t b = 0; b < 4; ++b)
+        // The navmesh takes the default allocator, which never refuses.
+        mnavBakeDef navmeshDef = *def;
+        navmeshDef.allocator = mnavDefaultBakeDef().allocator;
+        size_t size = 0;
+        CHECK(mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success &&
+                  mnavCreateNavmesh(&navmeshDef, &s_navmesh).result == mnav_success &&
+                  mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
+                  mnavCommit(s_navmesh) == mnav_success,
+              "loaded");
+    }
+    mnavDestroyBaker(baker);
+    return result;
+}
+
+// The polygon over the center of cell (x, z), counted from the origin,
+// within a meter of height y.
+static mnavNearest Over(int32_t x, int32_t z, double y)
+{
+    mnavPos3 center = {(x + 0.5) * 0.25, y, (z + 0.5) * 0.25};
+    mnavNearest n;
+    CHECK(mnavFindNearest(s_navmesh, nullptr, center, (mnavVec3){0.01f, 1.0f, 0.01f}, &n) ==
+              mnav_success,
+          "nearest");
+    if (!n.over)
+    {
+        n.polygon = (mnavPolygonId){0, 0, 0};
+    }
+    return n;
+}
+
+// Its area, or NO_POLYGON.
+static mnavAreaType At(int32_t x, int32_t z, double y)
+{
+    mnavNearest n = Over(x, z, y);
+    mnavAreaType area = NO_POLYGON;
+    if (n.polygon.slot != 0)
+    {
+        CHECK(mnavGetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
+    }
+    return area;
+}
+
+// The cells from (x0, z0) to (x1, z1) with a polygon over them at height
+// y.
+static int32_t Walkable(int32_t x0, int32_t z0, int32_t x1, int32_t z1, double y)
+{
+    int32_t n = 0;
+    for (int32_t z = z0; z <= z1; ++z)
+    {
+        for (int32_t x = x0; x <= x1; ++x)
         {
-            hash = (hash ^ ((value >> (8 * b)) & 0xFFu)) * 0x100000001B3ull;
+            n += At(x, z, y) != NO_POLYGON ? 1 : 0;
         }
     }
-    for (int32_t i = 0; i < field->spanCount; ++i)
+    return n;
+}
+
+static mnavDebugVertex s_drawVertices[DRAW_ROOM];
+static uint32_t s_drawTriangles[3 * DRAW_ROOM];
+static uint32_t s_drawLines[2 * DRAW_ROOM];
+
+// The hash of the loaded tile as mnavDebugNavmesh draws it: its polygons,
+// detail triangles and edges, but not the fingerprint of its input.
+static uint64_t DrawHash(void)
+{
+    mnavDebugBuffer buffer = {{0, 0, 0}, s_drawVertices, DRAW_ROOM, 0, s_drawTriangles, DRAW_ROOM,
+                              0,         s_drawLines,    DRAW_ROOM, 0};
+    CHECK(mnavDebugNavmesh(s_navmesh, 0, 0, 1, 1, &buffer) == mnav_success, "drawn");
+    uint64_t hash = MNAV_HASH_INIT;
+    for (int32_t i = 0; i < buffer.vertexCount; ++i)
     {
-        const mnavSpan* span = &field->spans[i];
-        uint8_t bytes[5] = {(uint8_t)span->bottom, (uint8_t)(span->bottom >> 8), (uint8_t)span->top,
-                            (uint8_t)(span->top >> 8), span->area};
-        for (int32_t b = 0; b < 5; ++b)
-        {
-            hash = (hash ^ bytes[b]) * 0x100000001B3ull;
-        }
+        const mnavDebugVertex* v = &s_drawVertices[i];
+        uint32_t words[5];
+        memcpy(&words[0], &v->x, 4);
+        memcpy(&words[1], &v->y, 4);
+        memcpy(&words[2], &v->z, 4);
+        words[3] = (uint32_t)v->kind;
+        words[4] = v->value;
+        hash = mnavHash64(hash, words, (int32_t)sizeof(words));
     }
-    return hash;
+    hash = mnavHash64(hash, s_drawTriangles, buffer.triangleCount * 3 * (int32_t)sizeof(uint32_t));
+    return mnavHash64(hash, s_drawLines, buffer.lineCount * 2 * (int32_t)sizeof(uint32_t));
 }
 
 // A floor from (0, 0) to (10, 10) at height 0, counter-clockwise from above.
 static const mnavVec3 s_floor[4] = {{0, 0, 0}, {0, 0, 10}, {10, 0, 10}, {10, 0, 0}};
 static const int32_t s_floorIndices[6] = {0, 1, 2, 0, 2, 3};
+static const mnavTriangleMesh s_floorMesh = {s_floor, 4, s_floorIndices, 2, nullptr};
 
 static void TestFloorFillsItsCells(void)
 {
-    Bake bake = MakeBake();
-    mnavTriangleMesh mesh = {s_floor, 4, s_floorIndices, 2, nullptr};
-    CHECK(Build(&bake, &mesh, 1, 0, 0) == mnav_success, "built");
-    // The tile starts 5 border cells before the origin, so the floor's
-    // 0.25 m cells are 5 to 44 on both axes.
-    CHECK(bake.field.frame.width == 138, "128 cells and two borders of 5");
-    int32_t inside = 0;
-    int32_t outside = 0;
-    for (int32_t z = 0; z < bake.field.frame.width; ++z)
+    // The floor's 0.25 m cells are 0 to 39 on both axes; its outer ring
+    // is a ledge, so cells 1 to 38 are walkable, at the top of the span
+    // from height 0 to 1, 0.125 m.
+    mnavBakeDef def = Exact();
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_success, "baked");
+    CHECK(Walkable(1, 1, 38, 38, 0.0) == 38 * 38, "every inner cell");
+    CHECK(Walkable(0, 0, 127, 127, 0.0) == 38 * 38, "nothing more");
+    CHECK(Over(20, 20, 0.0).point.y == 0.125, "at the span's top");
+    // A floor between two cell heights tops at the higher.
+    const float heights[2] = {0.05f, 0.2f};
+    for (int32_t k = 0; k < 2; ++k)
     {
-        for (int32_t x = 0; x < bake.field.frame.width; ++x)
+        mnavVec3 raised[4];
+        for (int32_t i = 0; i < 4; ++i)
         {
-            bool covered = x >= 5 && x <= 44 && z >= 5 && z <= 44;
-            int32_t count = ColumnSpans(&bake.field, x, z);
-            if (covered && count == 1)
-            {
-                const mnavSpan* span = ColumnSpan(&bake.field, x, z, 0);
-                inside += span->bottom == MNAV_HEIGHT_OFFSET &&
-                          span->top == MNAV_HEIGHT_OFFSET + 1 && span->area == mnav_areaWalkable;
-            }
-            outside += !covered && count != 0;
+            raised[i] = (mnavVec3){s_floor[i].x, heights[k], s_floor[i].z};
         }
+        const mnavTriangleMesh mesh = {raised, 4, s_floorIndices, 2, nullptr};
+        CHECK(Bake(&def, &mesh, 1, 0, 0, nullptr) == mnav_success &&
+                  Over(20, 20, (double)heights[k]).point.y == (k == 0 ? 0.125 : 0.25),
+              "a floor between cell heights");
     }
-    CHECK(inside == 40 * 40, "every covered cell has one walkable span");
-    CHECK(outside == 0, "no span outside the floor");
-    CHECK(bake.field.spanCount == 1600, "1600 spans");
-    Release(&bake);
-    CHECK(bake.memory.used == 0, "everything released");
 }
 
 static void TestSlopesAndFacing(void)
 {
-    mnavVec3 corners[3] = {{0, 0, 0}, {0, 0, 1}, {1, 0, 0}};
-    CHECK(mnavTriangleArea(corners, 5, 0.7f) == 5, "flat and up is walkable");
-    mnavVec3 flipped[3] = {corners[0], corners[2], corners[1]};
-    CHECK(mnavTriangleArea(flipped, 5, 0.7f) == mnav_areaNone, "facing down is solid only");
-    // A 50 degree ramp against a 45 degree limit, and a 40 degree one.
-    mnavVec3 steep[3] = {{0, 0, 0}, {0, 1.19175f, 1}, {1, 0, 0}};
-    mnavVec3 gentle[3] = {{0, 0, 0}, {0, 0.83910f, 1}, {1, 0, 0}};
-    CHECK(mnavTriangleArea(steep, 5, 0.70710677f) == mnav_areaNone, "50 degrees is too steep");
-    CHECK(mnavTriangleArea(gentle, 5, 0.70710677f) == 5, "40 degrees is walkable");
-    mnavVec3 line[3] = {{0, 0, 0}, {1, 0, 0}, {2, 0, 0}};
-    CHECK(mnavTriangleArea(line, 5, 0.7f) == -1, "a degenerate triangle has no area");
-    CHECK(mnavTriangleArea(corners, mnav_areaNone, 0.7f) == mnav_areaNone, "unwalkable stays");
+    mnavBakeDef def = Exact();
+    mnavBakeReport report;
+    // Facing down, the floor is solid only.
+    const int32_t down[6] = {0, 2, 1, 0, 3, 2};
+    const mnavTriangleMesh flipped = {s_floor, 4, down, 2, nullptr};
+    CHECK(Bake(&def, &flipped, 1, 0, 0, &report) == mnav_success && report.polygons == 0,
+          "facing down is solid only");
+    // Given no area, it stays unwalkable.
+    const mnavAreaType none[2] = {mnav_areaNone, mnav_areaNone};
+    const mnavTriangleMesh unwalkable = {s_floor, 4, s_floorIndices, 2, none};
+    CHECK(Bake(&def, &unwalkable, 1, 0, 0, &report) == mnav_success && report.polygons == 0,
+          "unwalkable stays");
+    // Ramps 4 m long rising along z: 50 degrees from x = 2 to 6 m against
+    // a 45 degree limit, and 40 degrees from x = 12 to 16 m.
+    const mnavVec3 ramps[8] = {{2, 0, 2},  {2, 4.767f, 6},   {6, 4.767f, 6},   {6, 0, 2},
+                               {12, 0, 2}, {12, 3.3564f, 6}, {16, 3.3564f, 6}, {16, 0, 2}};
+    const int32_t rampIndices[12] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+    const mnavTriangleMesh rampMesh = {ramps, 8, rampIndices, 4, nullptr};
+    CHECK(Bake(&def, &rampMesh, 1, 0, 0, nullptr) == mnav_success, "baked");
+    CHECK(At(16, 16, 2.38) == NO_POLYGON, "50 degrees is too steep");
+    CHECK(At(56, 16, 1.68) == mnav_areaWalkable, "40 degrees is walkable");
+    // A degenerate triangle 1 m over the floor, along x = 5 m: it has no
+    // area, so it leaves the floor under it as it was.
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, &report) == mnav_success, "baked");
+    uint64_t plain = DrawHash();
+    uint64_t fingerprint = report.fingerprint;
+    const mnavVec3 withLine[7] = {s_floor[0], s_floor[1], s_floor[2], s_floor[3],
+                                  {5, 1, 2},  {5, 1, 5},  {5, 1, 8}};
+    const int32_t lineIndices[9] = {0, 1, 2, 0, 2, 3, 4, 5, 6};
+    const mnavTriangleMesh lineMesh = {withLine, 7, lineIndices, 3, nullptr};
+    CHECK(Bake(&def, &lineMesh, 1, 0, 0, &report) == mnav_success && DrawHash() == plain &&
+              report.fingerprint == fingerprint,
+          "a degenerate triangle has no area");
 }
 
 static void TestStackedFloorsKeepSeparateSpans(void)
@@ -146,13 +221,16 @@ static void TestStackedFloorsKeepSeparateSpans(void)
         vertices[i + 4] = (mnavVec3){s_floor[i].x, 3.0f, s_floor[i].z};
     }
     const int32_t indices[12] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
-    Bake bake = MakeBake();
-    mnavTriangleMesh mesh = {vertices, 8, indices, 4, nullptr};
-    CHECK(Build(&bake, &mesh, 1, 0, 0) == mnav_success, "built");
-    CHECK(ColumnSpans(&bake.field, 10, 10) == 2, "two floors, two spans");
-    CHECK(ColumnSpan(&bake.field, 10, 10, 0)->bottom == MNAV_HEIGHT_OFFSET, "lower first");
-    CHECK(ColumnSpan(&bake.field, 10, 10, 1)->bottom == MNAV_HEIGHT_OFFSET + 24, "3 m is 24");
-    Release(&bake);
+    const mnavTriangleMesh mesh = {vertices, 8, indices, 4, nullptr};
+    mnavBakeDef def = Exact();
+    CHECK(Bake(&def, &mesh, 1, 0, 0, nullptr) == mnav_success, "baked");
+    mnavNearest low = Over(10, 10, 0.0);
+    mnavNearest high = Over(10, 10, 3.0);
+    CHECK(low.polygon.slot != 0 && high.polygon.slot != 0 &&
+              memcmp(&low.polygon, &high.polygon, sizeof(low.polygon)) != 0,
+          "two floors, two polygons");
+    // 3 m is 24 cell heights: the upper span runs from 24 to 25.
+    CHECK(low.point.y == 0.125 && high.point.y == 3.125, "each at its own height");
 }
 
 static void TestMergedAreaDoesNotDependOnOrder(void)
@@ -168,7 +246,7 @@ static void TestMergedAreaDoesNotDependOnOrder(void)
     const mnavAreaType areasLowFirst[2] = {2, 1};
     const mnavAreaType areasHighFirst[2] = {1, 2};
     // A wall from 0 up to the upper floor at x = 5 m joins the two into
-    // one solid.
+    // one solid in the cells beside x = 5 m, z = 5 m.
     mnavVec3 wall[3] = {{4, 0, 5}, {5, 0.375f, 5}, {6, 0, 5}};
     const int32_t wallIndices[3] = {0, 1, 2};
     const mnavAreaType wallArea[1] = {mnav_areaNone};
@@ -178,146 +256,162 @@ static void TestMergedAreaDoesNotDependOnOrder(void)
         mnavAreaType areas[2] = {0, 0};
         for (int32_t order = 0; order < 2; ++order)
         {
-            Bake bake = MakeBake();
-            bake.def.agent.stepHeight = pass == 0 ? 0.25f : 0.75f;
+            mnavBakeDef def = Exact();
+            def.agent.stepHeight = pass == 0 ? 0.25f : 0.75f;
             mnavTriangleMesh meshes[2] = {
                 {vertices, 6, order == 0 ? lowFirst : highFirst, 2,
                  order == 0 ? areasLowFirst : areasHighFirst},
                 {wall, 3, wallIndices, 1, wallArea},
             };
-            CHECK(Build(&bake, meshes, 2, 0, 0) == mnav_success, "built");
-            hashes[order] = HashField(&bake.field);
-            // Cell (25, 25) lies under the wall at z = 5 m, x = 5 m.
-            CHECK(ColumnSpans(&bake.field, 25, 25) == 1, "one merged span");
-            areas[order] = ColumnSpan(&bake.field, 25, 25, 0)->area;
-            Release(&bake);
+            CHECK(Bake(&def, meshes, 2, 0, 0, nullptr) == mnav_success, "baked");
+            hashes[order] = DrawHash();
+            // Cell (19, 20) lies under the wall's top, at x = 4.75 m.
+            areas[order] = At(19, 20, 0.375);
         }
-        CHECK(hashes[0] == hashes[1], "same heightfield in either order");
-        CHECK(areas[0] == (pass == 0 ? 1 : 2), "area by the step rule");
+        CHECK(hashes[0] == hashes[1], "the same tile in either order");
+        CHECK(areas[0] == (pass == 0 ? 1 : 2) && areas[1] == areas[0], "area by the step rule");
     }
 }
 
 static void TestBoundaryEdgeLeavesNoSliver(void)
 {
-    // A floor from x = 0 to 10 m ends exactly on a cell boundary; column
-    // 45 must stay empty, and a wall on that boundary goes to column 45.
-    Bake bake = MakeBake();
-    mnavTriangleMesh mesh = {s_floor, 4, s_floorIndices, 2, nullptr};
-    CHECK(Build(&bake, &mesh, 1, 0, 0) == mnav_success, "built");
-    CHECK(ColumnSpans(&bake.field, 45, 20) == 0, "no sliver past the edge");
-    Release(&bake);
-    mnavVec3 wall[3] = {{10, 0, 4}, {10, 2, 4.1f}, {10, 0, 4.2f}};
-    const int32_t indices[3] = {0, 1, 2};
-    mnavTriangleMesh wallMesh = {wall, 3, indices, 1, nullptr};
-    bake = MakeBake();
-    CHECK(Build(&bake, &wallMesh, 1, 0, 0) == mnav_success, "built");
-    CHECK(ColumnSpans(&bake.field, 45, 21) == 1, "the wall is in column 45");
-    CHECK(ColumnSpans(&bake.field, 44, 21) == 0, "and not in column 44");
-    CHECK(ColumnSpan(&bake.field, 45, 21, 0)->top == MNAV_HEIGHT_OFFSET + 16, "2 m tall");
-    Release(&bake);
+    // A floor from x = 0 to 10 m ends exactly on a cell boundary: cell 40
+    // stays empty, so cell 39 is the floor's ledge.
+    mnavBakeDef def = Exact();
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_success, "baked");
+    CHECK(At(39, 20, 0.0) == NO_POLYGON && At(38, 20, 0.0) == mnav_areaWalkable,
+          "no sliver past the edge");
+    // A wall 2 m tall on that boundary, over a floor 20 m wide, stands in
+    // cell 40, not 39.
+    const mnavVec3 vertices[7] = {{0, 0, 0},  {0, 0, 10},    {20, 0, 10},  {20, 0, 0},
+                                  {10, 0, 4}, {10, 2, 4.1f}, {10, 0, 4.2f}};
+    const int32_t indices[9] = {0, 1, 2, 0, 2, 3, 4, 5, 6};
+    const mnavTriangleMesh mesh = {vertices, 7, indices, 3, nullptr};
+    CHECK(Bake(&def, &mesh, 1, 0, 0, nullptr) == mnav_success, "baked");
+    CHECK(At(40, 16, 0.0) == NO_POLYGON, "the wall is in cell 40");
+    CHECK(At(39, 16, 0.0) == mnav_areaWalkable, "and not in cell 39");
 }
 
-// A triangle standing on the plane x = at, from z = 1 to 2 m.
-static bool TouchesAt(const mnavTileFrame* frame, float at)
+// The fingerprint of tile (0, 0) of the floor with a wall standing on the
+// plane x = at, from z = 1 to 2 m.
+static uint64_t WallFingerprint(float at)
 {
-    const mnavVec3 corners[3] = {{at, 0, 1}, {at, 2, 1.5f}, {at, 0, 2}};
-    return mnavTriangleTouchesTile(frame, corners);
+    const mnavVec3 vertices[7] = {s_floor[0], s_floor[1],    s_floor[2], s_floor[3],
+                                  {at, 0, 1}, {at, 2, 1.5f}, {at, 0, 2}};
+    const int32_t indices[9] = {0, 1, 2, 0, 2, 3, 4, 5, 6};
+    const mnavTriangleMesh mesh = {vertices, 7, indices, 3, nullptr};
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBakeReport report;
+    CHECK(Bake(&def, &mesh, 1, 0, 0, &report) == mnav_success, "baked");
+    return report.fingerprint;
 }
 
 static void TestTriangleOnTheTileEdges(void)
 {
-    // 40 cells of 0.25 m from x = -1.25 to 8.75 m, exact in floats. A
-    // wall exactly on the near edge reaches cell 0; one exactly on the far
-    // edge reaches cell 40, past the tile; one a float below it, cell 39.
-    const mnavTileFrame frame = {40, -1.25f, -1.25f, 0.25f, 0.2f};
-    CHECK(TouchesAt(&frame, -1.25f), "a wall on the near edge is in");
-    CHECK(!TouchesAt(&frame, nextafterf(-1.25f, -2.0f)), "a float before it is out");
-    CHECK(!TouchesAt(&frame, -1.5f), "a cell before it is out");
-    CHECK(!TouchesAt(&frame, 8.75f), "a wall on the far edge is out");
-    CHECK(TouchesAt(&frame, nextafterf(8.75f, 0.0f)), "a float before it is in");
-    CHECK(!TouchesAt(&frame, 9.25f) && !TouchesAt(&frame, 500.0f), "past it is out");
-    const mnavVec3 across[3] = {{-50, 0, 1}, {60, 0, 1.5f}, {-50, 0, 2}};
-    CHECK(mnavTriangleTouchesTile(&frame, across), "a triangle across the tile is in");
+    // The fingerprint holds the triangles that reach the tile and its
+    // border of 5 cells: x = -1.25 to 33.25 m, exact in floats. A wall
+    // exactly on the near edge reaches it; one exactly on the far edge
+    // does not; one a float below the far edge does.
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBakeReport report;
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, &report) == mnav_success, "baked");
+    uint64_t floor = report.fingerprint;
+    CHECK(WallFingerprint(-1.25f) != floor, "a wall on the near edge is in");
+    CHECK(WallFingerprint(nextafterf(-1.25f, -2.0f)) == floor, "a float before it is out");
+    CHECK(WallFingerprint(-1.5f) == floor, "a cell before it is out");
+    CHECK(WallFingerprint(33.25f) == floor, "a wall on the far edge is out");
+    CHECK(WallFingerprint(nextafterf(33.25f, 0.0f)) != floor, "a float before it is in");
+    CHECK(WallFingerprint(33.75f) == floor && WallFingerprint(500.0f) == floor, "past it is out");
+    // A triangle across the tile, its corners all outside it.
+    const mnavVec3 across[3] = {{-50, 0, -50}, {-50, 0, 200}, {200, 0, -50}};
+    const int32_t indices[3] = {0, 1, 2};
+    const mnavTriangleMesh mesh = {across, 3, indices, 1, nullptr};
+    def = Exact();
+    CHECK(Bake(&def, &mesh, 1, 0, 0, &report) == mnav_success &&
+              Walkable(0, 0, 127, 127, 0.0) == 128 * 128,
+          "a triangle across the tile is in");
 }
 
 static void TestNeighborTileSeesOnlyItsBorder(void)
 {
-    // Tile (1, 0) starts at x = 32 m less a 1.25 m border: the floor
-    // reaches only tile (0, 0); a floor at 30 to 40 m reaches both.
-    Bake bake = MakeBake();
-    mnavTriangleMesh mesh = {s_floor, 4, s_floorIndices, 2, nullptr};
-    CHECK(Build(&bake, &mesh, 1, 1, 0) == mnav_success, "built");
-    CHECK(bake.field.spanCount == 0, "nothing in the neighbor");
-    Release(&bake);
+    // Tile (1, 0) starts at x = 32 m less its border: the floor reaches
+    // only tile (0, 0); a floor at 30 to 40 m reaches both.
+    mnavBakeDef def = Exact();
+    mnavBakeReport report;
+    mnavBakeReport empty;
+    const mnavTriangleMesh nothing = {s_floor, 4, s_floorIndices, 0, nullptr};
+    CHECK(Bake(&def, &nothing, 1, 1, 0, &empty) == mnav_success, "baked");
+    CHECK(Bake(&def, &s_floorMesh, 1, 1, 0, &report) == mnav_success && report.polygons == 0 &&
+              report.fingerprint == empty.fingerprint,
+          "nothing in the neighbor");
     mnavVec3 shifted[4];
     for (int32_t i = 0; i < 4; ++i)
     {
         shifted[i] = (mnavVec3){s_floor[i].x + 30.0f, 0.0f, s_floor[i].z};
     }
-    mnavTriangleMesh across = {shifted, 4, s_floorIndices, 2, nullptr};
-    bake = MakeBake();
-    CHECK(Build(&bake, &across, 1, 1, 0) == mnav_success, "built");
-    // From 30.75 m (cell 0 of tile 1) to 40 m: 37 cells by 40.
-    CHECK(bake.field.spanCount == 37 * 40, "the neighbor holds its share");
-    Release(&bake);
+    const mnavTriangleMesh across = {shifted, 4, s_floorIndices, 2, nullptr};
+    CHECK(Bake(&def, &across, 1, 1, 0, nullptr) == mnav_success, "baked");
+    // Tile 1's cells 128 to 159 hold the floor up to 40 m, its last cell
+    // a ledge; the floor goes on past the tile's near side.
+    CHECK(Walkable(128, 1, 158, 38, 0.0) == 31 * 38 && Walkable(128, 0, 255, 127, 0.0) == 31 * 38,
+          "the neighbor holds its share");
 }
 
 static void TestLimitsAreTyped(void)
 {
-    mnavTriangleMesh mesh = {s_floor, 4, s_floorIndices, 2, nullptr};
-    Bake bake = MakeBake();
-    // 1600 cells, and the 40 on the diagonal get a fragment from each
-    // triangle.
-    bake.def.limits.tileSpans = 1639;
-    CHECK(Build(&bake, &mesh, 1, 0, 0) == mnav_errorLimit, "fragments past the limit");
-    CHECK(bake.memory.used == 0, "nothing held after a refusal");
-    bake = MakeBake();
-    bake.def.limits.tileSpans = 1640;
-    CHECK(Build(&bake, &mesh, 1, 0, 0) == mnav_success, "fragments at the limit");
-    Release(&bake);
-    bake = MakeBake();
-    bake.def.limits.tileTriangles = 1;
-    CHECK(Build(&bake, &mesh, 1, 0, 0) == mnav_errorLimit, "triangles past the limit");
-    bake = MakeBake();
-    bake.def.limits.memoryBytes = 4096;
-    CHECK(Build(&bake, &mesh, 1, 0, 0) == mnav_errorLimit, "memory past the limit");
-    CHECK(bake.memory.used == 0, "nothing held after the memory limit");
-    bake = MakeBake();
-    CHECK(Build(&bake, &mesh, 1, 1 << 20, 0) == mnav_errorRange, "tile past the extent");
+    // 1600 cells, the 40 on the diagonal a fragment from each triangle,
+    // and the border's none.
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.limits.tileSpans = 1639;
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_errorLimit,
+          "fragments past the limit");
+    def.limits.tileSpans = 1640;
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_success, "fragments at the limit");
+    def = mnavDefaultBakeDef();
+    def.limits.tileTriangles = 1;
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_errorLimit,
+          "triangles past the limit");
+    def = mnavDefaultBakeDef();
+    CHECK(Bake(&def, &s_floorMesh, 1, 1 << 20, 0, nullptr) == mnav_errorRange,
+          "tile past the extent");
 }
 
-static void* FailingAlloc(size_t size, size_t alignment, void* context)
+// Allocations left before the allocator refuses, or -1 for no end.
+static int32_t s_allowed = -1;
+
+static void* RefusingAlloc(size_t size, size_t alignment, void* context)
 {
-    (void)alignment;
-    int32_t* left = context;
-    if (*left == 0)
+    if (s_allowed == 0)
     {
         return nullptr;
     }
-    *left -= 1;
-    return malloc(size);
+    s_allowed -= s_allowed > 0 ? 1 : 0;
+    return CountingAlloc(size, alignment, context);
 }
 
-static void ForwardFree(void* memory, size_t size, size_t alignment, void* context)
+static void TestMemoryLimitAndRefusedMemory(void)
 {
-    (void)size;
-    (void)alignment;
-    (void)context;
-    free(memory);
-}
-
-static void TestAllocatorFailureIsCapacity(void)
-{
-    mnavTriangleMesh mesh = {s_floor, 4, s_floorIndices, 2, nullptr};
-    for (int32_t allowed = 0; allowed < 4; ++allowed)
+    // A memory limit too small for the heightfield.
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.allocator = CountingAllocator();
+    def.limits.memoryBytes = 4096;
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_errorLimit, "memory past the limit");
+    CHECK(s_held == 0, "nothing held after the memory limit");
+    // Each allocation of the baker and the bake refused in turn.
+    def = mnavDefaultBakeDef();
+    def.allocator = (mnavAllocator){RefusingAlloc, CountingFree, nullptr};
+    mnavResult result = mnav_errorCapacity;
+    int32_t allowed = 0;
+    for (; result == mnav_errorCapacity && allowed < 256; ++allowed)
     {
-        int32_t left = allowed;
-        Bake bake = MakeBake();
-        bake.def.allocator = (mnavAllocator){FailingAlloc, ForwardFree, &left};
-        mnavResult result = Build(&bake, &mesh, 1, 0, 0);
-        CHECK(result == mnav_errorCapacity, "a failed allocation is capacity");
-        CHECK(bake.memory.used == 0, "nothing counted after a failure");
+        s_allowed = allowed;
+        result = Bake(&def, &s_floorMesh, 1, 0, 0, nullptr);
+        mnavDestroyNavmesh(s_navmesh);
+        s_navmesh = nullptr;
+        CHECK(s_held == 0, "nothing held after a refusal");
     }
+    s_allowed = -1;
+    CHECK(result == mnav_success && allowed > 1, "every refusal is capacity, until enough");
 }
 
 static void TestSoupDependsOnlyOnTheTriangleSet(void)
@@ -339,25 +433,26 @@ static void TestSoupDependsOnlyOnTheTriangleSet(void)
         }
         backwardAreas[r] = areas[t];
     }
-    Bake bake = MakeBake();
-    mnavTriangleMesh one = {vertices, SOUP_TRIANGLES * 3, forward, SOUP_TRIANGLES, areas};
-    CHECK(Build(&bake, &one, 1, 0, 0) == mnav_success, "built forward");
-    uint64_t hash = HashField(&bake.field);
-    int32_t spans = bake.field.spanCount;
-    uint64_t peak = bake.memory.peak;
-    Release(&bake);
-    // The same set, reversed and split across two meshes.
-    int32_t half = SOUP_TRIANGLES / 2;
-    mnavTriangleMesh two[2] = {
-        {vertices, SOUP_TRIANGLES * 3, backward, half, backwardAreas},
-        {vertices, SOUP_TRIANGLES * 3, backward + half * 3, SOUP_TRIANGLES - half,
-         backwardAreas + half},
-    };
-    bake = MakeBake();
-    CHECK(Build(&bake, two, 2, 0, 0) == mnav_success, "built backward");
-    CHECK(HashField(&bake.field) == hash, "the same heightfield from the same set");
-    Release(&bake);
-    printf("soup: %d spans, peak %llu bytes\n", spans, (unsigned long long)peak);
+    // Baked exactly, and with the default def's border of 5 cells and
+    // erosion, which leaves no polygon of the soup.
+    const mnavBakeDef defs[2] = {Exact(), mnavDefaultBakeDef()};
+    for (int32_t d = 0; d < 2; ++d)
+    {
+        mnavBakeReport report;
+        const mnavTriangleMesh one = {vertices, SOUP_TRIANGLES * 3, forward, SOUP_TRIANGLES, areas};
+        CHECK(Bake(&defs[d], &one, 1, 0, 0, &report) == mnav_success, "baked forward");
+        uint64_t hash = DrawHash();
+        // The same set, reversed and split across two meshes.
+        int32_t half = SOUP_TRIANGLES / 2;
+        const mnavTriangleMesh two[2] = {
+            {vertices, SOUP_TRIANGLES * 3, backward, half, backwardAreas},
+            {vertices, SOUP_TRIANGLES * 3, backward + half * 3, SOUP_TRIANGLES - half,
+             backwardAreas + half},
+        };
+        CHECK(Bake(&defs[d], two, 2, 0, 0, nullptr) == mnav_success, "baked backward");
+        CHECK(DrawHash() == hash, "the same tile from the same set");
+        printf("soup: %d polygons\n", report.polygons);
+    }
 }
 
 int main(void)
@@ -370,7 +465,8 @@ int main(void)
     TestTriangleOnTheTileEdges();
     TestNeighborTileSeesOnlyItsBorder();
     TestLimitsAreTyped();
-    TestAllocatorFailureIsCapacity();
+    TestMemoryLimitAndRefusedMemory();
     TestSoupDependsOnlyOnTheTriangleSet();
+    mnavDestroyNavmesh(s_navmesh);
     return s_failures == 0 ? 0 : 1;
 }
