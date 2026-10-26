@@ -27,6 +27,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mode=${1:?usage: tools/fuzz.sh targets|build|seeds|run|night OUT ...}
 out=${2:?usage: tools/fuzz.sh targets|build|seeds|run|night OUT ...}
+# The build's log goes beside OUT, which a fresh checkout does not have.
+mkdir -p "$(dirname "$out")"
 
 # The committed seeds of a target, unpacked into a directory. A target
 # without seeds is an error, never an empty start.
