@@ -307,9 +307,30 @@ static mnavResult Seed(mnavMemory* memory, Work* work)
     return result == mnav_success ? Keep(memory, work, 0, high) : result;
 }
 
+// Every raw vertex from at to end, stepping by step, has the neighbor
+// first has and lies on the segment from from to to.
+static void CheckStraight(const Work* work, int32_t at, int32_t end, int32_t step,
+                          const RawVertex* from, const RawVertex* to)
+{
+    int32_t n = work->rawCount;
+    uint32_t neighbor = work->raw[at].neighbor;
+    for (; at != end; at = (at + step) % n)
+    {
+        const RawVertex* v = &work->raw[at];
+        int64_t cross = (int64_t)(to->x - from->x) * (v->z - from->z) -
+                        (int64_t)(to->z - from->z) * (v->x - from->x);
+        MNAV_ASSERT(cross == 0 && v->neighbor == neighbor);
+    }
+}
+
 // The raw vertex farthest from the kept segment at position i, or -1,
 // for walls and area borders; the segment is measured in its lexical
-// direction so the regions on both sides of an edge agree.
+// direction so the regions on both sides of an edge agree. Every other
+// edge has a region of the same area or a border region across, and is
+// straight: a region is a whole layer of row sweeps (region.c), and
+// spans linked along x always share a sweep, so two regions of one area
+// meet only across a row of cells, and a border region only along the
+// tile's side. Simplifying such an edge would keep nothing more.
 static int32_t Farthest(const Work* work, int32_t i, float* distanceOut)
 {
     int32_t n = work->rawCount;
@@ -338,6 +359,10 @@ static int32_t Farthest(const Work* work, int32_t i, float* distanceOut)
                 farthest = at;
             }
         }
+    }
+    else if (MNAV_INVARIANTS)
+    {
+        CheckStraight(work, at, end, step, from, to);
     }
     *distanceOut = distance;
     return farthest;
