@@ -125,9 +125,9 @@ static inline size_t HandTileBytesWith(uint8_t* out, int32_t place, const HandSq
                 HandSide(xs[k], zs[k], xs[(k + 1) % 4], zs[(k + 1) % 4], def.tileCells);
         }
         parts[s] = (mnavDetailPart){s * 4, s * 2, 4, 2};
-        triangles[s * 2] = s == degenerate ? (mnavDetailTriangle){{0, 2, 2}, 0}
-                                           : (mnavDetailTriangle){{0, 1, 2}, 3};
-        triangles[s * 2 + 1] = (mnavDetailTriangle){{0, 2, 3}, 6};
+        triangles[s * 2] =
+            s == degenerate ? (mnavDetailTriangle){{0, 2, 2}} : (mnavDetailTriangle){{0, 1, 2}};
+        triangles[s * 2 + 1] = (mnavDetailTriangle){{0, 2, 3}};
     }
     HandLink(polygons, count);
     mnavPolyMesh mesh = {vertices,         removable,     vertexCount,

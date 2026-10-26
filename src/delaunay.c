@@ -34,7 +34,7 @@ static bool InCircle(const mnavDetailVertex* a, const mnavDetailVertex* b,
 
 static void Write(mnavTriangulation* tr, int32_t t, uint8_t a, uint8_t b, uint8_t c)
 {
-    tr->triangles[t] = (mnavDetailTriangle){{a, b, c}, 0};
+    tr->triangles[t] = (mnavDetailTriangle){{a, b, c}};
     tr->changed[t] = 1;
 }
 

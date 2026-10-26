@@ -2,6 +2,7 @@
 # dependencies stay one-way. tools/check_modules.py enforces it.
 allocator: fpenv
 bytes:
+fields: bytes invariant
 base:
 scalar:
 bake_def: fpenv scalar
@@ -31,7 +32,7 @@ border_vertices: allocator contour planar polymesh triangulate
 height_patch: allocator compact polymesh region
 detail: allocator compact contour delaunay height_patch invariant polymesh region triangulate
 delaunay: invariant
-tile: allocator bytes detail polymesh
+tile: allocator bytes detail fields invariant polymesh
 flight_def: bake_def fpenv scalar
 flight: allocator bake_def flight_def heightfield raster
 flight_tile: allocator bytes flight flight_def

@@ -19,8 +19,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// The header's size in bytes.
-#define MNAV_TILE_HEADER_BYTES 104
+// The header's size in bytes: the magic, the format version, the
+// generation, the fingerprint, the payload's hash and size, and the field
+// count. The fields follow.
+#define MNAV_TILE_HEADER_BYTES 32
 
 // What a tile records beside its meshes: the bake's generation
 // (MNAV_BAKE_GENERATOR), the bake's fingerprint of its input, the tile's place in the grid, and the
