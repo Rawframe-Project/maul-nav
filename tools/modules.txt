@@ -35,7 +35,7 @@ delaunay: invariant
 tile: allocator bytes detail fields invariant polymesh
 flight_def: bake_def fpenv scalar
 flight: allocator bake_def flight_def heightfield raster
-flight_tile: allocator bytes flight flight_def
+flight_tile: allocator bytes fields flight flight_def invariant
 flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def flight_tile fpenv raster
 flight_volume: allocator flight flight_def flight_tile fpenv
 flight_space: flight flight_volume

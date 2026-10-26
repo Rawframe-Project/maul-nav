@@ -27,7 +27,7 @@
 
 // The hash of the test world's four flight tiles' bytes, the same on
 // every platform.
-#define FLIGHT_BYTES_HASH 0x90022157031cac11ull
+#define FLIGHT_BYTES_HASH 0xb591d2b1cd797091ull
 
 // The test world, made beforehand, for WorldHash.
 static mnavTriangleMesh s_world;
@@ -174,25 +174,22 @@ static void TestBakeStageAndQuery(void)
 }
 
 // Whether tile 1 with byte i flipped is refused as it should be: but in
-// the generation, the fingerprint and the place, which any value may hold;
-// as another version in the version; as past the limit, or malformed, in
-// the counts.
+// the generation and the fingerprint, which any value may hold; as
+// another version in the version. The payload's hash covers the rest of
+// the bytes, the place and the fields' tags among them.
 static bool FlipRefused(size_t i, size_t size)
 {
     memcpy(s_bad, s_bytes[1], size);
     s_bad[i] ^= 0x5A;
     bool free = (i >= AT_GENERATOR && i < AT_GENERATOR + 2) ||
-                (i >= AT_FINGERPRINT && i < AT_FINGERPRINT + 8) ||
-                (i >= AT_PLACE && i < AT_PLACE + 8);
-    bool count = i >= AT_NODES && i < AT_NODES + 8;
+                (i >= AT_FINGERPRINT && i < AT_FINGERPRINT + 8);
     bool version = i == 4 || i == 5;
     mnavTileResult r = StageBad(size);
     if (free)
     {
         return r.result == mnav_success;
     }
-    return r.result == (version ? mnav_errorVersion : mnav_errorInvalid) ||
-           (count && r.result == mnav_errorLimit);
+    return r.result == (version ? mnav_errorVersion : mnav_errorInvalid);
 }
 
 static void TestTruncatedAndFlippedBytes(void)
@@ -651,12 +648,162 @@ static void TestBakerRefusals(void)
           "past each limit");
 }
 
+// A field of tile 1: its tag and payload.
+typedef struct Piece
+{
+    char tag[4];
+    const uint8_t* bytes;
+    size_t size;
+} Piece;
+
+static void PutLittle32(uint8_t* at, size_t value)
+{
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        at[k] = (uint8_t)(value >> (8 * k));
+    }
+}
+
+// Writes tile 1's header and the pieces as fields into s_bad, each padded
+// with pad bytes, seals it and stages it.
+static mnavTileResult Fields(const Piece* pieces, int32_t count, uint8_t pad)
+{
+    memcpy(s_bad, s_bytes[1], FIELDS_START);
+    PutLittle32(s_bad + AT_FIELDS, (size_t)count);
+    size_t at = FIELDS_START;
+    for (int32_t k = 0; k < count; ++k)
+    {
+        memcpy(s_bad + at, pieces[k].tag, 4);
+        PutLittle32(s_bad + at + 4, pieces[k].size);
+        memcpy(s_bad + at + 8, pieces[k].bytes, pieces[k].size);
+        at += 8 + pieces[k].size;
+        while (at % 8 != 0)
+        {
+            s_bad[at++] = pad;
+        }
+    }
+    PutLittle32(s_bad + AT_PAYLOAD, at - FIELDS_START);
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_bad + FIELDS_START, (int32_t)(at - FIELDS_START));
+    for (int32_t k = 0; k < 8; ++k)
+    {
+        s_bad[AT_HASH + k] = (uint8_t)(hash >> (8 * k));
+    }
+    return StageBad(at);
+}
+
+static bool Is(mnavTileResult r, mnavResult result, mnavTileSection section)
+{
+    return r.result == result && r.section == section;
+}
+
+static void TestFields(void)
+{
+    // Tile 1's fields, in order of their names.
+    const char* tags[4] = {"FLHT", "LEAF", "NODE", "ROOT"};
+    const mnavTileSection sections[4] = {mnav_tileHeader, mnav_tileFlightLeaves,
+                                         mnav_tileFlightNodes, mnav_tileFlightRoots};
+    const size_t records[4] = {56, 8, 2, 1};
+    Piece pieces[5];
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        size_t length = 0;
+        size_t at = FlightFieldAt(s_bytes[1], tags[k], &length);
+        CHECK(at > 0, "tile 1 has every field");
+        pieces[k] = (Piece){{0}, s_bytes[1] + at, length};
+        memcpy(pieces[k].tag, tags[k], 4);
+    }
+    CHECK(Fields(pieces, 4, 0).result == mnav_success, "reassembled, it loads");
+    // A tag a later version may write.
+    const uint8_t later[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    pieces[4] = (Piece){{'Z', 'O', 'N', 'E'}, later, 8};
+    mnavTileResult r = Fields(pieces, 5, 0);
+    CHECK(r.result == mnav_errorVersion && r.section == mnav_tilePayload && r.index == 4,
+          "an unknown tag");
+    // No FLHT; ROOT before NODE.
+    CHECK(Is(Fields(pieces + 1, 3, 0), mnav_errorInvalid, mnav_tileHeader), "no FLHT");
+    Piece swapped[4] = {pieces[0], pieces[1], pieces[3], pieces[2]};
+    CHECK(Is(Fields(swapped, 4, 0), mnav_errorInvalid, mnav_tileFlightNodes), "NODE after ROOT");
+    // ROOT, a single byte, is padded: a padding byte not 0.
+    CHECK(Is(Fields(pieces, 4, 1), mnav_errorInvalid, mnav_tileFlightRoots),
+          "a padding byte not 0");
+    // Each field a byte short of whole records and a record short, and
+    // present with no bytes; FLHT and ROOT, of fixed length, a record long.
+    static uint8_t longer[TILE_MOST];
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        size_t whole = pieces[k].size;
+        if (records[k] > 1)
+        {
+            pieces[k].size = whole - 1;
+            CHECK(Is(Fields(pieces, 4, 0), mnav_errorInvalid, sections[k]),
+                  "a field a byte short of whole records");
+        }
+        pieces[k].size = whole - records[k];
+        CHECK(Fields(pieces, 4, 0).result == mnav_errorInvalid, "a field a record short");
+        pieces[k].size = 0;
+        CHECK(Is(Fields(pieces, 4, 0), mnav_errorInvalid, sections[k]), "a field of no bytes");
+        pieces[k].size = whole;
+    }
+    // Each field a byte long.
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        Piece whole = pieces[k];
+        CHECK(whole.size < sizeof longer, "room for a byte more");
+        memcpy(longer, whole.bytes, whole.size);
+        longer[whole.size] = 0;
+        pieces[k].bytes = longer;
+        pieces[k].size = whole.size + 1;
+        CHECK(Is(Fields(pieces, 4, 0), mnav_errorInvalid, sections[k]), "a field a byte long");
+        pieces[k] = whole;
+    }
+    for (int32_t k = 0; k < 4; k += 3)
+    {
+        Piece whole = pieces[k];
+        memcpy(longer, whole.bytes, whole.size);
+        memset(longer + whole.size, 0, records[k]);
+        pieces[k].bytes = longer;
+        pieces[k].size = whole.size + records[k];
+        CHECK(Is(Fields(pieces, 4, 0), mnav_errorInvalid, sections[k]),
+              "a fixed field a record long");
+        pieces[k] = whole;
+    }
+    // Every cube empty: no NODE or LEAF, which read as none.
+    const uint8_t empty = 0;
+    const Piece open[2] = {pieces[0], {{'R', 'O', 'O', 'T'}, &empty, 1}};
+    CHECK(Fields(open, 2, 0).result == mnav_success, "open air loads without NODE or LEAF");
+}
+
+static void TestEmptyFieldsAreLeftOut(void)
+{
+    // A tile baked from nothing over no ground: every cube empty, so the
+    // writer leaves NODE and LEAF out.
+    mnavFlightDef def = Def();
+    def.groundBelow = false;
+    mnavFlightBaker* baker = nullptr;
+    CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success, "baker");
+    const mnavBakeInput nothing = {nullptr, 0, nullptr, 0, nullptr, 0, nullptr};
+    size_t size = 0;
+    CHECK(mnavBakeFlightTile(baker, &nothing, 0, 0, nullptr) == mnav_success &&
+              mnavCopyFlightTile(baker, s_bad, TILE_MOST, &size) == mnav_success,
+          "baked");
+    mnavDestroyFlightBaker(baker);
+    size_t length = 0;
+    CHECK(Little32(s_bad + AT_FIELDS) == 2 && FlightFieldAt(s_bad, "NODE", &length) == 0 &&
+              FlightFieldAt(s_bad, "LEAF", &length) == 0,
+          "FLHT and ROOT only");
+    mnavFlightVolume* volume = Volume(&def);
+    CHECK(mnavStageFlightTile(volume, s_bad, size).result == mnav_success, "it loads");
+    mnavDestroyFlightVolume(volume);
+}
+
 int main(void)
 {
     TestDefIsChecked();
     BakeAll();
     TestBakeStageAndQuery();
     TestTruncatedAndFlippedBytes();
+    TestFields();
+    TestEmptyFieldsAreLeftOut();
     TestOtherSettingsAndLimits();
     TestStagingAndRemoval();
     TestRefusedMemory();

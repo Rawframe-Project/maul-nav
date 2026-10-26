@@ -35,7 +35,7 @@
 
 // The hash of every stored byte, so that the data is never changed by
 // accident.
-#define STORED_HASH 0x57dae0a07fbb69a1ull
+#define STORED_HASH 0x1d6d44c523580278ull
 
 // What queries on the stored tiles answer.
 #define GROUND_PATH_HASH  0xc2eb19d847441002ull
