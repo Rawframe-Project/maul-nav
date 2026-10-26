@@ -7,8 +7,9 @@
 // region's own cells, and a lookup outside the patch, as a sample lies
 // within its polygon, which the patch covers with a cell to spare. One is
 // unreached: a vertex of a mixed polygon whose nearest spans round its
-// corner tie, one below and one above it. No scene finds it yet (#88).
-// test_height_patch.c bakes the cases bakes reach.
+// corner tie at two heights, one below and one above it.
+// test_height_patch.c bakes the cases bakes reach, among them a tie of
+// spans at one height in different cells.
 
 #include "allocator.h"
 #include "compact.h"
