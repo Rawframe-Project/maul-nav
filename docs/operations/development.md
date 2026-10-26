@@ -49,12 +49,13 @@ Each target, `test/fuzz_<area>.c`, reads bytes as the library's input: tile and 
 ```sh
 tools/fuzz.sh build out/fuzz                     # every target, Clang 20 with the sanitizers
 tools/fuzz.sh run out/fuzz 300 4                 # each for 300 s from its seeds, 4 at a time
+tools/fuzz.sh seeds out/fuzz                     # every target's seeds, into out/corpus-run/<target>
 tools/fuzz.sh night out/fuzz fuzz_query 600      # one target from out/corpus/fuzz_query and its seeds, merged back
 tools/fuzz.sh targets out/fuzz                   # the targets the build defines, as JSON
-./out/fuzz/fuzz_query out/fuzz-crashes/crash-<hash>
+./out/fuzz/fuzz_query out/fuzz-crashes/fuzz_query/crash-<hash>
 ```
 
-`tools/fuzz.sh` always bounds a run by `-max_total_time`; run long campaigns through the workspace's heavy-job wrapper. To grow a target's committed seeds, pack a merged corpus with `tar -czf test/corpus/fuzz_<area>.tar.gz -C out/corpus/fuzz_<area> .` when its new inputs reach code the seeds do not. A crash becomes a test in the suite of its module, with the smallest input that still fails (`-minimize_crash=1`).
+`tools/fuzz.sh` always bounds a run by `-max_total_time` and runs each target through `tools/fuzz_target.sh`, which writes the log, its seed first, to `out/fuzz-logs/<target>.log`, a finding to `out/fuzz-crashes/<target>/` and, on a finding, its report without the input to `out/fuzz-reports/<target>.txt`; run long campaigns through the workspace's heavy-job wrapper. To grow a target's committed seeds, pack a merged corpus with `tar -czf test/corpus/fuzz_<area>.tar.gz -C out/corpus/fuzz_<area> .` when its new inputs reach code the seeds do not. A crash becomes a test in the suite of its module, with the smallest input that still fails (`-minimize_crash=1`).
 
 ## The differential harness
 
@@ -94,7 +95,7 @@ perf stat -e instructions:u out/linux-gcc-14/maul-nav_bench --count flight-paths
 ## Debugging a failure
 
 - **A red CI cell.** A failed test cell uploads its ctest logs as `logs-<preset>` for a week (`gh run download <run> -n logs-<preset>`); the `web` job's are `logs-web-emscripten` and the large scenes' `logs-nightly`. A fuzz job that finds something uploads `fuzz` (or `fuzz-<target>` at night): the logs and the input that failed. The same preset reproduces a cell here: `cmake --preset <preset> && cmake --build --preset <preset> && ctest --preset <preset> -L <suite> --output-on-failure`.
-- **A fuzz finding.** The target run on the one input replays it and stops: `./out/fuzz/fuzz_query out/fuzz-crashes/crash-<hash>`. `-minimize_crash=1 -max_total_time=60` shrinks it before it becomes a test in its module's suite.
+- **A fuzz finding.** The target run on the one input replays it and stops: `./out/fuzz/fuzz_query out/fuzz-crashes/fuzz_query/crash-<hash>`. `-minimize_crash=1 -max_total_time=60` shrinks it before it becomes a test in its module's suite.
 - **A broken assertion.** `MNAV_ASSERT` traps where the check fails. On x86-64 the trap is `ud2`, a SIGILL, and in the sanitizer presets `ASAN_OPTIONS=handle_sigill=1 out/linux-clang-20-asan/test_<suite>` prints its stack with file and line. On AArch64 it is `brk`, a SIGTRAP, which that option does not cover; there a debugger stops at the check.
 - **A golden that differs under one host floating-point setting.** `EveryFloatHost` (`test/float_hosts.h`) prints `float host <i>` with the hash it got, and `the setting changed` when a call left the host's setting changed. On x86-64 and AArch64, host `i` is rounding mode `i / 2` (to nearest, downward, upward, toward zero), with flush-to-zero and denormals-are-zero on when `i` is odd; elsewhere it is rounding mode `i`. A public call that computes outside its entry, or host code that runs inside one, is the usual cause.
 - **A moved golden.** Each suite prints the hash it got (`LEVEL_TILE_HASH=...`), so the commit that moved it is found by building commits and comparing. A moved bake golden with unmoved query goldens is a bake change, and a moved golden on `test/stored_tiles.h` is a query change. `FIELD_HASH` and `GROUP_HASH` use no navmesh, so a bake leaves them alone.

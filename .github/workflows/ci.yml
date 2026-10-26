@@ -37,7 +37,7 @@ env:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@23883e3610442d449485b0a5ec5192709efbc33c # v0.0.23
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@56543e92d01e59abdb4299c4824a0c1facdc08ce # v0.0.25
     permissions:
       pull-requests: read
 
@@ -52,10 +52,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Rawframe-Project/.github/.github/actions/docs-check@23883e3610442d449485b0a5ec5192709efbc33c # v0.0.23
+      - uses: Rawframe-Project/.github/.github/actions/docs-check@56543e92d01e59abdb4299c4824a0c1facdc08ce # v0.0.25
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@23883e3610442d449485b0a5ec5192709efbc33c # v0.0.23
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@56543e92d01e59abdb4299c4824a0c1facdc08ce # v0.0.25
     permissions:
       contents: read
 
@@ -138,7 +138,7 @@ jobs:
           - { preset: linux-arm64-gcc-14, runner: ubuntu-24.04-arm }
           - { preset: macos-clang, runner: macos-15 }
           - { preset: windows-clang-cl, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@23883e3610442d449485b0a5ec5192709efbc33c # v0.0.23
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@56543e92d01e59abdb4299c4824a0c1facdc08ce # v0.0.25
     permissions:
       contents: read
     with:
@@ -205,7 +205,10 @@ jobs:
         run: stat -c '%s bytes' out/web-emscripten/libmaul-nav.a
 
   # Every fuzz target from its committed seeds, four at a time, briefly: on
-  # pull requests and on main. The night's long run is fuzz-night.
+  # pull requests and on main. The night's long run is fuzz-night. Each
+  # target runs through tools/fuzz_target.sh, which keeps its log and any
+  # finding on the runner and prints a finding's report without its input;
+  # nothing is uploaded.
   fuzz:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -222,18 +225,19 @@ jobs:
           persist-credentials: false
       - name: Build
         run: tools/fuzz.sh build out/fuzz
+      - name: Seeds
+        run: tools/fuzz.sh seeds out/fuzz
       - name: Run
-        run: tools/fuzz.sh run out/fuzz "$FUZZ_SECONDS" 4
-      - name: Fuzz logs and crash inputs
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: fuzz
-          path: |
-            out/fuzz-logs/
-            out/fuzz-crashes/
-          if-no-files-found: ignore
-          retention-days: 7
+        # The step pattern of tools/fuzz_target.sh: the reports cleared, the
+        # targets' status kept, and every report printed once they finish.
+        run: |
+          rm -rf out/fuzz-reports
+          status=0
+          printf '%s\n' out/fuzz/fuzz_* |
+            xargs -P 4 -I {} sh -c 'tools/fuzz_target.sh "$1" -max_total_time="$FUZZ_SECONDS" -timeout=30 "out/corpus-run/${1##*/}"' _ {} ||
+            status=$?
+          cat out/fuzz-reports/*.txt 2>/dev/null || true
+          exit "$status"
 
   # The fuzz targets the build defines, so that a new one runs at night
   # without a list to keep.
@@ -259,7 +263,7 @@ jobs:
 
   # Every night, each target alone for ten minutes, from the corpus the last
   # night left in its cache and the committed seeds; the merged corpus is
-  # saved for the next night.
+  # saved for the next night when the target found nothing.
   fuzz-night:
     needs: fuzz-targets
     strategy:
@@ -276,6 +280,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Restore the corpus
+        if: github.event_name != 'pull_request'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
@@ -289,22 +294,12 @@ jobs:
           # A scheduled run has no inputs, so it takes the full 600.
           FUZZ_SECONDS: ${{ inputs.fuzz-seconds || 600 }}
         run: tools/fuzz.sh night out/fuzz "$TARGET" "$FUZZ_SECONDS"
+      # Only a run that found nothing saves its corpus.
       - name: Save the corpus
-        if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
           key: corpus-${{ matrix.target }}-${{ github.run_id }}
-      - name: Fuzz log and crash inputs
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: fuzz-${{ matrix.target }}
-          path: |
-            out/fuzz-logs/
-            out/fuzz-crashes/
-          if-no-files-found: ignore
-          retention-days: 7
 
   # Every night, what the pull request check leaves out: the large scenes
   # (the 1,000-agent doorway crowd, with its golden value), and the suites'

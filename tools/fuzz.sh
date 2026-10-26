@@ -8,6 +8,8 @@
 #                                             as a JSON array (configures OUT)
 #   tools/fuzz.sh build OUT                   the targets, with Clang 20 and
 #                                             the sanitizers, into OUT
+#   tools/fuzz.sh seeds OUT                   every target's committed seeds,
+#                                             into out/corpus-run/TARGET
 #   tools/fuzz.sh run OUT SECONDS JOBS        every target for SECONDS from
 #                                             its committed seeds, JOBS at once
 #   tools/fuzz.sh night OUT TARGET SECONDS    one target for SECONDS from
@@ -15,14 +17,16 @@
 #                                             the corpus merged back there
 #
 # A target's seeds are test/corpus/TARGET.tar.gz, which must exist; fuzz_tile
-# also gets test_tile --seed's tile. Logs go to out/fuzz-logs, the inputs that
-# failed to out/fuzz-crashes. Every run is bounded by -max_total_time.
+# also gets test_tile --seed's tile. Every run goes through
+# tools/fuzz_target.sh, bounded by -max_total_time: it keeps the log in
+# out/fuzz-logs and a finding in out/fuzz-crashes, and reports a finding
+# without its input. CI's fuzz job runs the targets as run does, step by
+# step.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-mode=${1:?usage: tools/fuzz.sh targets|build|run|night OUT ...}
-out=${2:?usage: tools/fuzz.sh targets|build|run|night OUT ...}
-mkdir -p out/fuzz-logs out/fuzz-crashes
+mode=${1:?usage: tools/fuzz.sh targets|build|seeds|run|night OUT ...}
+out=${2:?usage: tools/fuzz.sh targets|build|seeds|run|night OUT ...}
 
 # The committed seeds of a target, unpacked into a directory. A target
 # without seeds is an error, never an empty start.
@@ -40,18 +44,30 @@ seeds() { # target directory
 }
 
 # One target for some seconds over corpus directories, new inputs written
-# to the first; its log is printed when it finds something.
+# to the first; a finding leaves its report in out/fuzz-reports.
 fuzz() { # target seconds corpus...
-    local target=$1 seconds=$2 log=out/fuzz-logs/$1.log
+    local target=$1 seconds=$2
     shift 2
-    if "$out/$target" -max_total_time="$seconds" -timeout=30 -artifact_prefix=out/fuzz-crashes/ \
-        "$@" >"$log" 2>&1; then
-        echo "$target: no finding in $seconds s"
-    else
-        tail -n 60 "$log"
-        echo "::error::$target found something"
-        return 1
-    fi
+    tools/fuzz_target.sh "$out/$target" -max_total_time="$seconds" -timeout=30 "$@"
+}
+
+# Every built target, or an error when none was built.
+built() {
+    targets=("$out"/fuzz_*)
+    [ -x "${targets[0]}" ] || {
+        echo "::error::no fuzz target was built"
+        exit 1
+    }
+}
+
+# Every built target's seeds, into out/corpus-run/TARGET.
+seed_all() {
+    local target name
+    for target in "${targets[@]}"; do
+        name=$(basename "$target")
+        rm -rf "out/corpus-run/$name"
+        seeds "$name" "out/corpus-run/$name"
+    done
 }
 
 # Configures the fuzz build and lists the targets it defines, one a line, as
@@ -81,25 +97,28 @@ build)
     # shellcheck disable=SC2086
     cmake --build "$out" --target $targets test_tile >>"$out.log"
     ;;
+seeds)
+    built
+    seed_all
+    ;;
 run)
     seconds=${3:?seconds}
     jobs=${4:?jobs}
-    targets=("$out"/fuzz_*)
-    [ -x "${targets[0]}" ] || {
-        echo "::error::no fuzz target was built"
-        exit 1
-    }
+    built
     echo "${#targets[@]} targets, $seconds s each, $jobs at once"
-    run_one() {
-        local name
-        name=$(basename "$1")
-        rm -rf "out/corpus-run/$name"
-        seeds "$name" "out/corpus-run/$name" || return 1
-        fuzz "$name" "$seconds" "out/corpus-run/$name"
-    }
-    export -f run_one seeds fuzz
+    seed_all
+    # The step pattern of tools/fuzz_target.sh: the reports cleared, the
+    # targets' status kept, and every report printed once they finish.
+    rm -rf out/fuzz-reports
+    status=0
     export out seconds
-    printf '%s\n' "${targets[@]}" | xargs -P "$jobs" -I {} bash -c 'run_one "$1"' _ {}
+    export -f fuzz
+    # shellcheck disable=SC2016
+    printf '%s\n' "${targets[@]}" |
+        xargs -P "$jobs" -I {} bash -c 'fuzz "$(basename "$1")" "$seconds" "out/corpus-run/$(basename "$1")"' _ {} ||
+        status=$?
+    cat out/fuzz-reports/*.txt 2>/dev/null || true
+    exit "$status"
     ;;
 night)
     target=${3:?target}
@@ -121,22 +140,32 @@ night)
     mkdir -p "$corpus"
     seeds "$target" "out/seeds/$target"
     status=0
+    rm -rf out/fuzz-reports
     # The seeds are a second corpus, so a night without a cached corpus
     # still starts from them; new inputs go to the first.
     fuzz "$target" "$seconds" "$corpus" "out/seeds/$target" || status=1
+    cat out/fuzz-reports/*.txt 2>/dev/null || true
     # The merge keeps the inputs that reach new code, from the last nights'
     # corpus and the seeds, so the corpus never falls below the seeds.
     rm -rf "out/merged/$target"
     mkdir -p "out/merged/$target"
+    # The merge runs every input again, so a crash there dumps one into
+    # its log: the log stays on the machine, and a failure prints only
+    # the target and the exit status.
+    merge=0
     "$out/$target" -merge=1 "out/merged/$target" "$corpus" "out/seeds/$target" \
-        >"out/fuzz-logs/$target.merge.log" 2>&1
+        >"out/fuzz-logs/$target.merge.log" 2>&1 || merge=$?
+    if [ "$merge" -ne 0 ]; then
+        echo "::error::$target: the corpus merge exited with status $merge"
+        exit 1
+    fi
     rm -rf "$corpus"
     mv "out/merged/$target" "$corpus"
     echo "$target: corpus of $(find "$corpus" -type f | wc -l) inputs"
     exit $status
     ;;
 *)
-    echo "usage: tools/fuzz.sh targets|build|run|night OUT ..." >&2
+    echo "usage: tools/fuzz.sh targets|build|seeds|run|night OUT ..." >&2
     exit 2
     ;;
 esac
