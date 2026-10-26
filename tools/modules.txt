@@ -46,8 +46,8 @@ fingerprint: bytes outline raster terrain tile_index
 bake_input: input terrain volume
 baker: allocator bake_def bake_input border_vertices bytes compact contour detail erode field_pack filter fingerprint fpenv heightfield holes input outline polymesh raster region terrain tile tile_cache tile_index volume
 tile_cache: allocator compact field_pack fpenv outline raster
-field_pack: allocator compact lz raster
-lz:
+field_pack: allocator compact invariant lz raster
+lz: invariant
 navmesh: allocator bake_def detail fpenv polymesh tile
 nearest: detail fpenv navmesh polymesh query_filter raster
 path: allocator fpenv funnel navmesh offmesh polymesh query query_filter raster
