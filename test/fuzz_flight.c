@@ -80,9 +80,9 @@ static void Load(const uint8_t* data, size_t size)
     if (size >= MNAV_FLIGHT_HEADER_BYTES)
     {
         size_t payload = size - MNAV_FLIGHT_HEADER_BYTES;
-        mnavByteWriter w = {bytes + 32};
+        mnavByteWriter w = {bytes + 24};
         mnavPutU32(&w, payload);
-        w.at = bytes + 24;
+        w.at = bytes + 16;
         mnavPutU64(&w,
                    mnavHash64(MNAV_HASH_INIT, bytes + MNAV_FLIGHT_HEADER_BYTES, (int32_t)payload));
     }
@@ -101,8 +101,8 @@ static void Load(const uint8_t* data, size_t size)
         Expect(mnavEncodeFlightTile(&memory, &def, fingerprint, &tile, &again, &againSize) ==
                mnav_success);
         // The loader reads any generation; the encoder writes this one's.
-        Expect(againSize == size && memcmp(again, bytes, 8) == 0 &&
-               memcmp(again + 10, bytes + 10, size - 10) == 0);
+        Expect(againSize == size && memcmp(again, bytes, 6) == 0 &&
+               memcmp(again + 8, bytes + 8, size - 8) == 0);
         mnavReleaseFlightTileBytes(&memory, again, againSize);
         mnavReleaseFlightTile(&memory, &tile);
     }

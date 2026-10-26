@@ -285,11 +285,11 @@ static void Rehash(size_t size)
 static void TestPayloadStructure(void)
 {
     size_t size = s_sizes[1];
-    size_t roots = MNAV_FLIGHT_HEADER_BYTES;
-    size_t nodes = roots + 1;
-    mnavByteReader r = {s_bytes[1] + AT_NODES, 8, false};
-    size_t nodeCount = (size_t)mnavGetU32(&r);
-    size_t leaves = nodes + 2 * nodeCount;
+    size_t length = 0;
+    size_t roots = FlightFieldAt(s_bytes[1], "ROOT", &length);
+    size_t nodes = FlightFieldAt(s_bytes[1], "NODE", &length);
+    size_t leaves = FlightFieldAt(s_bytes[1], "LEAF", &length);
+    CHECK(roots > 0 && nodes > 0 && leaves > 0, "tile 1 has every field");
     const struct
     {
         size_t at;
@@ -341,15 +341,17 @@ static void TestPayloadStructure(void)
     Rehash(size);
     got = StageBad(size);
     wrong += got.section == mnav_tileFlightNodes && got.index == 0 ? 0 : 1;
-    // A spare leaf: one more declared and stored than the octree uses.
-    memcpy(s_bad, s_bytes[1], size);
-    mnavByteReader leafCount = {s_bytes[1] + AT_NODES + 4, 4, false};
-    mnavByteWriter w = {s_bad + AT_NODES + 4};
-    mnavPutU32(&w, mnavGetU32(&leafCount) + 1);
-    w.at = s_bad + 32;
-    mnavPutU32(&w, size + 8 - MNAV_FLIGHT_HEADER_BYTES);
-    w.at = s_bad + size;
+    // A spare leaf: one more stored than the octree uses, at the end of
+    // LEAF, whose length grows by it.
+    size_t end = leaves + length;
+    memcpy(s_bad, s_bytes[1], end);
+    memcpy(s_bad + end + 8, s_bytes[1] + end, size - end);
+    mnavByteWriter w = {s_bad + end};
     mnavPutU64(&w, 1);
+    w.at = s_bad + leaves - 4;
+    mnavPutU32(&w, length + 8);
+    w.at = s_bad + AT_PAYLOAD;
+    mnavPutU32(&w, size + 8 - MNAV_FLIGHT_HEADER_BYTES);
     Rehash(size + 8);
     got = StageBad(size + 8);
     wrong += got.section == mnav_tileFlightLeaves && got.index == -1 ? 0 : 1;

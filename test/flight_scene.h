@@ -19,16 +19,41 @@
 #include <stdio.h>
 #include <string.h>
 
-// Where the header keeps its fields.
+// Where the header keeps its values, and where the fields start.
 enum
 {
-    AT_GENERATOR = 8,
-    AT_FINGERPRINT = 16,
-    AT_HASH = 24,
-    AT_PLACE = 36,
-    AT_NODES = 96,
+    AT_GENERATOR = 6,
+    AT_FINGERPRINT = 8,
+    AT_HASH = 16,
+    AT_PAYLOAD = 24,
+    AT_FIELDS = 28,
+    FIELDS_START = 32,
     TILE_MOST = 1 << 20
 };
+
+static inline uint32_t Little32(const uint8_t* at)
+{
+    return (uint32_t)at[0] | (uint32_t)at[1] << 8 | (uint32_t)at[2] << 16 | (uint32_t)at[3] << 24;
+}
+
+// Where the field of a tag starts its payload in a well-formed tile, and
+// its length; 0 for both when the tile has none.
+static inline size_t FlightFieldAt(const uint8_t* bytes, const char tag[4], size_t* length)
+{
+    size_t at = FIELDS_START;
+    for (uint32_t k = Little32(bytes + AT_FIELDS); k > 0; --k)
+    {
+        size_t size = Little32(bytes + at + 4);
+        if (memcmp(bytes + at, tag, 4) == 0)
+        {
+            *length = size;
+            return at + 8;
+        }
+        at += 8 + (size + 7) / 8 * 8;
+    }
+    *length = 0;
+    return 0;
+}
 
 static uint8_t s_bytes[4][TILE_MOST];
 static size_t s_sizes[4];

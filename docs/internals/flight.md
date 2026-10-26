@@ -29,9 +29,18 @@ Per 32 m tile with a 0.5 m flier: 6.4 KB on a debris field of boxes floating up 
 
 ## The format and loading
 
-Magic `MNVF` and a format version of its own (`MNAV_FLIGHT_FORMAT`), little-endian. A 104-byte header holds the generator, flags, the fingerprint, the payload's hash and size, the place, the settings' bits and the node and leaf counts. The payload is a class byte per cube, a 16-bit mask per node and a 64-bit word per leaf; child and root indices are not stored, and the loader rebuilds them.
+A flight tile is an asset format in the family's sense, as the ground tile is ([bake.md](bake.md#the-tile-format)), with the same header and fields: magic `MNVF` and a format version of its own (`MNAV_FLIGHT_FORMAT`), little-endian, aligned to 8 bytes. The 32-byte header holds the generator, the fingerprint, the payload's hash and size, and the number of fields, which follow in increasing order of their names:
 
-The loader reads every byte as hostile: counts against the def's limits before allocating, the payload's hash, the settings against the volume's def, and the canonical form (classes up to mixed, masks with no child both mixed and solid and never all empty or all solid, leaves neither empty nor full, every count used exactly). A tile has one canonical encoding, so two bakes of the same space are the same bytes, and a tile that is not canonical is refused, naming the section and element.
+| Tag | Holds | Record | When absent |
+|---|---|---|---|
+| `FLHT` | the place, the side in voxels, whether the ground below is solid, the voxel size, radius, floor and ceiling as binary32 bits, the origin as binary64 bits, the floor voxel | 56 bytes | required |
+| `LEAF` | a 64-bit word per leaf | 8 bytes | none |
+| `NODE` | a 16-bit mask per node | 2 bytes | none |
+| `ROOT` | a class byte per cube, as many as the def's shape has | 1 byte | required |
+
+Child and root indices are not stored, and the loader rebuilds them; the counts are the fields' lengths. A space with no mixed cube has no nodes or leaves, and the writer leaves `NODE` and `LEAF` out.
+
+The loader reads every byte as hostile: the payload's hash, the fields as the ground tile's are read (a tag this version does not know is `mnav_errorVersion`), counts against the def's limits before allocating, `FLHT`'s settings against the volume's def, and the canonical form (classes up to mixed, masks with no child both mixed and solid and never all empty or all solid, leaves neither empty nor full, every count used exactly). A tile has one canonical encoding, so two bakes of the same space are the same bytes, and a tile that is not canonical is refused, naming the section and element.
 
 ## The search
 

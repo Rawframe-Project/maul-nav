@@ -25,12 +25,12 @@ extern "C"
 #endif
 
 // The flight tile format's version, written into every flight tile.
-#define MNAV_FLIGHT_FORMAT 2
+#define MNAV_FLIGHT_FORMAT 3
 
 // The flight bake's generation, written into every flight tile and hashed
 // into its fingerprint: it rises with any change to the library that gives
 // other flight tile bytes for the same def and input, and only then.
-#define MNAV_FLIGHT_GENERATOR 1
+#define MNAV_FLIGHT_GENERATOR 2
 
 // The range of a flight tile's side, in voxels: 4 times a power of 2.
 #define MNAV_MIN_FLIGHT_TILE_VOXELS 16

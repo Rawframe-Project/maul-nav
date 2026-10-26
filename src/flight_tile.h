@@ -19,13 +19,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// The header's size in bytes.
-#define MNAV_FLIGHT_HEADER_BYTES 104
+// The header's size in bytes: the magic, the format version, the
+// generation, the fingerprint, the payload's hash and size, and the field
+// count. The fields follow.
+#define MNAV_FLIGHT_HEADER_BYTES 32
 
 // Writes a tile baked with def, its generator's version and fingerprint,
 // into bytes allocated from memory, which mnavReleaseFlightTileBytes
-// frees. The payload is a class byte per cube, a mask per node and a word
-// per leaf; child and root indices are not stored.
+// frees. The fields are FLHT's settings, a class byte per cube, a mask
+// per node and a word per leaf; child and root indices are not stored.
 mnavResult mnavEncodeFlightTile(mnavMemory* memory, const mnavFlightDef* def, uint64_t fingerprint,
                                 const mnavFlightTile* tile, uint8_t** bytes, size_t* size);
 
