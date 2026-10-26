@@ -55,7 +55,7 @@ tools/fuzz.sh targets out/fuzz                   # the targets the build defines
 ./out/fuzz/fuzz_query out/fuzz-crashes/fuzz_query/crash-<hash>
 ```
 
-`tools/fuzz.sh` always bounds a run by `-max_total_time` and runs each target through `tools/fuzz_target.sh`, which writes the log, its seed first, to `out/fuzz-logs/<target>.log`, a finding to `out/fuzz-crashes/<target>/` and, on a finding, its report without the input to `out/fuzz-reports/<target>.txt`; run long campaigns through the workspace's heavy-job wrapper. To grow a target's committed seeds, pack a merged corpus with `tar -czf test/corpus/fuzz_<area>.tar.gz -C out/corpus/fuzz_<area> .` when its new inputs reach code the seeds do not. A crash becomes a test in the suite of its module, with the smallest input that still fails (`-minimize_crash=1`).
+`tools/fuzz.sh` always bounds a run by `-max_total_time` and runs each target through `tools/fuzz_target.sh`, which writes the log, its seed first, to `out/fuzz-logs/<target>.log`, a finding to `out/fuzz-crashes/<target>/` and, on a finding, its report without the input to `out/fuzz-reports/<target>.txt`; run long campaigns through the workspace's heavy-job wrapper. A corpus is merged with `tools/fuzz_target.sh --merge TARGET MERGED INPUT_DIR...`, which keeps the merge's log there too and fails when an input crashes. To grow a target's committed seeds, pack a merged corpus with `tar -czf test/corpus/fuzz_<area>.tar.gz -C out/corpus/fuzz_<area> .` when its new inputs reach code the seeds do not. A crash becomes a test in the suite of its module, with the smallest input that still fails (`-minimize_crash=1`).
 
 ## The differential harness
 

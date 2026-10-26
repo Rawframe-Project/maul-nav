@@ -149,16 +149,12 @@ night)
     cat out/fuzz-reports/*.txt 2>/dev/null || true
     # The merge keeps the inputs that reach new code, from the last nights'
     # corpus and the seeds, so the corpus never falls below the seeds.
+    # The merge runs every input again; fuzz_target.sh keeps its log on
+    # the machine and fails, with a report like a run's, when an input
+    # crashed, so that corpus is not saved.
     rm -rf "out/merged/$target"
-    mkdir -p "out/merged/$target"
-    # The merge runs every input again, so a crash there dumps one into
-    # its log: the log stays on the machine, and a failure prints only
-    # the target and the exit status.
-    merge=0
-    "$out/$target" -merge=1 "out/merged/$target" "$corpus" "out/seeds/$target" \
-        >"out/fuzz-logs/$target.merge.log" 2>&1 || merge=$?
-    if [ "$merge" -ne 0 ]; then
-        echo "::error::$target: the corpus merge exited with status $merge"
+    if ! tools/fuzz_target.sh --merge "$out/$target" "out/merged/$target" "$corpus" "out/seeds/$target"; then
+        cat "out/fuzz-reports/$target.txt" 2>/dev/null || true
         exit 1
     fi
     rm -rf "$corpus"
