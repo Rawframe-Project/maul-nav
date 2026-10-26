@@ -18,6 +18,7 @@
 #include "allocator.h"
 #include "bake_tile.h"
 #include "detail.h"
+#include "fields.h"
 #include "float_hosts.h"
 #include "fpenv.h"
 #include "polymesh.h"
@@ -33,24 +34,29 @@
 #include <string.h>
 
 // The hash of the level tile's bytes, the same on every platform.
-#define LEVEL_TILE_HASH 0x772aa4da964f4edaull
+#define LEVEL_TILE_HASH 0xe2c0ed6096ea1fc6ull
 
-// Offsets into the header.
+// Offsets into the header and into the TILE field's payload.
 enum
 {
     FORMAT_AT = 4,
-    HEADER_BYTES_AT = 6,
-    FLAGS_AT = 14,
-    HASH_AT = 24,
-    PAYLOAD_AT = 32,
-    TILE_CELLS_AT = 44,
-    CELL_SIZE_AT = 48,
-    ORIGIN_AT = 64,
-    VERTICES_AT = 88,
-    DETAIL_TRIANGLES_AT = 96,
+    HASH_AT = 16,
+    PAYLOAD_AT = 24,
+    FIELDS_AT = 28,
+    INFO_CELLS_AT = 8,
+    INFO_CELL_SIZE_AT = 16,
+    INFO_ORIGIN_AT = 24,
     // The offset cell height of a hand tile's floor.
-    BASE = 32768
+    BASE = 32768,
+    MOST_PIECES = 8
 };
+
+#define TAG_PARTS     MNAV_TAG('D', 'P', 'R', 'T')
+#define TAG_TRIANGLES MNAV_TAG('D', 'T', 'R', 'I')
+#define TAG_EXTRA     MNAV_TAG('D', 'V', 'R', 'T')
+#define TAG_POLYGONS  MNAV_TAG('P', 'O', 'L', 'Y')
+#define TAG_INFO      MNAV_TAG('T', 'I', 'L', 'E')
+#define TAG_VERTICES  MNAV_TAG('V', 'E', 'R', 'T')
 
 static void PutLittle(uint8_t* at, uint64_t value, int32_t bytes)
 {
@@ -58,6 +64,16 @@ static void PutLittle(uint8_t* at, uint64_t value, int32_t bytes)
     {
         at[k] = (uint8_t)(value >> (8 * k));
     }
+}
+
+static uint64_t GetLittle(const uint8_t* at, int32_t bytes)
+{
+    uint64_t value = 0;
+    for (int32_t k = 0; k < bytes; ++k)
+    {
+        value |= (uint64_t)at[k] << (8 * k);
+    }
+    return value;
 }
 
 // Sets the header's payload size and hash to match the bytes, so a change
@@ -68,6 +84,66 @@ static void Reseal(uint8_t* bytes, size_t size)
     PutLittle(bytes + PAYLOAD_AT, payload, 4);
     PutLittle(bytes + HASH_AT,
               mnavHash64(MNAV_HASH_INIT, bytes + MNAV_TILE_HEADER_BYTES, (int32_t)payload), 8);
+}
+
+// A field of a well-formed tile: its tag and payload.
+typedef struct Piece
+{
+    uint32_t tag;
+    const uint8_t* bytes;
+    size_t size;
+} Piece;
+
+// The fields of well-formed bytes, in order; returns their number.
+static int32_t Pieces(const uint8_t* bytes, Piece pieces[MOST_PIECES])
+{
+    int32_t count = (int32_t)GetLittle(bytes + FIELDS_AT, 4);
+    size_t at = MNAV_TILE_HEADER_BYTES;
+    for (int32_t k = 0; k < count && k < MOST_PIECES; ++k)
+    {
+        size_t size = (size_t)GetLittle(bytes + at + 4, 4);
+        pieces[k] = (Piece){(uint32_t)GetLittle(bytes + at, 4), bytes + at + 8, size};
+        at += 8 + (size + 7) / 8 * 8;
+    }
+    return count;
+}
+
+// The offset of a field's payload in well-formed bytes, or 0.
+static size_t FieldAt(const uint8_t* bytes, uint32_t tag)
+{
+    Piece pieces[MOST_PIECES];
+    int32_t count = Pieces(bytes, pieces);
+    for (int32_t k = 0; k < count; ++k)
+    {
+        if (pieces[k].tag == tag)
+        {
+            return (size_t)(pieces[k].bytes - bytes);
+        }
+    }
+    return 0;
+}
+
+// Writes the header of header and the pieces as fields into out, each
+// padded with pad bytes, and seals it; returns its size.
+static size_t Assemble(const uint8_t* header, const Piece* pieces, int32_t count, uint8_t pad,
+                       uint8_t* out)
+{
+    memcpy(out, header, MNAV_TILE_HEADER_BYTES);
+    PutLittle(out + FIELDS_AT, (uint64_t)count, 4);
+    size_t at = MNAV_TILE_HEADER_BYTES;
+    for (int32_t k = 0; k < count; ++k)
+    {
+        PutLittle(out + at, pieces[k].tag, 4);
+        PutLittle(out + at + 4, pieces[k].size, 4);
+        memcpy(out + at + 8, pieces[k].bytes, pieces[k].size);
+        at += 8 + pieces[k].size;
+        while (at % 8 != 0)
+        {
+            out[at++] = pad;
+        }
+    }
+    Reseal(out, at);
+    return at;
 }
 
 typedef struct Fixture
@@ -325,7 +401,7 @@ static void TestEveryByteChangeIsRefusedOrCanonical(void)
 // The offset of polygon p's record in the tile's bytes.
 static size_t PolygonAt(const Fixture* f, int32_t p)
 {
-    size_t at = MNAV_TILE_HEADER_BYTES + (size_t)f->baked.mesh.vertexCount * 6;
+    size_t at = FieldAt(f->bytes, TAG_POLYGONS);
     for (int32_t q = 0; q < p; ++q)
     {
         at += 2 + (size_t)f->baked.mesh.polygons[q].count * 5;
@@ -359,21 +435,22 @@ static void TestHeaderRefusals(void)
     CHECK(Is(Changed(&f, FORMAT_AT, MNAV_TILE_FORMAT + 1, 2, true), mnav_errorVersion,
              mnav_tileHeader),
           "another format version");
-    CHECK(Is(Changed(&f, HEADER_BYTES_AT, 108, 2, true), mnav_errorInvalid, mnav_tileHeader),
-          "header size");
-    CHECK(Is(Changed(&f, FLAGS_AT, 1, 2, true), mnav_errorInvalid, mnav_tileHeader), "flags");
-    CHECK(Is(Changed(&f, TILE_CELLS_AT, 8, 2, true), mnav_errorInvalid, mnav_tileHeader),
+    size_t info = FieldAt(f.bytes, TAG_INFO);
+    CHECK(Is(Changed(&f, info + INFO_CELLS_AT, 8, 2, true), mnav_errorInvalid, mnav_tileHeader),
           "tile cells");
-    CHECK(Is(Changed(&f, CELL_SIZE_AT, 0x7FC00000u, 4, true), mnav_errorInvalid, mnav_tileHeader),
+    CHECK(Is(Changed(&f, info + INFO_CELL_SIZE_AT, 0x7FC00000u, 4, true), mnav_errorInvalid,
+             mnav_tileHeader),
           "NaN cell size");
-    CHECK(Is(Changed(&f, ORIGIN_AT, 0x7FF0000000000000ull, 8, true), mnav_errorInvalid,
+    CHECK(Is(Changed(&f, info + INFO_ORIGIN_AT, 0x7FF0000000000000ull, 8, true), mnav_errorInvalid,
              mnav_tileHeader),
           "infinite origin");
     CHECK(Is(Changed(&f, HASH_AT, 0, 8, false), mnav_errorInvalid, mnav_tilePayload), "hash");
     CHECK(Is(Changed(&f, PAYLOAD_AT, f.size, 4, false), mnav_errorInvalid, mnav_tilePayload),
           "payload size");
-    CHECK(Is(Changed(&f, VERTICES_AT, 60000, 2, true), mnav_errorInvalid, mnav_tilePayload),
-          "counts past the payload");
+    CHECK(Is(Changed(&f, FIELDS_AT, 7, 4, true), mnav_errorInvalid, mnav_tilePayload),
+          "more fields than the payload holds");
+    CHECK(Is(Changed(&f, FIELDS_AT, 5, 4, true), mnav_errorInvalid, mnav_tilePayload),
+          "bytes past the fields counted");
     CHECK(mnavDecodeTile(&f.memory, nullptr, 0, &(mnavTileInfo){0}, &(mnavPolyMesh){0},
                          &(mnavDetailMesh){0})
                   .result == mnav_errorInvalid,
@@ -433,23 +510,16 @@ static void TestMeshRefusals(void)
     PutLittle(copy + first + 5, polygon->vertices[0], 2);
     Reseal(copy, f.size);
     CHECK(Is(Load(&f.memory, copy, f.size), mnav_errorInvalid, mnav_tilePolygons), "not convex");
-    // The first detail part: one more vertex than the header counts, and a
+    // The first detail part: one more vertex than DVRT holds, and a
     // corner past its part.
-    size_t parts = PolygonAt(&f, mesh->polygonCount);
+    size_t parts = FieldAt(f.bytes, TAG_PARTS);
     CHECK(Is(Changed(&f, parts, f.baked.detail.parts[0].vertexCount - mesh->polygons[0].count + 1,
                      1, true),
              mnav_errorInvalid, mnav_tileDetailParts),
-          "parts not summing to the header");
-    size_t extra = (size_t)(f.baked.detail.vertexCount);
-    for (int32_t p = 0; p < mesh->polygonCount; ++p)
-    {
-        extra -= (size_t)mesh->polygons[p].count;
-    }
-    size_t triangles = parts + (size_t)mesh->polygonCount * 2 + extra * 6;
-    CHECK(Is(Changed(&f, triangles, 200, 1, true), mnav_errorInvalid, mnav_tileDetailTriangles),
+          "parts not summing to the detail fields");
+    CHECK(Is(Changed(&f, FieldAt(f.bytes, TAG_TRIANGLES), 200, 1, true), mnav_errorInvalid,
+             mnav_tileDetailTriangles),
           "a corner past its part");
-    CHECK(Is(Changed(&f, triangles + 3, 8, 1, true), mnav_errorInvalid, mnav_tileDetailTriangles),
-          "outline bits past three");
     Unbake(&f);
 }
 
@@ -506,7 +576,7 @@ static void HandPolygon(Hand* h, const uint16_t* corners, int32_t count,
     for (int32_t k = 1; k + 1 < count; ++k)
     {
         h->triangles[h->detail.triangleCount++] =
-            (mnavDetailTriangle){{0, (uint8_t)k, (uint8_t)(k + 1)}, 0};
+            (mnavDetailTriangle){{0, (uint8_t)k, (uint8_t)(k + 1)}};
     }
     h->mesh.polygonCount += 1;
     h->detail.partCount += 1;
@@ -589,21 +659,17 @@ static void TestBoundaryRefusals(void)
 {
     // Each value one past what a check allows, refused by that check and
     // so named where it stands: a vertex a cell past the tile, a polygon
-    // with no detail parts, fewer detail triangles than polygons in the
-    // header, an edge side past the four, a polygon of two vertices.
+    // with no detail parts, an edge side past the four, a polygon of two
+    // vertices.
     static Fixture f;
     Bake(&f);
     const mnavPolyMesh* mesh = &f.baked.mesh;
-    CHECK(Names(Changed(&f, MNAV_TILE_HEADER_BYTES, (uint64_t)mesh->tileCells + 1, 2, true),
+    CHECK(Names(Changed(&f, FieldAt(f.bytes, TAG_VERTICES), (uint64_t)mesh->tileCells + 1, 2, true),
                 mnav_tileVertices, 0),
           "a vertex past the tile");
-    size_t parts = PolygonAt(&f, mesh->polygonCount);
+    size_t parts = FieldAt(f.bytes, TAG_PARTS);
     CHECK(Names(Changed(&f, parts + 1, 0, 1, true), mnav_tileDetailParts, 0),
           "a polygon with no detail parts");
-    mnavTileResult few =
-        Changed(&f, DETAIL_TRIANGLES_AT, (uint64_t)mesh->polygonCount - 1, 4, true);
-    CHECK(few.result == mnav_errorInvalid && few.section == mnav_tilePayload,
-          "fewer detail triangles than polygons");
     CHECK(Names(Changed(&f, PolygonAt(&f, 0) + 2 + 4, 5, 1, true), mnav_tilePolygons, 0),
           "a side past the four");
     CHECK(Names(Changed(&f, PolygonAt(&f, 0), 2, 1, true), mnav_tilePolygons, 0),
@@ -628,6 +694,181 @@ static void TestHeaderSettingsAreChecked(void)
     h.info.x = 0;
     h.info.agentHeight = 0;
     CHECK(Names(HandLoad(&h), mnav_tileHeader, -1), "an agent of no height");
+}
+
+// Loads the fixture's fields as given, each padded with pad bytes.
+static mnavTileResult Fields(Fixture* f, const Piece* pieces, int32_t count, uint8_t pad)
+{
+    static uint8_t copy[(1 << 16) + 64];
+    size_t size = Assemble(f->bytes, pieces, count, pad, copy);
+    return Load(&f->memory, copy, size);
+}
+
+static void TestFieldRefusals(void)
+{
+    static Fixture f;
+    Bake(&f);
+    Piece pieces[MOST_PIECES + 1];
+    int32_t count = Pieces(f.bytes, pieces);
+    CHECK(count == 6 && pieces[0].tag == TAG_PARTS && pieces[1].tag == TAG_TRIANGLES &&
+              pieces[2].tag == TAG_EXTRA && pieces[3].tag == TAG_POLYGONS &&
+              pieces[4].tag == TAG_INFO && pieces[5].tag == TAG_VERTICES,
+          "six fields in order of their names");
+    CHECK(Fields(&f, pieces, count, 0).result == mnav_success, "reassembled, it loads");
+    uint64_t held = f.memory.used;
+    // A tag a later version may write, after the last or among them.
+    const uint8_t later[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    pieces[count] = (Piece){MNAV_TAG('Z', 'O', 'N', 'E'), later, 8};
+    mnavTileResult r = Fields(&f, pieces, count + 1, 0);
+    CHECK(r.result == mnav_errorVersion && r.section == mnav_tilePayload && r.index == count,
+          "an unknown tag after the last");
+    Piece first = pieces[0];
+    pieces[0].tag = MNAV_TAG('A', 'R', 'E', 'A');
+    r = Fields(&f, pieces, count, 0);
+    CHECK(r.result == mnav_errorVersion && r.section == mnav_tilePayload && r.index == 0,
+          "an unknown tag first");
+    pieces[0] = first;
+    // The TILE field missing, repeated or out of order.
+    Piece moved[MOST_PIECES];
+    memcpy(moved, pieces, sizeof(moved));
+    moved[4] = pieces[5];
+    CHECK(Is(Fields(&f, moved, count - 1, 0), mnav_errorInvalid, mnav_tileHeader), "no TILE");
+    moved[4] = pieces[5];
+    moved[5] = pieces[4];
+    CHECK(Is(Fields(&f, moved, count, 0), mnav_errorInvalid, mnav_tileHeader), "TILE after VERT");
+    Piece twice[MOST_PIECES];
+    memcpy(twice, pieces, sizeof(Piece) * 4);
+    twice[4] = pieces[3];
+    twice[5] = pieces[4];
+    twice[6] = pieces[5];
+    CHECK(Is(Fields(&f, twice, count + 1, 0), mnav_errorInvalid, mnav_tilePolygons), "POLY twice");
+    // Padding that is not zero, on a field with padding.
+    CHECK(pieces[5].size % 8 != 0 || pieces[3].size % 8 != 0, "a field with padding");
+    mnavTileResult padded = Fields(&f, pieces, count, 1);
+    CHECK(padded.result == mnav_errorInvalid && padded.section != mnav_tilePayload,
+          "a padding byte not 0, named by its field");
+    // Each array field one byte short of whole records, and one record
+    // short; a field present with no bytes.
+    const mnavTileSection sections[6] = {mnav_tileDetailParts,    mnav_tileDetailTriangles,
+                                         mnav_tileDetailVertices, mnav_tilePolygons,
+                                         mnav_tileHeader,         mnav_tileVertices};
+    const size_t records[6] = {2, 3, 6, 0, 48, 6};
+    for (int32_t k = 0; k < count; ++k)
+    {
+        size_t whole = pieces[k].size;
+        pieces[k].size = whole - 1;
+        CHECK(Is(Fields(&f, pieces, count, 0), mnav_errorInvalid, sections[k]),
+              "a field a byte short of whole records");
+        pieces[k].size = records[k] > 0 ? whole - records[k] : whole - 2 - 5 * 3;
+        CHECK(Fields(&f, pieces, count, 0).result == mnav_errorInvalid, "a field a record short");
+        pieces[k].size = 0;
+        CHECK(Is(Fields(&f, pieces, count, 0), mnav_errorInvalid, sections[k]),
+              "a field of no bytes");
+        pieces[k].size = whole;
+    }
+    // TILE and DPRT, whose lengths are fixed, one record long.
+    static uint8_t longer[1 << 12];
+    for (int32_t k = 0; k <= 4; k += 4)
+    {
+        Piece whole = pieces[k];
+        size_t record = k == 0 ? 2 : 48;
+        memcpy(longer, whole.bytes, whole.size);
+        memset(longer + whole.size, 0, record);
+        pieces[k] = (Piece){whole.tag, longer, whole.size + record};
+        CHECK(Is(Fields(&f, pieces, count, 0), mnav_errorInvalid, sections[k]),
+              "a fixed field a record long");
+        pieces[k] = whole;
+    }
+    CHECK(f.memory.used == held, "nothing held after a refusal");
+    Unbake(&f);
+}
+
+static void TestEmptyFieldsAreLeftOut(void)
+{
+    // A square with no detail vertices past its own: no DVRT, which reads
+    // as none.
+    const int32_t points[8] = {4, 4, 4, 8, 8, 8, 8, 4};
+    const uint16_t square[4] = {0, 1, 2, 3};
+    static Hand h;
+    HandBegin(&h, points, 4);
+    HandPolygon(&h, square, 4, nullptr, 0);
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    CHECK(mnavEncodeTile(&memory, &h.info, &h.mesh, &h.detail, &bytes, &size) == mnav_success,
+          "encoded");
+    Piece pieces[MOST_PIECES];
+    int32_t count = Pieces(bytes, pieces);
+    CHECK(count == 5 && FieldAt(bytes, TAG_EXTRA) == 0, "no DVRT");
+    mnavTileInfo info;
+    mnavPolyMesh mesh;
+    mnavDetailMesh detail;
+    CHECK(mnavDecodeTile(&memory, bytes, size, &info, &mesh, &detail).result == mnav_success &&
+              detail.vertexCount == 4 && detail.parts[0].vertexCount == 4,
+          "loads with the polygon's own vertices only");
+    mnavReleaseDetailMesh(&memory, &detail);
+    mnavReleasePolyMesh(&memory, &mesh);
+    mnavReleaseTileBytes(&memory, bytes, size);
+    // A tile with no polygons: only TILE, and nothing read.
+    HandBegin(&h, points, 0);
+    CHECK(mnavEncodeTile(&memory, &h.info, &h.mesh, &h.detail, &bytes, &size) == mnav_success,
+          "encoded");
+    CHECK(Pieces(bytes, pieces) == 1 && pieces[0].tag == TAG_INFO &&
+              size == MNAV_TILE_HEADER_BYTES + 8 + 48,
+          "only TILE");
+    CHECK(mnavDecodeTile(&memory, bytes, size, &info, &mesh, &detail).result == mnav_success &&
+              mesh.vertexCount == 0 && mesh.polygonCount == 0 && detail.partCount == 0 &&
+              detail.triangleCount == 0,
+          "loads empty");
+    mnavReleaseDetailMesh(&memory, &detail);
+    mnavReleasePolyMesh(&memory, &mesh);
+    mnavReleaseTileBytes(&memory, bytes, size);
+    CHECK(memory.used == 0, "nothing held");
+}
+
+static void TestLinksMatchTheGeometry(void)
+{
+    // Two squares side by side, (4, 4) to (8, 8) and (8, 4) to (12, 8),
+    // sharing the edge from (8, 8) to (8, 4): the first's edge 2, the
+    // second's edge 0, run the other way.
+    const int32_t points[12] = {4, 4, 4, 8, 8, 8, 8, 4, 12, 8, 12, 4};
+    const uint16_t left[4] = {0, 1, 2, 3};
+    const uint16_t right[4] = {3, 2, 4, 5};
+    static Hand h;
+    HandBegin(&h, points, 6);
+    HandPolygon(&h, left, 4, nullptr, 0);
+    HandPolygon(&h, right, 4, nullptr, 0);
+    h.polygons[0].neighbors[2] = 1;
+    h.polygons[1].neighbors[0] = 0;
+    CHECK(HandLoad(&h).result == mnav_success, "linked across the shared edge");
+    // A link one way only.
+    h.polygons[1].neighbors[0] = MNAV_NO_INDEX;
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "a link not returned");
+    // Links both ways, but across edges the squares do not share.
+    h.polygons[0].neighbors[2] = MNAV_NO_INDEX;
+    h.polygons[0].neighbors[1] = 1;
+    h.polygons[1].neighbors[1] = 0;
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "linked across edges not shared");
+    h.polygons[0].neighbors[1] = MNAV_NO_INDEX;
+    h.polygons[1].neighbors[1] = MNAV_NO_INDEX;
+    h.polygons[0].neighbors[2] = 1;
+    h.polygons[1].neighbors[0] = 0;
+    // A side mark on a linked edge, and on an edge on no tile side.
+    h.polygons[0].sides[2] = 3;
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "a side on a linked edge");
+    h.polygons[0].sides[2] = 0;
+    h.polygons[0].sides[0] = 1;
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "a side on an edge inside the tile");
+    // A square on the tile's -X side: its edge there must carry side 1,
+    // and no other.
+    HandBegin(&h, (const int32_t[]){0, 4, 0, 8, 4, 8, 4, 4}, 4);
+    HandPolygon(&h, left, 4, nullptr, 0);
+    h.polygons[0].sides[0] = 1;
+    CHECK(HandLoad(&h).result == mnav_success, "the -X side marked");
+    h.polygons[0].sides[0] = 0;
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "the side unmarked");
+    h.polygons[0].sides[0] = 3;
+    CHECK(Names(HandLoad(&h), mnav_tilePolygons, 0), "marked as another side");
 }
 
 static void TestMemoryLimitIsTyped(void)
@@ -674,5 +915,8 @@ int main(int argc, char** argv)
     TestHeaderSettingsAreChecked();
     TestMemoryLimitIsTyped();
     TestBoundaryRefusals();
+    TestFieldRefusals();
+    TestEmptyFieldsAreLeftOut();
+    TestLinksMatchTheGeometry();
     return s_failures == 0 ? 0 : 1;
 }

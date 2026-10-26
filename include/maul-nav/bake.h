@@ -504,14 +504,14 @@ extern "C"
                                                                      const mnavTriangleMesh* mesh);
 
 // The tile format version this library writes and reads.
-#define MNAV_TILE_FORMAT 2
+#define MNAV_TILE_FORMAT 3
 
 // The navmesh bake's generation, written into every tile and hashed into
 // its fingerprint. It rises with any change to the library that gives
 // other tile bytes for the same def and input, and only then, so a tile a
 // host keeps by its fingerprint goes stale exactly when a bake would
 // differ, not at every release.
-#define MNAV_BAKE_GENERATOR 1
+#define MNAV_BAKE_GENERATOR 2
 
     // A baker: the def it was made with, its memory, and the last tile it
     // baked. Made by mnavCreateBaker.

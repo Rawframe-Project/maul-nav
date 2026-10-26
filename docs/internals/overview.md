@@ -58,6 +58,8 @@ A def's named limits count work, never time: nodes per search, polygons per tile
 
 Input is hostile: geometry, tile bytes, ids and every argument. Each is validated and refused with a status in every build, and the result names what was refused (the setting, the input element, the tile section and element) where a caller needs it to find the fault. The tile and flight tile loaders check every count against the def's limits and the bytes present before allocating, the payload's hash, and every structural rule of the mesh, and are fuzzed.
 
+The library writes two asset formats in the family's sense, the tile ([bake.md](bake.md#the-tile-format)) and the flight tile ([flight.md](flight.md#the-format-and-loading)), which a host bakes once and ships. It writes no state format: nothing a running program saves is written by the library, and the tile cache lives in memory only.
+
 Internal invariants are asserted with `MNAV_ASSERT` (`src/invariant.h`): on in builds without `NDEBUG` (Debug, sanitizer and fuzz builds), where a broken invariant traps at the fault, and compiled out of Release, whose per-span and per-node loops must not pay for them.
 
 ## Testing

@@ -13,11 +13,6 @@
 #include "maul-nav/debug.h"
 
 #include <stdint.h>
-#include <stdio.h>
-
-// The bytes of the tile with a bump on its edge, the same on every
-// platform.
-#define BUMP_HASH 0xa66f564a7b20c654ull
 
 enum
 {
@@ -237,12 +232,6 @@ static void TestBumpOnAnEdgeIsSampled(void)
     Part part = Read(polygon);
     CHECK(part.sound && part.outline == 7, "seven outline edges");
     CHECK(part.vertices > 7, "samples inside hold the floor round the bump");
-    // The tile also keeps, per detail triangle, which of its edges lie on
-    // the polygon's outline; nothing reads them back, so the bytes are
-    // pinned.
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_tile, (int32_t)s_tileSize);
-    printf("BUMP_HASH=%016llx\n", (unsigned long long)hash);
-    CHECK(hash == BUMP_HASH, "the pinned bytes");
     // Within the maximum error the bump is dropped.
     UseDetail(16, 64);
     Load(&scene);

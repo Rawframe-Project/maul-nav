@@ -19,12 +19,10 @@ typedef struct mnavDetailVertex
 } mnavDetailVertex;
 
 // Three corners, indices into the polygon's part of the vertices, wound
-// like the polygons, and in bit k whether the edge from corner k to the
-// next lies on the polygon's outline.
+// like the polygons.
 typedef struct mnavDetailTriangle
 {
     uint8_t corners[3];
-    uint8_t outline;
 } mnavDetailTriangle;
 
 // The triangles over a set of vertices, with room for capacity triangles

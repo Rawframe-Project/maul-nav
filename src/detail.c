@@ -227,20 +227,6 @@ static void BuildOutline(Builder* builder, const mnavPolygon* polygon)
     }
 }
 
-// Whether the edge between vertices u and v runs along the outline.
-static bool OnOutline(const Part* part, int32_t u, int32_t v)
-{
-    for (int32_t h = 0; h < part->hullCount; ++h)
-    {
-        int32_t next = part->hull[(h + 1) % part->hullCount];
-        if ((part->hull[h] == u && next == v) || (part->hull[h] == v && next == u))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 // Triangulates the outline by ear clipping.
 static void TriangulateOutline(Builder* builder)
 {
@@ -261,21 +247,6 @@ static void TriangulateOutline(Builder* builder)
         for (int32_t c = 0; c < 3; ++c)
         {
             triangle->corners[c] = part->hull[part->corners[t * 3 + c]];
-        }
-    }
-}
-
-// Flags each triangle's edges that run along the outline.
-static void MarkOutline(Part* part)
-{
-    for (int32_t t = 0; t < part->triangleCount; ++t)
-    {
-        mnavDetailTriangle* triangle = &part->triangles[t];
-        triangle->outline = 0;
-        for (int32_t c = 0; c < 3; ++c)
-        {
-            bool on = OnOutline(part, triangle->corners[c], triangle->corners[(c + 1) % 3]);
-            triangle->outline |= (uint8_t)(on ? 1u << c : 0u);
         }
     }
 }
@@ -503,7 +474,6 @@ static mnavResult BuildPart(Builder* builder, int32_t p)
         return result;
     }
     AddInterior(builder);
-    MarkOutline(builder->part);
     return Store(builder, p);
 }
 
