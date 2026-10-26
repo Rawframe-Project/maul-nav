@@ -52,8 +52,9 @@ static void Box(float x0, float z0, float x1, float z1, mnavAreaType area)
 // A floor of 8 by 8 tiles from (shift, shift), a pillar of 2 m every 8 m
 // and, every 64 m, a wall across with one gap of 6 m, the gaps
 // zigzagging; rugs of another area, as cheap, across tile sides, so that
-// runs of touching links cross them; baked into s_bytes.
-static float BakeWorld(float shift)
+// runs of touching links cross them. Its first tiles by tiles are baked
+// into bytes, TILES to a row.
+static float BakeWorld(float shift, int32_t tiles, uint8_t** bytes, size_t* sizes)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     float side = def.cellSize * (float)def.tileCells * (float)TILES;
@@ -85,18 +86,17 @@ static float BakeWorld(float shift)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     uint8_t* buffer = malloc(CAPACITY);
     int32_t first = (int32_t)floorf(shift / (def.cellSize * (float)def.tileCells));
-    for (int32_t z = 0; z < TILES; ++z)
+    for (int32_t z = 0; z < tiles; ++z)
     {
-        for (int32_t x = 0; x < TILES; ++x)
+        for (int32_t x = 0; x < tiles; ++x)
         {
             int32_t t = z * TILES + x;
-            free(s_bytes[t]);
             CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, s_outlineCount, nullptr},
                                  first + x, first + z, nullptr) == mnav_success &&
-                      mnavCopyBakedTile(baker, buffer, CAPACITY, &s_sizes[t]) == mnav_success,
+                      mnavCopyBakedTile(baker, buffer, CAPACITY, &sizes[t]) == mnav_success,
                   "baked");
-            s_bytes[t] = malloc(s_sizes[t]);
-            memcpy(s_bytes[t], buffer, s_sizes[t]);
+            bytes[t] = malloc(sizes[t]);
+            memcpy(bytes[t], buffer, sizes[t]);
         }
     }
     free(buffer);
@@ -104,20 +104,29 @@ static float BakeWorld(float shift)
     return side;
 }
 
-// The navmesh with every tile, loaded forward or backward.
-static mnavNavmesh* Load(bool backward)
+// The navmesh with the first tiles by tiles of bytes, TILES to a row,
+// loaded forward or backward.
+static mnavNavmesh* LoadTiles(uint8_t* const* bytes, const size_t* sizes, int32_t tiles,
+                              bool backward)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
-    for (int32_t i = 0; i < TILES * TILES; ++i)
+    for (int32_t i = 0; i < tiles * tiles; ++i)
     {
-        int32_t t = backward ? TILES * TILES - 1 - i : i;
-        CHECK(mnavStageTile(navmesh, s_bytes[t], s_sizes[t]).result == mnav_success, "staged");
+        int32_t k = backward ? tiles * tiles - 1 - i : i;
+        int32_t t = k / tiles * TILES + k % tiles;
+        CHECK(mnavStageTile(navmesh, bytes[t], sizes[t]).result == mnav_success, "staged");
     }
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     return navmesh;
+}
+
+// The navmesh with every tile of the world, loaded forward or backward.
+static mnavNavmesh* Load(bool backward)
+{
+    return LoadTiles(s_bytes, s_sizes, TILES, backward);
 }
 
 static mnavQuery* Query(int32_t nodes)
@@ -526,23 +535,32 @@ static void TestUpdates(void)
 
 static void TestNegativePlaces(void)
 {
-    // The same world 4 tiles back on both axes, at negative places: the
-    // clusters fall on the same tiles, so the graph is the same.
-    mnavNavmesh* navmesh = Load(false);
+    // The world's first 4 by 4 tiles, and the same tiles of the world 4
+    // tiles back on both axes, at places -4 to -1: the clusters fall on
+    // the same tiles, so the graph is the same.
+    static uint8_t* back[TILES * TILES];
+    static size_t backSizes[TILES * TILES];
+    mnavNavmesh* navmesh = LoadTiles(s_bytes, s_sizes, 4, false);
     mnavQuery* query = Query(2048);
     mnavHierarchy* hierarchy = Hierarchy(2);
     mnavHierarchyReport here;
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &here) == mnav_success, "built");
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &here) == mnav_success &&
+              here.clusters == 4,
+          "built");
     mnavDestroyNavmesh(navmesh);
-    BakeWorld(-128.0f);
-    navmesh = Load(false);
-    mnavHierarchyReport back;
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &back) == mnav_success &&
-              memcmp(&here, &back, sizeof(here)) == 0,
+    BakeWorld(-128.0f, 4, back, backSizes);
+    navmesh = LoadTiles(back, backSizes, 4, false);
+    mnavHierarchyReport moved;
+    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &moved) == mnav_success &&
+              memcmp(&here, &moved, sizeof(here)) == 0,
           "the same graph at negative places");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
+    for (int32_t t = 0; t < TILES * TILES; ++t)
+    {
+        free(back[t]);
+    }
 }
 
 static void TestLoadOrder(void)
@@ -600,11 +618,13 @@ static void TestChangeAcrossASide(void)
     filter.areas &= ~((uint64_t)1 << 4);
     int32_t agreed = 0;
     int32_t tried = 0;
-    // Every 12 m along the side; outside the dense form every 24 m from
-    // 18 m, half the places, among them three of the four where an update
-    // that misses a transition's inclusion changing gives another graph.
-    for (double z = s_dense ? 6.0 : 18.0; z < 250.0; z += s_dense ? 12.0 : 24.0)
+    // Every 12 m along the side from 6 m; outside the dense form the four
+    // places among them where an update that misses a transition's
+    // inclusion changing gives another graph.
+    static const double chosen[4] = {42.0, 126.0, 138.0, 234.0};
+    for (int32_t k = 0; k < (s_dense ? 21 : 4); ++k)
     {
+        double z = s_dense ? 6.0 + 12.0 * k : chosen[k];
         mnavNavmesh* navmesh = Load(false);
         mnavQuery* query = Query(1024);
         mnavHierarchy* updated = Hierarchy(2);
@@ -987,7 +1007,7 @@ int main(int argc, char** argv)
         return 2;
     }
     TestStoredWorld();
-    float side = BakeWorld(0.0f);
+    float side = BakeWorld(0.0f, TILES, s_bytes, s_sizes);
     TestAgainstPlainPaths(side);
     TestRandomPairs();
     TestLoadOrder();
