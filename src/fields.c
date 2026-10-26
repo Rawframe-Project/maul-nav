@@ -50,9 +50,12 @@ static mnavFieldsResult Refuse(mnavResult result, int32_t known, uint64_t at)
 mnavFieldsResult mnavReadFields(const uint8_t* bytes, size_t size, uint64_t count,
                                 const uint32_t* known, int32_t knownCount, mnavField* fields)
 {
+    uint32_t rank = 0;
     for (int32_t k = 0; k < knownCount; ++k)
     {
-        MNAV_ASSERT(k == 0 || Rank(known[k - 1]) < Rank(known[k]));
+        uint32_t next = Rank(known[k]);
+        MNAV_ASSERT(k == 0 || rank < next);
+        rank = next;
         fields[k] = (mnavField){nullptr, 0};
     }
     mnavByteReader r = {bytes, size, false};
