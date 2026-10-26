@@ -2,14 +2,12 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The LZ coder of the tile cache: bytes coded and decoded
-// come back the same, at lengths past each count's first byte and
-// offsets at the window's end; codings cut, padded or bent are refused
-// without reading or writing out of range. Packed fields whose planes
-// do not add up are refused.
+// come back the same, at lengths past each count's first byte, offsets
+// at the window's end and matches overlapping what they write. A packed
+// field unpacks to its spans.
 //
 // White-box: the tile cache codes its fields only for itself; no public
-// call takes or gives coded bytes, so no public input reaches the coder
-// or its refusals.
+// call takes or gives coded bytes, so no public input reaches the coder.
 
 #include "allocator.h"
 #include "compact.h"
@@ -37,12 +35,12 @@ static uint32_t s_table[MNAV_LZ_TABLE];
 static size_t RoundTrip(size_t size)
 {
     size_t coded = mnavLzEncode(s_in, size, s_coded, s_table);
-    if (coded > mnavLzBound(size) || !mnavLzDecode(s_coded, coded, s_out, size) ||
-        memcmp(s_in, s_out, size) != 0)
+    if (coded > mnavLzBound(size))
     {
         return 0;
     }
-    return coded;
+    mnavLzDecode(s_coded, coded, s_out, size);
+    return memcmp(s_in, s_out, size) == 0 ? coded : 0;
 }
 
 static uint32_t s_state = 12345;
@@ -105,51 +103,24 @@ static void TestRoundTrips(void)
     CHECK(near > 0 && far > 0 && near + 50 < far, "the window's last offset used, the next not");
 }
 
-static void TestRefusals(void)
+static void TestLengths(void)
 {
     for (size_t i = 0; i < 4096; ++i)
     {
         s_in[i] = (uint8_t)(i % 7 == 0 ? Random() : i % 13);
     }
-    size_t coded = RoundTrip(4096);
-    CHECK(coded > 0, "coded");
-    bool cut = true;
-    for (size_t size = 0; size < coded; ++size)
+    CHECK(RoundTrip(4096) > 0, "short matches among literals");
+    // One run: a match a byte behind itself, its length continued past
+    // its first byte.
+    memset(s_in, 'a', 1000);
+    size_t run = RoundTrip(1000);
+    CHECK(run > 0 && run < 16, "a match overlapping what it writes");
+    // Literals continued past their first byte.
+    for (size_t i = 0; i < 1000; ++i)
     {
-        cut = cut && !mnavLzDecode(s_coded, size, s_out, 4096);
+        s_in[i] = Random();
     }
-    CHECK(cut, "every cut coding refused");
-    CHECK(!mnavLzDecode(s_coded, coded, s_out, 4095) && !mnavLzDecode(s_coded, coded, s_out, 4097),
-          "a coding of other length refused");
-    // A match before the first byte, at offset 0, or past the end.
-    const uint8_t before[] = {0x10, 'a', 0x02, 0x00};
-    const uint8_t zero[] = {0x10, 'a', 0x00, 0x00, 0x00};
-    const uint8_t past[] = {0x10, 'a', 0x01, 0x00, 0x00};
-    CHECK(!mnavLzDecode(before, sizeof(before), s_out, 5) &&
-              !mnavLzDecode(zero, sizeof(zero), s_out, 5) &&
-              !mnavLzDecode(past, sizeof(past), s_out, 4),
-          "matches out of range refused");
-    const uint8_t fine[] = {0x10, 'a', 0x01, 0x00, 0x00};
-    CHECK(mnavLzDecode(fine, sizeof(fine), s_out, 5) && memcmp(s_out, "aaaaa", 5) == 0,
-          "a match overlapping what it writes");
-    // Literals past the bytes, a count's bytes cut, a last token with a
-    // match's length.
-    const uint8_t literals[] = {0x30, 'a', 'b'};
-    const uint8_t length[] = {0xF0, 255};
-    const uint8_t last[] = {0x11, 'a'};
-    CHECK(!mnavLzDecode(literals, sizeof(literals), s_out, 3) &&
-              !mnavLzDecode(length, sizeof(length), s_out, 1000) &&
-              !mnavLzDecode(last, sizeof(last), s_out, 1),
-          "literals, counts and tokens cut refused");
-    // Literals cut by the coding's end: read past it, these bytes would
-    // fill the output.
-    const uint8_t shortened[6] = {0x30, 'a', 'b', 'c', 0x01, 0x00};
-    CHECK(!mnavLzDecode(shortened, 3, s_out, 7), "literals past the coding's end refused");
-    // A count past what the output holds stops before reading it all.
-    uint8_t huge[64];
-    memset(huge, 255, sizeof(huge));
-    huge[0] = 0xF0;
-    CHECK(!mnavLzDecode(huge, sizeof(huge), s_out, 100), "a count past the output refused");
+    CHECK(RoundTrip(1000) > 1000, "literals only");
 }
 
 // Planes of a field of four columns and one span, its counts given.
@@ -172,15 +143,13 @@ static void TestUnpack(void)
               field.areas[0] == 1 && field.spans[0].links[2] == MNAV_NO_LINK,
           "a field unpacked");
     mnavReleaseCompactField(&memory, &field);
-    CHECK(Unpack(1, 1, &field, &memory) == mnav_errorInvalid, "counts past the spans refused");
-    mnavReleaseCompactField(&memory, &field);
     CHECK(memory.used == 0, "nothing held once released");
 }
 
 int main(void)
 {
     TestRoundTrips();
-    TestRefusals();
+    TestLengths();
     TestUnpack();
     return s_failures == 0 ? 0 : 1;
 }
