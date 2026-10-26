@@ -174,18 +174,16 @@ bool mnavInsertVertex(mnavTriangulation* triangulation, int32_t v, int32_t t, in
 {
     mnavTriangulation* tr = triangulation;
     uint8_t p = (uint8_t)v;
+    // Either split adds two triangles and stacks at most four edges.
+    MNAV_ASSERT(tr->count + 2 <= tr->capacity && tr->stackCapacity >= 4);
     if (edge < 0)
     {
-        if (tr->count + 2 > tr->capacity || tr->stackCapacity < 3)
-        {
-            return false;
-        }
         SplitInside(tr, p, t);
         return true;
     }
     int32_t far = 0;
     int32_t n = Across(tr, t, edge, &far);
-    if (n < 0 || tr->count + 2 > tr->capacity || tr->stackCapacity < 4)
+    if (n < 0)
     {
         return false;
     }

@@ -56,8 +56,9 @@ int32_t mnavLocate(const mnavTriangulation* triangulation, int32_t x, int32_t z,
 
 // Inserts vertex v, which lies in triangle t (inside, or on the edge from
 // corner edge when edge is at least 0), and restores the Delaunay
-// property round it. Returns false, changing nothing, when v lies on an
-// edge with no triangle across it or the capacity is too small.
+// property round it. The triangles have room for two more and the stack
+// for four. Returns false, changing nothing, when v lies on an edge with
+// no triangle across it.
 bool mnavInsertVertex(mnavTriangulation* triangulation, int32_t v, int32_t t, int32_t edge);
 
 #endif // MAUL_NAV_SRC_DELAUNAY_H
