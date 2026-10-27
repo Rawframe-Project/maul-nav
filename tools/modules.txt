@@ -49,7 +49,7 @@ baker: allocator bake_def bake_input border_vertices bytes compact contour detai
 tile_cache: allocator compact field_pack fpenv outline raster
 field_pack: allocator compact invariant lz raster
 lz: invariant
-navmesh: allocator bake_def detail fpenv polymesh tile
+navmesh: allocator bake_def detail fpenv invariant polymesh tile
 nearest: detail fpenv navmesh polymesh query_filter raster
 path: allocator fpenv funnel navmesh offmesh polymesh query query_filter raster
 raycast: fpenv navmesh polymesh query query_filter
