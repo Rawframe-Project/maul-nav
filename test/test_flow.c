@@ -582,6 +582,36 @@ static void TestRepairChecks(void)
     mnavDestroyFlowField(field);
 }
 
+// A repair cut short by a begin leaves no marks behind: a later repair of
+// the same cell raises it again and gives the field a build gives.
+static void TestRepairAfterABegin(void)
+{
+    memset(s_areas, 1, sizeof(s_areas));
+    mnavGrid grid = Grid();
+    mnavQueryFilter filter = Costs();
+    mnavFlowField* repaired = Make(WIDTH * HEIGHT);
+    mnavFlowField* built = Make(WIDTH * HEIGHT);
+    const mnavCell goal = {4, 4};
+    // A cell on the way from the east to the goal.
+    const mnavCell changed = {10, 4};
+    CHECK(mnavBuildFlowField(repaired, &grid, &filter, &goal, 1) == mnav_success, "built");
+    s_areas[changed.y * WIDTH + changed.x] = (mnavAreaType)4;
+    CHECK(mnavUpdateFlowField(repaired, &grid, &goal, 1, &changed, 1) == mnav_success,
+          "a repair begun");
+    CHECK(mnavBuildFlowField(repaired, &grid, &filter, &goal, 1) == mnav_success,
+          "the repair cut short by a build");
+    s_areas[changed.y * WIDTH + changed.x] = mnav_areaNone;
+    bool ended = false;
+    CHECK(mnavUpdateFlowField(repaired, &grid, &goal, 1, &changed, 1) == mnav_success &&
+              mnavContinueFlowField(repaired, &grid, INT32_MAX, &ended) == mnav_success && ended,
+          "the cell repaired again");
+    CHECK(mnavBuildFlowField(built, &grid, &filter, &goal, 1) == mnav_success, "built afresh");
+    CHECK(Differ(repaired, built, (mnavFlowRegion){0, 0, WIDTH, HEIGHT}) == 0,
+          "the repair gives the field a build gives");
+    mnavDestroyFlowField(repaired);
+    mnavDestroyFlowField(built);
+}
+
 static void TestRepairs(void)
 {
     RepairHistory(nullptr, 3u);
@@ -600,6 +630,7 @@ int main(void)
     TestRegion();
     TestSteps();
     TestRepairs();
+    TestRepairAfterABegin();
     TestRepairChecks();
     return s_failures == 0 ? 0 : 1;
 }
