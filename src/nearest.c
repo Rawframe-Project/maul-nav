@@ -366,6 +366,7 @@ static MNAV_NOINLINE mnavResult FindPolygonsWork(const mnavNavmesh* navmesh,
     Search s = {navmesh, center, half, 0.0, 0.0, 0.0, nullptr};
     mnavCover c = mnavCoverOf(navmesh, center, half);
     int64_t loaded = 0;
+    // int32_t is enough: 2^31 polygons would take over 64 GB of tiles.
     int32_t count = 0;
     for (int32_t i = FirstColumn(navmesh, c.x0);
          i < navmesh->placeCount && navmesh->places[i].x <= c.x1; ++i)

@@ -52,6 +52,7 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/base.c
     src/baker.c
     src/border_vertices.c
+    src/clip.c
     src/commit.c
     src/compact.c
     src/corridor.c
@@ -219,6 +220,9 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(hierarchy)
     maul_add_dense(hierarchy)
     maul_add_test(spatial)
+    # The circle clip running out of room, which no public call reaches at
+    # the room the random point gives it.
+    maul_add_test(clip WHITEBOX)
     maul_add_test(steer)
     maul_add_test(linkgen)
     maul_add_test(debug)

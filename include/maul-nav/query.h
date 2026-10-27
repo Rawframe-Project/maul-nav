@@ -1028,7 +1028,9 @@ extern "C"
     /// @param radius   How far to search, in meters, at least 0 and finite.
     /// @param seed     Any value.
     /// @param pointOut Receives the point.
-    /// @return As mnavFindWallDistance.
+    /// @return As mnavFindWallDistance; also `mnav_errorLimit` when a
+    /// polygon clipped to the circle, its 32-gon, has more corners than
+    /// the clip holds, which rounding alone can cause.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult

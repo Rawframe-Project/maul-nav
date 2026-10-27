@@ -46,6 +46,9 @@ mnavResult mnavCheckSolidInput(const mnavBakeDef* def, const mnavBakeInput* inpu
         }
         total += input->meshes[m].triangleCount;
     }
+    // An element's index fits in int32_t: every mesh, terrain and volume
+    // before it was read, at least 24 bytes each, and 2^31 of them would
+    // take 48 GB.
     for (int32_t i = 0; i < input->terrainCount; ++i)
     {
         mnavInputResult checked = mnavCheckTerrain(def, &input->terrains[i]);
