@@ -483,7 +483,9 @@ extern "C"
 
     // A path corridor: the polygons from the agent's to its
     // target's, in a buffer the caller owns, with the agent's position on
-    // the first and the target on the last.
+    // the first and the target on the last. It is well formed with a
+    // buffer, a capacity of at least 1, and from 1 to capacity polygons;
+    // every corridor call refuses one that is not.
     typedef struct mnavCorridor
     {
         mnavPos3 position;
@@ -537,8 +539,9 @@ extern "C"
     ///
     /// @param corridor The corridor.
     /// @param path     A path from mnavFindPath or mnavFinishPath.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
-    /// path with no polygon or point; `mnav_errorCapacity` when the path
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// corridor with no buffer or a capacity below 1, or a path with no
+    /// polygon or point; `mnav_errorCapacity` when the path
     /// has more polygons than the corridor's buffer, which is unchanged.
     /// @par Thread safety
     /// Safe from any thread; the corridor is used by one thread at a time.
@@ -554,9 +557,10 @@ extern "C"
     /// @param filter   The areas and kinds usable, or NULL for all.
     /// @param corridor The corridor.
     /// @param validOut Receives the count.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
-    /// filter not built from mnavDefaultQueryFilter; `mnav_errorRange` for
-    /// a filter cost out of its range.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// corridor not well formed or a filter not built from
+    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of
+    /// its range.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may check corridors at
     /// once between commits.
@@ -572,10 +576,10 @@ extern "C"
     /// @param navmesh  The navmesh.
     /// @param corridor The corridor.
     /// @param cornersOut Receives the straight path.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or
-    /// polygons not joined; `mnav_errorStale` for a polygon whose tile has
-    /// been replaced or removed; `mnav_errorLimit` for a corridor of more
-    /// polygons than the context's node limit.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
+    /// corridor not well formed or polygons not joined; `mnav_errorStale` for a polygon whose tile
+    /// has been replaced or removed; `mnav_errorLimit` for a corridor of more polygons than the
+    /// context's node limit.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavCorridorCorners(mnavQuery* query,
@@ -720,7 +724,7 @@ extern "C"
     ///                 counts.
     /// @param moveOut  Receives the walk, or NULL.
     /// @return As mnavMoveAlongSurface; also `mnav_errorInvalid` for a
-    /// corridor with no buffer, and `mnav_errorCapacity` when the merged
+    /// corridor not well formed, and `mnav_errorCapacity` when the merged
     /// corridor would outgrow its buffer, which leaves it unchanged.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
@@ -764,8 +768,8 @@ extern "C"
     /// @param corridor     The corridor.
     /// @param toward       The point to look toward.
     /// @param shortenedOut Receives whether the corridor changed.
-    /// @return As mnavRaycast; also `mnav_errorInvalid` for a corridor
-    /// with no buffer or a NULL shortenedOut.
+    /// @return As mnavRaycast; also `mnav_errorInvalid` for a corridor not
+    /// well formed or a NULL shortenedOut.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// So is the corridor.
@@ -790,8 +794,8 @@ extern "C"
     ///                    mnav_pathNotLoaded or mnav_pathNone when an end
     ///                    found no polygon.
     /// @return `mnav_success` whenever the corridor was looked at;
-    /// `mnav_errorInvalid` for a NULL argument or a corridor with no
-    /// buffer; `mnav_errorCapacity` when the path has more polygons than
+    /// `mnav_errorInvalid` for a NULL argument or a corridor not well
+    /// formed; `mnav_errorCapacity` when the path has more polygons than
     /// the buffer, which leaves the corridor as it was; the errors of
     /// mnavFindNearest and mnavFindPath otherwise.
     /// @par Thread safety
