@@ -51,7 +51,7 @@ field_pack: allocator compact invariant lz raster
 lz: invariant
 navmesh: allocator bake_def detail fpenv polymesh tile
 nearest: detail fpenv navmesh polymesh query_filter raster
-path: allocator fpenv funnel navmesh offmesh polymesh query query_filter raster
+path: allocator fpenv funnel invariant navmesh offmesh polymesh query query_filter raster
 raycast: fpenv navmesh polymesh query query_filter
 shortest: fpenv navmesh offmesh polymesh query query_filter
 query: allocator fpenv
