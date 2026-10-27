@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Flight volumes through the public API: the def's checks;
-// tiles baked, copied, staged and committed; the bytes pinned; every
-// truncated or corrupted tile refused, naming its section; tiles of other
-// settings refused; staging, removal, replacement and a refused commit
-// that changes nothing; every byte given back. Every voxel against the
-// octree, the walk and the payload's structure are test_flight_octree.c's.
+// Flight volumes through the public API: the def's checks; tiles baked,
+// copied, staged and committed; the bytes pinned, with no padding of the
+// def or the input in them; every truncated or corrupted tile refused,
+// naming its section; tiles of other settings refused; staging, removal,
+// replacement and a refused commit that changes nothing; every byte given
+// back. Every voxel against the octree, the walk and the payload's
+// structure are test_flight_octree.c's.
 
 #include "counting_allocator.h"
 #include "flight_scene.h"
@@ -796,6 +797,72 @@ static void TestEmptyFieldsAreLeftOut(void)
     mnavDestroyFlightVolume(volume);
 }
 
+// The test world's def over a byte pattern, every field then set one by
+// one, so only its padding keeps the pattern.
+static void DefOver(mnavFlightDef* def, int pattern)
+{
+    const mnavFlightDef d = Def();
+    memset(def, pattern, sizeof(*def));
+    def->cookie = d.cookie;
+    def->version = d.version;
+    def->allocator.alloc = d.allocator.alloc;
+    def->allocator.free = d.allocator.free;
+    def->allocator.context = d.allocator.context;
+    def->origin.x = d.origin.x;
+    def->origin.y = d.origin.y;
+    def->origin.z = d.origin.z;
+    def->voxelSize = d.voxelSize;
+    def->tileVoxels = d.tileVoxels;
+    def->floor = d.floor;
+    def->ceiling = d.ceiling;
+    def->radius = d.radius;
+    def->groundBelow = d.groundBelow;
+    def->limits.inputTriangles = d.limits.inputTriangles;
+    def->limits.tileSpans = d.limits.tileSpans;
+    def->limits.tileNodes = d.limits.tileNodes;
+    def->limits.tileLeaves = d.limits.tileLeaves;
+    def->limits.tiles = d.limits.tiles;
+    def->limits.memoryBytes = d.limits.memoryBytes;
+}
+
+// Flight tile bytes are built field by field: the padding of the def and
+// the input never reaches them. Tile 0 baked from structs over two byte
+// patterns gives the bytes BakeAll pinned.
+static void TestPaddingNeverReachesTheTile(void)
+{
+    static uint8_t bytes[TILE_MOST];
+    for (int pattern = 0x00; pattern <= 0xFF; pattern += 0xFF)
+    {
+        mnavFlightDef def;
+        DefOver(&def, pattern);
+        mnavFlightBaker* baker = nullptr;
+        CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success, "baker");
+        mnavTriangleMesh mesh;
+        memset(&mesh, pattern, sizeof(mesh));
+        mesh.vertices = s_world.vertices;
+        mesh.vertexCount = s_world.vertexCount;
+        mesh.indices = s_world.indices;
+        mesh.triangleCount = s_world.triangleCount;
+        mesh.areas = s_world.areas;
+        mnavBakeInput input;
+        memset(&input, pattern, sizeof(input));
+        input.meshes = &mesh;
+        input.meshCount = 1;
+        input.terrains = nullptr;
+        input.terrainCount = 0;
+        input.volumes = nullptr;
+        input.volumeCount = 0;
+        input.index = nullptr;
+        size_t size = 0;
+        CHECK(mnavBakeFlightTile(baker, &input, 0, 0, nullptr) == mnav_success &&
+                  mnavCopyFlightTile(baker, bytes, TILE_MOST, &size) == mnav_success,
+              "baked and copied");
+        CHECK(size == s_sizes[0] && memcmp(bytes, s_bytes[0], size) == 0,
+              "the pinned bytes over the pattern");
+        mnavDestroyFlightBaker(baker);
+    }
+}
+
 int main(void)
 {
     TestDefIsChecked();
@@ -808,6 +875,7 @@ int main(void)
     TestStagingAndRemoval();
     TestRefusedMemory();
     TestBakerRefusals();
+    TestPaddingNeverReachesTheTile();
     CHECK(s_held == 0, "every byte given back");
     return s_failures == 0 ? 0 : 1;
 }
