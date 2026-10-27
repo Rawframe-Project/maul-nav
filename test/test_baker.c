@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // The public bake call: a baker made from a def bakes one tile per call,
-// reports what it did, and hands the tile's bytes over.
+// reports what it did, and hands the tile's bytes over, built field by
+// field so that no padding of the def or the input reaches them.
 
 #include "soup.h"
 #include "test_harness.h"
@@ -401,6 +402,129 @@ static void TestTilesToTheExtent(void)
     mnavDestroyBaker(baker);
 }
 
+// A def over a byte pattern, every field then set one by one to the
+// default's, so only its padding keeps the pattern.
+static void DefOver(mnavBakeDef* def, int pattern)
+{
+    const mnavBakeDef d = mnavDefaultBakeDef();
+    memset(def, pattern, sizeof(*def));
+    def->cookie = d.cookie;
+    def->version = d.version;
+    def->allocator.alloc = d.allocator.alloc;
+    def->allocator.free = d.allocator.free;
+    def->allocator.context = d.allocator.context;
+    def->origin.x = d.origin.x;
+    def->origin.y = d.origin.y;
+    def->origin.z = d.origin.z;
+    def->cellSize = d.cellSize;
+    def->cellHeight = d.cellHeight;
+    def->tileCells = d.tileCells;
+    def->agent.radius = d.agent.radius;
+    def->agent.height = d.agent.height;
+    def->agent.stepHeight = d.agent.stepHeight;
+    def->agent.maxSlopeDegrees = d.agent.maxSlopeDegrees;
+    def->minRegionArea = d.minRegionArea;
+    def->maxEdgeError = d.maxEdgeError;
+    def->maxEdgeLength = d.maxEdgeLength;
+    def->detailSampleDistance = d.detailSampleDistance;
+    def->detailMaxError = d.detailMaxError;
+    def->limits.inputTriangles = d.limits.inputTriangles;
+    def->limits.tileTriangles = d.limits.tileTriangles;
+    def->limits.tileSpans = d.limits.tileSpans;
+    def->limits.tilePolygons = d.limits.tilePolygons;
+    def->limits.tileVertices = d.limits.tileVertices;
+    def->limits.tileLinks = d.limits.tileLinks;
+    def->limits.tiles = d.limits.tiles;
+    def->limits.links = d.limits.links;
+    def->limits.memoryBytes = d.limits.memoryBytes;
+    def->tier = d.tier;
+    def->clock.now = d.clock.now;
+    def->clock.context = d.clock.context;
+}
+
+// Bakes the level and a volume over it from structs filled with a byte
+// pattern and then set field by field; copies the tile's bytes.
+static size_t BakeOver(int pattern, uint8_t* bytes)
+{
+    mnavBakeDef def;
+    DefOver(&def, pattern);
+    mnavBaker* baker = nullptr;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
+    mnavTriangleMesh level = Level();
+    mnavTriangleMesh mesh;
+    memset(&mesh, pattern, sizeof(mesh));
+    mesh.vertices = level.vertices;
+    mesh.vertexCount = level.vertexCount;
+    mesh.indices = level.indices;
+    mesh.triangleCount = level.triangleCount;
+    mesh.areas = level.areas;
+    static const mnavVec2 square[4] = {{2.0f, 2.0f}, {6.0f, 2.0f}, {6.0f, 6.0f}, {2.0f, 6.0f}};
+    mnavBakeVolume volume;
+    memset(&volume, pattern, sizeof(volume));
+    volume.points = square;
+    volume.pointCount = 4;
+    volume.minY = -10.0f;
+    volume.maxY = 10.0f;
+    volume.kind = mnav_volumeArea;
+    volume.area = (mnavAreaType)2;
+    mnavBakeInput input;
+    memset(&input, pattern, sizeof(input));
+    input.meshes = &mesh;
+    input.meshCount = 1;
+    input.terrains = nullptr;
+    input.terrainCount = 0;
+    input.volumes = &volume;
+    input.volumeCount = 1;
+    input.index = nullptr;
+    size_t size = 0;
+    CHECK(mnavBakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
+              mnavCopyBakedTile(baker, bytes, TILE_CAPACITY, &size) == mnav_success,
+          "baked and copied");
+    mnavDestroyBaker(baker);
+    return size;
+}
+
+// Bakes a floor's outline from structs filled with a byte pattern and then
+// set field by field; copies the tile's bytes.
+static size_t Bake2DOver(int pattern, uint8_t* bytes)
+{
+    mnavBakeDef def;
+    DefOver(&def, pattern);
+    mnavBaker* baker = nullptr;
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
+    static const mnavVec2 floor[4] = {{1.0f, 1.0f}, {7.0f, 1.0f}, {7.0f, 7.0f}, {1.0f, 7.0f}};
+    mnavOutline outline;
+    memset(&outline, pattern, sizeof(outline));
+    outline.points = floor;
+    outline.pointCount = 4;
+    outline.area = (mnavAreaType)1;
+    mnavBake2DInput input;
+    memset(&input, pattern, sizeof(input));
+    input.outlines = &outline;
+    input.outlineCount = 1;
+    input.index = nullptr;
+    size_t size = 0;
+    CHECK(mnavBakeTile2D(baker, &input, 0, 0, nullptr) == mnav_success &&
+              mnavCopyBakedTile(baker, bytes, TILE_CAPACITY, &size) == mnav_success,
+          "baked and copied");
+    mnavDestroyBaker(baker);
+    return size;
+}
+
+// Tile bytes are built field by field: the padding of the def and the
+// input never reaches them.
+static void TestPaddingNeverReachesTheTile(void)
+{
+    static uint8_t zeros[TILE_CAPACITY];
+    static uint8_t ones[TILE_CAPACITY];
+    size_t a = BakeOver(0x00, zeros);
+    size_t b = BakeOver(0xFF, ones);
+    CHECK(a > 0 && a == b && memcmp(zeros, ones, a) == 0, "the same bytes over both patterns");
+    a = Bake2DOver(0x00, zeros);
+    b = Bake2DOver(0xFF, ones);
+    CHECK(a > 0 && a == b && memcmp(zeros, ones, a) == 0, "the same 2D bytes over both patterns");
+}
+
 int main(void)
 {
     TestCreateChecksTheDef();
@@ -413,5 +537,6 @@ int main(void)
     TestLimitsEndInAStage();
     TestStagesAreTimedAndMeasured();
     TestTilesToTheExtent();
+    TestPaddingNeverReachesTheTile();
     return s_failures == 0 ? 0 : 1;
 }
