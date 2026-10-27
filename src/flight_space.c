@@ -8,6 +8,7 @@
 
 #include "flight.h"
 #include "flight_volume.h"
+#include "invariant.h"
 
 #include "maul-nav/flight.h"
 
@@ -87,6 +88,9 @@ static int32_t Hold(const mnavFlightTile* t, int32_t x, int32_t y, int32_t z, mn
     const mnavFlightNode* node = &t->nodes[t->rootNodes[c]];
     for (int32_t size = t->side / 2;; size /= 2)
     {
+        // A side of 16 voxels or more halves to the leaves' 4, which end
+        // the descent.
+        MNAV_ASSERT(size >= 4);
         int32_t o =
             (x >= b->x + size ? 1 : 0) | (y >= b->y + size ? 2 : 0) | (z >= b->z + size ? 4 : 0);
         b->x += (o & 1) != 0 ? size : 0;
@@ -345,6 +349,7 @@ static void Collect(const mnavFlightTile* t, int32_t c, const Region* r)
             }
             else
             {
+                MNAV_ASSERT(top < STACK_DEPTH);
                 stack[top++] = (Frame){Child(node, o), x, y, z, h};
             }
         }
@@ -618,6 +623,10 @@ static bool Within(const mnavFlightCursor* cursor, Walk* w, const int32_t end[3]
         {
             return false;
         }
+        // A voxel short of the end's lies a step away along an axis the
+        // segment moves on, whose crossing is the one due; without it the
+        // walk would not move.
+        MNAV_ASSERT(*tied != 0);
         if (!Inside(&w->open, to))
         {
             if (!LeafClear(cursor, w->at, w->step, *tied, to))

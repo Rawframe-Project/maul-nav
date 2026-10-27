@@ -38,7 +38,7 @@ flight: allocator bake_def flight_def heightfield raster
 flight_tile: allocator bytes fields flight flight_def invariant
 flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def flight_tile fpenv raster
 flight_volume: allocator flight flight_def flight_tile fpenv
-flight_space: flight flight_volume
+flight_space: flight flight_volume invariant
 flight_frame: flight_volume
 flight_debug: draw flight_frame flight_space fpenv
 flight_search: flight_frame flight_space flight_volume fpenv query
