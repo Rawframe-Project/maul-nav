@@ -14,6 +14,7 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 // The hash of the agents' walks along their corridors.
@@ -161,6 +162,63 @@ static void TestChecksAndLimits(void)
               mnavResetCorridor(&corridor, buffer, 0, a.polygon, a.point) == mnav_errorInvalid &&
               mnavSetCorridor(&corridor, nullptr) == mnav_errorInvalid,
           "bad arguments");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
+// Every corridor call refuses a corridor whose fields are malformed, and
+// reads none of its buffer: one polygon more than its capacity, a
+// capacity of 0, and no polygon. The buffer holds exactly its capacity,
+// so AddressSanitizer would see a read past it. mnavSetCorridor replaces
+// the count, so it refuses only the capacity.
+static void TestMalformedCorridors(void)
+{
+    mnavNavmesh* navmesh = LoadWorld();
+    mnavQuery* query = MakeQuery(64);
+    mnavNearest a = On(navmesh, 2.0, 2.0, 2.0f);
+    mnavPolygonId* buffer = malloc(2 * sizeof(mnavPolygonId));
+    CHECK(buffer != nullptr, "a buffer of two polygons");
+    buffer[0] = a.polygon;
+    buffer[1] = a.polygon;
+    const mnavCorridor bad[3] = {{a.point, a.point, buffer, 3, 2},
+                                 {a.point, a.point, buffer, 1, 0},
+                                 {a.point, a.point, buffer, 0, 2}};
+    for (int32_t k = 0; k < 3; ++k)
+    {
+        mnavCorridor c = bad[k];
+        int32_t valid = -1;
+        mnavCorners corners;
+        mnavAreaRun runs[4];
+        int32_t count = 0;
+        mnavMove move;
+        bool shortened = false;
+        mnavPath path;
+        bool refused =
+            mnavCheckCorridor(navmesh, nullptr, &c, &valid) == mnav_errorInvalid &&
+            mnavCorridorCorners(query, navmesh, &c, &corners) == mnav_errorInvalid &&
+            mnavCorridorAreas(query, navmesh, &c, nullptr, runs, 4, &count) == mnav_errorInvalid &&
+            mnavMoveCorridor(query, navmesh, nullptr, &c, a.point, &move) == mnav_errorInvalid &&
+            mnavMoveCorridorTarget(query, navmesh, nullptr, &c, a.point, &move) ==
+                mnav_errorInvalid &&
+            mnavShortcutCorridor(query, navmesh, nullptr, &c, a.point, &shortened) ==
+                mnav_errorInvalid &&
+            mnavReplanCorridor(query, navmesh, nullptr, &c, (mnavVec3){1.0f, 1.0f, 1.0f}, &path) ==
+                mnav_errorInvalid;
+        CHECK(refused && c.count == bad[k].count && c.capacity == bad[k].capacity && valid == -1 &&
+                  !shortened,
+              "a malformed corridor refused by every call, unchanged");
+    }
+    mnavPath path;
+    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, a.polygon, a.point, &path) ==
+                  mnav_success &&
+              path.polygonCount == 1,
+          "a path of one polygon");
+    mnavCorridor noRoom = bad[1];
+    mnavCorridor stale = {a.point, a.point, buffer, 5, 2};
+    CHECK(mnavSetCorridor(&noRoom, &path) == mnav_errorInvalid &&
+              mnavSetCorridor(&stale, &path) == mnav_success && stale.count == 1,
+          "loading refuses no room, and replaces any count");
+    free(buffer);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
@@ -638,6 +696,7 @@ int main(void)
     LoadWorldTiles();
     TestCornersAreThePathsStraightPath();
     TestChecksAndLimits();
+    TestMalformedCorridors();
     TestFiltersAndLinks();
     TestMovingTheEnds();
     TestFollowingCorridors();

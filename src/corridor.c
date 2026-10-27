@@ -31,6 +31,15 @@ static bool SameId(mnavPolygonId a, mnavPolygonId b)
     return a.slot == b.slot && a.generation == b.generation && a.polygon == b.polygon;
 }
 
+// Whether a corridor is well formed: a buffer, room for a polygon at
+// least, and from one polygon to its room. Its fields are the caller's,
+// so every call checks them before it reads the buffer.
+static bool WellFormed(const mnavCorridor* corridor)
+{
+    return corridor != nullptr && corridor->polygons != nullptr && corridor->capacity >= 1 &&
+           corridor->count >= 1 && corridor->count <= corridor->capacity;
+}
+
 static MNAV_NOINLINE mnavResult ResetCorridorWork(mnavCorridor* corridor, mnavPolygonId* buffer,
                                                   int32_t capacity, mnavPolygonId polygon,
                                                   mnavPos3 position)
@@ -55,8 +64,9 @@ mnavResult mnavResetCorridor(mnavCorridor* corridor, mnavPolygonId* buffer, int3
 
 static MNAV_NOINLINE mnavResult SetCorridorWork(mnavCorridor* corridor, const mnavPath* path)
 {
+    // The count is replaced, so only the buffer and its room are read.
     if (corridor == nullptr || path == nullptr || corridor->polygons == nullptr ||
-        path->polygonCount < 1 || path->pointCount < 1)
+        corridor->capacity < 1 || path->polygonCount < 1 || path->pointCount < 1)
     {
         return mnav_errorInvalid;
     }
@@ -210,8 +220,7 @@ static MNAV_NOINLINE mnavResult CheckCorridorWork(const mnavNavmesh* navmesh,
                                                   const mnavQueryFilter* filter,
                                                   const mnavCorridor* corridor, int32_t* validOut)
 {
-    if (navmesh == nullptr || corridor == nullptr || validOut == nullptr ||
-        corridor->polygons == nullptr)
+    if (navmesh == nullptr || validOut == nullptr || !WellFormed(corridor))
     {
         return mnav_errorInvalid;
     }
@@ -239,8 +248,7 @@ static MNAV_NOINLINE mnavResult CorridorCornersWork(mnavQuery* query, const mnav
                                                     const mnavCorridor* corridor,
                                                     mnavCorners* cornersOut)
 {
-    if (query == nullptr || navmesh == nullptr || corridor == nullptr || cornersOut == nullptr ||
-        corridor->polygons == nullptr || corridor->count < 1)
+    if (query == nullptr || navmesh == nullptr || cornersOut == nullptr || !WellFormed(corridor))
     {
         return mnav_errorInvalid;
     }
@@ -494,7 +502,7 @@ static MNAV_NOINLINE mnavResult MoveCorridorWork(mnavQuery* query, const mnavNav
                                                  mnavCorridor* corridor, mnavPos3 wanted,
                                                  mnavMove* moveOut)
 {
-    if (corridor == nullptr || corridor->polygons == nullptr || corridor->count < 1)
+    if (!WellFormed(corridor))
     {
         return mnav_errorInvalid;
     }
@@ -505,8 +513,7 @@ static MNAV_NOINLINE mnavResult MoveCorridorWork(mnavQuery* query, const mnavNav
     if (result == mnav_success)
     {
         corridor->position = move.point;
-        MNAV_ASSERT(corridor->count >= 1 && corridor->count <= corridor->capacity &&
-                    SameId(corridor->polygons[0], move.polygon));
+        MNAV_ASSERT(SameId(corridor->polygons[0], move.polygon));
     }
     if (result == mnav_success && moveOut != nullptr)
     {
@@ -530,7 +537,7 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetWork(mnavQuery* query, const m
                                                        mnavCorridor* corridor, mnavPos3 wanted,
                                                        mnavMove* moveOut)
 {
-    if (corridor == nullptr || corridor->polygons == nullptr || corridor->count < 1)
+    if (!WellFormed(corridor))
     {
         return mnav_errorInvalid;
     }
@@ -542,8 +549,7 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetWork(mnavQuery* query, const m
     if (result == mnav_success)
     {
         corridor->target = move.point;
-        MNAV_ASSERT(corridor->count >= 1 && corridor->count <= corridor->capacity &&
-                    SameId(corridor->polygons[corridor->count - 1], move.polygon));
+        MNAV_ASSERT(SameId(corridor->polygons[corridor->count - 1], move.polygon));
     }
     if (result == mnav_success && moveOut != nullptr)
     {
@@ -567,8 +573,7 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorWork(mnavQuery* query, const mna
                                                      mnavCorridor* corridor, mnavPos3 toward,
                                                      bool* shortenedOut)
 {
-    if (corridor == nullptr || corridor->polygons == nullptr || corridor->count < 1 ||
-        shortenedOut == nullptr)
+    if (!WellFormed(corridor) || shortenedOut == nullptr)
     {
         return mnav_errorInvalid;
     }
@@ -635,8 +640,7 @@ static MNAV_NOINLINE mnavResult ReplanCorridorWork(mnavQuery* query, const mnavN
                                                    mnavCorridor* corridor, mnavVec3 halfExtents,
                                                    mnavPath* pathOut)
 {
-    if (query == nullptr || navmesh == nullptr || corridor == nullptr || pathOut == nullptr ||
-        corridor->polygons == nullptr || corridor->count < 1)
+    if (query == nullptr || navmesh == nullptr || pathOut == nullptr || !WellFormed(corridor))
     {
         return mnav_errorInvalid;
     }
