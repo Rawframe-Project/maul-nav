@@ -19,10 +19,9 @@ may change the API, the ABI and the tile formats.
   that is repeated, out of order, empty, not a whole number of records,
   or padded with non-zero bytes, and bytes after the last field, with
   `mnav_errorInvalid` naming the field's `mnavTileSection`; an unknown
-  tag is `mnav_errorVersion`. `MNAV_TILE_FORMAT` is 3 and
-  `MNAV_BAKE_GENERATOR` 2. Every tile's bytes and fingerprint change, so
-  a host rebakes its tiles; the meshes they hold, and so paths and
-  queries, do not change.
+  tag is `mnav_errorVersion`. `MNAV_TILE_FORMAT` is 3. Every tile's
+  bytes and fingerprint change, so a host rebakes its tiles; the meshes
+  they hold, and so paths and queries, do not change.
   ([#97](https://github.com/Rawframe-Project/maul-nav/pull/97))
 - **Breaking:** a flight tile takes the same form: a 32-byte header with
   the magic `MNVF`, then the fields `FLHT`, `LEAF`, `NODE` and `ROOT`,
@@ -45,6 +44,9 @@ may change the API, the ABI and the tile formats.
   whole loses the area it did not triangulate, and that
   `mnavBakeReport.partialRings` counts it.
   ([#91](https://github.com/Rawframe-Project/maul-nav/pull/91))
+- `mnavBakeReport.partialRings` counts the polygon stage's rings alone:
+  a detail outline, a simple ring since #109, always triangulates whole.
+  ([#112](https://github.com/Rawframe-Project/maul-nav/pull/112))
 
 ### Fixed
 
@@ -80,12 +82,13 @@ may change the API, the ABI and the tile formats.
   by a 64-bit hash, so a baker of another def is always refused with
   `mnav_errorInvalid`. A cache's tile slots grow by 80 bytes each.
   ([#90](https://github.com/Rawframe-Project/maul-nav/pull/90))
-- The detail stage places each edge sample exactly on its edge, so a
-  sliver polygon's outline is a simple ring and triangulates whole,
-  where before a sample rounded off its edge could leave the ring cut
-  short and counted in `partialRings`. Polygons sharing an edge still
-  place the same points. Tile bytes change for polygons with sloped
-  edges, and `MNAV_BAKE_GENERATOR` is 3.
+- **Breaking:** the detail stage places each edge sample exactly on its
+  edge, so a sliver polygon's outline is a simple ring and triangulates
+  whole, where before a sample rounded off its edge could leave the ring
+  cut short and counted in `partialRings`. Polygons sharing an edge
+  still place the same points. Tile bytes and fingerprints change for
+  polygons with sloped edges, and `MNAV_BAKE_GENERATOR` is 3, so a host
+  rebakes its tiles.
   ([#109](https://github.com/Rawframe-Project/maul-nav/pull/109))
 
 ## [0.0.4](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.0.4) (2026-10-24)
