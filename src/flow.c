@@ -13,6 +13,7 @@
 #include "draw.h"
 #include "flow.h"
 #include "fpenv.h"
+#include "invariant.h"
 #include "query_filter.h"
 
 #include "maul-nav/bake.h"
@@ -183,6 +184,7 @@ static void SiftUp(mnavFlowField* f, int32_t at)
 
 static int32_t Pop(mnavFlowField* f)
 {
+    MNAV_ASSERT(f->heapCount > 0 && f->places[f->heap[0]] == 0);
     int32_t top = f->heap[0];
     int32_t last = f->heap[--f->heapCount];
     int32_t at = 0;
@@ -214,6 +216,16 @@ static int32_t Pop(mnavFlowField* f)
 
 void mnavFlowLower(mnavFlowField* f, int32_t cell, double cost, int32_t next)
 {
+    // A goal leads to itself; any other cell's way costs no less than its
+    // next cell's, as area costs are at least 0.
+    MNAV_ASSERT(next == cell || cost >= f->costs[next]);
+    // A cell is in the heap once at most, so the heap has room for every
+    // cell of the region; one in it is where the heap holds it. A repair
+    // lists each cell it touches once.
+    MNAV_ASSERT(f->places[cell] < 0 ? f->heapCount < f->region.width * f->region.height
+                                    : f->heap[f->places[cell]] == cell);
+    MNAV_ASSERT(!f->repairing || (f->marks[cell] & mnav_flowTouched) != 0 ||
+                f->touchedCount < f->region.width * f->region.height);
     f->costs[cell] = cost;
     f->next[cell] = next;
     if (f->places[cell] < 0)

@@ -14,6 +14,7 @@
 
 #include "flow.h"
 #include "fpenv.h"
+#include "invariant.h"
 
 #include "maul-nav/base.h"
 #include "maul-nav/flow.h"
@@ -28,6 +29,8 @@ static void Raise(mnavFlowField* f, int32_t cell)
 {
     if ((f->marks[cell] & mnav_flowRaised) == 0)
     {
+        // Each cell is listed once, by its marks.
+        MNAV_ASSERT(f->touchedCount < f->region.width * f->region.height);
         f->marks[cell] |= mnav_flowRaised | mnav_flowTouched;
         f->touched[f->touchedCount++] = cell;
     }
@@ -208,6 +211,9 @@ static MNAV_NOINLINE mnavResult UpdateFlowFieldWork(mnavFlowField* field, const 
         return result;
     }
     mnavFlowSearch s = {field, grid->areas};
+    // Only an ended field is repaired, and its heap is empty: the raised
+    // cells below leave it without a place to update.
+    MNAV_ASSERT(field->heapCount == 0);
     field->repairing = true;
     field->touchedCount = 0;
     field->fixed = 0;
