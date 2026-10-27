@@ -446,7 +446,7 @@ static void Count(const Stages* s, mnavBakeReport* report)
     report->detailVertices = s->detail.vertexCount;
     report->detailTriangles = s->detail.triangleCount;
     report->droppedHoles = s->set.droppedHoles;
-    report->partialRings = s->mesh.failedRings + s->detail.failedPolygons;
+    report->partialRings = s->mesh.failedRings;
     report->fallbackHeights = s->detail.fallbackHeights;
     report->cappedDetail = s->detail.cappedPolygons;
 }

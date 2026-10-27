@@ -603,7 +603,8 @@ static void MarkSides(mnavPolyMesh* mesh)
 }
 
 // Corner k of a polygon is a vertex of the mesh no other corner repeats,
-// where the polygon does not turn backward.
+// and the edge from it has length on the ground, with every corner on its
+// inner side or on it.
 static void CheckCorner(const mnavPolyMesh* mesh, const mnavPolygon* polygon, int32_t k)
 {
     int32_t n = polygon->count;
@@ -613,12 +614,14 @@ static void CheckCorner(const mnavPolyMesh* mesh, const mnavPolygon* polygon, in
         MNAV_ASSERT(polygon->vertices[j] != polygon->vertices[k]);
     }
     const mnavMeshVertex* v = mesh->vertices;
-    int32_t a = polygon->vertices[(k + n - 1) % n];
-    int32_t b = polygon->vertices[k];
-    int32_t c = polygon->vertices[(k + 1) % n];
-    int64_t turn = (int64_t)(v[b].x - v[a].x) * (v[c].z - v[a].z) -
-                   (int64_t)(v[c].x - v[a].x) * (v[b].z - v[a].z);
-    MNAV_ASSERT(turn <= 0);
+    int32_t a = polygon->vertices[k];
+    int32_t b = polygon->vertices[(k + 1) % n];
+    MNAV_ASSERT(v[a].x != v[b].x || v[a].z != v[b].z);
+    for (int32_t j = 0; j < n; ++j)
+    {
+        int32_t c = polygon->vertices[j];
+        MNAV_ASSERT(TwiceArea(v, a, b, c) <= 0);
+    }
 }
 
 // The neighbor across edge k of polygon p, if any, has the same edge the
@@ -644,19 +647,24 @@ static void CheckNeighbor(const mnavPolyMesh* mesh, int32_t p, int32_t k)
     MNAV_ASSERT(back);
 }
 
-// Every polygon has three to MNAV_POLYGON_VERTICES corners and edges as
-// CheckCorner and CheckNeighbor require.
+// Every polygon has three to MNAV_POLYGON_VERTICES corners, edges as
+// CheckCorner and CheckNeighbor require, and area on the ground: it is
+// convex, as a tile's loader requires and the detail stage relies on.
 static void CheckPolyMesh(const mnavPolyMesh* mesh)
 {
     for (int32_t p = 0; p < mesh->polygonCount; ++p)
     {
         const mnavPolygon* polygon = &mesh->polygons[p];
         MNAV_ASSERT(polygon->count >= 3 && polygon->count <= MNAV_POLYGON_VERTICES);
+        int64_t area = 0;
         for (int32_t k = 0; k < polygon->count; ++k)
         {
             CheckCorner(mesh, polygon, k);
             CheckNeighbor(mesh, p, k);
+            area += TwiceArea(mesh->vertices, polygon->vertices[0], polygon->vertices[k],
+                              polygon->vertices[(k + 1) % polygon->count]);
         }
+        MNAV_ASSERT(area < 0);
     }
 }
 
