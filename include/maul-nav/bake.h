@@ -642,7 +642,9 @@ extern "C"
     /// another number of meshes or another number of triangles in a mesh
     /// is `mnav_errorInvalid`; `mnav_errorRange` for a mesh past the
     /// extent or a tile past it; `mnav_errorLimit` when a named limit or
-    /// the memory limit is reached (the report's stage says where);
+    /// the memory limit is reached, or when rasterizing cuts a triangle
+    /// into a piece of more corners than a piece holds, which only
+    /// rounding can cause (the report's stage says where);
     /// `mnav_errorCapacity` when the allocator fails. On failure the baker
     /// holds no tile.
     /// @par Thread safety
