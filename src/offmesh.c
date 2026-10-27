@@ -8,6 +8,7 @@
 
 #include "allocator.h"
 #include "fpenv.h"
+#include "invariant.h"
 #include "navmesh.h"
 #include "nearest.h"
 #include "sort.h"
@@ -25,9 +26,16 @@
 #define POLYGON_BITS 16
 
 static_assert(MNAV_MAX_LINKS <= 1 << LINK_BITS, "a key holds every link slot");
+static_assert(MNAV_MAX_TILE_POLYGONS <= 1 << POLYGON_BITS, "a key holds every polygon");
 
 uint64_t mnavAttachmentKey(mnavAttachment a)
 {
+    // Each field fits its bits: a link below the navmesh's slot limit, a
+    // polygon of a tile, and a tile slot below 2^27, which only that many
+    // slots each worn out by 2^32 tiles could pass.
+    MNAV_ASSERT(a.link >= 0 && a.link < 1 << LINK_BITS);
+    MNAV_ASSERT(a.polygon >= 0 && a.polygon < 1 << POLYGON_BITS);
+    MNAV_ASSERT(a.slot >= 0 && a.slot < 1 << (63 - LINK_BITS - POLYGON_BITS));
     return (uint64_t)(uint32_t)a.slot << (1 + LINK_BITS + POLYGON_BITS) |
            (uint64_t)(uint32_t)a.polygon << (1 + LINK_BITS) | (uint64_t)(uint32_t)a.link << 1 |
            (uint64_t)a.reverse;

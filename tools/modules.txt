@@ -56,7 +56,7 @@ raycast: fpenv navmesh polymesh query query_filter
 shortest: fpenv invariant navmesh offmesh polymesh query query_filter
 query: allocator fpenv
 query_filter:
-offmesh: allocator fpenv navmesh nearest sort
+offmesh: allocator fpenv invariant navmesh nearest sort
 commit: fpenv invariant modifiers navmesh offmesh
 funnel: invariant navmesh query
 surface: fpenv navmesh nearest polymesh query query_filter
