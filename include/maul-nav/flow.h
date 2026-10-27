@@ -124,10 +124,10 @@ extern "C"
     /// negative count, a grid with no areas, a side below 1 or a cell size not
     /// more than 0 or not finite, a region empty or not within the grid, a goal
     /// outside the grid, or a filter not built from mnavDefaultQueryFilter or
-    /// with a cost not finite; `mnav_errorLimit` for a side past
-    /// MNAV_MAX_GRID_SIDE or a filter cost past MNAV_MIN_AREA_COST or
-    /// MNAV_MAX_AREA_COST; `mnav_errorCapacity` for a region of more cells than
-    /// the field's limit. On an error the field holds nothing.
+    /// with a NaN cost; `mnav_errorLimit` for a side past MNAV_MAX_GRID_SIDE or
+    /// a filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST, an infinity
+    /// included; `mnav_errorCapacity` for a region of more cells than the
+    /// field's limit. On an error the field holds nothing.
     /// @par Thread safety
     /// Safe from any thread; the field is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBeginFlowField(mnavFlowField* field,

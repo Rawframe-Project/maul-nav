@@ -86,9 +86,7 @@ static MNAV_NOINLINE mnavResult SteerWork(const mnavCorners* corners, const mnav
     {
         return mnav_errorVersion;
     }
-    if (!isfinite(def->maxSpeed) || !isfinite(def->slowDistance) ||
-        !isfinite(def->arriveDistance) || def->maxSpeed < 0.0f || def->slowDistance < 0.0f ||
-        def->arriveDistance < 0.0f)
+    if (!(def->maxSpeed >= 0.0f) || !(def->slowDistance >= 0.0f) || !(def->arriveDistance >= 0.0f))
     {
         return mnav_errorInvalid;
     }

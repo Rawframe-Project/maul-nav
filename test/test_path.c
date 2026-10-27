@@ -316,6 +316,8 @@ static void TestQueryDefsAreChecked(void)
     CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid, "a NaN length");
     def.limits.pathLength = MNAV_MAX_PATH_LENGTH * 2.0f;
     CHECK(mnavCreateQuery(&def, &query) == mnav_errorLimit, "too long");
+    def.limits.pathLength = INFINITY;
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorLimit, "an infinite length");
     def = (mnavQueryDef){0};
     CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid, "not from the default");
     CHECK(mnavCreateQuery(nullptr, &query) == mnav_errorInvalid &&

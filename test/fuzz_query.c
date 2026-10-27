@@ -341,9 +341,8 @@ static mnavResult Steer(Reader* r, const mnavCorridor* corridor)
     def.slowDistance = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.1);
     def.arriveDistance = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.01);
     def.anticipateTurns = Byte(r) % 2 == 0;
-    bool valid = isfinite(def.maxSpeed) && isfinite(def.slowDistance) &&
-                 isfinite(def.arriveDistance) && def.maxSpeed >= 0.0f && def.slowDistance >= 0.0f &&
-                 def.arriveDistance >= 0.0f;
+    // A NaN or a value below 0 is wrong; an infinity passes the bound.
+    bool valid = def.maxSpeed >= 0.0f && def.slowDistance >= 0.0f && def.arriveDistance >= 0.0f;
     bool within = def.maxSpeed <= MNAV_MAX_STEER_SPEED &&
                   def.slowDistance <= MNAV_MAX_STEER_DISTANCE &&
                   def.arriveDistance <= MNAV_MAX_STEER_DISTANCE;

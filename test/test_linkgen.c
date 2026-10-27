@@ -253,7 +253,7 @@ static void TestChecksAndBuffer(const mnavNavmesh* navmesh)
           "a drop past the reach");
     def.dropMax = INFINITY;
     CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_errorInvalid,
+              mnav_errorLimit,
           "an infinite drop");
     def = Def();
     def.detour = 0.5f;

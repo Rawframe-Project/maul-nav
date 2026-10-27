@@ -190,6 +190,9 @@ static void TestFiltersAreChecked(void)
     filter.costs[5] = MNAV_MAX_AREA_COST * 2.0f;
     CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorLimit,
           "too dear");
+    filter.costs[5] = INFINITY;
+    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorLimit,
+          "an infinite cost, past the bound");
     filter.costs[5] = MNAV_MIN_AREA_COST;
     filter.costs[6] = MNAV_MAX_AREA_COST;
     CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_success,

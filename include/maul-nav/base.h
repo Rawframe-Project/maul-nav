@@ -95,7 +95,7 @@ extern "C"
         // The call did what was asked.
         mnav_success = 0,
         // An argument a correct program never passes: a null pointer where
-        // one is required, a value that is not finite or lies outside the
+        // one is required, a NaN, a value (an infinity included) outside a
         // range its documentation gives with no named constant, a
         // combination the call does not take.
         mnav_errorInvalid = -1,
@@ -119,9 +119,9 @@ extern "C"
         // reader makes on them fails with this, or with mnav_errorVersion.
         mnav_errorFormat = -8,
         // An argument, or its content, passes a fixed bound the library
-        // publishes as a named constant (MNAV_MAX_* or MNAV_MIN_*): a
-        // coordinate past the extent, a count past its most. More room would
-        // not help.
+        // publishes as a named constant (MNAV_MAX_* or MNAV_MIN_*), an
+        // infinity included: a coordinate past the extent, a count past its
+        // most. More room would not help.
         mnav_errorLimit = -9,
         // The place asked about has no tile loaded: not a wall, nothing
         // is known there.

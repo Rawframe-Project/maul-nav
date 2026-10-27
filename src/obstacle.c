@@ -27,9 +27,9 @@
 // count as covered by it.
 #define COVERED 1e-9
 
-static bool Finite(mnavPos2 p)
+static bool HasNaN(mnavPos2 p)
 {
-    return isfinite(p.x) && isfinite(p.y);
+    return isnan(p.x) || isnan(p.y);
 }
 
 static bool Within(mnavPos2 p, double bound)
@@ -43,13 +43,13 @@ static double LeftOf(mnavPos2 a, mnavPos2 b, mnavPos2 c)
     return mnavDet2(mnavSub2(a, c), mnavSub2(b, a));
 }
 
-// Whether an obstacle is well formed: mnav_errorInvalid unless its values
-// are finite, a radius is given for one point alone, its edges have some
-// length and a polygon runs counterclockwise; mnav_errorLimit for a
-// point, speed or radius past its MNAV_MAX_AVOIDANCE_ bound.
+// Whether an obstacle is well formed: mnav_errorInvalid for a NaN, a
+// radius given but for one point alone, an edge of no length or a polygon
+// not counterclockwise; mnav_errorLimit for a point, speed or radius past
+// its MNAV_MAX_AVOIDANCE_ bound, an infinity included.
 static mnavResult CheckObstacle(const mnavObstacle* o)
 {
-    if (o->points == nullptr || o->pointCount < 1 || !Finite(o->velocity) || !isfinite(o->radius) ||
+    if (o->points == nullptr || o->pointCount < 1 || HasNaN(o->velocity) || isnan(o->radius) ||
         (o->pointCount == 1) != (o->radius > 0.0) || o->radius < 0.0)
     {
         return mnav_errorInvalid;
@@ -60,7 +60,7 @@ static mnavResult CheckObstacle(const mnavObstacle* o)
     {
         mnavPos2 a = o->points[i];
         mnavPos2 b = o->points[(i + 1) % o->pointCount];
-        if (!Finite(a) || (o->pointCount > 1 && a.x == b.x && a.y == b.y))
+        if (HasNaN(a) || (o->pointCount > 1 && a.x == b.x && a.y == b.y))
         {
             return mnav_errorInvalid;
         }

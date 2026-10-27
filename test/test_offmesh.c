@@ -266,7 +266,7 @@ static void TestDefsAndLimits(void)
     link.radius = MNAV_MAX_LINK_RADIUS * 2.0f;
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "too wide");
     link.radius = INFINITY;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "an infinite radius");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "an infinite radius");
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
     link.cost = NAN;
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "a NaN cost");
@@ -298,7 +298,10 @@ static void TestDefsAndLimits(void)
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid,
           "an edge link of ends too near for a direction");
     link = Link(7.5, 7.5, (double)INFINITY, 7.5, 0.5f);
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "an end not finite");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit,
+          "an infinite end, past the extent");
+    link = Link(7.5, 7.5, (double)NAN, 7.5, 0.5f);
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "a NaN end");
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
     CHECK(mnavStageLink(nullptr, &link, &id) == mnav_errorInvalid &&
               mnavStageLink(navmesh, nullptr, &id) == mnav_errorInvalid &&

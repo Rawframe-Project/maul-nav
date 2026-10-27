@@ -42,7 +42,7 @@ mnavInputResult mnavCheckVolume(const mnavBakeDef* def, const mnavBakeVolume* vo
     for (int32_t i = 0; i < volume->pointCount; ++i)
     {
         mnavVec2 p = volume->points[i];
-        if (!isfinite(p.x) || !isfinite(p.y))
+        if (isnan(p.x) || isnan(p.y))
         {
             return Refuse(mnav_errorInvalid, mnav_elementPoint, i);
         }

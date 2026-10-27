@@ -142,7 +142,7 @@ static void TestRefusals(void)
     bad.maxSpeed = MNAV_MAX_STEER_SPEED * 2.0f;
     CHECK(mnavSteer(&c, &bad, &s) == mnav_errorLimit, "too fast");
     bad.maxSpeed = INFINITY;
-    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorInvalid, "an infinite speed");
+    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorLimit, "an infinite speed");
     bad = def;
     bad.slowDistance = (float)NAN;
     CHECK(mnavSteer(&c, &bad, &s) == mnav_errorInvalid, "a slowing distance of NaN");

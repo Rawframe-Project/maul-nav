@@ -613,6 +613,12 @@ static void TestObstacleChecks(void)
     def = mnavDefaultAvoidanceDef();
     def.obstacleTimeHorizon = 0.0;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorLimit, "no obstacle horizon");
+    // Minus infinity is below MNAV_MIN_AVOIDANCE_TIME; plus infinity passes
+    // no bound and is wrong.
+    def.obstacleTimeHorizon = -(double)INFINITY;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorLimit, "a horizon of minus infinity");
+    def.obstacleTimeHorizon = (double)INFINITY;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid, "an endless horizon");
     def = mnavDefaultAvoidanceDef();
     def.limits.obstacleNeighbors = 0;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid, "no obstacle neighbours");

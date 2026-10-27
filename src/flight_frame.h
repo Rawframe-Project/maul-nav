@@ -23,7 +23,8 @@ typedef struct mnavFlightFrame
 mnavFlightFrame mnavMakeFlightFrame(const mnavFlightVolume* volume);
 
 // A world point in voxels, and the voxel holding it: mnav_errorInvalid for
-// a point not finite, mnav_errorLimit for one past MNAV_MAX_FLIGHT_VOXELS.
+// a NaN coordinate, mnav_errorLimit for one past MNAV_MAX_FLIGHT_VOXELS,
+// an infinity included.
 mnavResult mnavFlightToVoxels(const mnavFlightFrame* frame, mnavPos3 point, double out[3],
                               int32_t voxel[3]);
 

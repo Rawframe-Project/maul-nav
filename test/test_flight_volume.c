@@ -126,13 +126,16 @@ static void CheckOutside(const mnavFlightVolume* volume)
     {
         wrong += mnavIsFlightOpen(volume, away[k], &open) == mnav_errorNotLoaded ? 0 : 1;
     }
-    const mnavPos3 out[4] = {
-        {1.0, -2.01, 1.0}, {1.0, 30.0, 1.0}, {(double)NAN, 5.0, 1.0}, {1.0, 5.0, 1e300}};
-    // Below the floor, above the ceiling and not finite are wrong; past
-    // MNAV_MAX_FLIGHT_VOXELS is a bound.
-    const mnavResult refused[4] = {mnav_errorInvalid, mnav_errorInvalid, mnav_errorInvalid,
-                                   mnav_errorLimit};
-    for (int32_t k = 0; k < 4; ++k)
+    const mnavPos3 out[5] = {{1.0, -2.01, 1.0},
+                             {1.0, 30.0, 1.0},
+                             {(double)NAN, 5.0, 1.0},
+                             {1.0, 5.0, 1e300},
+                             {(double)INFINITY, 5.0, 1.0}};
+    // Below the floor, above the ceiling and NaN are wrong; past
+    // MNAV_MAX_FLIGHT_VOXELS, an infinity included, is a bound.
+    const mnavResult refused[5] = {mnav_errorInvalid, mnav_errorInvalid, mnav_errorInvalid,
+                                   mnav_errorLimit, mnav_errorLimit};
+    for (int32_t k = 0; k < 5; ++k)
     {
         wrong += mnavIsFlightOpen(volume, out[k], &open) == refused[k] && !open ? 0 : 1;
     }
@@ -476,6 +479,7 @@ static void TestDefIsChecked(void)
         case 12:
             d.ceiling = INFINITY;
             expect = mnav_flightSettingCeiling;
+            bound = true;
             break;
         case 13:
             d.ceiling = 32760.0f;

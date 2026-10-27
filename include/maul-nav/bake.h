@@ -419,10 +419,10 @@ extern "C"
     /// @param outline The outline.
     /// @return `mnav_success`; for a def mnavValidateBakeDef refuses, the
     /// status it gives; `mnav_errorInvalid` for a NULL argument, fewer than 3
-    /// points, an area of MNAV_AREA_TYPES or more, or a point that is not
-    /// finite (the point); `mnav_errorLimit` for a point past the extent input
-    /// may have (the point); `mnav_errorCapacity` for more points than the
-    /// inputTriangles limit.
+    /// points, an area of MNAV_AREA_TYPES or more, or a point with a NaN
+    /// coordinate (the point); `mnav_errorLimit` for a point past the extent
+    /// input may have, an infinity included (the point); `mnav_errorCapacity`
+    /// for more points than the inputTriangles limit.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateOutline(const mnavBakeDef* def,
@@ -483,14 +483,14 @@ extern "C"
     /// @param def       The def to check.
     /// @param cellsOut  Receives the settings in cells when the def is
     ///                  valid. May be NULL.
-    /// @return `mnav_success`; `mnav_errorInvalid` with the setting for a
-    /// NULL def, a def without its cookie, an allocator with one function,
-    /// a value that is not finite or lies outside the range its field gives
-    /// with no named constant, or an agent radius whose border is wider than
-    /// a tile; `mnav_errorLimit` with the setting for a value past an
-    /// MNAV_MIN_ or MNAV_MAX_ bound its field names, an agent height or step
-    /// height past MNAV_MAX_HEIGHT_CELLS included; `mnav_errorVersion` with
-    /// no setting for a def built against another version of the headers.
+    /// @return `mnav_success`; `mnav_errorInvalid` with the setting for a NULL
+    /// def, a def without its cookie, an allocator with one function, a NaN, a
+    /// value (an infinity included) outside the range its field gives with no
+    /// named constant, or an agent radius whose border is wider than a tile;
+    /// `mnav_errorLimit` with the setting for a value past an MNAV_MIN_ or
+    /// MNAV_MAX_ bound its field names, an infinity and an agent height or step
+    /// height past MNAV_MAX_HEIGHT_CELLS included; `mnav_errorVersion` with no
+    /// setting for a def built against another version of the headers.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavValidateBakeDef(const mnavBakeDef* def,
@@ -502,13 +502,13 @@ extern "C"
     /// @param mesh  The mesh.
     /// @return `mnav_success`; for a def mnavValidateBakeDef refuses, the
     /// status it gives; `mnav_errorInvalid` for a NULL argument, a negative
-    /// count, a NULL array its count needs, a vertex coordinate that is not
-    /// finite, a vertex index outside the vertices or an area type of
-    /// MNAV_AREA_TYPES or more; `mnav_errorCapacity` for more triangles than
-    /// the def's inputTriangles limit; `mnav_errorLimit` for a vertex more
-    /// than MNAV_MAX_EXTENT_CELLS cells from the origin on the ground or
-    /// MNAV_MAX_HEIGHT_CELLS cell heights above or below it. The element and
-    /// index name the first offending vertex or triangle.
+    /// count, a NULL array its count needs, a NaN vertex coordinate, a vertex
+    /// index outside the vertices or an area type of MNAV_AREA_TYPES or more;
+    /// `mnav_errorCapacity` for more triangles than the def's inputTriangles
+    /// limit; `mnav_errorLimit` for a vertex more than MNAV_MAX_EXTENT_CELLS
+    /// cells from the origin on the ground or MNAV_MAX_HEIGHT_CELLS cell
+    /// heights above or below it, an infinity included. The element and index
+    /// name the first offending vertex or triangle.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateTriangleMesh(const mnavBakeDef* def,
@@ -638,25 +638,24 @@ extern "C"
     /// @param tileX     The tile's column in the grid from the origin.
     /// @param tileZ     The tile's row.
     /// @param reportOut Receives what the bake did. May be NULL.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or
-    /// input, a negative count, NULL meshes, terrains or volumes with a
-    /// positive count, or a mesh its check refuses (the report names it);
-    /// a terrain with fewer than 2 samples on a side, a spacing not more
-    /// than 0 or not finite, a height not finite (the sample) or an area of
-    /// MNAV_AREA_TYPES or more (the cell) is `mnav_errorInvalid`, a side past
-    /// MNAV_MAX_TERRAIN_SIDE or a sample past the extent input may have
-    /// `mnav_errorLimit`; a volume with fewer than 3 points, a kind out of
-    /// range, an area volume's area not walkable, heights not finite or
-    /// backward, or a point not finite (the point) is `mnav_errorInvalid`, a
-    /// point past the extent (the point) `mnav_errorLimit`; a tile index made
-    /// for another grid, another number of meshes or another number of
-    /// triangles in a mesh is `mnav_errorInvalid`; `mnav_errorLimit` for a
-    /// mesh past the extent, a tile past it, or a triangle that rasterizing
-    /// cuts into a piece of more than MNAV_MAX_PIECE_CORNERS corners, which
-    /// only rounding can cause (the report's stage says where);
-    /// `mnav_errorCapacity` when a named limit or the memory limit is
-    /// reached or the allocator fails. On failure the baker holds no
-    /// tile.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or input, a
+    /// negative count, NULL meshes, terrains or volumes with a positive count,
+    /// or a mesh its check refuses (the report names it); a terrain with fewer
+    /// than 2 samples on a side, a spacing not more than 0 or not finite, a NaN
+    /// height (the sample) or an area of MNAV_AREA_TYPES or more (the cell) is
+    /// `mnav_errorInvalid`, a side past MNAV_MAX_TERRAIN_SIDE or a sample past
+    /// the extent input may have `mnav_errorLimit`; a volume with fewer than 3
+    /// points, a kind out of range, an area volume's area not walkable, heights
+    /// not finite or backward, or a NaN point coordinate (the point) is
+    /// `mnav_errorInvalid`, a point past the extent, an infinity included (the
+    /// point), `mnav_errorLimit`; a tile index made for another grid, another
+    /// number of meshes or another number of triangles in a mesh is
+    /// `mnav_errorInvalid`; `mnav_errorLimit` for a mesh past the extent, a
+    /// tile past it, or a triangle that rasterizing cuts into a piece of more
+    /// than MNAV_MAX_PIECE_CORNERS corners, which only rounding can cause (the
+    /// report's stage says where); `mnav_errorCapacity` when a named limit or
+    /// the memory limit is reached or the allocator fails. On failure the baker
+    /// holds no tile.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     /// Bakers share nothing, so one per thread bakes tiles in parallel.

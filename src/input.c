@@ -25,7 +25,7 @@ static mnavInputResult CheckVertex(const mnavBakeDef* def, const mnavTriangleMes
     float ground = def->cellSize * (float)MNAV_MAX_EXTENT_CELLS;
     float vertical = def->cellHeight * (float)MNAV_MAX_HEIGHT_CELLS;
     mnavVec3 v = mesh->vertices[i];
-    if (!isfinite(v.x) || !isfinite(v.y) || !isfinite(v.z))
+    if (isnan(v.x) || isnan(v.y) || isnan(v.z))
     {
         return Refuse(mnav_errorInvalid, mnav_elementVertex, i);
     }
@@ -159,7 +159,7 @@ mnavInputResult mnavCheckOutline(const mnavBakeDef* def, const mnavOutline* outl
     for (int32_t i = 0; i < outline->pointCount; ++i)
     {
         mnavVec2 p = outline->points[i];
-        if (!isfinite(p.x) || !isfinite(p.y))
+        if (isnan(p.x) || isnan(p.y))
         {
             return Refuse(mnav_errorInvalid, mnav_elementPoint, i);
         }

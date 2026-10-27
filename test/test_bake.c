@@ -74,9 +74,9 @@ static void TestGridSettingsAreChecked(void)
     broken = def;
     broken.cellSize = NAN;
     CHECK(Refuses(broken, mnav_settingCellSize), "NaN cell");
-    // Not finite is wrong, not a value past the bound.
+    // An infinity passes the published bound; a NaN is wrong.
     broken.cellSize = INFINITY;
-    CHECK(Refuses(broken, mnav_settingCellSize), "infinite cell");
+    CHECK(Bounds(broken, mnav_settingCellSize), "infinite cell");
     broken = def;
     broken.cellHeight = 11.0f;
     CHECK(Bounds(broken, mnav_settingCellHeight), "cell too tall");
@@ -111,7 +111,7 @@ static void TestAgentSettingsAreChecked(void)
     broken.agent.height = 5000.0f;
     CHECK(Bounds(broken, mnav_settingAgentHeight), "height past the cell range");
     broken.agent.height = INFINITY;
-    CHECK(Refuses(broken, mnav_settingAgentHeight), "infinite height");
+    CHECK(Bounds(broken, mnav_settingAgentHeight), "infinite height");
     broken = def;
     broken.agent.stepHeight = NAN;
     CHECK(Refuses(broken, mnav_settingAgentStepHeight), "NaN step");
@@ -136,7 +136,7 @@ static void TestAgentSettingsAreChecked(void)
     broken.maxEdgeError = MNAV_MAX_CELL_SIZE * MNAV_MAX_TILE_CELLS * 2.0f;
     CHECK(Bounds(broken, mnav_settingMaxEdgeError), "edge error past the bound");
     broken.maxEdgeError = INFINITY;
-    CHECK(Refuses(broken, mnav_settingMaxEdgeError), "infinite edge error");
+    CHECK(Bounds(broken, mnav_settingMaxEdgeError), "infinite edge error");
     broken = def;
     broken.maxEdgeLength = NAN;
     CHECK(Refuses(broken, mnav_settingMaxEdgeLength), "NaN edge length");
@@ -246,7 +246,8 @@ static void TestHostileVerticesAreNamed(void)
     CHECK(MeshFails(&mesh, mnav_errorInvalid, mnav_elementVertex, 2), "NaN vertex");
     vertices[2].y = 0.0f;
     vertices[1].x = -INFINITY;
-    CHECK(MeshFails(&mesh, mnav_errorInvalid, mnav_elementVertex, 1), "infinite vertex");
+    CHECK(MeshFails(&mesh, mnav_errorLimit, mnav_elementVertex, 1),
+          "infinite vertex, past the extent");
     vertices[1].x = 10.0f;
     // 0.25 m cells reach 2^22 cells, 1,048,576 m, from the origin.
     vertices[3].z = 1048576.0f;

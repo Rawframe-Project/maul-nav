@@ -48,9 +48,9 @@ mnavAttachment mnavAttachmentOf(uint64_t key)
                             (int32_t)(key >> 1 & ((1u << LINK_BITS) - 1)), (key & 1u) != 0};
 }
 
-static bool FinitePoint(mnavPos3 p)
+static bool HasNaN(mnavPos3 p)
 {
-    return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
+    return isnan(p.x) || isnan(p.y) || isnan(p.z);
 }
 
 // The slot an id names, or the reason it names none; links in their last
@@ -88,7 +88,7 @@ static bool InExtent(const mnavNavmesh* navmesh, mnavPos3 p)
 
 static mnavResult CheckDef(const mnavNavmesh* navmesh, const mnavLinkDef* def)
 {
-    if (!FinitePoint(def->start) || !FinitePoint(def->end))
+    if (HasNaN(def->start) || HasNaN(def->end))
     {
         return mnav_errorInvalid;
     }
@@ -96,8 +96,8 @@ static mnavResult CheckDef(const mnavNavmesh* navmesh, const mnavLinkDef* def)
     {
         return mnav_errorLimit;
     }
-    if (!(isfinite(def->radius) && isfinite(def->cost) && isfinite(def->width)) ||
-        def->radius < 0.0f || def->cost < 0.0f || def->width < 0.0f || def->kind >= MNAV_LINK_KINDS)
+    if (!(def->radius >= 0.0f && def->cost >= 0.0f && def->width >= 0.0f) ||
+        def->kind >= MNAV_LINK_KINDS)
     {
         return mnav_errorInvalid;
     }

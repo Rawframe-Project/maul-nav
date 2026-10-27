@@ -45,11 +45,11 @@ static bool InRange(float value, float low, float high)
     return value >= low && value <= high;
 }
 
-// A value of a setting with published bounds: mnav_errorInvalid for one
-// not finite, mnav_errorLimit outside the bounds.
+// A value of a setting with published bounds: mnav_errorInvalid for a NaN,
+// mnav_errorLimit outside the bounds, an infinity included.
 static mnavBakeDefResult Bounded(float value, float low, float high, mnavBakeSetting setting)
 {
-    if (!isfinite(value))
+    if (isnan(value))
     {
         return Refuse(mnav_errorInvalid, setting);
     }
@@ -57,12 +57,12 @@ static mnavBakeDefResult Bounded(float value, float low, float high, mnavBakeSet
 }
 
 // A length converted to cells against a most of cells: mnav_errorInvalid
-// for a value not finite and 0 or more, or 0 where it must be positive;
-// past the most, the status given.
+// for a NaN, a value below 0, or 0 where it must be positive; past the
+// most, an infinity included, the status given.
 static mnavBakeDefResult Cells(float value, float unit, bool roundUp, int32_t most, mnavResult past,
                                bool positive, mnavBakeSetting setting, int32_t* cells)
 {
-    if (!isfinite(value) || value < 0.0f || (positive && value == 0.0f))
+    if (!InRange(value, 0.0f, INFINITY) || (positive && value == 0.0f))
     {
         return Refuse(mnav_errorInvalid, setting);
     }
@@ -179,7 +179,7 @@ static mnavBakeDefResult ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cel
     float cellArea = def->cellSize * def->cellSize;
     r = Cells(def->minRegionArea, cellArea, true, 1 << 30, mnav_errorInvalid, false,
               mnav_settingMinRegionArea, &cells->minRegion);
-    if (r.result == mnav_success && !(isfinite(def->maxEdgeError) && def->maxEdgeError >= 0.0f))
+    if (r.result == mnav_success && !InRange(def->maxEdgeError, 0.0f, INFINITY))
     {
         r = Refuse(mnav_errorInvalid, mnav_settingMaxEdgeError);
     }

@@ -23,7 +23,7 @@ mnavFlightFrame mnavMakeFlightFrame(const mnavFlightVolume* volume)
 mnavResult mnavFlightToVoxels(const mnavFlightFrame* frame, mnavPos3 point, double out[3],
                               int32_t voxel[3])
 {
-    if (!isfinite(point.x) || !isfinite(point.y) || !isfinite(point.z))
+    if (isnan(point.x) || isnan(point.y) || isnan(point.z))
     {
         return mnav_errorInvalid;
     }

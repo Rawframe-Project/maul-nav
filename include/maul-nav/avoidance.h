@@ -206,9 +206,10 @@ extern "C"
     /// not from mnavDefaultAvoidanceDef; `mnav_errorVersion` for one built
     /// against another version of the headers; `mnav_errorInvalid` also for a
     /// limit below 1 (below 0 for obstacle vertices), a neighbor distance not
-    /// more than 0 or not finite, or a horizon not finite; `mnav_errorLimit`
-    /// for a limit past its MNAV_MAX_AVOIDANCE_ value or a horizon shorter than
-    /// MNAV_MIN_AVOIDANCE_TIME; `mnav_errorCapacity` when the allocator fails.
+    /// more than 0 or not finite, or a horizon that is NaN or plus infinity;
+    /// `mnav_errorLimit` for a limit past its MNAV_MAX_AVOIDANCE_ value or a
+    /// horizon shorter than MNAV_MIN_AVOIDANCE_TIME; `mnav_errorCapacity` when
+    /// the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def,
@@ -245,14 +246,15 @@ extern "C"
     /// @param velocitiesOut Receives agentCount velocities, in the agents'
     ///                      order.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
-    /// agents or obstacles, a negative count, a step not finite, an agent or
-    /// obstacle with a value not finite, an agent with a radius not more than
-    /// 0, a maximum speed below 0 or a priority not more than 0, a zero-length
-    /// obstacle edge, a circle's radius not more than 0, another obstacle with
-    /// a radius, or a polygon not counterclockwise; `mnav_errorLimit` for a
-    /// step shorter than MNAV_MIN_AVOIDANCE_TIME, or a coordinate, speed or
-    /// radius past its MNAV_MAX_AVOIDANCE_ bound; `mnav_errorCapacity` for more
-    /// agents or obstacle points than the set's limits.
+    /// agents or obstacles, a negative count, a step that is NaN or plus
+    /// infinity, an agent or obstacle with a NaN value, an agent with a radius
+    /// not more than 0, a maximum speed below 0 or a priority not more than 0
+    /// or not finite, a zero-length obstacle edge, a circle's radius not more
+    /// than 0, another obstacle with a radius, or a polygon not
+    /// counterclockwise; `mnav_errorLimit` for a step shorter than
+    /// MNAV_MIN_AVOIDANCE_TIME, or a coordinate, speed or radius past its
+    /// MNAV_MAX_AVOIDANCE_ bound, an infinity included; `mnav_errorCapacity`
+    /// for more agents or obstacle points than the set's limits.
     /// @par Thread safety
     /// Safe from any thread; the set is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents,
@@ -283,13 +285,14 @@ extern "C"
     /// @param velocitiesOut Receives agentCount velocities, in the agents'
     ///                      order.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
-    /// agents or spheres, a negative count, a step not finite, an agent or
-    /// sphere with a value not finite or a radius not more than 0, or an agent
-    /// with a maximum speed below 0 or a priority not more than 0;
-    /// `mnav_errorLimit` for a step shorter than MNAV_MIN_AVOIDANCE_TIME, or a
-    /// coordinate, speed or radius past its MNAV_MAX_AVOIDANCE_ bound;
-    /// `mnav_errorCapacity` for more agents than the set's limit or more
-    /// spheres than its obstacle points.
+    /// agents or spheres, a negative count, a step that is NaN or plus
+    /// infinity, an agent or sphere with a NaN value or a radius not more than
+    /// 0, or an agent with a maximum speed below 0 or a priority not more than
+    /// 0 or not finite; `mnav_errorLimit` for a step shorter than
+    /// MNAV_MIN_AVOIDANCE_TIME, or a coordinate, speed or radius past its
+    /// MNAV_MAX_AVOIDANCE_ bound, an infinity included; `mnav_errorCapacity`
+    /// for more agents than the set's limit or more spheres than its obstacle
+    /// points.
     /// @par Thread safety
     /// Safe from any thread; the set is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavAvoid3D(mnavAvoidance* avoidance,

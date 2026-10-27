@@ -38,7 +38,7 @@ The bytes are the tile: store them as cooked content, and load them into a [navm
 
 `mnavBakeTile` takes meshes, terrains and volumes together in an `mnavBakeInput`, and `mnavBakeTile2D` takes outlines in an `mnavBake2DInput`.
 
-Input is hostile: a coordinate that is not finite, an index out of range or an area past 63 is refused, and the report names the first mesh and the vertex, triangle or point refused. `mnavValidateTriangleMesh` and `mnavValidateOutline` run the same checks without baking, for an import step that wants to catch bad geometry early. Degenerate and duplicate triangles are accepted and contribute nothing.
+Input is hostile: a NaN coordinate, an index out of range or an area past 63 is `mnav_errorInvalid`, a point past the extent, an infinity included, is `mnav_errorLimit`, and the report names the first mesh and the vertex, triangle or point refused. `mnavValidateTriangleMesh` and `mnavValidateOutline` run the same checks without baking, for an import step that wants to catch bad geometry early. Degenerate and duplicate triangles are accepted and contribute nothing.
 
 ## Many tiles
 

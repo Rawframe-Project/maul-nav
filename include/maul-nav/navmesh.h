@@ -292,20 +292,19 @@ extern "C"
     /// @param navmesh  The navmesh.
     /// @param def      The link.
     /// @param linkOut  Receives its id, usable once it is committed.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// point that is not finite, or an edge link whose ends lie at one
-    /// place on the ground or so near that the square of their distance
-    /// rounds to 0, a radius, cost or width below 0 or not finite, or a
-    /// kind of MNAV_LINK_KINDS or more; `mnav_errorLimit` for a point
-    /// farther from the def's origin than bake input may lie
-    /// (MNAV_MAX_EXTENT_CELLS cells on the ground, MNAV_MAX_HEIGHT_CELLS
-    /// cell heights up or down), a radius, cost or width past its MNAV_MAX_
-    /// bound, or when a crossing would need a slot from MNAV_MAX_LINKS on
-    /// (left only by slots worn out by 2^32 links each);
-    /// `mnav_errorCapacity` when the links' crossings, staged and committed,
-    /// would pass the links limit, or memory its limit, or when the
-    /// allocator fails. A refused link is refused whole, none of its
-    /// crossings taken.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
+    /// with a NaN coordinate, or an edge link whose ends lie at one place on
+    /// the ground or so near that the square of their distance rounds to 0, a
+    /// radius, cost or width below 0 or NaN, or a kind of MNAV_LINK_KINDS or
+    /// more; `mnav_errorLimit` for a point farther from the def's origin than
+    /// bake input may lie (MNAV_MAX_EXTENT_CELLS cells on the ground,
+    /// MNAV_MAX_HEIGHT_CELLS cell heights up or down), a radius, cost or width
+    /// past its MNAV_MAX_ bound, an infinity included, or when a crossing would
+    /// need a slot from MNAV_MAX_LINKS on (left only by slots worn out by 2^32
+    /// links each); `mnav_errorCapacity` when the links' crossings, staged and
+    /// committed, would pass the links limit, or memory its limit, or when the
+    /// allocator fails. A refused link is refused whole, none of its crossings
+    /// taken.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run while a link is staged.

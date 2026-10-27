@@ -15,7 +15,7 @@ How a tile is made from host geometry, how its bytes are laid out and checked, a
 
 A def's settings are meters (the slope in degrees), what a person picks. The bake works in cells, and the conversion must be the same everywhere: `src/bake_def.c` divides in binary32, counts a quotient within 2^-10 of an integer as that integer, then rounds heights and the radius up and the step height down, so that no agent loses a cell of clearance to rounding. `mnavValidateBakeDef` reports the result, which a tool can show.
 
-Input is checked before any work (`src/input.c`, `src/bake_input.c`): non-finite coordinates, indices out of range, area types past 63 and points past the extent are refused, naming the first vertex, then triangle. The extent (2^22 cells on the ground, 32,767 cell heights up or down) keeps every later integer within 32 bits. Degenerate and duplicate triangles are accepted and contribute nothing, since real level geometry has them.
+Input is checked before any work (`src/input.c`, `src/bake_input.c`): NaN coordinates, indices out of range and area types past 63 (`mnav_errorInvalid`) and points past the extent, infinities included (`mnav_errorLimit`), are refused, naming the first vertex, then triangle. The extent (2^22 cells on the ground, 32,767 cell heights up or down) keeps every later integer within 32 bits. Degenerate and duplicate triangles are accepted and contribute nothing, since real level geometry has them.
 
 ## The pipeline
 

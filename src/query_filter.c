@@ -39,7 +39,7 @@ mnavResult mnavCheckFilter(const mnavQueryFilter* filter, const mnavQueryFilter*
     for (int32_t a = 0; a < MNAV_AREA_TYPES; ++a)
     {
         float cost = filter->costs[a];
-        if (!isfinite(cost))
+        if (isnan(cost))
         {
             return mnav_errorInvalid;
         }

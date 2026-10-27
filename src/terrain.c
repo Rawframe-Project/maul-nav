@@ -53,7 +53,7 @@ static mnavInputResult CheckSamples(const mnavBakeDef* def, const mnavTerrain* t
         for (int32_t c = 0; c < t->columns; ++c)
         {
             int32_t i = r * t->columns + c;
-            if (!isfinite(t->heights[i]))
+            if (isnan(t->heights[i]))
             {
                 return Refuse(mnav_errorInvalid, mnav_elementSample, i);
             }

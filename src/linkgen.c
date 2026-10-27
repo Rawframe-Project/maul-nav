@@ -29,9 +29,10 @@ static bool Within(float v, float low, float high)
     return isfinite(v) && v >= low && v <= high;
 }
 
-// The def's distances, costs and kinds: mnav_errorInvalid for a value not
-// finite or below 0, a spacing of 0, a detour from 0 to 1 or past 10^6, or
-// a kind past the kinds; mnav_errorLimit past an MNAV_MAX_ value.
+// The def's distances, costs and kinds: mnav_errorInvalid for a NaN or a
+// value below 0, a spacing of 0, a detour from 0 to 1 or past 10^6, or
+// a kind past the kinds; mnav_errorLimit past an MNAV_MAX_ value, an
+// infinity included.
 static mnavResult CheckDef(const mnavLinkGenDef* d)
 {
     const float values[8] = {d->spacing,        d->dropMax, d->jumpMax,  d->climbMax,
@@ -42,7 +43,7 @@ static mnavResult CheckDef(const mnavLinkGenDef* d)
     bool past = false;
     for (int32_t k = 0; k < 8; ++k)
     {
-        if (!isfinite(values[k]) || values[k] < 0.0f)
+        if (!(values[k] >= 0.0f))
         {
             return mnav_errorInvalid;
         }

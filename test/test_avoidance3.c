@@ -540,8 +540,8 @@ static void TestChecks(void)
           "a preferred velocity out of range");
     pair[1] = agents[1];
     pair[1].velocity.y = (double)INFINITY;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
-          "a velocity not finite");
+    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
+          "an infinite velocity, past the speed bound");
     pair[1] = agents[1];
     pair[1].radius = 0.0;
     CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid, "no radius");

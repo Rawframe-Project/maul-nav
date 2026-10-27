@@ -235,11 +235,11 @@ extern "C"
     /// Checks a flight def.
     ///
     /// @param def  The def.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL def, or with
-    /// the first setting refused for a value that is not finite, outside
-    /// the range its field gives with no named constant, or not a power of
-    /// two where one is needed; `mnav_errorLimit` with the setting for a
-    /// value past an MNAV_MIN_ or MNAV_MAX_ bound its field names;
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL def, or with the
+    /// first setting refused for a NaN, a value (an infinity included) outside
+    /// the range its field gives with no named constant, or not a power of two
+    /// where one is needed; `mnav_errorLimit` with the setting for a value past
+    /// an MNAV_MIN_ or MNAV_MAX_ bound its field names, an infinity included;
     /// `mnav_errorVersion` with no setting for a def built against another
     /// version of the headers.
     /// @par Thread safety
@@ -406,11 +406,11 @@ extern "C"
     /// @param point    The point, in world coordinates.
     /// @param openOut  Receives whether the point is open; false on
     ///                 failure.
-    /// @return `mnav_success`; `mnav_errorNotLoaded` when no tile is
-    /// committed under the point; `mnav_errorInvalid` for a NULL argument,
-    /// or a point not finite or below or above the volume;
-    /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
-    /// from the origin.
+    /// @return `mnav_success`; `mnav_errorNotLoaded` when no tile is committed
+    /// under the point; `mnav_errorInvalid` for a NULL argument, or a point
+    /// with a NaN coordinate or below or above the volume; `mnav_errorLimit`
+    /// for a point more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an
+    /// infinity included.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the volume at
     /// once between commits; none may while a stage or commit call runs.
@@ -440,8 +440,9 @@ extern "C"
     ///                 looks over the end's space that far first.
     ///                 `mnav_pathNone`, with the start alone.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, or a
-    /// point not finite or below or above the volume; `mnav_errorLimit` for
-    /// a point more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin.
+    /// point with a NaN coordinate or below or above the volume;
+    /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
+    /// from the origin, an infinity included.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and the volume is not changed during the search.
@@ -463,8 +464,9 @@ extern "C"
     /// @param start   The start, in world coordinates.
     /// @param end     The end, in world coordinates.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, or a
-    /// point not finite or below or above the volume; `mnav_errorLimit` for
-    /// a point more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin.
+    /// point with a NaN coordinate or below or above the volume;
+    /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
+    /// from the origin, an infinity included.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBeginFlightPath(mnavQuery* query,
@@ -515,8 +517,8 @@ extern "C"
     /// @param to      Its end.
     /// @param hitOut  Receives what stopped it, where and at what fraction.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
-    /// point not finite; `mnav_errorLimit` for a point more than
-    /// MNAV_MAX_FLIGHT_VOXELS voxels from the origin.
+    /// point with a NaN coordinate; `mnav_errorLimit` for a point more than
+    /// MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an infinity included.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the volume at
     /// once between commits; none may while a stage or commit call runs.
@@ -542,9 +544,9 @@ extern "C"
     ///                    mnavFlightRaycast gives it; may be NULL, and is
     ///                    left alone when every step is clear.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// negative count or a point not finite; `mnav_errorLimit` for a point
-    /// more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin; either
-    /// before any step is cast.
+    /// negative count or a point with a NaN coordinate; `mnav_errorLimit` for a
+    /// point more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an
+    /// infinity included; either before any step is cast.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the volume at
     /// once between commits; none may while a stage or commit call runs.
@@ -563,10 +565,10 @@ extern "C"
     /// @param radius      How far to look, in meters, at least 0.
     /// @param nearestOut  Receives the nearest open point.
     /// @param foundOut    Receives whether one lies within the radius.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// point not finite, or a radius below 0 or not finite;
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
+    /// with a NaN coordinate, or a radius below 0 or not finite;
     /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
-    /// from the origin.
+    /// from the origin, an infinity included.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the volume at
     /// once between commits; none may while a stage or commit call runs.
@@ -586,13 +588,13 @@ extern "C"
     /// @param high    Its highest corner, at least low on every axis.
     /// @param buffer  The buffer appended to.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// corner not finite, a box backward, or a buffer with a count out of
-    /// range, an array missing or an origin not finite; `mnav_errorLimit`
-    /// for a corner more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin
-    /// or a box of more than MNAV_MAX_FLIGHT_DEBUG_VOXELS voxels within the
-    /// floor and ceiling;
-    /// `mnav_errorCapacity` when the buffer filled, its counts saying what
-    /// the whole needs.
+    /// corner with a NaN coordinate, a box backward, or a buffer with a count
+    /// out of range, an array missing or an origin not finite;
+    /// `mnav_errorLimit` for a corner more than MNAV_MAX_FLIGHT_VOXELS voxels
+    /// from the origin, an infinity included or a box of more than
+    /// MNAV_MAX_FLIGHT_DEBUG_VOXELS voxels within the floor and ceiling;
+    /// `mnav_errorCapacity` when the buffer filled, its counts saying what the
+    /// whole needs.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the volume at
     /// once between commits; the buffer is used by one thread at a time.

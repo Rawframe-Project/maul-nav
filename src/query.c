@@ -52,7 +52,7 @@ static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQue
         return mnav_errorVersion;
     }
     const mnavQueryLimits* limits = &def->limits;
-    if (limits->nodes < 1 || !(limits->pathLength > 0.0f) || !isfinite(limits->pathLength))
+    if (limits->nodes < 1 || !(limits->pathLength > 0.0f))
     {
         return mnav_errorInvalid;
     }

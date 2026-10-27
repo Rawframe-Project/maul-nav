@@ -17,9 +17,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-static bool Finite(mnavPos3 p)
+static bool HasNaN(mnavPos3 p)
 {
-    return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
+    return isnan(p.x) || isnan(p.y) || isnan(p.z);
 }
 
 // Draws a block's twelve edges.
@@ -56,7 +56,7 @@ static int32_t Larger(int32_t a, int32_t b)
 static MNAV_NOINLINE mnavResult DebugFlightWork(const mnavFlightVolume* volume, mnavPos3 low,
                                                 mnavPos3 high, mnavDebugBuffer* buffer)
 {
-    if (volume == nullptr || !mnavGoodBuffer(buffer) || !Finite(low) || !Finite(high) ||
+    if (volume == nullptr || !mnavGoodBuffer(buffer) || HasNaN(low) || HasNaN(high) ||
         low.x > high.x || low.y > high.y || low.z > high.z)
     {
         return mnav_errorInvalid;

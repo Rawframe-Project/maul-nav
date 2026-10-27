@@ -31,15 +31,13 @@
 #define ENTRIES_PER_VERTEX 8
 
 // The def's limits, distance and horizons: mnav_errorInvalid for a count
-// below 1 (0 for obstacle vertices), a distance not positive and finite
-// or a horizon not finite, mnav_errorLimit past an MNAV_MAX_ or below an
-// MNAV_MIN_ value.
+// below 1 (0 for obstacle vertices) or a distance not positive and finite,
+// mnav_errorLimit past an MNAV_MAX_ value; the horizons as mnavAvoidTime.
 static mnavResult CheckLimits(const mnavAvoidanceDef* def)
 {
     const mnavAvoidanceLimits* limits = &def->limits;
     if (limits->agents < 1 || limits->neighbors < 1 || limits->obstacleVertices < 0 ||
-        limits->obstacleNeighbors < 1 || !mnavAvoidPositive(def->neighborDistance) ||
-        !isfinite(def->timeHorizon) || !isfinite(def->obstacleTimeHorizon))
+        limits->obstacleNeighbors < 1 || !mnavAvoidPositive(def->neighborDistance))
     {
         return mnav_errorInvalid;
     }

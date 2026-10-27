@@ -57,24 +57,31 @@ static inline mnavResult mnavAvoidJoin(mnavResult a, mnavResult b)
     return a == mnav_errorInvalid || b == mnav_success ? a : b;
 }
 
-// mnav_errorInvalid for a value not finite, mnav_errorLimit for one whose
-// magnitude passes bound.
+// mnav_errorInvalid for a NaN, mnav_errorLimit for a value whose
+// magnitude passes bound, an infinity included.
 static inline mnavResult mnavAvoidBound(double v, double bound)
 {
-    if (!isfinite(v))
+    if (isnan(v))
     {
         return mnav_errorInvalid;
     }
     return fabs(v) <= bound ? mnav_success : mnav_errorLimit;
 }
 
+// A time: mnav_errorLimit below MNAV_MIN_AVOIDANCE_TIME, minus infinity
+// included; mnav_errorInvalid for a NaN or plus infinity, which no bound
+// names.
 static inline mnavResult mnavAvoidTime(double v)
 {
-    if (!isfinite(v))
+    if (isnan(v))
     {
         return mnav_errorInvalid;
     }
-    return v >= MNAV_MIN_AVOIDANCE_TIME ? mnav_success : mnav_errorLimit;
+    if (v < MNAV_MIN_AVOIDANCE_TIME)
+    {
+        return mnav_errorLimit;
+    }
+    return isfinite(v) ? mnav_success : mnav_errorInvalid;
 }
 
 static inline mnavResult mnavAvoidSpeed(double v)

@@ -72,7 +72,7 @@ static mnavFlightDefResult TileSide(int32_t side)
 static mnavFlightDefResult Shape(const mnavFlightDef* def, mnavFlightShape* shape)
 {
     float low = def->floor / def->voxelSize;
-    if (!isfinite(def->floor))
+    if (isnan(low))
     {
         return Refuse(mnav_errorInvalid, mnav_flightSettingFloor);
     }
@@ -83,7 +83,7 @@ static mnavFlightDefResult Shape(const mnavFlightDef* def, mnavFlightShape* shap
     shape->floorVoxel = (int32_t)floorf(low);
     // Both bounds are within the height range, so the quotient is small.
     float high = def->ceiling / def->voxelSize;
-    if (!isfinite(def->ceiling) || !(high > low))
+    if (!(high > low))
     {
         return Refuse(mnav_errorInvalid, mnav_flightSettingCeiling);
     }
@@ -120,7 +120,7 @@ mnavFlightDefResult mnavCheckFlightDef(const mnavFlightDef* def, mnavFlightShape
     {
         return Refuse(mnav_errorInvalid, mnav_flightSettingOrigin);
     }
-    if (!isfinite(def->voxelSize))
+    if (isnan(def->voxelSize))
     {
         return Refuse(mnav_errorInvalid, mnav_flightSettingVoxelSize);
     }

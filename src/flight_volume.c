@@ -319,7 +319,7 @@ static MNAV_NOINLINE mnavResult IsFlightOpenWork(const mnavFlightVolume* volume,
     const mnavFlightDef* def = &volume->def;
     double voxel = (double)def->voxelSize;
     int64_t v[3] = {0, 0, 0};
-    if (!isfinite(point.x) || !isfinite(point.y) || !isfinite(point.z))
+    if (isnan(point.x) || isnan(point.y) || isnan(point.z))
     {
         return mnav_errorInvalid;
     }

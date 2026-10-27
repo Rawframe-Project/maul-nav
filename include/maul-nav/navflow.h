@@ -200,13 +200,13 @@ extern "C"
     /// @param goalCount How many, at least 0.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// negative count, a goal polygon id never handed out or a goal point not
-    /// finite, or a filter not built from mnavDefaultQueryFilter or with a cost
-    /// not finite; `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST
-    /// or MNAV_MAX_AREA_COST; `mnav_errorStale` for a goal polygon whose tile
-    /// was replaced or removed; `mnav_errorCapacity` for a navmesh of more
-    /// polygons (in the tiles searched), tile slots or off-mesh links than the
-    /// field's limits. A build allocates nothing. On an error the field holds
-    /// nothing.
+    /// finite, or a filter not built from mnavDefaultQueryFilter or with a NaN
+    /// cost; `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
+    /// MNAV_MAX_AREA_COST, an infinity included; `mnav_errorStale` for a goal
+    /// polygon whose tile was replaced or removed; `mnav_errorCapacity` for a
+    /// navmesh of more polygons (in the tiles searched), tile slots or off-mesh
+    /// links than the field's limits. A build allocates nothing. On an error
+    /// the field holds nothing.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh at
     /// once while no commit runs on it; the field is used by one thread at
