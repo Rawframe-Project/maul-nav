@@ -13,6 +13,7 @@
 #include "allocator.h"
 #include "draw.h"
 #include "fpenv.h"
+#include "invariant.h"
 #include "navmesh.h"
 #include "offmesh.h"
 #include "query_filter.h"
@@ -201,6 +202,7 @@ static void SiftUp(mnavNavFlow* f, int32_t at)
 
 static int32_t Pop(mnavNavFlow* f)
 {
+    MNAV_ASSERT(f->heapCount > 0 && f->places[f->heap[0]] == 0);
     int32_t top = f->heap[0];
     int32_t last = f->heap[--f->heapCount];
     int32_t at = 0;
@@ -233,6 +235,14 @@ static int32_t Pop(mnavNavFlow* f)
 // Gives polygon p a way through polygon q at a cost, standing at place.
 static void Lower(mnavNavFlow* f, int32_t p, double cost, const Way* way)
 {
+    // A polygon done keeps its way, and a way costs no less than the
+    // polygon it leads on to: area and link costs are at least 0.
+    MNAV_ASSERT(f->places[p] != DONE);
+    MNAV_ASSERT(way->next < 0 || cost >= f->ways[way->next].cost);
+    // Each polygon enters the heap once, so it has room for them all; one
+    // in it is where the heap holds it.
+    MNAV_ASSERT(f->places[p] == NOT_OPEN ? f->heapCount < f->def.limits.polygons
+                                         : f->heap[f->places[p]] == p);
     f->ways[p] = *way;
     f->ways[p].cost = cost;
     if (f->places[p] == NOT_OPEN)
@@ -286,6 +296,9 @@ static void Polygon(const mnavNavFlow* f, int32_t number, int32_t* slot, int32_t
             hi = middle;
         }
     }
+    // A slot outside the region numbers no polygon, so the one found holds
+    // the number.
+    MNAV_ASSERT(number >= f->firsts[lo] && number < f->firsts[lo + 1]);
     *slot = lo;
     *polygon = number - f->firsts[lo];
 }
