@@ -126,6 +126,9 @@ struct mnavNavmesh
     mnavOffLink* links;
     int32_t linkSlots;
     int32_t linkCapacity;
+    // The slots an attachment's key holds: MNAV_MAX_LINKS, which a
+    // white-box test lowers to reach the last without that many links.
+    int32_t linkSlotLimit;
     int32_t linksHeld;
     int32_t linksPending;
     // Every attached link from each polygon it leaves, as keys sorted by

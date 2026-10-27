@@ -173,13 +173,14 @@ static MNAV_NOINLINE mnavResult StageLinkWork(mnavNavmesh* navmesh, const mnavLi
         return mnav_errorLimit;
     }
     // The crossings take the lowest free slots, then new ones; a key holds
-    // slots below MNAV_MAX_LINKS, which only worn slots can fill.
+    // slots below the limit, MNAV_MAX_LINKS, which only worn slots can
+    // fill.
     int32_t last = -1;
     for (int32_t k = 0; k < n; ++k)
     {
         last = NextFree(navmesh, last + 1);
     }
-    if (last >= MNAV_MAX_LINKS)
+    if (last >= navmesh->linkSlotLimit)
     {
         return mnav_errorLimit;
     }
