@@ -9,6 +9,7 @@
 #include "bake_def.h"
 #include "detail.h"
 #include "fpenv.h"
+#include "invariant.h"
 #include "polymesh.h"
 #include "tile.h"
 
@@ -506,6 +507,8 @@ static int32_t TakeSlot(mnavTilePlan* plan)
             return s;
         }
     }
+    // MakePlan took a slot for every staged change.
+    MNAV_ASSERT(plan->slotCount < plan->slotCapacity);
     plan->slots[plan->slotCount] = (mnavSlot){0, false, 0, 0, nullptr};
     return plan->slotCount++;
 }
@@ -540,6 +543,19 @@ static void PlanChange(mnavTilePlan* plan, int32_t existing, const mnavStaged* s
     }
 }
 
+// Appends a place to the planned places, which stay sorted with each
+// place once, within the room MakePlan took for the committed places and
+// the staged changes, and each naming a slot that holds a tile.
+static void AddPlace(mnavTilePlan* plan, mnavPlace place)
+{
+    MNAV_ASSERT(plan->placeCount < plan->placeCapacity);
+    MNAV_ASSERT(plan->slots[place.slot].tile != nullptr);
+    MNAV_ASSERT(plan->placeCount == 0 ||
+                Before(plan->places[plan->placeCount - 1].x, plan->places[plan->placeCount - 1].z,
+                       place.x, place.z));
+    plan->places[plan->placeCount++] = place;
+}
+
 // Merges the committed places with the staged changes, both sorted, into
 // the planned places.
 static void PlanPlaces(const mnavNavmesh* navmesh, mnavTilePlan* plan)
@@ -555,10 +571,13 @@ static void PlanPlaces(const mnavNavmesh* navmesh, mnavTilePlan* plan)
             change == nullptr || (old != nullptr && Before(old->x, old->z, change->x, change->z));
         if (takeOld)
         {
-            plan->places[plan->placeCount++] = *old;
+            AddPlace(plan, *old);
             a += 1;
             continue;
         }
+        // Stage keeps one change a place.
+        MNAV_ASSERT(b == 0 || Before(navmesh->staged[b - 1].x, navmesh->staged[b - 1].z, change->x,
+                                     change->z));
         a += old != nullptr && old->x == change->x && old->z == change->z ? 1 : 0;
         b += 1;
         if (change->tile == nullptr)
@@ -569,7 +588,7 @@ static void PlanPlaces(const mnavNavmesh* navmesh, mnavTilePlan* plan)
         {
             if (plan->slots[s].tile == change->tile)
             {
-                plan->places[plan->placeCount++] = (mnavPlace){change->x, change->z, s};
+                AddPlace(plan, (mnavPlace){change->x, change->z, s});
             }
         }
     }

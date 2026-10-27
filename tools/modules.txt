@@ -41,7 +41,7 @@ flight_volume: allocator flight flight_def flight_tile fpenv
 flight_space: flight flight_volume
 flight_frame: flight_volume
 flight_debug: draw flight_frame flight_space fpenv
-flight_search: flight_frame flight_space flight_volume fpenv query
+flight_search: flight_frame flight_space flight_volume fpenv invariant query
 flight_probe: flight flight_frame flight_space flight_volume fpenv
 fingerprint: bytes outline raster terrain tile_index
 bake_input: input terrain volume
@@ -49,11 +49,11 @@ baker: allocator bake_def bake_input border_vertices bytes compact contour detai
 tile_cache: allocator compact field_pack fpenv outline raster
 field_pack: allocator compact invariant lz raster
 lz: invariant
-navmesh: allocator bake_def detail fpenv polymesh tile
+navmesh: allocator bake_def detail fpenv invariant polymesh tile
 nearest: detail fpenv navmesh polymesh query_filter raster
-path: allocator fpenv funnel navmesh offmesh polymesh query query_filter raster
+path: allocator fpenv funnel invariant navmesh offmesh polymesh query query_filter raster
 raycast: fpenv navmesh polymesh query query_filter
-shortest: fpenv navmesh offmesh polymesh query query_filter
+shortest: fpenv invariant navmesh offmesh polymesh query query_filter
 query: allocator fpenv
 query_filter:
 offmesh: allocator fpenv navmesh nearest sort
@@ -64,11 +64,11 @@ corridor: fpenv funnel invariant navmesh offmesh polymesh query query_filter
 modifiers: allocator fpenv navmesh
 grid: fpenv query query_filter
 clip: polymesh
-spatial: clip fpenv navmesh nearest query query_filter
+spatial: clip fpenv invariant navmesh nearest query query_filter
 linkgen: fpenv navmesh path query query_filter
 flow: allocator draw fpenv invariant query_filter
 flow_repair: flow fpenv invariant
-navflow: allocator draw fpenv navmesh offmesh query_filter sort
+navflow: allocator draw fpenv invariant navmesh offmesh query_filter sort
 hierarchy: allocator fpenv invariant navmesh offmesh path query query_filter sort
 hierarchy_path: fpenv hierarchy navmesh path query
 # Avoidance uses the base alone, never a navmesh module.

@@ -6,6 +6,7 @@
 #include "allocator.h"
 #include "fpenv.h"
 #include "funnel.h"
+#include "invariant.h"
 #include "navmesh.h"
 #include "offmesh.h"
 #include "polymesh.h"
@@ -53,7 +54,9 @@ static void SiftUp(mnavQuery* query, int32_t at)
 
 static int32_t Pop(mnavQuery* query)
 {
+    MNAV_ASSERT(query->heapCount > 0);
     int32_t top = query->heap[0].node;
+    MNAV_ASSERT(query->nodes[top].heap == 0);
     query->nodes[top].heap = MNAV_NO_NODE;
     mnavHeapEntry last = query->heap[--query->heapCount];
     int32_t at = 0;
@@ -84,6 +87,9 @@ static int32_t Pop(mnavQuery* query)
 
 void mnavPushNode(mnavQuery* query, int32_t n)
 {
+    // Each node made enters the open list once, and the nodes made are at
+    // most the limit, which is the open list's room.
+    MNAV_ASSERT(n >= 0 && n < query->nodeCount && query->heapCount < query->limits.nodes);
     query->heap[query->heapCount] = EntryOf(query, n);
     SiftUp(query, query->heapCount++);
 }
@@ -142,6 +148,8 @@ static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPo
     double step = Distance(parent->at, via);
     double span = offMesh ? Distance(a, b) : 0.0;
     double cost = parent->cost + step * (double)s->filter->costs[crossed->area] + linkCost;
+    // Area costs and link costs are positive or 0, so no step lowers it.
+    MNAV_ASSERT(cost >= parent->cost);
     double length = parent->length + step + span;
     double toEnd = key->tag == MNAV_TAG_END ? 0.0 : Distance(at, s->end);
     if (length + toEnd > s->limit)
@@ -154,6 +162,7 @@ static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPo
     if (n != MNAV_NO_NODE)
     {
         mnavSearchNode* node = &query->nodes[n];
+        MNAV_ASSERT(node->heap == MNAV_NO_NODE || query->heap[node->heap].node == n);
         if (node->heap != MNAV_NO_NODE && cost < node->cost)
         {
             node->cost = cost;
@@ -201,6 +210,8 @@ static void ExpandInner(mnavSearch* s, int32_t n, const mnavTile* tile, const mn
             return;
         }
     }
+    // A neighbor runs the edge back, which the tile's loader checks.
+    MNAV_ASSERT(false);
 }
 
 // The point of edge ab whose coordinate along a tile side is u.
@@ -537,6 +548,7 @@ void mnavRestartSearch(mnavQuery* query, int32_t n)
     mnavClearTable(query);
     for (int32_t k = 0; k < count; ++k)
     {
+        MNAV_ASSERT(sorted[k] >= k && (k == 0 || sorted[k] > sorted[k - 1]));
         mnavSearchNode node = query->nodes[sorted[k]];
         node.parent =
             node.parent == MNAV_NO_NODE ? MNAV_NO_NODE : RankOf(sorted, count, node.parent);
