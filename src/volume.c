@@ -36,7 +36,7 @@ mnavInputResult mnavCheckVolume(const mnavBakeDef* def, const mnavBakeVolume* vo
     }
     if (volume->pointCount > def->limits.inputTriangles)
     {
-        return Refuse(mnav_errorLimit, mnav_elementNone, -1);
+        return Refuse(mnav_errorCapacity, mnav_elementNone, -1);
     }
     float ground = def->cellSize * (float)MNAV_MAX_EXTENT_CELLS;
     for (int32_t i = 0; i < volume->pointCount; ++i)
@@ -48,7 +48,7 @@ mnavInputResult mnavCheckVolume(const mnavBakeDef* def, const mnavBakeVolume* vo
         }
         if (fabsf(p.x) > ground || fabsf(p.y) > ground)
         {
-            return Refuse(mnav_errorRange, mnav_elementPoint, i);
+            return Refuse(mnav_errorLimit, mnav_elementPoint, i);
         }
     }
     return Refuse(mnav_success, mnav_elementNone, -1);

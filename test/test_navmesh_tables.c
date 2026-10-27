@@ -164,7 +164,7 @@ static void TestFailedCommitLinksNothing(void)
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "one tile");
-    CHECK(StageAt(navmesh, 1) == mnav_success && mnavCommit(navmesh) == mnav_errorLimit,
+    CHECK(StageAt(navmesh, 1) == mnav_success && mnavCommit(navmesh) == mnav_errorCapacity,
           "past the links limit");
     CHECK(Links(navmesh, 0, 0) == 0, "nothing linked");
     mnavDestroyNavmesh(navmesh);

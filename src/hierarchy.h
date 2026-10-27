@@ -103,7 +103,7 @@ void mnavMarkCluster(mnavHierarchy* h, int32_t cluster, uint8_t value);
 
 // Runs Dijkstra's search from a point in a polygon within a cluster,
 // opening the nodes just beyond it, backward when asked (off-mesh links
-// followed from where they land); mnav_errorLimit when it runs out of
+// followed from where they land); mnav_errorCapacity when it runs out of
 // nodes.
 mnavResult mnavSearchCluster(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh,
                              bool backward, int32_t cluster, mnavPolygonId polygon, mnavPos3 point);

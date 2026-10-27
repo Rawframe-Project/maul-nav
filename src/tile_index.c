@@ -109,7 +109,7 @@ static mnavResult Measure(mnavTileIndex* index, Source s, int64_t* entriesOut)
             all.z0 = r.z0 < all.z0 ? r.z0 : all.z0;
             all.z1 = r.z1 > all.z1 ? r.z1 : all.z1;
             entries += (r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1);
-            if (entries > INT32_MAX)
+            if (entries > MNAV_MAX_INDEX_ENTRIES)
             {
                 return mnav_errorLimit;
             }
@@ -122,7 +122,7 @@ static mnavResult Measure(mnavTileIndex* index, Source s, int64_t* entriesOut)
         // refused index stays 0 by 0 tiles.
         int64_t columns = all.x1 - all.x0 + 1;
         int64_t rows = all.z1 - all.z0 + 1;
-        if (columns * rows >= INT32_MAX)
+        if (columns * rows > MNAV_MAX_INDEX_ENTRIES)
         {
             return mnav_errorLimit;
         }

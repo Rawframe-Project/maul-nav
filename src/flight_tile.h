@@ -36,9 +36,9 @@ void mnavReleaseFlightTileBytes(mnavMemory* memory, uint8_t* bytes, size_t size)
 // Reads a tile from size bytes, checking it against a valid def and its
 // shape: on success tile holds it, with its indices rebuilt, and
 // fingerprintOut its fingerprint; on failure nothing is held. A
-// malformed tile or one baked with other settings is mnav_errorInvalid,
-// another format version mnav_errorVersion, counts past the def's limits
-// mnav_errorLimit.
+// malformed tile, one baked with other settings or one with counts past
+// the def's limits is mnav_errorFormat, another format version
+// mnav_errorVersion.
 mnavTileResult mnavDecodeFlightTile(mnavMemory* memory, const mnavFlightDef* def,
                                     const mnavFlightShape* shape, const uint8_t* bytes, size_t size,
                                     mnavFlightTile* tile, uint64_t* fingerprintOut);

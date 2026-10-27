@@ -29,18 +29,31 @@ static bool Within(float v, float low, float high)
     return isfinite(v) && v >= low && v <= high;
 }
 
-static bool GoodDef(const mnavLinkGenDef* d)
+// The def's distances, costs and kinds: mnav_errorInvalid for a value not
+// finite or below 0, a spacing of 0, a detour from 0 to 1 or past 10^6, or
+// a kind past the kinds; mnav_errorLimit past an MNAV_MAX_ value.
+static mnavResult CheckDef(const mnavLinkGenDef* d)
 {
-    return Within(d->spacing, 0.0f, MNAV_MAX_LINK_REACH) && d->spacing > 0.0f &&
-           Within(d->dropMax, 0.0f, MNAV_MAX_LINK_REACH) &&
-           Within(d->jumpMax, 0.0f, MNAV_MAX_LINK_REACH) &&
-           Within(d->climbMax, 0.0f, MNAV_MAX_LINK_REACH) &&
-           (d->detour == 0.0f || Within(d->detour, 1.0f, 1.0e6f)) &&
-           Within(d->filterDistance, 0.0f, MNAV_MAX_LINK_REACH) &&
-           Within(d->radius, 0.0f, MNAV_MAX_LINK_RADIUS) &&
-           Within(d->dropCost, 0.0f, MNAV_MAX_LINK_COST) &&
-           Within(d->jumpCost, 0.0f, MNAV_MAX_LINK_COST) && d->dropKind < MNAV_LINK_KINDS &&
-           d->jumpKind < MNAV_LINK_KINDS;
+    const float values[8] = {d->spacing,        d->dropMax, d->jumpMax,  d->climbMax,
+                             d->filterDistance, d->radius,  d->dropCost, d->jumpCost};
+    const float most[8] = {MNAV_MAX_LINK_REACH, MNAV_MAX_LINK_REACH, MNAV_MAX_LINK_REACH,
+                           MNAV_MAX_LINK_REACH, MNAV_MAX_LINK_REACH, MNAV_MAX_LINK_RADIUS,
+                           MNAV_MAX_LINK_COST,  MNAV_MAX_LINK_COST};
+    bool past = false;
+    for (int32_t k = 0; k < 8; ++k)
+    {
+        if (!isfinite(values[k]) || values[k] < 0.0f)
+        {
+            return mnav_errorInvalid;
+        }
+        past = past || values[k] > most[k];
+    }
+    if (d->spacing == 0.0f || (d->detour != 0.0f && !Within(d->detour, 1.0f, 1.0e6f)) ||
+        d->dropKind >= MNAV_LINK_KINDS || d->jumpKind >= MNAV_LINK_KINDS)
+    {
+        return mnav_errorInvalid;
+    }
+    return past ? mnav_errorLimit : mnav_success;
 }
 
 // A generation: its inputs, the agent's sizes in meters, and the links so
@@ -307,9 +320,10 @@ static mnavResult Generate(mnavQuery* query, const mnavNavmesh* navmesh,
     {
         return result;
     }
-    if (!GoodDef(def))
+    result = CheckDef(def);
+    if (result != mnav_success)
     {
-        return mnav_errorRange;
+        return result;
     }
     // Samples closer than a cell tell nothing a cell's resolution can.
     if (def->spacing < navmesh->def.cellSize)

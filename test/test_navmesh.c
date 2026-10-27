@@ -125,7 +125,7 @@ static void TestFailedCommitChangesNothing(void)
     size_t before = s_held;
     CHECK(StageAt(navmesh, 1) == mnav_success, "staged");
     size_t staged = s_held;
-    CHECK(mnavCommit(navmesh) == mnav_errorLimit, "past the links limit");
+    CHECK(mnavCommit(navmesh) == mnav_errorCapacity, "past the links limit");
     mnavTileId id;
     CHECK(mnavGetTile(navmesh, 1, 0, &id) == mnav_errorNotLoaded, "nothing applied");
     CHECK(s_held == staged, "the change stays staged, nothing taken or given back");
@@ -140,7 +140,7 @@ static void TestFailedCommitChangesNothing(void)
     def.limits.tiles = 1;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     CHECK(StageAt(navmesh, 0) == mnav_success && StageAt(navmesh, 1) == mnav_success &&
-              mnavCommit(navmesh) == mnav_errorLimit,
+              mnavCommit(navmesh) == mnav_errorCapacity,
           "past the tiles limit");
     mnavDestroyNavmesh(navmesh);
 }
@@ -154,10 +154,10 @@ static void TestTilesMustMatchTheDef(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     size_t held = s_held;
     mnavTileResult result = mnavStageTile(navmesh, s_tiles[0], s_sizes[0]);
-    CHECK(result.result == mnav_errorInvalid && result.section == mnav_tileHeader,
+    CHECK(result.result == mnav_errorFormat && result.section == mnav_tileHeader,
           "baked for another agent");
     result = mnavStageTile(navmesh, s_tiles[0], s_sizes[0] - 1);
-    CHECK(result.result == mnav_errorInvalid, "damaged bytes");
+    CHECK(result.result == mnav_errorFormat, "damaged bytes");
     CHECK(s_held == held, "nothing staged");
     mnavDestroyNavmesh(navmesh);
     CHECK(mnavStageTile(nullptr, s_tiles[0], s_sizes[0]).result == mnav_errorInvalid &&

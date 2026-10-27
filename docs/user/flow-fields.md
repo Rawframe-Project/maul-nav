@@ -15,6 +15,6 @@ When many agents share goals, one search serves them all: a flow field holds, fo
 - `mnavCreateNavFlow` with a def of the most polygons, tile slots and off-mesh links it covers, then `mnavBuildNavFlow` toward goal points on polygons.
 - `mnavNavFlowAt` gives a polygon's cost, its next polygon, and the portal to head for on the way out of it, or the off-mesh link to take. An agent heads for its polygon's portal and the next polygon's after it; within a polygon, the host steers.
 - **In steps.** `mnavBeginNavFlow` takes a box of tile places (all by default), and `mnavContinueNavFlow` settles a budget of polygons at a time, with the same field for any budgets.
-- **Commits.** A commit to the navmesh makes the field stale, and reads refuse it (`mnav_errorStale`). There are no repairs over a navmesh, since a polygon's way decides where in it the cost is measured; a build is cheap instead. A host whose goals move keeps two fields, building the next in steps while agents read the last.
+- **Commits.** A commit to the navmesh leaves the field out of date, and reads refuse it (`mnav_errorState`). There are no repairs over a navmesh, since a polygon's way decides where in it the cost is measured; a build is cheap instead. A host whose goals move keeps two fields, building the next in steps while agents read the last.
 
 Both kinds draw as arrows into a [debug buffer](debug-drawing.md).

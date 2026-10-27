@@ -143,17 +143,17 @@ static void TestCommitsMakeSearchesStale(void)
                   mnav_success &&
               mnavContinuePath(query, navmesh, 3, &ended) == mnav_success && !ended,
           "under way");
-    CHECK(mnavContinuePath(query, other, 3, &ended) == mnav_errorStale &&
-              mnavFinishPath(query, other, &path) == mnav_errorStale,
+    CHECK(mnavContinuePath(query, other, 3, &ended) == mnav_errorInvalid &&
+              mnavFinishPath(query, other, &path) == mnav_errorInvalid,
           "not on another navmesh");
     // Staging changes nothing; committing does.
     CHECK(mnavStageTile(navmesh, s_tiles[3], s_sizes[3]).result == mnav_success &&
               mnavContinuePath(query, navmesh, 3, &ended) == mnav_success,
           "staging alone");
     CHECK(mnavCommit(navmesh) == mnav_success &&
-              mnavContinuePath(query, navmesh, 3, &ended) == mnav_errorStale &&
-              mnavFinishPath(query, navmesh, &path) == mnav_errorStale,
-          "stale after a commit");
+              mnavContinuePath(query, navmesh, 3, &ended) == mnav_errorState &&
+              mnavFinishPath(query, navmesh, &path) == mnav_errorState,
+          "out of date after a commit");
     // A commit with nothing staged changes nothing.
     CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){62.0, 0.0, 62.0}, box, &b) == mnav_success &&
               mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point) ==
@@ -179,8 +179,8 @@ static void TestFinishingEarly(void)
           "ends");
     bool ended = true;
     mnavPath path;
-    CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorInvalid &&
-              mnavFinishPath(query, navmesh, &path) == mnav_errorInvalid,
+    CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorState &&
+              mnavFinishPath(query, navmesh, &path) == mnav_errorState,
           "nothing begun");
     CHECK(mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point) ==
                   mnav_success &&
@@ -192,8 +192,8 @@ static void TestFinishingEarly(void)
               path.end == mnav_pathUnfinished && path.polygonCount >= 1 &&
               path.polygons[0].polygon == a.polygon.polygon && path.pointCount >= 2,
           "unfinished, toward the end");
-    CHECK(mnavFinishPath(query, navmesh, &path) == mnav_errorInvalid &&
-              mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorInvalid,
+    CHECK(mnavFinishPath(query, navmesh, &path) == mnav_errorState &&
+              mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorState,
           "finished once");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);

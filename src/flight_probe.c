@@ -34,9 +34,11 @@ static MNAV_NOINLINE mnavResult FlightRaycastWork(const mnavFlightVolume* volume
     double b[3];
     int32_t at[3];
     int32_t to3[3];
-    if (!mnavFlightToVoxels(&frame, from, a, at) || !mnavFlightToVoxels(&frame, to, b, to3))
+    mnavResult result = mnavFlightToVoxels(&frame, from, a, at);
+    result = result == mnav_success ? mnavFlightToVoxels(&frame, to, b, to3) : result;
+    if (result != mnav_success)
     {
-        return mnav_errorRange;
+        return result;
     }
     mnavFlightCursor cursor = mnavMakeFlightCursor(volume);
     double t = 1.0;
@@ -75,9 +77,10 @@ static MNAV_NOINLINE mnavResult CheckFlightPathWork(const mnavFlightVolume* volu
     int32_t cell[3];
     for (int32_t i = 0; i < pointCount; ++i)
     {
-        if (!mnavFlightToVoxels(&frame, points[i], v, cell))
+        mnavResult result = mnavFlightToVoxels(&frame, points[i], v, cell);
+        if (result != mnav_success)
         {
-            return mnav_errorRange;
+            return result;
         }
     }
     // One cursor serves every step, so that steps in one tile look it up
@@ -275,9 +278,14 @@ static MNAV_NOINLINE mnavResult FindNearestFlightPointWork(const mnavFlightVolum
     mnavFlightFrame frame = mnavMakeFlightFrame(volume);
     Nearest n = {{0.0, 0.0, 0.0}, 0.0, {0.0, 0.0, 0.0}, false};
     int32_t at[3];
-    if (!mnavFlightToVoxels(&frame, point, n.p, at) || !(radius >= 0.0f) || !isfinite(radius))
+    if (!(radius >= 0.0f) || !isfinite(radius))
     {
-        return mnav_errorRange;
+        return mnav_errorInvalid;
+    }
+    mnavResult result = mnavFlightToVoxels(&frame, point, n.p, at);
+    if (result != mnav_success)
+    {
+        return result;
     }
     mnavFlightCursor cursor = mnavMakeFlightCursor(volume);
     if (mnavFlightHolder(&cursor, at[0], at[1], at[2], nullptr) == MNAV_SPACE_OPEN)

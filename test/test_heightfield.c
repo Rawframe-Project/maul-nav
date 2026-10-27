@@ -363,16 +363,16 @@ static void TestLimitsAreTyped(void)
     // and the border's none.
     mnavBakeDef def = mnavDefaultBakeDef();
     def.limits.tileSpans = 1639;
-    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_errorLimit,
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_errorCapacity,
           "fragments past the limit");
     def.limits.tileSpans = 1640;
     CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_success, "fragments at the limit");
     def = mnavDefaultBakeDef();
     def.limits.tileTriangles = 1;
-    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_errorLimit,
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_errorCapacity,
           "triangles past the limit");
     def = mnavDefaultBakeDef();
-    CHECK(Bake(&def, &s_floorMesh, 1, 1 << 20, 0, nullptr) == mnav_errorRange,
+    CHECK(Bake(&def, &s_floorMesh, 1, 1 << 20, 0, nullptr) == mnav_errorLimit,
           "tile past the extent");
 }
 
@@ -395,7 +395,8 @@ static void TestMemoryLimitAndRefusedMemory(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.allocator = CountingAllocator();
     def.limits.memoryBytes = 4096;
-    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_errorLimit, "memory past the limit");
+    CHECK(Bake(&def, &s_floorMesh, 1, 0, 0, nullptr) == mnav_errorCapacity,
+          "memory past the limit");
     CHECK(s_held == 0, "nothing held after the memory limit");
     // Each allocation of the baker and the bake refused in turn.
     def = mnavDefaultBakeDef();

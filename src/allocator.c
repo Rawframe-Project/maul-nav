@@ -48,7 +48,7 @@ mnavResult mnavAllocate(mnavMemory* memory, size_t count, size_t size, size_t al
     }
     if (total > memory->limit)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     if (bytes == 0)
     {

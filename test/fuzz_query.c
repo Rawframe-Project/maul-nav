@@ -86,7 +86,8 @@ static bool Finite(mnavPos3 p)
 
 static bool Typed(mnavResult result)
 {
-    return result <= mnav_success && result >= mnav_errorTier;
+    // Every status the library defines has a name.
+    return strcmp(mnavResultName(result), "unknown result") != 0;
 }
 
 static mnavNavmesh* s_navmesh;
@@ -340,12 +341,15 @@ static mnavResult Steer(Reader* r, const mnavCorridor* corridor)
     def.slowDistance = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.1);
     def.arriveDistance = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.01);
     def.anticipateTurns = Byte(r) % 2 == 0;
-    bool good = def.maxSpeed >= 0.0f && def.maxSpeed <= MNAV_MAX_STEER_SPEED &&
-                def.slowDistance >= 0.0f && def.slowDistance <= MNAV_MAX_STEER_DISTANCE &&
-                def.arriveDistance >= 0.0f && def.arriveDistance <= MNAV_MAX_STEER_DISTANCE;
+    bool valid = isfinite(def.maxSpeed) && isfinite(def.slowDistance) &&
+                 isfinite(def.arriveDistance) && def.maxSpeed >= 0.0f && def.slowDistance >= 0.0f &&
+                 def.arriveDistance >= 0.0f;
+    bool within = def.maxSpeed <= MNAV_MAX_STEER_SPEED &&
+                  def.slowDistance <= MNAV_MAX_STEER_DISTANCE &&
+                  def.arriveDistance <= MNAV_MAX_STEER_DISTANCE;
     mnavSteering steering;
     result = mnavSteer(&corners, &def, &steering);
-    Expect(result == (good ? mnav_success : mnav_errorRange));
+    Expect(result == (!valid ? mnav_errorInvalid : within ? mnav_success : mnav_errorLimit));
     if (result != mnav_success)
     {
         return result;

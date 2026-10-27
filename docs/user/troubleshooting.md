@@ -4,13 +4,14 @@
 
 | Result | Meaning | What to do |
 |---|---|---|
-| `mnav_errorInvalid` | An argument is wrong: a NULL pointer, a def not made by its default, a value outside its range, malformed input or tile bytes. | The result struct, where there is one, names the setting, the input element or the tile section refused. |
-| `mnav_errorCapacity` | A caller buffer is too small, or the allocator failed. | A buffer call reports the size it needed; grow the buffer and call again. |
-| `mnav_errorLimit` | A named limit in a def was reached, and the work it bounds was not done. | Raise the limit in the def, or split the work. A bake's report says which stage hit it. |
-| `mnav_errorRange` | A coordinate is finite but too far from the frame's origin for the library to represent. | Move the origin nearer the input, or split the world into several origins. |
+| `mnav_errorInvalid` | An argument a correct program never passes: a NULL pointer, a def not made by its default, a value not finite or outside the range its documentation gives, an object other than the one the call needs, malformed input geometry. | The result struct, where there is one, names the setting or the input element refused. |
+| `mnav_errorCapacity` | Room is too small: a caller buffer, the allocator, or a limit the def sets (memory, polygons per tile, nodes per search, agents per step) was reached, and the work it bounds was not done. | A buffer call reports the size it needed; grow the buffer, raise the limit in the def, or split the work. A bake's report says which stage hit it. |
+| `mnav_errorStale` | An id names a tile, polygon or link replaced or removed since it was handed out. | Find the polygon again. |
+| `mnav_errorState` | The object is not in a state the call takes: a search or field not begun or not ended, one that outlived a commit to its navmesh or volume, a link staged and not yet committed. | Begin the search or field again, or finish it first. |
 | `mnav_errorVersion` | Tile bytes of another format version, or a def built against headers of another library version. | Rebake the tiles, or rebuild the program against the linked library. |
+| `mnav_errorFormat` | Tile bytes are malformed, or were baked with other settings. | The tile result names the section and element refused. Rebake the tile. |
+| `mnav_errorLimit` | An argument passes a fixed bound the library publishes as an `MNAV_MAX_` or `MNAV_MIN_` constant: a coordinate past the extent, a def value past its bound. More room would not help. | Keep values within the bound; for coordinates, move the origin nearer the input, or split the world into several origins. |
 | `mnav_errorNotLoaded` | The place has no tile loaded. It is not a wall: nothing is known there. | Wait for the tile, then ask again. |
-| `mnav_errorStale` | An id names a tile, polygon or link replaced or removed since it was handed out, or a search or field outlived a commit. | Find the polygon again, or begin the search or field again. |
 | `mnav_errorTier` | The navmesh's tier does not allow the change. | Make the navmesh with the tier the change needs. |
 
 `mnavResultName` gives any result's name for a log.

@@ -233,7 +233,7 @@ static MNAV_NOINLINE mnavResult CommitFlightWork(mnavFlightVolume* volume)
     int64_t count = CountAfter(volume);
     if (count > volume->def.limits.tiles)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     mnavFlightEntry* next = nullptr;
     if (count > 0)
@@ -288,12 +288,12 @@ mnavResult mnavGetFlightTile(const mnavFlightVolume* volume, int32_t tileX, int3
     return e != nullptr ? mnav_success : mnav_errorNotLoaded;
 }
 
-// The voxel holding a coordinate, from the origin's, or false past what
-// a voxel index can be.
+// The voxel holding a distance from the origin; false past
+// MNAV_MAX_FLIGHT_VOXELS.
 static bool VoxelOf(double meters, double voxel, int64_t* voxelOut)
 {
     double q = floor(meters / voxel);
-    if (!(fabs(q) < 1073741824.0))
+    if (!(fabs(q) <= (double)MNAV_MAX_FLIGHT_VOXELS))
     {
         return false;
     }
@@ -319,17 +319,22 @@ static MNAV_NOINLINE mnavResult IsFlightOpenWork(const mnavFlightVolume* volume,
     const mnavFlightDef* def = &volume->def;
     double voxel = (double)def->voxelSize;
     int64_t v[3] = {0, 0, 0};
+    if (!isfinite(point.x) || !isfinite(point.y) || !isfinite(point.z))
+    {
+        return mnav_errorInvalid;
+    }
     if (!VoxelOf(point.x - def->origin.x, voxel, &v[0]) ||
         !VoxelOf(point.y - def->origin.y, voxel, &v[1]) ||
         !VoxelOf(point.z - def->origin.z, voxel, &v[2]))
     {
-        return mnav_errorRange;
+        return mnav_errorLimit;
     }
+    // Below the floor or above the ceiling, the def's bounds.
     int64_t side = def->tileVoxels;
     int64_t y = v[1] - volume->shape.floorVoxel;
     if (y < 0 || y >= (int64_t)volume->shape.cubeCount * side)
     {
-        return mnav_errorRange;
+        return mnav_errorInvalid;
     }
     int64_t tileX = FloorDiv(v[0], side);
     int64_t tileZ = FloorDiv(v[2], side);

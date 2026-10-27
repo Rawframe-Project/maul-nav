@@ -213,7 +213,7 @@ static void TestLimitsAndEnds(void)
     bad = grid;
     bad.width = MNAV_MAX_GRID_SIDE + 1;
     CHECK(mnavFindGridPath(query, &bad, nullptr, (mnavCell){0, 0}, (mnavCell){1, 0}, &path) ==
-              mnav_errorInvalid,
+              mnav_errorLimit,
           "too wide");
     bad = grid;
     bad.areas = nullptr;
@@ -321,7 +321,7 @@ static void TestEndsASlicedSearch(void)
                   mnav_success &&
               mnavFindGridPath(query, &grid, nullptr, (mnavCell){0, 0}, (mnavCell){3, 3}, &path) ==
                   mnav_success &&
-              mnavContinuePath(query, navmesh, 16, &ended) == mnav_errorInvalid,
+              mnavContinuePath(query, navmesh, 16, &ended) == mnav_errorState,
           "the sliced search ended");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);

@@ -97,9 +97,9 @@ extern "C"
     /// @param hierarchyOut Receives the hierarchy, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
     /// not from mnavDefaultHierarchyDef; `mnav_errorVersion` for one built
-    /// against another version of the headers; `mnav_errorRange` for a limit or
-    /// cluster side out of its range; `mnav_errorCapacity` when the allocator
-    /// fails.
+    /// against another version of the headers; `mnav_errorInvalid` also for a
+    /// limit or cluster side below 1; `mnav_errorLimit` for one past its
+    /// MNAV_MAX_ value; `mnav_errorCapacity` when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateHierarchy(const mnavHierarchyDef* def,
@@ -130,12 +130,12 @@ extern "C"
     /// @param filter    The areas usable and their costs, or NULL; the
     ///                  hierarchy keeps a copy.
     /// @param reportOut Receives what was made. May be NULL.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or
-    /// a filter not built from mnavDefaultQueryFilter; `mnav_errorRange`
-    /// for a filter cost out of its range; `mnav_errorLimit` for more tile
-    /// slots, transitions or edges than the limits, or a cluster needing
-    /// more nodes than the context's limit. On an error the hierarchy holds
-    /// no graph.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// filter not built from mnavDefaultQueryFilter or with a cost not finite;
+    /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
+    /// MNAV_MAX_AREA_COST; `mnav_errorCapacity` for more tile slots,
+    /// transitions or edges than the limits, or a cluster needing more nodes
+    /// than the context\'s limit. On an error the hierarchy holds no graph.
     /// @par Thread safety
     /// Safe from any thread; the hierarchy and the context are used by one
     /// thread at a time, and no commit runs on the navmesh.
@@ -158,10 +158,10 @@ extern "C"
     /// @param navmesh   The navmesh.
     /// @param reportOut Receives what the graph holds and the searches run.
     ///                  May be NULL.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// hierarchy with no graph, or one built for another navmesh;
-    /// `mnav_errorLimit` as mnavBuildHierarchy. On an error the hierarchy
-    /// holds no graph.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// hierarchy built for another navmesh; `mnav_errorState` for a hierarchy
+    /// with no graph; `mnav_errorCapacity` as mnavBuildHierarchy. On an error
+    /// the hierarchy holds no graph.
     /// @par Thread safety
     /// Safe from any thread; the hierarchy and the context are used by one
     /// thread at a time, and no commit runs on the navmesh.
@@ -189,10 +189,10 @@ extern "C"
     /// @param endPolygon   The polygon the end lies in.
     /// @param end          The end point.
     /// @param pathOut      Receives the path.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// point not finite, a hierarchy with no graph, or one built for
-    /// another navmesh; `mnav_errorStale` for a navmesh committed since the
-    /// build; the errors of mnavFindPath otherwise.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
+    /// not finite, or a hierarchy built for another navmesh; `mnav_errorState`
+    /// for a hierarchy with no graph, or a navmesh committed since the build;
+    /// the errors of mnavFindPath otherwise.
     /// @par Thread safety
     /// Safe from any thread; the context and the hierarchy are used by one
     /// thread at a time.

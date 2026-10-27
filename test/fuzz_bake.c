@@ -167,8 +167,8 @@ static size_t BakeTwice(mnavBaker* baker, const Input* in, bool flat, int32_t ou
     Expect(result == report.result);
     if (result != mnav_success)
     {
-        Expect(result == mnav_errorInvalid || result == mnav_errorRange ||
-               result == mnav_errorLimit);
+        Expect(result == mnav_errorInvalid || result == mnav_errorLimit ||
+               result == mnav_errorCapacity);
         return 0;
     }
     size_t size = 0;
@@ -213,8 +213,8 @@ static void Rebuild(mnavBaker* baker, const mnavBakeInput* input, int32_t obstac
     }
     else
     {
-        Expect(cached == mnav_errorInvalid || cached == mnav_errorRange ||
-               cached == mnav_errorLimit);
+        Expect(cached == mnav_errorInvalid || cached == mnav_errorLimit ||
+               cached == mnav_errorCapacity);
     }
     mnavDestroyTileCache(cache);
 }

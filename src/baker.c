@@ -158,7 +158,7 @@ static mnavResult CheckOutlines(const mnavBaker* baker, const Input* in, int32_t
     {
         total += outlines[o].pointCount;
     }
-    return total > baker->def.limits.inputTriangles ? mnav_errorLimit : mnav_success;
+    return total > baker->def.limits.inputTriangles ? mnav_errorCapacity : mnav_success;
 }
 
 // Checks, with a tile index, that it fits, each mesh's counts and
@@ -534,7 +534,7 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
     if (result == mnav_success &&
         !mnavMakeTileFrame(&baker->def, &baker->cells, tileX, tileZ, &frame))
     {
-        result = mnav_errorRange;
+        result = mnav_errorLimit;
     }
     Stages stages = {0};
     const mnavBakeSettings settings = Settings(&baker->def, tileX, tileZ);
@@ -669,7 +669,7 @@ static mnavResult CheckObstacles(const mnavBaker* baker, const mnavCachedTile* t
         }
         total += obstacles[i].pointCount;
     }
-    return total > baker->def.limits.inputTriangles ? mnav_errorLimit : mnav_success;
+    return total > baker->def.limits.inputTriangles ? mnav_errorCapacity : mnav_success;
 }
 
 static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache* cache,
@@ -699,7 +699,7 @@ static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache*
     if (result == mnav_success)
     {
         result = ckd_add(&count, tile->volumeCount, obstacleCount)
-                     ? mnav_errorLimit
+                     ? mnav_errorCapacity
                      : mnavAllocate(&baker->memory, (size_t)count, sizeof(mnavBakeVolume),
                                     alignof(mnavBakeVolume), (void**)&volumes);
     }

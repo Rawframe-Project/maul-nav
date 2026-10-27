@@ -338,7 +338,7 @@ static void TestEveryTruncationIsRefused(void)
         {
             Reseal(copy, size);
         }
-        CHECK(Load(&f.memory, copy, size).result == mnav_errorInvalid, "refused");
+        CHECK(Load(&f.memory, copy, size).result == mnav_errorFormat, "refused");
     }
     CHECK(f.memory.used == held, "nothing held after a refusal");
     Unbake(&f);
@@ -359,7 +359,7 @@ static void TestTrailingBytesAreRefused(void)
         memset(copy + f.size, 0, extra);
         Reseal(copy, f.size + extra);
         mnavTileResult r = Load(&f.memory, copy, f.size + extra);
-        CHECK(r.result == mnav_errorInvalid && r.section == mnav_tilePayload,
+        CHECK(r.result == mnav_errorFormat && r.section == mnav_tilePayload,
               "trailing bytes refused as the payload's");
     }
     CHECK(f.memory.used == held, "nothing held after a refusal");
@@ -431,25 +431,25 @@ static void TestHeaderRefusals(void)
 {
     static Fixture f;
     Bake(&f);
-    CHECK(Is(Changed(&f, 0, 'X', 1, true), mnav_errorInvalid, mnav_tileHeader), "magic");
+    CHECK(Is(Changed(&f, 0, 'X', 1, true), mnav_errorFormat, mnav_tileHeader), "magic");
     CHECK(Is(Changed(&f, FORMAT_AT, MNAV_TILE_FORMAT + 1, 2, true), mnav_errorVersion,
              mnav_tileHeader),
           "another format version");
     size_t info = FieldAt(f.bytes, TAG_INFO);
-    CHECK(Is(Changed(&f, info + INFO_CELLS_AT, 8, 2, true), mnav_errorInvalid, mnav_tileHeader),
+    CHECK(Is(Changed(&f, info + INFO_CELLS_AT, 8, 2, true), mnav_errorFormat, mnav_tileHeader),
           "tile cells");
-    CHECK(Is(Changed(&f, info + INFO_CELL_SIZE_AT, 0x7FC00000u, 4, true), mnav_errorInvalid,
+    CHECK(Is(Changed(&f, info + INFO_CELL_SIZE_AT, 0x7FC00000u, 4, true), mnav_errorFormat,
              mnav_tileHeader),
           "NaN cell size");
-    CHECK(Is(Changed(&f, info + INFO_ORIGIN_AT, 0x7FF0000000000000ull, 8, true), mnav_errorInvalid,
+    CHECK(Is(Changed(&f, info + INFO_ORIGIN_AT, 0x7FF0000000000000ull, 8, true), mnav_errorFormat,
              mnav_tileHeader),
           "infinite origin");
-    CHECK(Is(Changed(&f, HASH_AT, 0, 8, false), mnav_errorInvalid, mnav_tilePayload), "hash");
-    CHECK(Is(Changed(&f, PAYLOAD_AT, f.size, 4, false), mnav_errorInvalid, mnav_tilePayload),
+    CHECK(Is(Changed(&f, HASH_AT, 0, 8, false), mnav_errorFormat, mnav_tilePayload), "hash");
+    CHECK(Is(Changed(&f, PAYLOAD_AT, f.size, 4, false), mnav_errorFormat, mnav_tilePayload),
           "payload size");
-    CHECK(Is(Changed(&f, FIELDS_AT, 7, 4, true), mnav_errorInvalid, mnav_tilePayload),
+    CHECK(Is(Changed(&f, FIELDS_AT, 7, 4, true), mnav_errorFormat, mnav_tilePayload),
           "more fields than the payload holds");
-    CHECK(Is(Changed(&f, FIELDS_AT, 5, 4, true), mnav_errorInvalid, mnav_tilePayload),
+    CHECK(Is(Changed(&f, FIELDS_AT, 5, 4, true), mnav_errorFormat, mnav_tilePayload),
           "bytes past the fields counted");
     CHECK(mnavDecodeTile(&f.memory, nullptr, 0, &(mnavTileInfo){0}, &(mnavPolyMesh){0},
                          &(mnavDetailMesh){0})
@@ -483,23 +483,23 @@ static void TestMeshRefusals(void)
     }
     CHECK(linked >= 0 && loose >= 0, "the level has both");
     size_t at = PolygonAt(&f, linked);
-    CHECK(Is(Changed(&f, at + 1, 0, 1, true), mnav_errorInvalid, mnav_tilePolygons), "area 0");
-    CHECK(Is(Changed(&f, at + 1, MNAV_AREA_TYPES, 1, true), mnav_errorInvalid, mnav_tilePolygons),
+    CHECK(Is(Changed(&f, at + 1, 0, 1, true), mnav_errorFormat, mnav_tilePolygons), "area 0");
+    CHECK(Is(Changed(&f, at + 1, MNAV_AREA_TYPES, 1, true), mnav_errorFormat, mnav_tilePolygons),
           "area past the types");
-    CHECK(Is(Changed(&f, at, 7, 1, true), mnav_errorInvalid, mnav_tilePolygons) ||
-              Changed(&f, at, 7, 1, true).result == mnav_errorInvalid,
+    CHECK(Is(Changed(&f, at, 7, 1, true), mnav_errorFormat, mnav_tilePolygons) ||
+              Changed(&f, at, 7, 1, true).result == mnav_errorFormat,
           "seven vertices");
-    CHECK(Is(Changed(&f, at + 2, (uint64_t)mesh->vertexCount, 2, true), mnav_errorInvalid,
+    CHECK(Is(Changed(&f, at + 2, (uint64_t)mesh->vertexCount, 2, true), mnav_errorFormat,
              mnav_tilePolygons),
           "a vertex past the vertices");
-    CHECK(Is(Changed(&f, at + 4, MNAV_NO_INDEX, 2, true), mnav_errorInvalid, mnav_tilePolygons),
+    CHECK(Is(Changed(&f, at + 4, MNAV_NO_INDEX, 2, true), mnav_errorFormat, mnav_tilePolygons),
           "a neighbor that does not link back");
-    CHECK(Is(Changed(&f, at + 4, (uint64_t)linked, 2, true), mnav_errorInvalid, mnav_tilePolygons),
+    CHECK(Is(Changed(&f, at + 4, (uint64_t)linked, 2, true), mnav_errorFormat, mnav_tilePolygons),
           "its own neighbor");
-    CHECK(Is(Changed(&f, at + 6, 1, 1, true), mnav_errorInvalid, mnav_tilePolygons),
+    CHECK(Is(Changed(&f, at + 6, 1, 1, true), mnav_errorFormat, mnav_tilePolygons),
           "a side on a linked edge");
     size_t edge = PolygonAt(&f, loose) + 2 + (size_t)looseEdge * 5;
-    CHECK(Is(Changed(&f, edge + 4, 2, 1, true), mnav_errorInvalid, mnav_tilePolygons),
+    CHECK(Is(Changed(&f, edge + 4, 2, 1, true), mnav_errorFormat, mnav_tilePolygons),
           "a side the edge does not lie on");
     // The first two vertices swapped: the polygon folds over itself.
     const mnavPolygon* polygon = &mesh->polygons[loose];
@@ -509,15 +509,15 @@ static void TestMeshRefusals(void)
     PutLittle(copy + first, polygon->vertices[1], 2);
     PutLittle(copy + first + 5, polygon->vertices[0], 2);
     Reseal(copy, f.size);
-    CHECK(Is(Load(&f.memory, copy, f.size), mnav_errorInvalid, mnav_tilePolygons), "not convex");
+    CHECK(Is(Load(&f.memory, copy, f.size), mnav_errorFormat, mnav_tilePolygons), "not convex");
     // The first detail part: one more vertex than DVRT holds, and a
     // corner past its part.
     size_t parts = FieldAt(f.bytes, TAG_PARTS);
     CHECK(Is(Changed(&f, parts, f.baked.detail.parts[0].vertexCount - mesh->polygons[0].count + 1,
                      1, true),
-             mnav_errorInvalid, mnav_tileDetailParts),
+             mnav_errorFormat, mnav_tileDetailParts),
           "parts not summing to the detail fields");
-    CHECK(Is(Changed(&f, FieldAt(f.bytes, TAG_TRIANGLES), 200, 1, true), mnav_errorInvalid,
+    CHECK(Is(Changed(&f, FieldAt(f.bytes, TAG_TRIANGLES), 200, 1, true), mnav_errorFormat,
              mnav_tileDetailTriangles),
           "a corner past its part");
     Unbake(&f);
@@ -597,7 +597,7 @@ static mnavTileResult HandLoad(Hand* h)
 
 static bool Names(mnavTileResult r, mnavTileSection section, int32_t index)
 {
-    return r.result == mnav_errorInvalid && r.section == section && r.index == index;
+    return r.result == mnav_errorFormat && r.section == section && r.index == index;
 }
 
 static void TestHandTilesRefuseOneFlawEach(void)
@@ -731,20 +731,20 @@ static void TestFieldRefusals(void)
     Piece moved[MOST_PIECES];
     memcpy(moved, pieces, sizeof(moved));
     moved[4] = pieces[5];
-    CHECK(Is(Fields(&f, moved, count - 1, 0), mnav_errorInvalid, mnav_tileHeader), "no TILE");
+    CHECK(Is(Fields(&f, moved, count - 1, 0), mnav_errorFormat, mnav_tileHeader), "no TILE");
     moved[4] = pieces[5];
     moved[5] = pieces[4];
-    CHECK(Is(Fields(&f, moved, count, 0), mnav_errorInvalid, mnav_tileHeader), "TILE after VERT");
+    CHECK(Is(Fields(&f, moved, count, 0), mnav_errorFormat, mnav_tileHeader), "TILE after VERT");
     Piece twice[MOST_PIECES];
     memcpy(twice, pieces, sizeof(Piece) * 4);
     twice[4] = pieces[3];
     twice[5] = pieces[4];
     twice[6] = pieces[5];
-    CHECK(Is(Fields(&f, twice, count + 1, 0), mnav_errorInvalid, mnav_tilePolygons), "POLY twice");
+    CHECK(Is(Fields(&f, twice, count + 1, 0), mnav_errorFormat, mnav_tilePolygons), "POLY twice");
     // Padding that is not zero, on a field with padding.
     CHECK(pieces[5].size % 8 != 0 || pieces[3].size % 8 != 0, "a field with padding");
     mnavTileResult padded = Fields(&f, pieces, count, 1);
-    CHECK(padded.result == mnav_errorInvalid && padded.section != mnav_tilePayload,
+    CHECK(padded.result == mnav_errorFormat && padded.section != mnav_tilePayload,
           "a padding byte not 0, named by its field");
     // Each array field one byte short of whole records, and one record
     // short; a field present with no bytes.
@@ -756,12 +756,12 @@ static void TestFieldRefusals(void)
     {
         size_t whole = pieces[k].size;
         pieces[k].size = whole - 1;
-        CHECK(Is(Fields(&f, pieces, count, 0), mnav_errorInvalid, sections[k]),
+        CHECK(Is(Fields(&f, pieces, count, 0), mnav_errorFormat, sections[k]),
               "a field a byte short of whole records");
         pieces[k].size = records[k] > 0 ? whole - records[k] : whole - 2 - 5 * 3;
-        CHECK(Fields(&f, pieces, count, 0).result == mnav_errorInvalid, "a field a record short");
+        CHECK(Fields(&f, pieces, count, 0).result == mnav_errorFormat, "a field a record short");
         pieces[k].size = 0;
-        CHECK(Is(Fields(&f, pieces, count, 0), mnav_errorInvalid, sections[k]),
+        CHECK(Is(Fields(&f, pieces, count, 0), mnav_errorFormat, sections[k]),
               "a field of no bytes");
         pieces[k].size = whole;
     }
@@ -774,7 +774,7 @@ static void TestFieldRefusals(void)
         memcpy(longer, whole.bytes, whole.size);
         memset(longer + whole.size, 0, record);
         pieces[k] = (Piece){whole.tag, longer, whole.size + record};
-        CHECK(Is(Fields(&f, pieces, count, 0), mnav_errorInvalid, sections[k]),
+        CHECK(Is(Fields(&f, pieces, count, 0), mnav_errorFormat, sections[k]),
               "a fixed field a record long");
         pieces[k] = whole;
     }
@@ -878,7 +878,8 @@ static void TestMemoryLimitIsTyped(void)
     mnavTileInfo info;
     mnavPolyMesh mesh;
     mnavDetailMesh detail;
-    CHECK(mnavDecodeTile(&small, f.bytes, f.size, &info, &mesh, &detail).result == mnav_errorLimit,
+    CHECK(mnavDecodeTile(&small, f.bytes, f.size, &info, &mesh, &detail).result ==
+              mnav_errorCapacity,
           "past the memory limit");
     CHECK(small.used == 0, "nothing held");
     Unbake(&f);

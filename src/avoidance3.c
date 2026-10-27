@@ -22,28 +22,34 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-static bool GoodVector(mnavPos3 v)
+static mnavResult CheckVector(mnavPos3 v)
 {
-    return mnavAvoidSpeed(v.x) && mnavAvoidSpeed(v.y) && mnavAvoidSpeed(v.z);
+    return mnavAvoidJoin(mnavAvoidJoin(mnavAvoidSpeed(v.x), mnavAvoidSpeed(v.y)),
+                         mnavAvoidSpeed(v.z));
 }
 
-static bool GoodPoint(mnavPos3 p)
+static mnavResult CheckPoint(mnavPos3 p)
 {
-    return mnavAvoidCoordinate(p.x) && mnavAvoidCoordinate(p.y) && mnavAvoidCoordinate(p.z);
+    return mnavAvoidJoin(mnavAvoidJoin(mnavAvoidCoordinate(p.x), mnavAvoidCoordinate(p.y)),
+                         mnavAvoidCoordinate(p.z));
 }
 
-static bool GoodAgent(const mnavAgent3D* agent)
+static mnavResult CheckAgent(const mnavAgent3D* agent)
 {
-    return GoodPoint(agent->position) && GoodVector(agent->velocity) &&
-           GoodVector(agent->preferred) && mnavAvoidRadius(agent->radius) &&
-           mnavAvoidSpeed(agent->maxSpeed) && agent->maxSpeed >= 0.0 &&
-           mnavAvoidPositive(agent->priority);
+    if (!(agent->maxSpeed >= 0.0) || !mnavAvoidPositive(agent->priority))
+    {
+        return mnav_errorInvalid;
+    }
+    mnavResult result = mnavAvoidJoin(CheckPoint(agent->position), CheckVector(agent->velocity));
+    result = mnavAvoidJoin(result, CheckVector(agent->preferred));
+    return mnavAvoidJoin(
+        result, mnavAvoidJoin(mnavAvoidRadius(agent->radius), mnavAvoidSpeed(agent->maxSpeed)));
 }
 
-static bool GoodSphere(const mnavSphere* sphere)
+static mnavResult CheckSphere(const mnavSphere* sphere)
 {
-    return GoodPoint(sphere->center) && mnavAvoidRadius(sphere->radius) &&
-           GoodVector(sphere->velocity);
+    mnavResult result = mnavAvoidJoin(CheckPoint(sphere->center), mnavAvoidRadius(sphere->radius));
+    return mnavAvoidJoin(result, CheckVector(sphere->velocity));
 }
 
 // A sphere's reach from an agent: the squared gap between them, or -1
@@ -226,22 +232,24 @@ static mnavResult Prepare(mnavAvoidance* avoidance, const mnavAgent3D* agents, i
     if (agentCount > avoidance->def.limits.agents ||
         sphereCount > avoidance->def.limits.obstacleVertices)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     for (int32_t s = 0; s < sphereCount; ++s)
     {
-        if (!GoodSphere(&spheres[s]))
+        mnavResult result = CheckSphere(&spheres[s]);
+        if (result != mnav_success)
         {
-            return mnav_errorInvalid;
+            return result;
         }
     }
     mnavCrowd* crowd = &avoidance->crowd;
     mnavBeginCrowd(crowd, true);
     for (int32_t i = 0; i < agentCount; ++i)
     {
-        if (!GoodAgent(&agents[i]))
+        mnavResult result = CheckAgent(&agents[i]);
+        if (result != mnav_success)
         {
-            return mnav_errorInvalid;
+            return result;
         }
         crowd->keys[i] = mnavCrowdKeyOf(crowd, agents[i].position, agents[i].id, i);
         crowd->keys[i].layers = agents[i].layers;
@@ -257,11 +265,16 @@ static MNAV_NOINLINE mnavResult Avoid3DWork(mnavAvoidance* avoidance, const mnav
 {
     if (avoidance == nullptr || agentCount < 0 || sphereCount < 0 ||
         (agentCount > 0 && (agents == nullptr || velocitiesOut == nullptr)) ||
-        (sphereCount > 0 && spheres == nullptr) || !mnavAvoidTime(step))
+        (sphereCount > 0 && spheres == nullptr))
     {
         return mnav_errorInvalid;
     }
-    mnavResult result = Prepare(avoidance, agents, agentCount, spheres, sphereCount);
+    mnavResult result = mnavAvoidTime(step);
+    if (result != mnav_success)
+    {
+        return result;
+    }
+    result = Prepare(avoidance, agents, agentCount, spheres, sphereCount);
     if (result != mnav_success)
     {
         return result;

@@ -128,9 +128,13 @@ static void CheckOutside(const mnavFlightVolume* volume)
     }
     const mnavPos3 out[4] = {
         {1.0, -2.01, 1.0}, {1.0, 30.0, 1.0}, {(double)NAN, 5.0, 1.0}, {1.0, 5.0, 1e300}};
+    // Below the floor, above the ceiling and not finite are wrong; past
+    // MNAV_MAX_FLIGHT_VOXELS is a bound.
+    const mnavResult refused[4] = {mnav_errorInvalid, mnav_errorInvalid, mnav_errorInvalid,
+                                   mnav_errorLimit};
     for (int32_t k = 0; k < 4; ++k)
     {
-        wrong += mnavIsFlightOpen(volume, out[k], &open) == mnav_errorRange && !open ? 0 : 1;
+        wrong += mnavIsFlightOpen(volume, out[k], &open) == refused[k] && !open ? 0 : 1;
     }
     CHECK(wrong == 0, "past the tiles, below, above or past the volume");
     CHECK(mnavIsFlightOpen(volume, (mnavPos3){1.0, 29.99, 1.0}, &open) == mnav_success,
@@ -190,7 +194,7 @@ static bool FlipRefused(size_t i, size_t size)
     {
         return r.result == mnav_success;
     }
-    return r.result == (version ? mnav_errorVersion : mnav_errorInvalid);
+    return r.result == (version ? mnav_errorVersion : mnav_errorFormat);
 }
 
 static void TestTruncatedAndFlippedBytes(void)
@@ -200,7 +204,7 @@ static void TestTruncatedAndFlippedBytes(void)
     for (size_t n = 0; n < size; n += n < 256 ? 1 : 97)
     {
         memcpy(s_bad, s_bytes[1], n);
-        wrong += StageBad(n).result != mnav_errorInvalid ? 1 : 0;
+        wrong += StageBad(n).result != mnav_errorFormat ? 1 : 0;
     }
     CHECK(wrong == 0, "every truncation refused");
     for (size_t i = 0; i < size; i += i < 256 ? 1 : 13)
@@ -221,9 +225,9 @@ static void TestOtherSettingsAndLimits(void)
     {
         int32_t change;
         mnavResult result;
-    } cases[] = {{0, mnav_errorInvalid}, {1, mnav_errorInvalid}, {2, mnav_errorInvalid},
-                 {3, mnav_errorInvalid}, {4, mnav_errorInvalid}, {5, mnav_errorInvalid},
-                 {6, mnav_errorLimit},   {7, mnav_errorLimit}};
+    } cases[] = {{0, mnav_errorFormat}, {1, mnav_errorFormat}, {2, mnav_errorFormat},
+                 {3, mnav_errorFormat}, {4, mnav_errorFormat}, {5, mnav_errorFormat},
+                 {6, mnav_errorFormat}, {7, mnav_errorFormat}};
     int32_t wrong = 0;
     for (size_t k = 0; k < sizeof(cases) / sizeof(cases[0]); ++k)
     {
@@ -266,7 +270,7 @@ static void TestOtherSettingsAndLimits(void)
     s_bad[4] = MNAV_FLIGHT_FORMAT + 1;
     CHECK(StageBad(s_sizes[1]).result == mnav_errorVersion, "another format version");
     s_bad[0] = 'X';
-    CHECK(StageBad(s_sizes[1]).result == mnav_errorInvalid, "another magic");
+    CHECK(StageBad(s_sizes[1]).result == mnav_errorFormat, "another magic");
 }
 
 // Staged twice at a place: the last one counts.
@@ -291,7 +295,7 @@ static void PastTheTilesLimit(mnavFlightVolume* volume)
     CHECK(mnavStageFlightTile(volume, s_bytes[0], s_sizes[0]).result == mnav_success &&
               mnavStageFlightTile(volume, s_bytes[2], s_sizes[2]).result == mnav_success,
           "two more");
-    CHECK(mnavCommitFlight(volume) == mnav_errorLimit, "past the tiles limit");
+    CHECK(mnavCommitFlight(volume) == mnav_errorCapacity, "past the tiles limit");
     CHECK(mnavGetFlightTile(volume, 0, 0, &f) == mnav_errorNotLoaded &&
               mnavGetFlightTile(volume, 1, 0, &f) == mnav_success,
           "nothing applied");
@@ -412,6 +416,8 @@ static void TestDefIsChecked(void)
     {
         mnavFlightDef d = good;
         mnavFlightSetting expect = mnav_flightSettingNone;
+        // Past a bound the library names, MNAV_MIN_ or MNAV_MAX_.
+        bool bound = false;
         switch (k)
         {
         case 0:
@@ -429,10 +435,12 @@ static void TestDefIsChecked(void)
         case 3:
             d.voxelSize = 0.0f;
             expect = mnav_flightSettingVoxelSize;
+            bound = true;
             break;
         case 4:
             d.voxelSize = 11.0f;
             expect = mnav_flightSettingVoxelSize;
+            bound = true;
             break;
         case 5:
             d.voxelSize = NAN;
@@ -441,6 +449,7 @@ static void TestDefIsChecked(void)
         case 6:
             d.tileVoxels = 8;
             expect = mnav_flightSettingTileVoxels;
+            bound = true;
             break;
         case 7:
             d.tileVoxels = 48;
@@ -449,6 +458,7 @@ static void TestDefIsChecked(void)
         case 8:
             d.tileVoxels = 1024;
             expect = mnav_flightSettingTileVoxels;
+            bound = true;
             break;
         case 9:
             d.floor = NAN;
@@ -457,6 +467,7 @@ static void TestDefIsChecked(void)
         case 10:
             d.floor = -40000.0f;
             expect = mnav_flightSettingFloor;
+            bound = true;
             break;
         case 11:
             d.ceiling = d.floor;
@@ -469,6 +480,7 @@ static void TestDefIsChecked(void)
         case 13:
             d.ceiling = 32760.0f;
             expect = mnav_flightSettingCeiling;
+            bound = true;
             break;
         case 14:
             d.radius = -0.5f;
@@ -489,6 +501,7 @@ static void TestDefIsChecked(void)
         case 18:
             d.limits.tileSpans = MNAV_MAX_TILE_SPANS + 1;
             expect = mnav_flightSettingTileSpans;
+            bound = true;
             break;
         case 19:
             d.limits.tileNodes = 0;
@@ -497,6 +510,7 @@ static void TestDefIsChecked(void)
         case 20:
             d.limits.tileNodes = MNAV_MAX_FLIGHT_TILE_NODES + 1;
             expect = mnav_flightSettingTileNodes;
+            bound = true;
             break;
         case 21:
             d.limits.tileLeaves = -1;
@@ -519,7 +533,9 @@ static void TestDefIsChecked(void)
             break;
         }
         mnavFlightDefResult got = mnavValidateFlightDef(&d);
-        mnavResult want = expect == mnav_flightSettingNone ? mnav_success : mnav_errorInvalid;
+        mnavResult want = expect == mnav_flightSettingNone ? mnav_success
+                          : bound                          ? mnav_errorLimit
+                                                           : mnav_errorInvalid;
         if (got.result != want || got.setting != expect)
         {
             printf("def case %d: %d, setting %d\n", k, got.result, got.setting);
@@ -579,7 +595,7 @@ static void InputRefusals(mnavFlightBaker* baker, const mnavBakeInput* input)
               mnavBakeFlightTile(baker, nullptr, 0, 0, &report) == mnav_errorInvalid &&
               mnavBakeFlightTile(nullptr, input, 0, 0, &report) == mnav_errorInvalid,
           "NULL input");
-    CHECK(mnavBakeFlightTile(baker, input, 1 << 20, 0, &report) == mnav_errorRange,
+    CHECK(mnavBakeFlightTile(baker, input, 1 << 20, 0, &report) == mnav_errorLimit,
           "a tile past the extent");
 }
 
@@ -596,13 +612,13 @@ static void TilesToTheExtent(mnavFlightBaker* baker)
         int32_t in = 0;
         int32_t out = 1 << 20;
         CHECK(mnavBakeFlightTile(baker, &none, out * dx[d], out * dz[d], nullptr) ==
-                  mnav_errorRange,
+                  mnav_errorLimit,
               "far past the extent");
         while (out - in > 1)
         {
             int32_t mid = in + (out - in) / 2;
             mnavResult result = mnavBakeFlightTile(baker, &none, mid * dx[d], mid * dz[d], nullptr);
-            CHECK(result == mnav_success || result == mnav_errorRange, "baked or refused");
+            CHECK(result == mnav_success || result == mnav_errorLimit, "baked or refused");
             in = result == mnav_success ? mid : in;
             out = result == mnav_success ? out : mid;
         }
@@ -642,10 +658,10 @@ static void TestBakerRefusals(void)
     triangles.limits.inputTriangles = 3;
     mnavFlightDef memory = def;
     memory.limits.memoryBytes = 65536;
-    CHECK(BakeLimited(leaves, &input) == mnav_errorLimit &&
-              BakeLimited(nodes, &input) == mnav_errorLimit &&
-              BakeLimited(triangles, &input) == mnav_errorLimit &&
-              BakeLimited(memory, &input) == mnav_errorLimit,
+    CHECK(BakeLimited(leaves, &input) == mnav_errorCapacity &&
+              BakeLimited(nodes, &input) == mnav_errorCapacity &&
+              BakeLimited(triangles, &input) == mnav_errorCapacity &&
+              BakeLimited(memory, &input) == mnav_errorCapacity,
           "past each limit");
 }
 
@@ -721,12 +737,11 @@ static void TestFields(void)
     CHECK(r.result == mnav_errorVersion && r.section == mnav_tilePayload && r.index == 4,
           "an unknown tag");
     // No FLHT; ROOT before NODE.
-    CHECK(Is(Fields(pieces + 1, 3, 0), mnav_errorInvalid, mnav_tileHeader), "no FLHT");
+    CHECK(Is(Fields(pieces + 1, 3, 0), mnav_errorFormat, mnav_tileHeader), "no FLHT");
     Piece swapped[4] = {pieces[0], pieces[1], pieces[3], pieces[2]};
-    CHECK(Is(Fields(swapped, 4, 0), mnav_errorInvalid, mnav_tileFlightNodes), "NODE after ROOT");
+    CHECK(Is(Fields(swapped, 4, 0), mnav_errorFormat, mnav_tileFlightNodes), "NODE after ROOT");
     // ROOT, a single byte, is padded: a padding byte not 0.
-    CHECK(Is(Fields(pieces, 4, 1), mnav_errorInvalid, mnav_tileFlightRoots),
-          "a padding byte not 0");
+    CHECK(Is(Fields(pieces, 4, 1), mnav_errorFormat, mnav_tileFlightRoots), "a padding byte not 0");
     // Each field a byte short of whole records and a record short, and
     // present with no bytes; FLHT and ROOT, of fixed length, a record long.
     static uint8_t longer[TILE_MOST];
@@ -736,13 +751,13 @@ static void TestFields(void)
         if (records[k] > 1)
         {
             pieces[k].size = whole - 1;
-            CHECK(Is(Fields(pieces, 4, 0), mnav_errorInvalid, sections[k]),
+            CHECK(Is(Fields(pieces, 4, 0), mnav_errorFormat, sections[k]),
                   "a field a byte short of whole records");
         }
         pieces[k].size = whole - records[k];
-        CHECK(Fields(pieces, 4, 0).result == mnav_errorInvalid, "a field a record short");
+        CHECK(Fields(pieces, 4, 0).result == mnav_errorFormat, "a field a record short");
         pieces[k].size = 0;
-        CHECK(Is(Fields(pieces, 4, 0), mnav_errorInvalid, sections[k]), "a field of no bytes");
+        CHECK(Is(Fields(pieces, 4, 0), mnav_errorFormat, sections[k]), "a field of no bytes");
         pieces[k].size = whole;
     }
     // Each field a byte long.
@@ -754,7 +769,7 @@ static void TestFields(void)
         longer[whole.size] = 0;
         pieces[k].bytes = longer;
         pieces[k].size = whole.size + 1;
-        CHECK(Is(Fields(pieces, 4, 0), mnav_errorInvalid, sections[k]), "a field a byte long");
+        CHECK(Is(Fields(pieces, 4, 0), mnav_errorFormat, sections[k]), "a field a byte long");
         pieces[k] = whole;
     }
     for (int32_t k = 0; k < 4; k += 3)
@@ -764,7 +779,7 @@ static void TestFields(void)
         memset(longer + whole.size, 0, records[k]);
         pieces[k].bytes = longer;
         pieces[k].size = whole.size + records[k];
-        CHECK(Is(Fields(pieces, 4, 0), mnav_errorInvalid, sections[k]),
+        CHECK(Is(Fields(pieces, 4, 0), mnav_errorFormat, sections[k]),
               "a fixed field a record long");
         pieces[k] = whole;
     }

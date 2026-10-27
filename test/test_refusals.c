@@ -93,7 +93,7 @@ static void TestInput(void)
           "a vertex not finite");
     v[2].y = 1.0e9f;
     r = mnavValidateTriangleMesh(&def, &mesh);
-    CHECK(r.result == mnav_errorRange && r.element == mnav_elementVertex && r.index == 2,
+    CHECK(r.result == mnav_errorLimit && r.element == mnav_elementVertex && r.index == 2,
           "a vertex out of range");
     v[2].y = 0.0f;
     indices[1] = 3;
@@ -105,7 +105,7 @@ static void TestInput(void)
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 1 << 20, 0,
-                             nullptr) == mnav_errorRange,
+                             nullptr) == mnav_errorLimit,
           "a 2D tile past the extent");
     mnavDestroyBaker(baker);
 }

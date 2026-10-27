@@ -31,7 +31,7 @@ static mnavInputResult CheckVertex(const mnavBakeDef* def, const mnavTriangleMes
     }
     if (fabsf(v.x) > ground || fabsf(v.z) > ground || fabsf(v.y) > vertical)
     {
-        return Refuse(mnav_errorRange, mnav_elementVertex, i);
+        return Refuse(mnav_errorLimit, mnav_elementVertex, i);
     }
     return Refuse(mnav_success, mnav_elementNone, -1);
 }
@@ -90,7 +90,7 @@ mnavInputResult mnavCheckMeshShape(const mnavBakeDef* def, const mnavTriangleMes
     }
     if (mesh->triangleCount > def->limits.inputTriangles)
     {
-        return Refuse(mnav_errorLimit, mnav_elementNone, -1);
+        return Refuse(mnav_errorCapacity, mnav_elementNone, -1);
     }
     return Refuse(mnav_success, mnav_elementNone, -1);
 }
@@ -153,7 +153,7 @@ mnavInputResult mnavCheckOutline(const mnavBakeDef* def, const mnavOutline* outl
     }
     if (outline->pointCount > def->limits.inputTriangles)
     {
-        return Refuse(mnav_errorLimit, mnav_elementNone, -1);
+        return Refuse(mnav_errorCapacity, mnav_elementNone, -1);
     }
     float ground = def->cellSize * (float)MNAV_MAX_EXTENT_CELLS;
     for (int32_t i = 0; i < outline->pointCount; ++i)
@@ -165,7 +165,7 @@ mnavInputResult mnavCheckOutline(const mnavBakeDef* def, const mnavOutline* outl
         }
         if (fabsf(p.x) > ground || fabsf(p.y) > ground)
         {
-            return Refuse(mnav_errorRange, mnav_elementPoint, i);
+            return Refuse(mnav_errorLimit, mnav_elementPoint, i);
         }
     }
     return Refuse(mnav_success, mnav_elementNone, -1);

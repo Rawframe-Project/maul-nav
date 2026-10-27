@@ -31,13 +31,19 @@
 // Coordinates are biased into 32 unsigned bits for sort keys.
 #define BIAS 0x80000000u
 
-static bool GoodDef(const mnavHierarchyDef* def)
+// The def's limits and cluster size: mnav_errorInvalid below 1,
+// mnav_errorLimit past their MNAV_MAX_ values.
+static mnavResult CheckDef(const mnavHierarchyDef* def)
 {
     const mnavHierarchyLimits* l = &def->limits;
-    return l->tiles >= 1 && l->tiles <= MNAV_MAX_HIERARCHY_TILES && l->transitions >= 1 &&
-           l->transitions <= MNAV_MAX_HIERARCHY_TRANSITIONS && l->edges >= 1 &&
-           l->edges <= MNAV_MAX_HIERARCHY_EDGES && def->clusterTiles >= 1 &&
-           def->clusterTiles <= MNAV_MAX_CLUSTER_TILES;
+    if (l->tiles < 1 || l->transitions < 1 || l->edges < 1 || def->clusterTiles < 1)
+    {
+        return mnav_errorInvalid;
+    }
+    return l->tiles > MNAV_MAX_HIERARCHY_TILES || l->transitions > MNAV_MAX_HIERARCHY_TRANSITIONS ||
+                   l->edges > MNAV_MAX_HIERARCHY_EDGES || def->clusterTiles > MNAV_MAX_CLUSTER_TILES
+               ? mnav_errorLimit
+               : mnav_success;
 }
 
 // An array of count items for the hierarchy, kept going on a failure.
@@ -120,9 +126,10 @@ static MNAV_NOINLINE mnavResult CreateHierarchyWork(const mnavHierarchyDef* def,
     {
         return mnav_errorInvalid;
     }
-    if (!GoodDef(def))
+    mnavResult checked = CheckDef(def);
+    if (checked != mnav_success)
     {
-        return mnav_errorRange;
+        return checked;
     }
     mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
     mnavHierarchy* h = nullptr;
@@ -344,7 +351,7 @@ static mnavResult AddSide(mnavHierarchy* h, const mnavNavmesh* navmesh, int32_t 
         }
         if (h->transitionCount == h->def.limits.transitions)
         {
-            return mnav_errorLimit;
+            return mnav_errorCapacity;
         }
         int32_t middle = (int32_t)(uint32_t)sorted[start + (end - start) / 2];
         int32_t runLow = tile->links[(uint32_t)sorted[start]].low;
@@ -376,7 +383,7 @@ static mnavResult AddLinks(mnavHierarchy* h, const mnavNavmesh* navmesh)
         }
         if (h->transitionCount == h->def.limits.transitions)
         {
-            return mnav_errorLimit;
+            return mnav_errorCapacity;
         }
         int32_t low = a.link * 2 + (a.reverse ? 1 : 0);
         h->transitions[h->transitionCount++] =
@@ -500,7 +507,7 @@ mnavResult mnavSearchCluster(mnavHierarchy* h, mnavQuery* query, const mnavNavme
     bool out = query->search.outOfNodes;
     query->search.active = false;
     query->flight.active = false;
-    return result != mnav_success ? result : (out ? mnav_errorLimit : mnav_success);
+    return result != mnav_success ? result : (out ? mnav_errorCapacity : mnav_success);
 }
 
 double mnavCostTo(const mnavQuery* query, const mnavTransition* v)
@@ -532,7 +539,7 @@ static mnavResult AddEdges(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh
         }
         if (h->edgeCount == h->def.limits.edges)
         {
-            return mnav_errorLimit;
+            return mnav_errorCapacity;
         }
         edges[h->edgeCount++] = (mnavEdge){v, cost};
     }
@@ -572,7 +579,7 @@ static mnavResult Build(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* n
 {
     if (navmesh->slotCount > h->def.limits.tiles)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     FindClusters(h, navmesh);
     size_t most = MostLinks(navmesh);
@@ -734,7 +741,7 @@ static mnavResult Research(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh
         }
         if ((size_t)count + (size_t)(last - first) > limit)
         {
-            result = mnav_errorLimit;
+            result = mnav_errorCapacity;
             break;
         }
         memcpy(&edges[count], &h->edges[first], (size_t)(last - first) * sizeof(mnavEdge));
@@ -889,8 +896,15 @@ static MNAV_NOINLINE mnavResult UpdateHierarchyWork(mnavHierarchy* hierarchy, mn
                                                     const mnavNavmesh* navmesh,
                                                     mnavHierarchyReport* reportOut)
 {
-    if (hierarchy == nullptr || query == nullptr || navmesh == nullptr ||
-        hierarchy->navmesh != navmesh)
+    if (hierarchy == nullptr || query == nullptr || navmesh == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    if (hierarchy->navmesh == nullptr)
+    {
+        return mnav_errorState;
+    }
+    if (hierarchy->navmesh != navmesh)
     {
         return mnav_errorInvalid;
     }

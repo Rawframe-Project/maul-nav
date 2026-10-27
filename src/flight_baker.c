@@ -134,7 +134,7 @@ static mnavResult Bake(mnavFlightBaker* baker, const mnavBakeInput* input, int32
     if (result == mnav_success &&
         !mnavMakeTileFrame(&baker->voxels, &baker->cells, tileX, tileZ, &frame))
     {
-        result = mnav_errorRange;
+        result = mnav_errorLimit;
     }
     if (result != mnav_success)
     {

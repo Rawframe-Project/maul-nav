@@ -12,6 +12,7 @@
 #include "maul-nav/base.h"
 #include "maul-nav/query.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -51,10 +52,13 @@ static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQue
         return mnav_errorVersion;
     }
     const mnavQueryLimits* limits = &def->limits;
-    if (limits->nodes < 1 || limits->nodes > MNAV_MAX_QUERY_NODES ||
-        !(limits->pathLength > 0.0f && limits->pathLength <= MNAV_MAX_PATH_LENGTH))
+    if (limits->nodes < 1 || !(limits->pathLength > 0.0f) || !isfinite(limits->pathLength))
     {
-        return mnav_errorRange;
+        return mnav_errorInvalid;
+    }
+    if (limits->nodes > MNAV_MAX_QUERY_NODES || limits->pathLength > MNAV_MAX_PATH_LENGTH)
+    {
+        return mnav_errorLimit;
     }
     mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
     mnavQuery* query = nullptr;

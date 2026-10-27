@@ -65,9 +65,11 @@ static MNAV_NOINLINE mnavResult DebugFlightWork(const mnavFlightVolume* volume, 
     double v[3];
     int32_t lo[3];
     int32_t hi[3];
-    if (!mnavFlightToVoxels(&frame, low, v, lo) || !mnavFlightToVoxels(&frame, high, v, hi))
+    mnavResult result = mnavFlightToVoxels(&frame, low, v, lo);
+    result = result == mnav_success ? mnavFlightToVoxels(&frame, high, v, hi) : result;
+    if (result != mnav_success)
     {
-        return mnav_errorRange;
+        return result;
     }
     // Below the floor and above the ceiling nothing is open.
     lo[1] = Larger(lo[1], 0);
@@ -76,7 +78,7 @@ static MNAV_NOINLINE mnavResult DebugFlightWork(const mnavFlightVolume* volume, 
                     ((double)hi[2] - lo[2] + 1.0);
     if (lo[1] <= hi[1] && voxels > (double)MNAV_MAX_FLIGHT_DEBUG_VOXELS)
     {
-        return mnav_errorRange;
+        return mnav_errorLimit;
     }
     mnavFlightCursor cursor = mnavMakeFlightCursor(volume);
     for (int32_t z = lo[2]; z <= hi[2]; ++z)

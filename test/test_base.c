@@ -20,15 +20,31 @@ static void TestVersionMatchesHeader(void)
 
 static void TestResultNames(void)
 {
-    CHECK(strcmp(mnavResultName(mnav_success), "mnav_success") == 0, "success name");
-    CHECK(strcmp(mnavResultName(mnav_errorInvalid), "mnav_errorInvalid") == 0, "invalid name");
-    CHECK(strcmp(mnavResultName(mnav_errorCapacity), "mnav_errorCapacity") == 0, "capacity name");
-    CHECK(strcmp(mnavResultName(mnav_errorLimit), "mnav_errorLimit") == 0, "limit name");
-    CHECK(strcmp(mnavResultName(mnav_errorRange), "mnav_errorRange") == 0, "range name");
-    CHECK(strcmp(mnavResultName(mnav_errorVersion), "mnav_errorVersion") == 0, "version name");
-    CHECK(strcmp(mnavResultName(mnav_errorNotLoaded), "mnav_errorNotLoaded") == 0,
-          "not loaded name");
-    CHECK(strcmp(mnavResultName(mnav_errorStale), "mnav_errorStale") == 0, "stale name");
+    // The family's shared errors keep its values; the library's own are
+    // numbered from -32 down.
+    const struct
+    {
+        mnavResult result;
+        int32_t value;
+        const char* name;
+    } results[] = {
+        {mnav_success, 0, "mnav_success"},
+        {mnav_errorInvalid, -1, "mnav_errorInvalid"},
+        {mnav_errorCapacity, -2, "mnav_errorCapacity"},
+        {mnav_errorStale, -3, "mnav_errorStale"},
+        {mnav_errorState, -6, "mnav_errorState"},
+        {mnav_errorVersion, -7, "mnav_errorVersion"},
+        {mnav_errorFormat, -8, "mnav_errorFormat"},
+        {mnav_errorLimit, -9, "mnav_errorLimit"},
+        {mnav_errorNotLoaded, -32, "mnav_errorNotLoaded"},
+        {mnav_errorTier, -33, "mnav_errorTier"},
+    };
+    for (size_t i = 0; i < sizeof(results) / sizeof(results[0]); ++i)
+    {
+        CHECK(results[i].result == results[i].value, "the family's value");
+        CHECK(strcmp(mnavResultName(results[i].result), results[i].name) == 0, "its name");
+    }
+    CHECK(strcmp(mnavResultName(-4), "unknown result") == 0, "a value no error has");
     CHECK(strcmp(mnavResultName(12345), "unknown result") == 0, "unknown name");
 }
 

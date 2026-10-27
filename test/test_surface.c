@@ -262,9 +262,9 @@ static void TestSlicedSearchEnded(void)
     bool ended = false;
     CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_success, "a slice");
     Move(query, navmesh, nullptr, 6.0, 7.5, 9.0, 7.5);
-    CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorInvalid, "ended by the move");
+    CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorState, "ended by the move");
     mnavPath path;
-    CHECK(mnavFinishPath(query, navmesh, &path) == mnav_errorInvalid, "nothing to finish");
+    CHECK(mnavFinishPath(query, navmesh, &path) == mnav_errorState, "nothing to finish");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }

@@ -74,8 +74,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     }
     else
     {
-        Expect(result.result == mnav_errorInvalid || result.result == mnav_errorVersion ||
-               result.result == mnav_errorLimit);
+        Expect(result.result == mnav_errorFormat || result.result == mnav_errorVersion ||
+               result.result == mnav_errorCapacity);
     }
     Expect(memory.used == 0);
     free(bytes);

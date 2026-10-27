@@ -20,16 +20,18 @@ const char* mnavResultName(mnavResult result)
         return "mnav_errorInvalid";
     case mnav_errorCapacity:
         return "mnav_errorCapacity";
-    case mnav_errorLimit:
-        return "mnav_errorLimit";
-    case mnav_errorRange:
-        return "mnav_errorRange";
-    case mnav_errorVersion:
-        return "mnav_errorVersion";
-    case mnav_errorNotLoaded:
-        return "mnav_errorNotLoaded";
     case mnav_errorStale:
         return "mnav_errorStale";
+    case mnav_errorState:
+        return "mnav_errorState";
+    case mnav_errorVersion:
+        return "mnav_errorVersion";
+    case mnav_errorFormat:
+        return "mnav_errorFormat";
+    case mnav_errorLimit:
+        return "mnav_errorLimit";
+    case mnav_errorNotLoaded:
+        return "mnav_errorNotLoaded";
     case mnav_errorTier:
         return "mnav_errorTier";
     default:

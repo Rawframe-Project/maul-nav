@@ -50,12 +50,12 @@ typedef struct mnavFragmentList
     int32_t limit;
 } mnavFragmentList;
 
-// The corners a piece of a triangle cut along cell lines holds. A
-// triangle cut by the two sides of its row has five, and by the two sides
-// of its cell seven, in exact arithmetic; a cut adds a corner more where
-// rounding leaves the corners on one side of the cut not in a run, so
-// each cut checks its room.
-#define MNAV_RASTER_CORNERS 12
+// The corners a piece of a triangle cut along cell lines holds,
+// MNAV_MAX_PIECE_CORNERS. A triangle cut by the two sides of its row has
+// five, and by the two sides of its cell seven, in exact arithmetic; a cut
+// adds a corner more where rounding leaves the corners on one side of the
+// cut not in a run, so each cut checks its room.
+#define MNAV_RASTER_CORNERS MNAV_MAX_PIECE_CORNERS
 
 // A piece of a triangle in cell units: (u, h, w) per corner, u and w
 // across the tile's cells, h in cell heights.
@@ -98,12 +98,12 @@ int32_t mnavTriangleArea(const mnavVec3 corners[3], mnavAreaType area, float cos
 bool mnavTriangleTouchesTile(const mnavTileFrame* frame, const mnavVec3 corners[3]);
 
 // Adds the fragments of a triangle that touches the tile;
-// mnav_errorLimit when a cut piece would pass MNAV_RASTER_CORNERS.
+// mnav_errorLimit when a cut piece would pass MNAV_MAX_PIECE_CORNERS.
 mnavResult mnavRasterizeTriangle(mnavMemory* memory, const mnavTileFrame* frame,
                                  const mnavVec3 corners[3], mnavAreaType area,
                                  mnavFragmentList* list);
 
-// Adds one fragment, growing the list; mnav_errorLimit past its limit.
+// Adds one fragment, growing the list; mnav_errorCapacity past its limit.
 mnavResult mnavAddFragment(mnavMemory* memory, mnavFragmentList* list, mnavFragment fragment);
 
 void mnavReleaseFragments(mnavMemory* memory, mnavFragmentList* list);

@@ -299,10 +299,10 @@ static void TestLimitsAreTyped(void)
     // The L needs six vertices and two polygons.
     mnavBakeDef def = Exact();
     def.limits.tileVertices = 5;
-    CHECK(Load(&def, &s_l, 1) == mnav_errorLimit, "vertices");
+    CHECK(Load(&def, &s_l, 1) == mnav_errorCapacity, "vertices");
     def = Exact();
     def.limits.tilePolygons = 1;
-    CHECK(Load(&def, &s_l, 1) == mnav_errorLimit, "polygons");
+    CHECK(Load(&def, &s_l, 1) == mnav_errorCapacity, "polygons");
     def.limits.tileVertices = 6;
     def.limits.tilePolygons = 2;
     CHECK(Load(&def, &s_l, 1) == mnav_success, "at the limits");

@@ -108,12 +108,13 @@ extern "C"
     /// @param capacity    The room, at least 0.
     /// @param foundOut    Receives the count and whether the box was all
     ///                    loaded.
-    /// @return `mnav_success`; `mnav_errorCapacity` when more polygons meet
-    /// the box than the buffer holds: it holds the first ones and foundOut
-    /// counts all; `mnav_errorInvalid` for a NULL argument, a negative
-    /// capacity, a center or extent that is not finite or a negative
-    /// extent, or a filter not built from mnavDefaultQueryFilter;
-    /// `mnav_errorRange` for a filter cost out of its range.
+    /// @return `mnav_success`; `mnav_errorCapacity` when more polygons meet the
+    /// box than the buffer holds: it holds the first ones and foundOut counts
+    /// all; `mnav_errorInvalid` for a NULL argument, a negative capacity, a
+    /// center or extent that is not finite or a negative extent, or a filter
+    /// not built from mnavDefaultQueryFilter or with a cost not finite;
+    /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
+    /// MNAV_MAX_AREA_COST.
     /// @par Thread safety
     /// Safe from any thread. Any number of queries may run at once between
     /// commits.
@@ -135,12 +136,12 @@ extern "C"
     /// @param point        The query point.
     /// @param halfExtents  The box's half sizes, in meters, at least 0.
     /// @param nearestOut   Receives the result.
-    /// @return `mnav_success`, also when no polygon's nearest point lies in
-    /// the box (the polygon's slot is then 0); `mnav_errorInvalid` for a NULL
-    /// argument, a point or extent that is not finite, or a negative
-    /// extent; `mnav_errorInvalid` for a filter not built from
-    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of its
-    /// range.
+    /// @return `mnav_success`, also when no polygon's nearest point lies in the
+    /// box (the polygon's slot is then 0); `mnav_errorInvalid` for a NULL
+    /// argument, a point or extent that is not finite, a negative extent, or a
+    /// filter not built from mnavDefaultQueryFilter or with a cost not finite;
+    /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
+    /// MNAV_MAX_AREA_COST.
     /// @par Thread safety
     /// Safe from any thread. Any number of queries may run at once between
     /// commits.
@@ -148,6 +149,11 @@ extern "C"
                                                        const mnavQueryFilter* filter,
                                                        mnavPos3 point, mnavVec3 halfExtents,
                                                        mnavNearest* nearestOut);
+
+// The most corners a polygon clipped to a circle holds: a polygon's six
+// and one more for each of the 32 sides of the 32-gon standing for the
+// circle; rounding can add a second at a side, which is refused.
+#define MNAV_MAX_CLIP_CORNERS 38
 
 // The largest nodes one search may use.
 #define MNAV_MAX_QUERY_NODES 1048576
@@ -269,8 +275,10 @@ extern "C"
     /// @param queryOut Receives the context, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
     /// not from mnavDefaultQueryDef; `mnav_errorVersion` for one built against
-    /// another version of the headers; `mnav_errorRange` for a limit out of its
-    /// range; `mnav_errorCapacity` when the allocator fails.
+    /// another version of the headers; `mnav_errorInvalid` also for fewer than
+    /// 1 node or a path length not more than 0 or not finite; `mnav_errorLimit`
+    /// for more nodes than MNAV_MAX_QUERY_NODES or a path length past
+    /// MNAV_MAX_PATH_LENGTH; `mnav_errorCapacity` when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateQuery(const mnavQueryDef* def,
@@ -306,11 +314,12 @@ extern "C"
     /// @param end          The end point.
     /// @param pathOut      Receives the result.
     /// @return `mnav_success` whenever a search ran, however it ended;
-    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite
-    /// or a polygon id that never existed; `mnav_errorInvalid` for a filter not built from
-    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of its
-    /// range; `mnav_errorStale` for a polygon id whose tile
-    /// has been replaced or removed.
+    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
+    /// polygon id that never existed, or a filter not built from
+    /// mnavDefaultQueryFilter or with a cost not finite; `mnav_errorLimit` for
+    /// a filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST;
+    /// `mnav_errorStale` for a polygon id whose tile has been replaced or
+    /// removed.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may search one navmesh at once between
@@ -349,12 +358,12 @@ extern "C"
     /// @param end          The end point.
     /// @param pathOut      Receives the result.
     /// @return `mnav_success` whenever a search ran, however it ended;
-    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite,
-    /// a polygon id that never existed, a filter not built from
-    /// mnavDefaultQueryFilter or one whose included areas differ in cost;
-    /// `mnav_errorRange` for a filter cost out of its range;
-    /// `mnav_errorStale` for a polygon id whose tile has been replaced or
-    /// removed.
+    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
+    /// polygon id that never existed, a filter not built from
+    /// mnavDefaultQueryFilter or with a cost not finite or one whose included
+    /// areas differ in cost; `mnav_errorLimit` for a filter cost past
+    /// MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST; `mnav_errorStale` for a
+    /// polygon id whose tile has been replaced or removed.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may search one navmesh at once between
@@ -379,11 +388,12 @@ extern "C"
     /// @param start        The start point.
     /// @param endPolygon   The polygon the end point lies on.
     /// @param end          The end point.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// point that is not finite, a polygon id that never existed or a
-    /// filter not built from mnavDefaultQueryFilter; `mnav_errorRange` for a
-    /// filter cost out of its range; `mnav_errorStale` for a polygon id
-    /// whose tile has been replaced or removed.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
+    /// that is not finite, a polygon id that never existed or a filter not
+    /// built from mnavDefaultQueryFilter or with a cost not finite;
+    /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
+    /// MNAV_MAX_AREA_COST; `mnav_errorStale` for a polygon id whose tile has
+    /// been replaced or removed.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -398,9 +408,10 @@ extern "C"
     /// @param navmesh  The navmesh the search began on.
     /// @param nodes    The most nodes to close, at least 1.
     /// @param endedOut Receives whether the search has ended.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, no
-    /// search begun, or fewer than 1 node; `mnav_errorStale` for another
-    /// navmesh, or one committed to since the search began: begin again.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, fewer
+    /// than 1 node, or a navmesh other than the search's; `mnav_errorState`
+    /// for no search begun, or a navmesh committed to since the search began:
+    /// begin again.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavContinuePath(mnavQuery* query,
@@ -414,9 +425,9 @@ extern "C"
     /// @param query    The context; its memory holds the result.
     /// @param navmesh  The navmesh the search began on.
     /// @param pathOut  Receives the result.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or no
-    /// search begun; `mnav_errorStale` for another navmesh, or one
-    /// committed to since the search began.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// navmesh other than the search's; `mnav_errorState` for no search begun,
+    /// or a navmesh committed to since the search began.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -468,11 +479,12 @@ extern "C"
     ///                     counts.
     /// @param moveOut      Receives the result.
     /// @return `mnav_success` whenever the move ran, however it ended;
-    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite,
-    /// a polygon id that never existed or a filter not built from
-    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of
-    /// its range; `mnav_errorStale` for a polygon id whose tile has been
-    /// replaced or removed.
+    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
+    /// polygon id that never existed or a filter not built from
+    /// mnavDefaultQueryFilter or with a cost not finite; `mnav_errorLimit` for
+    /// a filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST;
+    /// `mnav_errorStale` for a polygon id whose tile has been replaced or
+    /// removed.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may move on one navmesh at once between
@@ -559,8 +571,8 @@ extern "C"
     /// @param validOut Receives the count.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor not well formed or a filter not built from
-    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of
-    /// its range.
+    /// mnavDefaultQueryFilter or with a cost not finite; `mnav_errorLimit` for
+    /// a filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may check corridors at
     /// once between commits.
@@ -577,9 +589,9 @@ extern "C"
     /// @param corridor The corridor.
     /// @param cornersOut Receives the straight path.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// corridor not well formed or polygons not joined; `mnav_errorStale` for a polygon whose tile
-    /// has been replaced or removed; `mnav_errorLimit` for a corridor of more polygons than the
-    /// context's node limit.
+    /// corridor not well formed or polygons not joined; `mnav_errorStale` for a
+    /// polygon whose tile has been replaced or removed; `mnav_errorCapacity`
+    /// for a corridor of more polygons than the context's node limit.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavCorridorCorners(mnavQuery* query,
@@ -702,9 +714,10 @@ extern "C"
     /// @param steeringOut Receives the velocity and state.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, corners
     /// with no points or a def not from mnavDefaultSteerDef;
-    /// `mnav_errorVersion` for one built against another version
-    /// of the headers; `mnav_errorRange` for a def value out of its range or a corner
-    /// not finite.
+    /// `mnav_errorVersion` for one built against another version of the
+    /// headers; `mnav_errorInvalid` also for a def value below 0 or not finite,
+    /// or a corner not finite; `mnav_errorLimit` for a speed past
+    /// MNAV_MAX_STEER_SPEED or a distance past MNAV_MAX_STEER_DISTANCE.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavSteer(const mnavCorners* corners,
@@ -859,11 +872,12 @@ extern "C"
     /// @param end     The end cell.
     /// @param pathOut Receives the path; mnav_pathNone with the start
     ///                alone when the start is blocked.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// grid with no areas, a side out of range or a cell size not more than
-    /// 0 or not finite, a cell outside the grid, or a filter not built from
-    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of
-    /// its range.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a grid
+    /// with no areas, a side below 1 or a cell size not more than 0 or not
+    /// finite, a cell outside the grid, or a filter not built from
+    /// mnavDefaultQueryFilter or with a cost not finite; `mnav_errorLimit` for
+    /// a side past MNAV_MAX_GRID_SIDE or a filter cost past MNAV_MIN_AREA_COST
+    /// or MNAV_MAX_AREA_COST.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavFindGridPath(mnavQuery* query, const mnavGrid* grid,
@@ -880,9 +894,9 @@ extern "C"
     /// @param z         The point's Z.
     /// @param heightOut Receives the height.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// coordinate not finite, or a polygon id never handed out;
-    /// `mnav_errorStale` for a polygon whose tile has gone;
-    /// `mnav_errorRange` for a point outside the polygon on the ground.
+    /// coordinate not finite, a polygon id never handed out, or a point outside
+    /// the polygon on the ground; `mnav_errorStale` for a polygon whose tile
+    /// has gone.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it.
@@ -923,11 +937,12 @@ extern "C"
     /// @param center  The point.
     /// @param radius  How far to look, in meters, at least 0 and finite.
     /// @param wallOut Receives the wall.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// point or radius not finite, a negative radius, a polygon id never
-    /// handed out, or a filter not built from mnavDefaultQueryFilter;
-    /// `mnav_errorStale` for a polygon whose tile has gone;
-    /// `mnav_errorRange` for a filter cost out of its range.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
+    /// or radius not finite, a negative radius, a polygon id never handed out,
+    /// or a filter not built from mnavDefaultQueryFilter or with a cost not
+    /// finite; `mnav_errorStale` for a polygon whose tile has gone;
+    /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
+    /// MNAV_MAX_AREA_COST.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavFindWallDistance(mnavQuery* query,
@@ -977,13 +992,14 @@ extern "C"
     /// @param capacity The room, at least 0.
     /// @param foundOut Receives the count and whether the node limit cut
     ///                 the search short.
-    /// @return `mnav_success`; `mnav_errorCapacity` when more walls lie
-    /// within the radius than the buffer holds: it holds the nearest and
-    /// foundOut counts all; `mnav_errorInvalid` for a NULL argument, a
-    /// negative capacity, a point or radius not finite, a negative radius,
-    /// a polygon id never handed out, or a filter not built from
-    /// mnavDefaultQueryFilter; `mnav_errorStale` for a polygon whose tile
-    /// has gone; `mnav_errorRange` for a filter cost out of its range.
+    /// @return `mnav_success`; `mnav_errorCapacity` when more walls lie within
+    /// the radius than the buffer holds: it holds the nearest and foundOut
+    /// counts all; `mnav_errorInvalid` for a NULL argument, a negative
+    /// capacity, a point or radius not finite, a negative radius, a polygon id
+    /// never handed out, or a filter not built from mnavDefaultQueryFilter or
+    /// with a cost not finite; `mnav_errorStale` for a polygon whose tile has
+    /// gone; `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
+    /// MNAV_MAX_AREA_COST.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavFindWalls(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -1010,8 +1026,9 @@ extern "C"
     /// @param seed     Any value.
     /// @param pointOut Receives the point.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
-    /// filter not built from mnavDefaultQueryFilter; `mnav_errorRange` for
-    /// a filter cost out of its range.
+    /// filter not built from mnavDefaultQueryFilter or with a cost not finite;
+    /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
+    /// MNAV_MAX_AREA_COST.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it.
@@ -1032,9 +1049,9 @@ extern "C"
     /// @param radius   How far to search, in meters, at least 0 and finite.
     /// @param seed     Any value.
     /// @param pointOut Receives the point.
-    /// @return As mnavFindWallDistance; also `mnav_errorLimit` when a
-    /// polygon clipped to the circle, its 32-gon, has more corners than
-    /// the clip holds, which rounding alone can cause.
+    /// @return As mnavFindWallDistance; also `mnav_errorLimit` when a polygon
+    /// clipped to the circle, its 32-gon, has more than MNAV_MAX_CLIP_CORNERS
+    /// corners, which rounding alone can cause.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult
@@ -1116,11 +1133,12 @@ extern "C"
     /// @param end          The end point; only its ground position counts.
     /// @param rayOut       Receives the result.
     /// @return `mnav_success` whenever the ray was cast, however it ended;
-    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite
-    /// or a polygon id that never existed; `mnav_errorInvalid` for a filter not built from
-    /// mnavDefaultQueryFilter; `mnav_errorRange` for a filter cost out of its
-    /// range; `mnav_errorStale` for a polygon id whose tile
-    /// has been replaced or removed.
+    /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
+    /// polygon id that never existed, or a filter not built from
+    /// mnavDefaultQueryFilter or with a cost not finite; `mnav_errorLimit` for
+    /// a filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST;
+    /// `mnav_errorStale` for a polygon id whose tile has been replaced or
+    /// removed.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may cast on one navmesh at once between

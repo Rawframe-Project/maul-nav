@@ -200,7 +200,7 @@ static mnavResult Join(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* na
     int32_t last = h->clusterOf[endPolygon.slot - 1];
     ResetGraph(h);
     mnavResult result = mnavSearchCluster(h, query, navmesh, true, last, endPolygon, end);
-    if (result != mnav_success && result != mnav_errorLimit)
+    if (result != mnav_success && result != mnav_errorCapacity)
     {
         return result;
     }
@@ -214,7 +214,7 @@ static mnavResult Join(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* na
     }
     JoinLinks(h, query, navmesh, last);
     result = mnavSearchCluster(h, query, navmesh, false, first, startPolygon, start);
-    if (result != mnav_success && result != mnav_errorLimit)
+    if (result != mnav_success && result != mnav_errorCapacity)
     {
         return result;
     }
@@ -309,13 +309,21 @@ static mnavResult CheckQuery(const mnavQuery* query, const mnavHierarchy* h,
                              mnavPolygonId endPolygon, mnavPos3 end)
 {
     if (query == nullptr || h == nullptr || navmesh == nullptr || !FinitePoint(start) ||
-        !FinitePoint(end) || h->navmesh != navmesh)
+        !FinitePoint(end))
+    {
+        return mnav_errorInvalid;
+    }
+    if (h->navmesh == nullptr)
+    {
+        return mnav_errorState;
+    }
+    if (h->navmesh != navmesh)
     {
         return mnav_errorInvalid;
     }
     if (h->commits != navmesh->commits)
     {
-        return mnav_errorStale;
+        return mnav_errorState;
     }
     mnavResult result = mnavCheckPolygon(navmesh, startPolygon);
     return result == mnav_success ? mnavCheckPolygon(navmesh, endPolygon) : result;

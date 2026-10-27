@@ -49,14 +49,14 @@ static void TestCreateChecksTheDef(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.cellSize = -1.0f;
     mnavBakeDefResult result = mnavCreateBaker(&def, &baker);
-    CHECK(result.result == mnav_errorInvalid && result.setting == mnav_settingCellSize &&
+    CHECK(result.result == mnav_errorLimit && result.setting == mnav_settingCellSize &&
               baker == nullptr,
           "an invalid def names its setting");
     CHECK(mnavCreateBaker(nullptr, &baker).result == mnav_errorInvalid, "no def");
     def = mnavDefaultBakeDef();
     CHECK(mnavCreateBaker(&def, nullptr).result == mnav_errorInvalid, "nowhere to put it");
     def.limits.memoryBytes = 8;
-    CHECK(mnavCreateBaker(&def, &baker).result == mnav_errorLimit, "too little memory");
+    CHECK(mnavCreateBaker(&def, &baker).result == mnav_errorCapacity, "too little memory");
     mnavDestroyBaker(nullptr);
 }
 
@@ -250,7 +250,7 @@ static void TestBadInputIsNamed(void)
               report.polygons == 0,
           "no meshes, an empty tile");
     CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 1 << 20,
-                       0, &report) == mnav_errorRange,
+                       0, &report) == mnav_errorLimit,
           "a tile past the extent");
     CHECK(mnavBakeTile(nullptr, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
                        &report) == mnav_errorInvalid &&
@@ -268,7 +268,7 @@ static void TestLimitsEndInAStage(void)
     mnavTriangleMesh level = Level();
     mnavBakeReport report;
     CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                       &report) == mnav_errorLimit &&
+                       &report) == mnav_errorCapacity &&
               report.stage == mnav_stagePolygons,
           "the polygon limit, in the polygon stage");
     mnavDestroyBaker(baker);
@@ -276,11 +276,11 @@ static void TestLimitsEndInAStage(void)
     def.limits.memoryBytes = 65536;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
     CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                       &report) == mnav_errorLimit &&
+                       &report) == mnav_errorCapacity &&
               report.stage == mnav_stageRasterize && report.memoryPeak <= 65536,
           "the memory limit, early");
     CHECK(mnavBakeTile(baker, &(mnavBakeInput){nullptr, 0, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                       &report) == mnav_errorLimit,
+                       &report) == mnav_errorCapacity,
           "even an empty tile's columns do not fit");
     mnavDestroyBaker(baker);
     def = mnavDefaultBakeDef();
@@ -290,7 +290,7 @@ static void TestLimitsEndInAStage(void)
     meshes[0].triangleCount = 6;
     meshes[1].triangleCount = 6;
     CHECK(mnavBakeTile(baker, &(mnavBakeInput){meshes, 2, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                       &report) == mnav_errorLimit &&
+                       &report) == mnav_errorCapacity &&
               report.stage == mnav_stageInput,
           "the input limit counts every mesh");
     mnavDestroyBaker(baker);
@@ -354,7 +354,7 @@ static void TestStagesAreTimedAndMeasured(void)
     CHECK(mnavCreateBaker(&def, &timed).result == mnav_success, "created");
     reads = 0;
     CHECK(mnavBakeTile(timed, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                       &b) == mnav_errorLimit &&
+                       &b) == mnav_errorCapacity &&
               b.stage == mnav_stagePolygons,
           "ended in the polygon stage");
     bool upTo = true;
@@ -383,7 +383,7 @@ static void TestTilesToTheExtent(void)
         int32_t in = 0;
         int32_t out = 1 << 20;
         CHECK(mnavBakeTile(baker, &(mnavBakeInput){nullptr, 0, nullptr, 0, nullptr, 0, nullptr},
-                           out * dx[d], out * dz[d], nullptr) == mnav_errorRange,
+                           out * dx[d], out * dz[d], nullptr) == mnav_errorLimit,
               "far past the extent");
         while (out - in > 1)
         {
@@ -391,7 +391,7 @@ static void TestTilesToTheExtent(void)
             mnavResult result =
                 mnavBakeTile(baker, &(mnavBakeInput){nullptr, 0, nullptr, 0, nullptr, 0, nullptr},
                              mid * dx[d], mid * dz[d], nullptr);
-            CHECK(result == mnav_success || result == mnav_errorRange, "baked or refused");
+            CHECK(result == mnav_success || result == mnav_errorLimit, "baked or refused");
             in = result == mnav_success ? mid : in;
             out = result == mnav_success ? out : mid;
         }

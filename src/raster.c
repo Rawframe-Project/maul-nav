@@ -236,7 +236,7 @@ static mnavResult Grow(mnavMemory* memory, mnavFragmentList* list)
 {
     if (list->count >= list->limit)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     int32_t capacity = list->capacity < 1024 ? 1024 : list->capacity * 2;
     capacity = capacity > list->limit ? list->limit : capacity;

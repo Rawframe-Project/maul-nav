@@ -117,7 +117,7 @@ static mnavResult Weld(Builder* builder, const mnavContourVertex* v, int32_t* in
     int32_t index = mesh->vertexCount;
     if (index >= builder->maxVertices)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     mnavResult result = GrowVertices(builder, index + 1);
     if (result != mnav_success)
@@ -382,7 +382,7 @@ static mnavResult Store(Builder* builder, const mnavPolygon* polygon)
     mnavPolyMesh* mesh = builder->mesh;
     if (mesh->polygonCount >= builder->maxPolygons)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     mnavResult result = mnavReserve(
         builder->memory, (void**)&mesh->polygons, &mesh->polygonCapacity, mesh->polygonCount,

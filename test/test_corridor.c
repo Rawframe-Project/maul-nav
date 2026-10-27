@@ -129,7 +129,7 @@ static void TestChecksAndLimits(void)
               mnavSetCorridor(&corridor, &path) == mnav_success,
           "loaded");
     mnavQuery* small = MakeQuery(4);
-    CHECK(mnavCorridorCorners(small, navmesh, &corridor, &out) == mnav_errorLimit,
+    CHECK(mnavCorridorCorners(small, navmesh, &corridor, &out) == mnav_errorCapacity,
           "more polygons than the context's nodes");
     mnavDestroyQuery(small);
     // Two polygons swapped: not joined from there on.

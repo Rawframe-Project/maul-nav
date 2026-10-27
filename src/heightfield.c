@@ -35,7 +35,7 @@ static mnavResult AddTriangle(mnavMemory* memory, const mnavBakeDef* def,
     }
     if (++*touching > def->limits.tileTriangles)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     return mnavRasterizeTriangle(memory, frame, corners, (mnavAreaType)area, list);
 }

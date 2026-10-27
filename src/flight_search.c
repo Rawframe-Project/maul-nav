@@ -529,15 +529,24 @@ static void Store(const Search* s)
 }
 
 // Whether the context holds a search on this volume, unchanged since it
-// began: mnav_success, or the refusal.
+// began: mnav_success; mnav_errorState for none begun or a commit to the
+// volume since; mnav_errorInvalid for another volume.
 static mnavResult Holds(const mnavQuery* query, const mnavFlightVolume* volume)
 {
-    if (query == nullptr || volume == nullptr || !query->flight.active)
+    if (query == nullptr || volume == nullptr)
     {
         return mnav_errorInvalid;
     }
     const mnavFlightSliced* f = &query->flight;
-    return f->volume == volume && f->commits == volume->commits ? mnav_success : mnav_errorStale;
+    if (!f->active)
+    {
+        return mnav_errorState;
+    }
+    if (f->volume != volume)
+    {
+        return mnav_errorInvalid;
+    }
+    return f->commits == volume->commits ? mnav_success : mnav_errorState;
 }
 
 static MNAV_NOINLINE mnavResult BeginFlightPathWork(mnavQuery* query,
@@ -557,10 +566,16 @@ static MNAV_NOINLINE mnavResult BeginFlightPathWork(mnavQuery* query,
     double a[3];
     int32_t at[3];
     int32_t to[3];
-    if (!mnavFlightToVoxels(&frame, start, a, at) || !mnavFlightToVoxels(&frame, end, s.end, to) ||
-        at[1] < 0 || at[1] >= frame.layers || to[1] < 0 || to[1] >= frame.layers)
+    mnavResult result = mnavFlightToVoxels(&frame, start, a, at);
+    result = result == mnav_success ? mnavFlightToVoxels(&frame, end, s.end, to) : result;
+    if (result != mnav_success)
     {
-        return mnav_errorRange;
+        return result;
+    }
+    // Below the floor or above the ceiling, the volume's def's bounds.
+    if (at[1] < 0 || at[1] >= frame.layers || to[1] < 0 || to[1] >= frame.layers)
+    {
+        return mnav_errorInvalid;
     }
     query->search.active = false;
     query->flight = (mnavFlightSliced){.volume = volume,
