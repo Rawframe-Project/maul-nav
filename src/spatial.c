@@ -12,6 +12,7 @@
 
 #include "clip.h"
 #include "fpenv.h"
+#include "invariant.h"
 #include "navmesh.h"
 #include "nearest.h"
 #include "query.h"
@@ -127,7 +128,10 @@ static mnavRandomPoint NoPoint(void)
 static mnavRandomPoint PointIn(const mnavNavmesh* navmesh, int32_t slot, int32_t polygon,
                                const mnavPos3* c, int32_t count, Random* r)
 {
-    // Callers pass parts with area, which have three corners or more.
+    // Callers pass parts with area, which have three corners or more: a
+    // polygon, or the part of the one picked around a center, which only
+    // a part with area takes.
+    MNAV_ASSERT(count >= 3);
     if (count < 3)
     {
         return NoPoint();
@@ -268,6 +272,7 @@ static void SiftUp(mnavQuery* q, int32_t at)
 
 static int32_t Pop(mnavQuery* q)
 {
+    MNAV_ASSERT(q->heapCount > 0 && q->nodes[q->indexHeap[0]].heap == 0);
     int32_t top = q->indexHeap[0];
     int32_t last = q->indexHeap[--q->heapCount];
     int32_t at = 0;
@@ -380,6 +385,8 @@ static void Enter(Ring* r, int32_t from, int32_t slot, int32_t polygon, mnavPos3
     {
         if (q->nodes[n].heap != MNAV_NO_NODE && cost < q->nodes[n].cost)
         {
+            // A node still open is where the open list holds it.
+            MNAV_ASSERT(q->indexHeap[q->nodes[n].heap] == n);
             q->nodes[n].cost = cost;
             q->nodes[n].at = mid;
             q->nodes[n].parent = from;
@@ -393,6 +400,9 @@ static void Enter(Ring* r, int32_t from, int32_t slot, int32_t polygon, mnavPos3
         return;
     }
     n = q->nodeCount++;
+    // Each node enters the open list once, and the nodes made are at most
+    // its room.
+    MNAV_ASSERT(q->heapCount < q->limits.nodes);
     q->nodes[n] = (mnavSearchNode){a, b, mid, cost, 0.0, 0.0, slot, polygon, 0, 0, from, 0};
     q->table[cell] = n;
     Place(q, q->heapCount++, n);
