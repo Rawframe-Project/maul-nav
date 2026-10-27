@@ -50,6 +50,7 @@ static MNAV_NOINLINE mnavBakeDefResult CreateNavmeshWork(const mnavBakeDef* def,
     }
     navmesh->def = *def;
     navmesh->cells = cells;
+    navmesh->linkSlotLimit = MNAV_MAX_LINKS;
     navmesh->memory = memory;
     *navmeshOut = navmesh;
     return (mnavBakeDefResult){mnav_success, mnav_settingNone};

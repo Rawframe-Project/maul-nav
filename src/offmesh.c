@@ -12,6 +12,7 @@
 #include "nearest.h"
 #include "sort.h"
 
+#include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
@@ -22,6 +23,8 @@
 // The key's fields, low to high: direction, link, polygon, slot.
 #define LINK_BITS    20
 #define POLYGON_BITS 16
+
+static_assert(MNAV_MAX_LINKS <= 1 << LINK_BITS, "a key holds every link slot");
 
 uint64_t mnavAttachmentKey(mnavAttachment a)
 {
@@ -166,6 +169,18 @@ static MNAV_NOINLINE mnavResult StageLinkWork(mnavNavmesh* navmesh, const mnavLi
     }
     int32_t n = Crossings(navmesh, def);
     if (navmesh->linksHeld + n > navmesh->def.limits.links)
+    {
+        return mnav_errorLimit;
+    }
+    // The crossings take the lowest free slots, then new ones; a key holds
+    // slots below the limit, MNAV_MAX_LINKS, which only worn slots can
+    // fill.
+    int32_t last = -1;
+    for (int32_t k = 0; k < n; ++k)
+    {
+        last = NextFree(navmesh, last + 1);
+    }
+    if (last >= navmesh->linkSlotLimit)
     {
         return mnav_errorLimit;
     }
