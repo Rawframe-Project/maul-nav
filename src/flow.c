@@ -359,14 +359,19 @@ static MNAV_NOINLINE mnavResult BeginFlowFieldWork(mnavFlowField* field, const m
     field->filter = *usable;
     mnavFlowSearch s = {field, grid->areas};
     int32_t cells = field->region.width * field->region.height;
+    // A repair cut short leaves its marks and list behind: a later repair
+    // must find every cell unmarked.
     for (int32_t c = 0; c < cells; ++c)
     {
         field->costs[c] = (double)INFINITY;
         field->next[c] = c;
         field->places[c] = MNAV_FLOW_NOT_OPEN;
+        field->marks[c] = 0;
     }
     field->heapCount = 0;
     field->goalCount = 0;
+    field->touchedCount = 0;
+    field->fixed = 0;
     field->repairing = false;
     for (int32_t i = 0; i < goalCount; ++i)
     {
