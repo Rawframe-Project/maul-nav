@@ -34,7 +34,7 @@
 #include <string.h>
 
 // The hash of the level tile's bytes, the same on every platform.
-#define LEVEL_TILE_HASH 0xe2c0ed6096ea1fc6ull
+#define LEVEL_TILE_HASH 0x8983d326a3e9ac4eull
 
 // Offsets into the header and into the TILE field's payload.
 enum

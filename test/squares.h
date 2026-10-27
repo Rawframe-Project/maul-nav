@@ -125,6 +125,20 @@ static inline void Put(int32_t n, Square s, int32_t sides)
     s_areas[2 * n + 1] = s.area;
 }
 
+// Bakes the input and loads its tile in a fresh navmesh.
+static inline void LoadInput(const mnavBakeInput* input)
+{
+    CHECK(mnavBakeTile(s_baker, input, 0, 0, &s_report) == mnav_success &&
+              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &s_tileSize) == mnav_success,
+          "baked");
+    mnavDestroyNavmesh(s_navmesh);
+    s_navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
+              mnavStageTile(s_navmesh, s_tile, s_tileSize).result == mnav_success &&
+              mnavCommit(s_navmesh) == mnav_success,
+          "loaded");
+}
+
 // Bakes the scene and loads its tile in a fresh navmesh.
 static inline void Load(const Scene* scene)
 {
@@ -149,15 +163,7 @@ static inline void Load(const Scene* scene)
     }
     const mnavTriangleMesh mesh = {s_vertices, 4 * n, s_indices, 2 * n, s_areas};
     const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
-    CHECK(mnavBakeTile(s_baker, &input, 0, 0, &s_report) == mnav_success &&
-              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &s_tileSize) == mnav_success,
-          "baked");
-    mnavDestroyNavmesh(s_navmesh);
-    s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, s_tileSize).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
-          "loaded");
+    LoadInput(&input);
 }
 
 // The area of the polygon over cell (x, z) of the scene within a meter

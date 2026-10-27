@@ -113,9 +113,24 @@ static int32_t Height(Builder* builder, int32_t x, int32_t z, int32_t reference)
     return reference;
 }
 
+// The greatest common divisor of a and b, at least 0 and not both 0.
+static int64_t Divisor(int64_t a, int64_t b)
+{
+    while (b != 0)
+    {
+        int64_t r = a % b;
+        a = b;
+        b = r;
+    }
+    return a;
+}
+
 // Places the points of the edge from a to b at most a sample distance
 // apart, at most MNAV_DETAIL_EDGE_SAMPLES between the ends, with their
-// heights.
+// heights. Each point is the whole sixteenth on the edge nearest its even
+// place, so the outline runs exactly along the polygon's edges and stays
+// a simple ring however sharp a corner is; an edge with fewer such
+// sixteenths than segments takes each of them.
 // Returns the number of segments.
 static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mnavDetailVertex* b)
 {
@@ -123,6 +138,11 @@ static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mn
     int64_t dx = b->x - a->x;
     int64_t dz = b->z - a->z;
     int64_t dy = b->y - a->y;
+    // The steps between the edge's whole sixteenths: corners lie on whole
+    // cells, so there are at least SUBCELLS, or none on an edge of no
+    // length in plan, whose points all lie at its ends. dx is never
+    // negative, as the edge runs from its lexically first end.
+    int64_t steps = dx == 0 && dz == 0 ? 1 : Divisor(dx, dz < 0 ? -dz : dz);
     int64_t segments = 1;
     int64_t sample = builder->settings.sample;
     if (sample > 0)
@@ -134,12 +154,14 @@ static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mn
         segments += segments * sample * segments * sample < length2 ? 1 : 0;
         segments = segments < 1 ? 1 : segments;
         segments = segments > EDGE_POINTS - 1 ? EDGE_POINTS - 1 : segments;
+        segments = segments > steps ? steps : segments;
     }
     for (int64_t k = 0; k <= segments; ++k)
     {
         mnavDetailVertex* p = &part->points[k];
-        p->x = a->x + (int32_t)RoundDivide(dx * k, segments);
-        p->z = a->z + (int32_t)RoundDivide(dz * k, segments);
+        int64_t step = RoundDivide(steps * k, segments);
+        p->x = a->x + (int32_t)(dx / steps * step);
+        p->z = a->z + (int32_t)(dz / steps * step);
         int32_t reference = a->y + (int32_t)RoundDivide(dy * k, segments);
         bool end = k == 0 || k == segments;
         p->y = end ? reference : Height(builder, p->x, p->z, reference);

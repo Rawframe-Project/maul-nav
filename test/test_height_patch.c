@@ -121,7 +121,7 @@ static void TestPatchReachesACellPastThePolygon(void)
     // (3, 2); on the +X side the polygon ends at x = 5 and the step is at
     // (5, 2).
     const int32_t steps[2] = {3, 5};
-    const int64_t corners[2] = {75, 69};
+    const int64_t corners[2] = {74, 70};
     for (int32_t side = 0; side < 2; ++side)
     {
         Scene scene = Flat(0, false);
@@ -170,7 +170,7 @@ static void TestPatchReachesACellPastTheTileSide(void)
     Scene moved = MovedZ(&scene, s_movedZ);
     UseError(8);
     Load(&moved);
-    CHECK(HasCorner(75, 2, 75), "the step's height at (4, 4)");
+    CHECK(HasCorner(75, 2, 74), "the step's height at (4, 4)");
     s_movedZ = 0;
 }
 
@@ -186,7 +186,7 @@ static void TestSearchTakesTheNearestHeight(void)
     scene.level[5][5] = 1;
     UseError(8);
     Load(&scene);
-    CHECK(HasCorner(107, 2, 75), "the step's height at (6, 4)");
+    CHECK(HasCorner(106, 2, 75), "the step's height at (6, 4)");
 }
 
 static void TestSearchKeepsTheFirstOnTies(void)

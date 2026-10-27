@@ -364,13 +364,13 @@ static void TestDiagonalEdgeTakesEnoughSegments(void)
     // the raised cell's corner (7, 5), at height 2, to the quad's corner
     // (8, 8), at 1: 16 by 48 sixteenths, 50.6 long. Sampled every 25, the
     // rounded-down root, 50, is two whole segments, which fall short of
-    // the length, so it takes three, and its sample a third along, at
-    // (117, 96), on the floor, is kept.
+    // the length, so it takes three. Its sample a third along, at the
+    // edge's whole sixteenth nearest it, (117, 95), on the floor, is kept.
     Scene scene = Bumped(6, 5, 1);
     scene.area[4][6] = 7;
     UseDetail(25, 0);
     Load(&scene);
-    CHECK(HasCorner(Over(7, 7, 0), 117, 1, 96), "a sample a third along");
+    CHECK(HasCorner(Over(7, 7, 0), 117, 1, 95), "a sample a third along");
 }
 
 static void TestSamplesKeepHalfASampleFromTheEdges(void)
@@ -559,6 +559,75 @@ static void TestLevelDetailIsSound(void)
     }
 }
 
+// Whether every detail triangle of the navmesh covers ground: its corners
+// lie at three places in plan, not in line.
+static bool EveryTriangleHasArea(void)
+{
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0},
+                         s_drawVertices,
+                         DRAW_ROOM,
+                         0,
+                         s_drawTriangles,
+                         DRAW_ROOM,
+                         0,
+                         nullptr,
+                         0,
+                         0};
+    // Polygon edges go uncounted into a buffer with no line room.
+    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the triangles fit");
+    bool area = b.triangleCount > 0;
+    for (int32_t t = 0; t + 2 < b.triangleCount; t += 3)
+    {
+        Corner a = At16(s_drawTriangles[t]);
+        Corner p = At16(s_drawTriangles[t + 1]);
+        Corner q = At16(s_drawTriangles[t + 2]);
+        area = area && (p.x - a.x) * (q.z - a.z) - (q.x - a.x) * (p.z - a.z) != 0;
+    }
+    return area;
+}
+
+// Bakes one floor triangle for an agent of no radius, sampled every sample
+// cells within no error, and loads its tile.
+static void LoadTriangle(const mnavVec3* vertices, int32_t sample)
+{
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.agent.radius = 0.0f;
+    def.detailSampleDistance = 0.25f * (float)sample;
+    def.detailMaxError = 0.0f;
+    UseDef(&def);
+    const int32_t indices[3] = {0, 2, 1};
+    const mnavTriangleMesh mesh = {vertices, 3, indices, 1, nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    LoadInput(&input);
+}
+
+static void TestSliverOutlinesTriangulateWhole(void)
+{
+    // Found by a search of random floors: a ramp 31 m long, 2 m wide at
+    // its high end and rising half a meter from its sharp low corner. Its
+    // polygons are slivers there. Samples rounded off their edges once
+    // crossed near a sliver's sharp corner, and its outline did not
+    // triangulate whole; on their edges, every outline does.
+    const mnavVec3 vertices[3] = {{4.0f, 0.0f, 4.0f}, {35.0f, 0.5f, 25.0f}, {33.0f, 0.5f, 25.0f}};
+    LoadTriangle(vertices, 2);
+    CHECK(s_report.polygons == 7 && s_report.partialRings == 0, "every outline whole");
+    CHECK(EveryTriangleHasArea(), "every triangle with area");
+}
+
+static void TestEdgeTakesEachOfItsSixteenths(void)
+{
+    // Found by a search of random floors: a ramp whose one polygon has
+    // two long sides, 14 by 27 cells and 3 by 17, that share no factor.
+    // Each passes through only 16 whole sixteenths past its first corner,
+    // fewer than the segments a sample every cell asks for, and takes
+    // each of them once: no two of its points coincide.
+    const mnavVec3 vertices[3] = {{1.0f, 0.0f, 1.25f}, {5.75f, 0.5f, 1.5f}, {5.0f, 0.0f, 8.5f}};
+    LoadTriangle(vertices, 1);
+    CHECK(s_report.polygons == 1 && s_report.partialRings == 0, "one polygon, whole");
+    CHECK(EveryTriangleHasArea(), "every triangle with area");
+}
+
 int main(void)
 {
     TestFlatSquare();
@@ -576,6 +645,8 @@ int main(void)
     TestSearchTakesTheHeightNearestTheMean();
     TestLevelDetailIsSound();
     TestBumpyGroundReachesTheCap();
+    TestSliverOutlinesTriangulateWhole();
+    TestEdgeTakesEachOfItsSixteenths();
     Done();
     return s_failures == 0 ? 0 : 1;
 }
