@@ -5,6 +5,31 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.1.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.0.4...v0.1.0) (2026-10-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **links:** mnavGenerateLinks refuses a spacing below the navmesh's cell size with mnav_errorInvalid, and returns mnav_errorLimit when its links pass MNAV_MAX_LINKS or a landing's search box meets more than MNAV_MAX_LINK_LANDINGS polygons.
+* **query:** mnavFindRandomPointAround returns mnav_errorLimit when a polygon clipped to its circle has more corners than the clip holds.
+* **format:** flight tile format 3. Flight tiles are a 32-byte header and tagged fields (`FLHT`, `LEAF`, `NODE`, `ROOT`). Format 2 flight tiles are refused with mnav_errorVersion; rebake them.
+* **format:** tile format 3. Tiles are a 32-byte header and tagged fields (`DPRT`, `DTRI`, `DVRT`, `POLY`, `TILE`, `VERT`). Format 2 tiles are refused with mnav_errorVersion; rebake them.
+
+### Added
+
+* **format:** flight tiles as tagged fields, without unread bytes ([#98](https://github.com/Rawframe-Project/maul-nav/issues/98)) ([e066973](https://github.com/Rawframe-Project/maul-nav/commit/e0669732b1e5904be6acf9c41cc05b65310d62ea))
+* **format:** tiles as tagged fields, without unread bytes ([#97](https://github.com/Rawframe-Project/maul-nav/issues/97)) ([9064d9c](https://github.com/Rawframe-Project/maul-nav/commit/9064d9c0148dab5c6de1daacf3cf15b8d32e5b91))
+
+
+### Fixed
+
+* **bake:** place detail edge samples on their edges ([#109](https://github.com/Rawframe-Project/maul-nav/issues/109)) ([1ea55e5](https://github.com/Rawframe-Project/maul-nav/commit/1ea55e574f678582eee8c58b81e6f357e75bb5d3))
+* **bake:** stop a raster cut at its piece's room ([#115](https://github.com/Rawframe-Project/maul-nav/issues/115)) ([0759ebc](https://github.com/Rawframe-Project/maul-nav/commit/0759ebc85a29ab2548375f01c9210b5ca8b152de))
+* **cache:** compare a cached tile's settings in full on rebuild ([#90](https://github.com/Rawframe-Project/maul-nav/issues/90)) ([c85e0ca](https://github.com/Rawframe-Project/maul-nav/commit/c85e0cab5b701ba57f346195c47c1f43d5a69eb4)), closes [#72](https://github.com/Rawframe-Project/maul-nav/issues/72)
+* **corridor:** refuse corridors whose count is outside their capacity ([#114](https://github.com/Rawframe-Project/maul-nav/issues/114)) ([0f5e82b](https://github.com/Rawframe-Project/maul-nav/commit/0f5e82b4eafd5199f5facc4d88213a8f6f100cb4))
+* **links:** bound link generation's spacing, landings and total ([#116](https://github.com/Rawframe-Project/maul-nav/issues/116)) ([4aadb47](https://github.com/Rawframe-Project/maul-nav/commit/4aadb47ccb1e96bf353d0b4bf2532e02f932f346))
+* **query:** stop the circle clip at its buffer ([#113](https://github.com/Rawframe-Project/maul-nav/issues/113)) ([236228e](https://github.com/Rawframe-Project/maul-nav/commit/236228e5afc535359ebc7bd02807637fcebd1dff))
+
 ## [0.0.4](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.0.4) (2026-10-24)
 
 ### Changed
