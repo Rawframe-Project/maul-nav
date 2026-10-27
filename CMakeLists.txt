@@ -174,6 +174,8 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(height_patch)
     maul_add_test(height_patch_hand WHITEBOX)
     maul_add_test(heightfield)
+    # The cuts of rasterizing running out of room, which no bake reaches.
+    maul_add_test(raster_cut WHITEBOX)
     maul_add_test(holes)
     # Hand-built contour sets for dropping a hole, which no bake reaches
     # (test_holes_rings.c).

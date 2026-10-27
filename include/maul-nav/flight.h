@@ -277,8 +277,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or
     /// input or input mnavBakeTile refuses, the mesh named in the
     /// report; `mnav_errorRange` for input or a tile past the extent;
-    /// `mnav_errorLimit` past a limit; `mnav_errorCapacity` when the
-    /// allocator fails.
+    /// `mnav_errorLimit` past a limit, or when rasterizing cuts a triangle
+    /// into a piece of more corners than a piece holds, as for
+    /// mnavBakeTile; `mnav_errorCapacity` when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBakeFlightTile(mnavFlightBaker* baker,
