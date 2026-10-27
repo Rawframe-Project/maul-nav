@@ -208,11 +208,6 @@ static void WriteControl(uint64_t value)
     (void)value;
 }
 
-static uint64_t Wanted(uint64_t control)
-{
-    return control;
-}
-
 enum
 {
     s_controlBits = 0,
@@ -225,6 +220,10 @@ enum
 // Every control bit the library reads or sets, the x87 word's included,
 // is below the token's mark.
 static_assert((uint64_t)s_controlBits <= UINT32_MAX, "the control bits are below bit 63");
+
+// On WebAssembly the entries are fpenv.h's empty inline functions and
+// keep no depth.
+#if !defined(__wasm__)
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #define MNAV_THREAD_LOCAL __declspec(thread)
@@ -283,13 +282,6 @@ MNAV_NO_CANARY void mnavFloatEnvLeave(uint64_t token)
     s_thread.depth = 0;
 }
 
-void mnavFloatEnvRun(void (*body)(void* context), void* context)
-{
-    uint64_t token = mnavFloatEnvEnter();
-    body(context);
-    mnavFloatEnvLeave(token);
-}
-
 MNAV_NO_CANARY mnavFloatHost mnavFloatHostEnter(void)
 {
     mnavFloatHost host = s_thread;
@@ -314,6 +306,15 @@ MNAV_NO_CANARY void mnavFloatHostLeave(mnavFloatHost host)
     }
 }
 
+#endif
+
+void mnavFloatEnvRun(void (*body)(void* context), void* context)
+{
+    uint64_t token = mnavFloatEnvEnter();
+    body(context);
+    mnavFloatEnvLeave(token);
+}
+
 uint64_t mnavFloatControlRead(void)
 {
     return ReadControl();
@@ -326,5 +327,9 @@ void mnavFloatControlWrite(uint64_t value)
 
 uint32_t mnavFloatEnvDepth(void)
 {
+#if defined(__wasm__)
+    return 0;
+#else
     return s_thread.depth;
+#endif
 }
