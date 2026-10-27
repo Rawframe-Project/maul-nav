@@ -19,6 +19,7 @@
 #include "heightfield.h"
 #include "holes.h"
 #include "input.h"
+#include "invariant.h"
 #include "outline.h"
 #include "polymesh.h"
 #include "raster.h"
@@ -321,6 +322,9 @@ static void Enter(mnavBaker* baker, mnavBakeReport* report, mnavBakeStage next)
     uint64_t now = Now(baker);
     uint64_t peak = baker->memory.peak;
     mnavBakeStage stage = report->stage;
+    // The stages run in order, a failed one ending where it stopped, and
+    // nothing runs after the bake is done.
+    MNAV_ASSERT(stage < MNAV_BAKE_STAGES && next >= stage);
     if (stage < MNAV_BAKE_STAGES)
     {
         report->stageTicks[stage] += now - baker->stageStart;
@@ -523,6 +527,8 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
     {
         return mnav_errorInvalid;
     }
+    // The baker's memory between bakes: the stages give back all they take.
+    uint64_t held = baker->memory.used;
     mnavResult result = CheckInput(baker, in, tileX, tileZ, &report);
     mnavTileFrame frame = {0};
     if (result == mnav_success &&
@@ -565,6 +571,7 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
     }
     // A cache keeps tiles that baked, never what an earlier input left.
     result = Finish(baker, tileX, tileZ, &stages, result, &report, reportOut);
+    MNAV_ASSERT(baker->memory.used == held + (uint64_t)baker->tileSize);
     if (result != mnav_success)
     {
         mnavDropCachedTile(cache, tileX, tileZ);
@@ -675,6 +682,8 @@ static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache*
     {
         return mnav_errorInvalid;
     }
+    // The baker's memory between bakes: the stages give back all they take.
+    uint64_t held = baker->memory.used;
     Stages stages = {0};
     const mnavCachedTile* tile =
         cache != nullptr ? mnavFindCachedTile(cache, tileX, tileZ) : nullptr;
@@ -718,7 +727,9 @@ static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache*
     }
     mnavRelease(&baker->memory, volumes, (size_t)count, sizeof(mnavBakeVolume),
                 alignof(mnavBakeVolume));
-    return Finish(baker, tileX, tileZ, &stages, result, &report, reportOut);
+    result = Finish(baker, tileX, tileZ, &stages, result, &report, reportOut);
+    MNAV_ASSERT(baker->memory.used == held + (uint64_t)baker->tileSize);
+    return result;
 }
 
 mnavResult mnavRebuildTile(mnavBaker* baker, mnavTileCache* cache, int32_t tileX, int32_t tileZ,
