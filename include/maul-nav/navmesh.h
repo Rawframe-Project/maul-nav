@@ -299,8 +299,10 @@ extern "C"
     /// def's origin than bake input may lie (MNAV_MAX_EXTENT_CELLS cells
     /// on the ground, MNAV_MAX_HEIGHT_CELLS cell heights up or down), or a
     /// radius, cost, kind or width out of its range; `mnav_errorLimit` when the links' crossings,
-    /// staged and committed, would pass the links limit, or memory its
-    /// limit: the link is refused whole, none of its crossings taken;
+    /// staged and committed, would pass the links limit, when a crossing
+    /// would need a slot from MNAV_MAX_LINKS on (left only by slots worn
+    /// out by 2^32 links each), or memory its limit: the link is refused
+    /// whole, none of its crossings taken;
     /// `mnav_errorCapacity` when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
