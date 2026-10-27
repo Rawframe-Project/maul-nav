@@ -63,7 +63,8 @@ surface: fpenv navmesh nearest polymesh query query_filter
 corridor: fpenv funnel invariant navmesh offmesh polymesh query query_filter
 modifiers: allocator fpenv navmesh
 grid: fpenv query query_filter
-spatial: fpenv navmesh nearest query query_filter
+clip: polymesh
+spatial: clip fpenv navmesh nearest query query_filter
 linkgen: fpenv navmesh path query query_filter
 flow: allocator draw fpenv query_filter
 flow_repair: flow fpenv
