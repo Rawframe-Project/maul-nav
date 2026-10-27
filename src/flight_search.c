@@ -9,6 +9,7 @@
 #include "flight_space.h"
 #include "flight_volume.h"
 #include "fpenv.h"
+#include "invariant.h"
 #include "query.h"
 
 #include "maul-nav/base.h"
@@ -88,6 +89,7 @@ static void SiftUp(Search* s, int32_t at)
 static int32_t Pop(Search* s)
 {
     mnavQuery* q = s->query;
+    MNAV_ASSERT(q->heapCount > 0 && s->nodes[q->indexHeap[0]].heap == 0);
     int32_t top = q->indexHeap[0];
     int32_t last = q->indexHeap[--q->heapCount];
     int32_t at = 0;
@@ -245,8 +247,13 @@ static void Reach(void* context, mnavFlightBlock block)
     memcpy(n->point, p, sizeof(p));
     if (n->heap == MNAV_NO_NODE)
     {
+        // Each node enters the open list once, and the nodes made are at
+        // most its room.
+        MNAV_ASSERT(s->query->heapCount < s->query->limits.nodes);
         Place(s, s->query->heapCount++, node);
     }
+    // A node still open is where the open list holds it.
+    MNAV_ASSERT(s->query->indexHeap[n->heap] == node);
     SiftUp(s, n->heap);
 }
 
@@ -314,6 +321,9 @@ static void Settle(Search* s, int32_t node)
     {
         return;
     }
+    // Reach names the neighbor whenever it names the parent; Bend relies
+    // on it too, for a node that bent here.
+    MNAV_ASSERT(n->via != MNAV_NO_NODE);
     const Node* via = &s->nodes[n->via];
     if (n->parent != n->via && InSight(s, via->point, n->point))
     {
@@ -367,6 +377,7 @@ static mnavFlightPath PathTo(const Search* s, const mnavFlightFrame* frame, int3
     int32_t count = 0;
     for (int32_t n = last; n != MNAV_NO_NODE; n = s->nodes[n].parent)
     {
+        MNAV_ASSERT(count < 2 * s->query->limits.nodes + 1);
         points[count++] = mnavFlightToWorld(frame, s->nodes[n].point);
         if (s->nodes[n].bend != 0)
         {
@@ -375,6 +386,7 @@ static mnavFlightPath PathTo(const Search* s, const mnavFlightFrame* frame, int3
             double bend[2][3];
             for (int32_t k = Bend(s, &s->nodes[n], bend) - 1; k >= 0; --k)
             {
+                MNAV_ASSERT(count < 2 * s->query->limits.nodes + 1);
                 points[count++] = mnavFlightToWorld(frame, bend[k]);
             }
         }

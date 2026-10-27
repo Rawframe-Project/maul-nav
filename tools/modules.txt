@@ -41,7 +41,7 @@ flight_volume: allocator flight flight_def flight_tile fpenv
 flight_space: flight flight_volume
 flight_frame: flight_volume
 flight_debug: draw flight_frame flight_space fpenv
-flight_search: flight_frame flight_space flight_volume fpenv query
+flight_search: flight_frame flight_space flight_volume fpenv invariant query
 flight_probe: flight flight_frame flight_space flight_volume fpenv
 fingerprint: bytes outline raster terrain tile_index
 bake_input: input terrain volume
