@@ -65,6 +65,14 @@ may change the API, the ABI and the tile formats.
   clip holds. Rounding near a cut could add one corner too many, and the
   clip wrote past its buffer. Results otherwise do not change.
   ([#113](https://github.com/Rawframe-Project/maul-nav/pull/113))
+- **Breaking:** the detail stage places each edge sample exactly on its
+  edge, so a sliver polygon's outline is a simple ring and triangulates
+  whole, where before a sample rounded off its edge could leave the ring
+  cut short and counted in `partialRings`. Polygons sharing an edge
+  still place the same points. Tile bytes and fingerprints change for
+  polygons with sloped edges, and `MNAV_BAKE_GENERATOR` is 3, so a host
+  rebakes its tiles.
+  ([#109](https://github.com/Rawframe-Project/maul-nav/pull/109))
 - A raster cut stops at its piece's room of 12 corners: the bake fails
   at rasterizing with `mnav_errorLimit` instead of writing past the
   piece. Rounding of an interpolated corner near a cell line could make
@@ -82,14 +90,6 @@ may change the API, the ABI and the tile formats.
   by a 64-bit hash, so a baker of another def is always refused with
   `mnav_errorInvalid`. A cache's tile slots grow by 80 bytes each.
   ([#90](https://github.com/Rawframe-Project/maul-nav/pull/90))
-- **Breaking:** the detail stage places each edge sample exactly on its
-  edge, so a sliver polygon's outline is a simple ring and triangulates
-  whole, where before a sample rounded off its edge could leave the ring
-  cut short and counted in `partialRings`. Polygons sharing an edge
-  still place the same points. Tile bytes and fingerprints change for
-  polygons with sloped edges, and `MNAV_BAKE_GENERATOR` is 3, so a host
-  rebakes its tiles.
-  ([#109](https://github.com/Rawframe-Project/maul-nav/pull/109))
 
 ## [0.0.4](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.0.4) (2026-10-24)
 
