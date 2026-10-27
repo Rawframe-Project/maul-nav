@@ -34,13 +34,15 @@ static inline void TurnOnTile(float* x, float* z, int32_t turns)
     }
 }
 
-// The level turned a quarter turn turns times. Returns the number of
-// triangles.
-static inline int32_t MakeRampLevel(mnavVec3* vertices, int32_t* indices, int32_t turns)
+// The level with the ramp from z = 10 m up to the deck at z = top and the
+// deck on to z = end, turned a quarter turn turns times. Returns the
+// number of triangles.
+static inline int32_t MakeRampLevelTo(mnavVec3* vertices, int32_t* indices, int32_t turns,
+                                      float top, float end)
 {
     const mnavVec3 corners[8] = {{-1.0f, 0.0f, -1.0f}, {-1.0f, 0.0f, 41.0f}, {41.0f, 0.0f, 41.0f},
-                                 {41.0f, 0.0f, -1.0f}, {28.0f, 0.0f, 10.0f}, {28.0f, 3.0f, 22.0f},
-                                 {36.0f, 3.0f, 22.0f}, {36.0f, 0.0f, 10.0f}};
+                                 {41.0f, 0.0f, -1.0f}, {28.0f, 0.0f, 10.0f}, {28.0f, 3.0f, top},
+                                 {36.0f, 3.0f, top},   {36.0f, 0.0f, 10.0f}};
     const int32_t quads[12] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
     for (int32_t k = 0; k < 8; ++k)
     {
@@ -50,13 +52,20 @@ static inline int32_t MakeRampLevel(mnavVec3* vertices, int32_t* indices, int32_
     {
         indices[k] = quads[k];
     }
-    int32_t index = AddBox(vertices, indices, 8, 12, (mnavVec3){28.0f, 2.8f, 22.0f},
-                           (mnavVec3){36.0f, 3.0f, 30.0f});
+    int32_t index = AddBox(vertices, indices, 8, 12, (mnavVec3){28.0f, 2.8f, top},
+                           (mnavVec3){36.0f, 3.0f, end});
     for (int32_t k = 0; k < RAMP_LEVEL_VERTICES; ++k)
     {
         TurnOnTile(&vertices[k].x, &vertices[k].z, turns);
     }
     return index / 3;
+}
+
+// The level, its ramp 12 m long and its deck 8 m, turned a quarter turn
+// turns times. Returns the number of triangles.
+static inline int32_t MakeRampLevel(mnavVec3* vertices, int32_t* indices, int32_t turns)
+{
+    return MakeRampLevelTo(vertices, indices, turns, 22.0f, 30.0f);
 }
 
 #endif // MAUL_NAV_TEST_RAMP_LEVEL_H

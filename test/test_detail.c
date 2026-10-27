@@ -309,6 +309,103 @@ static void TestTiesKeepTheFirstFromTheLexicalEnd(void)
           "the sample nearer (4, 1)");
 }
 
+static void TestTiesTakeTheFirstInGridOrder(void)
+{
+    // A hill at cell (6, 6), one level up. Its sample goes in first; then
+    // the samples at (5, 5), (6, 5) and (5, 6) stray equally far below the
+    // surface, and the first in grid order, (5, 5), goes in next. Taking
+    // the last, (5, 6), first leaves (5, 5) within the error.
+    Scene scene = Bumped(6, 6, 1);
+    UseDetail(16, 0);
+    Load(&scene);
+    mnavPolygonId polygon = Over(2, 2, 0);
+    CHECK(HasCorner(polygon, 96, 2, 96) && HasCorner(polygon, 80, 1, 80) &&
+              Read(polygon).vertices == 9,
+          "the hilltop, then (5, 5)");
+}
+
+static void TestSlopedEdgeSearchesNearItsLine(void)
+{
+    // Cell (7, 7), at the quad's corner, one level up: the corner (8, 8)
+    // is at height 2, and the +X and +Z edges rise from 1 to 2 over 7
+    // samples. The samples lie on the ledge cells 8, which have no floor,
+    // and take the height nearest the edge's own at each, rounded to the
+    // nearest: 2 from the 4th on. The cells round the 5th and 6th reach
+    // the raised cell, so they take its height and the edge is kept
+    // stepped there. Searching near the edge's lower end, or rounding its
+    // height down, takes the floor's height all along.
+    Scene scene = Bumped(7, 7, 1);
+    UseDetail(16, 0);
+    Load(&scene);
+    mnavPolygonId polygon = Over(4, 4, 0);
+    CHECK(HasCorner(polygon, 80, 1, 128) && HasCorner(polygon, 96, 2, 128) &&
+              HasCorner(polygon, 128, 1, 80) && HasCorner(polygon, 128, 2, 96) &&
+              Read(polygon).vertices == 8,
+          "each edge stepped up at its 5th sample");
+}
+
+static void TestEdgePointsRoundToTheNearest(void)
+{
+    // The same raised corner, sampled every 24 sixteenths: an edge 112
+    // long takes 5 segments, its points 22.4 apart. The 4th lies 89.6 from
+    // the start and is placed at 90, on both rising edges.
+    Scene scene = Bumped(7, 7, 1);
+    UseDetail(24, 0);
+    Load(&scene);
+    mnavPolygonId polygon = Over(4, 4, 0);
+    CHECK(HasCorner(polygon, 106, 2, 128) && HasCorner(polygon, 128, 2, 106),
+          "the 4th point at 16 + 90");
+}
+
+static void TestDiagonalEdgeTakesEnoughSegments(void)
+{
+    // Found by a search of scenes: a cell of area 7 at (6, 4) and a cell
+    // at (6, 5) one level up split the floor, and a polygon edge runs from
+    // the raised cell's corner (7, 5), at height 2, to the quad's corner
+    // (8, 8), at 1: 16 by 48 sixteenths, 50.6 long. Sampled every 25, the
+    // rounded-down root, 50, is two whole segments, which fall short of
+    // the length, so it takes three, and its sample a third along, at
+    // (117, 96), on the floor, is kept.
+    Scene scene = Bumped(6, 5, 1);
+    scene.area[4][6] = 7;
+    UseDetail(25, 0);
+    Load(&scene);
+    CHECK(HasCorner(Over(7, 7, 0), 117, 1, 96), "a sample a third along");
+}
+
+static void TestSamplesKeepHalfASampleFromTheEdges(void)
+{
+    // Cell (6, 7), one level up, sampled every 20 sixteenths. The only grid
+    // point on it, (100, 120), lies 8 from the +Z edge, within half the
+    // sample distance, so it is not sampled, and the edge's samples near
+    // it take the floor's height, nearest the edge's own.
+    Scene scene = Bumped(6, 7, 1);
+    UseDetail(20, 0);
+    Load(&scene);
+    CHECK(Read(Over(2, 2, 0)).vertices == 4, "no sample near the edge");
+}
+
+static void TestLongEdgeTakesTheMostSamples(void)
+{
+    // Cells of a quarter of the scene's, on a tile of 256 to reach it:
+    // the ledge ring is one cell wide, and the quad's edges run 34 cells.
+    // Sampled every cell, an edge would take 34 segments; it takes the
+    // most, 21. On the -X edge, the cell (0, 1) one level up holds the 3rd
+    // and 4th samples, and the 4th and 5th, 30 and 36.5 sixteenths of a
+    // scene cell along z, are kept.
+    mnavBakeDef def = Exact();
+    def.cellSize = 0.0625f;
+    def.tileCells = 256;
+    def.detailSampleDistance = 0.0625f;
+    def.detailMaxError = 0.0f;
+    UseDef(&def);
+    Scene scene = Bumped(0, 1, 1);
+    Load(&scene);
+    mnavPolygonId polygon = Over(4, 4, 0);
+    CHECK(HasCorner(polygon, 4, 2, 30) && HasCorner(polygon, 4, 1, 36),
+          "21 segments on an edge of 34 cells");
+}
+
 static void TestNoHeightsFallBackAndCount(void)
 {
     // Found by a search of 2D floors: a floor of 17 by 17 cells from 2 m,
@@ -469,6 +566,12 @@ int main(void)
     TestHillInsideIsSampled();
     TestSharedEdgeIsSampledAlike();
     TestTiesKeepTheFirstFromTheLexicalEnd();
+    TestTiesTakeTheFirstInGridOrder();
+    TestSlopedEdgeSearchesNearItsLine();
+    TestEdgePointsRoundToTheNearest();
+    TestDiagonalEdgeTakesEnoughSegments();
+    TestSamplesKeepHalfASampleFromTheEdges();
+    TestLongEdgeTakesTheMostSamples();
     TestNoHeightsFallBackAndCount();
     TestSearchTakesTheHeightNearestTheMean();
     TestLevelDetailIsSound();
