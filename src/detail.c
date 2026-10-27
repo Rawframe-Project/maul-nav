@@ -50,10 +50,10 @@ typedef struct Part
     uint8_t changed[PART_TRIANGLES];
 } Part;
 
-// A grid sample inside a polygon: the triangle holding it (-1 for none)
-// and the edge it lies on, its height off the detail surface in whole
-// sixteenths of a cell height when beyond the maximum error (-1 when
-// within), and whether it is in the detail.
+// A grid sample inside a polygon: the triangle holding it (-1 before it
+// is measured) and the edge it lies on, its height off the detail
+// surface in whole sixteenths of a cell height when beyond the maximum
+// error (-1 when within), and whether it is in the detail.
 typedef struct Candidate
 {
     mnavDetailVertex point;
@@ -139,10 +139,11 @@ static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mn
     int64_t dz = b->z - a->z;
     int64_t dy = b->y - a->y;
     // The steps between the edge's whole sixteenths: corners lie on whole
-    // cells, so there are at least SUBCELLS, or none on an edge of no
-    // length in plan, whose points all lie at its ends. dx is never
-    // negative, as the edge runs from its lexically first end.
-    int64_t steps = dx == 0 && dz == 0 ? 1 : Divisor(dx, dz < 0 ? -dz : dz);
+    // cells and a polygon's edges have length on the ground (CheckPolyMesh
+    // in polymesh.c), so there are at least SUBCELLS. dx is never negative,
+    // as the edge runs from its lexically first end.
+    int64_t steps = Divisor(dx, dz < 0 ? -dz : dz);
+    MNAV_ASSERT(steps > 0);
     int64_t segments = 1;
     int64_t sample = builder->settings.sample;
     if (sample > 0)
@@ -249,7 +250,12 @@ static void BuildOutline(Builder* builder, const mnavPolygon* polygon)
     }
 }
 
-// Triangulates the outline by ear clipping.
+// Triangulates the outline by ear clipping. The polygon is convex with
+// area and its edges have length (CheckPolyMesh in polymesh.c), and the
+// outline adds points inside its edges, each at a place of its own
+// (PlacePoints). Such a ring always has a corner whose ear passes the
+// strict test, and cutting it leaves a ring of the same kind, so the
+// clipping finishes and every triangle it cuts has area.
 static void TriangulateOutline(Builder* builder)
 {
     Part* part = builder->part;
@@ -261,7 +267,7 @@ static void TriangulateOutline(Builder* builder)
     bool complete = true;
     mnavEarScratch scratch = {part->indices, part->ears};
     int32_t count = mnavTriangulate(part->ring, part->hullCount, scratch, part->corners, &complete);
-    builder->detail->failedPolygons += complete ? 0 : 1;
+    MNAV_ASSERT(complete);
     part->triangleCount = 0;
     for (int32_t t = 0; t < count; ++t)
     {
@@ -347,21 +353,17 @@ static mnavResult Collect(Builder* builder, int32_t n)
 }
 
 // Locates a candidate and measures its height off the triangle holding
-// it, against the maximum error.
+// it, against the maximum error. Candidates lie well inside the polygon
+// (WellInside), which the triangles cover whole, so one holds each, and
+// none lies on the outline, where an insertion would have no triangle
+// across. Every triangle has area: the outline's (TriangulateOutline),
+// each split at a point strictly inside a triangle or an edge, and each
+// flip, made only across a strictly convex quadrilateral.
 static void Measure(const Builder* builder, const mnavTriangulation* tr, Candidate* candidate)
 {
     const mnavDetailVertex* p = &candidate->point;
     candidate->value = -1;
     candidate->triangle = mnavLocate(tr, p->x, p->z, &candidate->edge);
-    // Samples lie well inside the polygon (WellInside), which the
-    // triangulation covers: one is always found, in a triangle with area,
-    // and never on the outer edge, where an insertion fails. This check,
-    // the area's and the insertion's guard the integer geometry against
-    // disagreeing with that, which no input has made it do.
-    if (candidate->triangle < 0)
-    {
-        return;
-    }
     const mnavDetailTriangle* triangle = &tr->triangles[candidate->triangle];
     const mnavDetailVertex* a = &tr->vertices[triangle->corners[0]];
     const mnavDetailVertex* b = &tr->vertices[triangle->corners[1]];
@@ -371,14 +373,11 @@ static void Measure(const Builder* builder, const mnavTriangulation* tr, Candida
     int64_t wb = mnavDetailArea2(a, p, c);
     int64_t wc = mnavDetailArea2(a, b, p);
     int64_t signedArea = wa + wb + wc;
-    if (signedArea == 0)
-    {
-        return;
-    }
+    MNAV_ASSERT(signedArea < 0);
     // The height off the plane, in sixteenths times twice the area.
     int64_t difference = (int64_t)p->y * signedArea - (wa * a->y + wb * b->y + wc * c->y);
     int64_t off = SUBCELLS * (difference < 0 ? -difference : difference);
-    int64_t area = signedArea < 0 ? -signedArea : signedArea;
+    int64_t area = -signedArea;
     if (off > (int64_t)builder->settings.error * area)
     {
         candidate->value = off / area;
@@ -428,16 +427,12 @@ static void AddInterior(Builder* builder)
         chosen->added = true;
         memset(part->changed, 0, sizeof(part->changed));
         part->vertices[part->vertexCount] = chosen->point;
-        if (!mnavInsertVertex(&tr, part->vertexCount, chosen->triangle, chosen->edge))
-        {
-            continue;
-        }
+        mnavInsertVertex(&tr, part->vertexCount, chosen->triangle, chosen->edge);
         part->vertexCount += 1;
         for (int32_t c = 0; c < builder->candidateCount; ++c)
         {
             Candidate* candidate = &builder->candidates[c];
-            if (!candidate->added && candidate->triangle >= 0 &&
-                part->changed[candidate->triangle] != 0)
+            if (!candidate->added && part->changed[candidate->triangle] != 0)
             {
                 Measure(builder, &tr, candidate);
             }

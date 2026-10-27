@@ -573,10 +573,10 @@ extern "C"
         uint64_t stageTicks[MNAV_BAKE_STAGES];
         uint64_t stageMemory[MNAV_BAKE_STAGES];
         // Holes that no bridge could join to their outline, polygon rings
-        // and detail outlines whose triangulation stopped short, detail
-        // samples that found no height and took the polygon's, and
-        // polygons whose detail reached its vertex cap. Rings cut short
-        // usually come from a large maxEdgeError.
+        // whose triangulation stopped short, detail samples that found no
+        // height and took the polygon's, and polygons whose detail reached
+        // its vertex cap. Rings cut short usually come from a large
+        // maxEdgeError.
         int32_t droppedHoles;
         int32_t partialRings;
         int32_t fallbackHeights;
