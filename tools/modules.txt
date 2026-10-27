@@ -53,7 +53,7 @@ navmesh: allocator bake_def detail fpenv polymesh tile
 nearest: detail fpenv navmesh polymesh query_filter raster
 path: allocator fpenv funnel invariant navmesh offmesh polymesh query query_filter raster
 raycast: fpenv navmesh polymesh query query_filter
-shortest: fpenv navmesh offmesh polymesh query query_filter
+shortest: fpenv invariant navmesh offmesh polymesh query query_filter
 query: allocator fpenv
 query_filter:
 offmesh: allocator fpenv navmesh nearest sort
