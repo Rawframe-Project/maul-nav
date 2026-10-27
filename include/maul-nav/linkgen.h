@@ -20,6 +20,8 @@ extern "C"
 
 // The farthest a generated link may reach, across or down, in meters.
 #define MNAV_MAX_LINK_REACH 100.0f
+// The most polygons a landing's search box, a cell wide, may meet.
+#define MNAV_MAX_LINK_LANDINGS 32
 
     // Decides whether the way between two points is free for the agent:
     // the host's collision test. True to keep the link. It is called only
@@ -33,8 +35,9 @@ extern "C"
     typedef struct mnavLinkGenDef
     {
         uint32_t cookie;
-        // The distance between samples along an edge, in meters, more than
-        // 0 and at most MNAV_MAX_LINK_REACH.
+        // The distance between samples along an edge, in meters, at most
+        // MNAV_MAX_LINK_REACH and at least the navmesh's cell size: samples
+        // closer than a cell tell nothing a cell's resolution can.
         float spacing;
         // The deepest drop, and the farthest jump across, in meters, 0 to
         // MNAV_MAX_LINK_REACH; 0 turns that kind off.
@@ -126,11 +129,15 @@ extern "C"
     /// @param countOut  Receives the number of links generated, also beyond
     ///                  the capacity.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a def
-    /// not from mnavDefaultLinkGenDef, a tile range backward, or a filter not
-    /// built from mnavDefaultQueryFilter;
-    /// `mnav_errorRange` for a def value or filter cost out of its range;
-    /// `mnav_errorCapacity` when more links were generated than the buffer
-    /// holds, the first capacity written.
+    /// not from mnavDefaultLinkGenDef, a spacing below the navmesh's cell
+    /// size, a tile range backward, or a filter not built from
+    /// mnavDefaultQueryFilter; `mnav_errorRange` for a def value or filter
+    /// cost out of its range; `mnav_errorCapacity` when more links were
+    /// generated than the buffer holds, the first capacity written;
+    /// `mnav_errorLimit` when generation stops, the links found so far
+    /// counted and the first capacity written: at a link past
+    /// MNAV_MAX_LINKS, the most a navmesh holds, or at a landing's search
+    /// box meeting more than MNAV_MAX_LINK_LANDINGS polygons.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and no commit runs on the navmesh. The def's clearance test runs on

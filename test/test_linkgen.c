@@ -237,6 +237,15 @@ static void TestChecksAndBuffer(const mnavNavmesh* navmesh)
     CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
               mnav_errorRange,
           "no spacing");
+    float cell = mnavDefaultBakeDef().cellSize;
+    def.spacing = nextafterf(cell, 0.0f);
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
+              mnav_errorInvalid,
+          "a spacing just below a cell");
+    def.spacing = cell;
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
+              mnav_success,
+          "a spacing of one cell");
     def = Def();
     def.detour = 0.5f;
     CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
