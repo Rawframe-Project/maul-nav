@@ -279,9 +279,11 @@ static bool KeepsOutline(const Work* work, uint16_t vertex)
 // polygons, or -1 when the triangulation does not finish. The hole's ring
 // is made of the outer edges of convex polygons round the vertex, so it
 // is star-shaped round the vertex's place and triangulates fully unless
-// it passes some vertex twice; the checks for an unfinished
-// triangulation and for triangles with a corner twice guard that case,
-// which no input has yet made.
+// it passes some vertex twice; the check for an unfinished triangulation
+// guards that case, which no input has yet made. A triangle with no area
+// on the ground is dropped, as the polygon stage drops one: it covers
+// nothing, and two vertices welded apart at one ground place would give
+// it an edge with no length there, which the detail stage divides by.
 static int32_t Fill(Work* work)
 {
     const mnavPolyMesh* mesh = work->mesh;
@@ -309,7 +311,7 @@ static int32_t Fill(Work* work)
         uint16_t a = work->hole[corner[0]];
         uint16_t b = work->hole[corner[1]];
         uint16_t c = work->hole[corner[2]];
-        if (a == b || a == c || b == c)
+        if (mnavArea2(&work->ring[corner[0]], &work->ring[corner[1]], &work->ring[corner[2]]) == 0)
         {
             continue;
         }
