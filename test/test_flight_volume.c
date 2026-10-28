@@ -565,8 +565,9 @@ static void TestDefIsChecked(void)
 static void CopyRefusals(mnavFlightBaker* baker, const mnavBakeInput* input)
 {
     size_t size = 7;
-    CHECK(mnavCopyFlightTile(baker, nullptr, 0, &size) == mnav_errorInvalid && size == 7,
-          "no tile yet");
+    CHECK(mnavCopyFlightTile(baker, nullptr, 0, &size) == mnav_errorState && size == 7 &&
+              mnavGetFlightBakerMisuse(baker) == 0,
+          "no tile yet: a state, not misuse");
     CHECK(mnavBakeFlightTile(baker, input, 0, 0, nullptr) == mnav_success, "baked");
     CHECK(mnavCopyFlightTile(baker, nullptr, 0, &size) == mnav_errorCapacity && size == s_sizes[0],
           "the size asked for");
@@ -592,7 +593,7 @@ static void InputRefusals(mnavFlightBaker* baker, const mnavBakeInput* input)
               report.input.result == mnav_errorInvalid,
           "a mesh refused");
     size_t size = 0;
-    CHECK(mnavCopyFlightTile(baker, nullptr, 0, &size) == mnav_errorInvalid,
+    CHECK(mnavCopyFlightTile(baker, nullptr, 0, &size) == mnav_errorState,
           "a failed bake holds no tile");
     mnavBakeInput broken = {nullptr, 1, nullptr, 0, nullptr, 0, nullptr};
     CHECK(mnavBakeFlightTile(baker, &broken, 0, 0, &report) == mnav_errorInvalid &&

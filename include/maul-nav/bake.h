@@ -803,8 +803,9 @@ extern "C"
     /// @param sizeOut   Receives the tile's size in bytes. May be NULL.
     /// @return `mnav_success`; `mnav_errorCapacity` when the buffer is
     /// smaller than the tile, with the size still written;
-    /// `mnav_errorInvalid` for a NULL baker, a NULL buffer with a
-    /// positive capacity, or a baker holding no tile.
+    /// `mnav_errorInvalid` for a NULL baker or a NULL buffer with a
+    /// positive capacity; `mnav_errorState` for a baker holding no tile,
+    /// before its first bake or after a failed one.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* bufferOut,
