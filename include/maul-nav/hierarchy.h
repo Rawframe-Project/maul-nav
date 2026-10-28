@@ -135,7 +135,7 @@ extern "C"
     /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
     /// MNAV_MAX_AREA_COST, an infinity included; `mnav_errorCapacity` for more
     /// tile slots, transitions or edges than the limits, or a cluster needing
-    /// more nodes than the context\'s limit. On an error the hierarchy holds no
+    /// more nodes than the context's limit. On an error the hierarchy holds no
     /// graph.
     /// @par Thread safety
     /// Safe from any thread; the hierarchy and the context are used by one
