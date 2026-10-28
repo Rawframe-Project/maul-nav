@@ -29,10 +29,11 @@ extern "C"
     // call returns; never afterward or from another thread. Its answer
     // decides the links, so it runs in the library's floating-point
     // environment: round to nearest, denormals kept. It may call what only
-    // reads the navmesh, with a query context of its own; while it runs,
-    // the navmesh's stage, commit and destroy calls and every call on the
-    // generating context are refused with mnav_errorBusy, one misuse
-    // counted on that object.
+    // reads the navmesh, with a query context of its own, and
+    // mnavStageTile and mnavStageTileRemoval, which change nothing
+    // generation reads; while it runs, the navmesh's other stage calls,
+    // commit and destroy and every call on the generating context are
+    // refused with mnav_errorBusy, one misuse counted on that object.
     typedef bool (*mnavClearanceFn)(void* context, mnavPos3 from, mnavPos3 to);
 
     // How links are generated. Build it with mnavDefaultLinkGenDef.
@@ -151,7 +152,8 @@ extern "C"
     /// Safe from any thread; the context is used by one thread at a time,
     /// and no commit runs on the navmesh. The def's clearance test runs on
     /// the calling thread, within the call; while it runs, the navmesh's
-    /// stage calls are refused with `mnav_errorBusy` from any thread.
+    /// stage calls but mnavStageTile and mnavStageTileRemoval are refused
+    /// with `mnav_errorBusy` from any thread.
     MNAV_NODISCARD MNAV_API mnavResult
     mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
                       const mnavLinkGenDef* def, int32_t tileX0, int32_t tileZ0, int32_t tileX1,

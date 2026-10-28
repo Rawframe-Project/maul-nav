@@ -247,7 +247,7 @@ static mnavResult Stage(mnavNavmesh* navmesh, int32_t x, int32_t z, mnavTile* ti
 static MNAV_NOINLINE mnavTileResult StageTileWork(mnavNavmesh* navmesh, const uint8_t* bytes,
                                                   size_t size)
 {
-    if (navmesh != nullptr && mnavHostCalledBack(&navmesh->host))
+    if (navmesh != nullptr && mnavHostCalledBackWriting(&navmesh->host))
     {
         return (mnavTileResult){mnav_errorBusy, mnav_tileHeader, -1};
     }
@@ -301,7 +301,7 @@ mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX, int32_t til
     {
         return mnav_errorInvalid;
     }
-    if (mnavHostCalledBack(&navmesh->host))
+    if (mnavHostCalledBackWriting(&navmesh->host))
     {
         return mnav_errorBusy;
     }

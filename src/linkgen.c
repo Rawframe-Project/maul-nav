@@ -171,8 +171,9 @@ static bool Near(const Gen* g, mnavPos3 start, mnavPos3 end)
 
 // The host's clearance test between two points, true without one. The
 // navmesh and the context are marked while it runs, so that a call back
-// into either that would change them is refused; the navmesh is only
-// read, and its mark is the one field this writes through it.
+// into either that would change what generation reads is refused; the
+// navmesh is only read, and its mark is the one field this writes
+// through it.
 static bool Clear(const Gen* g, mnavPos3 from, mnavPos3 to)
 {
     const mnavLinkGenDef* d = g->def;
@@ -181,11 +182,11 @@ static bool Clear(const Gen* g, mnavPos3 from, mnavPos3 to)
         return true;
     }
     mnavHostCode* navmesh = (mnavHostCode*)&g->navmesh->host;
-    mnavHostEnter(navmesh);
-    mnavHostEnter(&g->query->host);
+    mnavHostEnterReader(navmesh);
+    mnavHostEnterReader(&g->query->host);
     bool clear = d->clear(d->context, from, to);
-    mnavHostLeave(&g->query->host);
-    mnavHostLeave(navmesh);
+    mnavHostLeaveReader(&g->query->host);
+    mnavHostLeaveReader(navmesh);
     return clear;
 }
 

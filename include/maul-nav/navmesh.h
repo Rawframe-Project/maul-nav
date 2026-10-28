@@ -102,8 +102,8 @@ extern "C"
     /// for another tile format version; `mnav_errorCapacity` past the memory
     /// limit or when the allocator fails; `mnav_errorUnsupported` for a tile at
     /// a place where one is committed, below mnav_tierDynamic. Also
-    /// `mnav_errorBusy` when called back in from host code the navmesh runs
-    /// (its allocator, a clearance test), one misuse counted.
+    /// `mnav_errorBusy` when called back in from the navmesh's allocator, one
+    /// misuse counted; a link generation's clearance test may call it.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
     /// Staging changes nothing queries read, but it may not run beside
@@ -119,10 +119,13 @@ extern "C"
     /// @param tileZ    The tile's row.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
     /// `mnav_errorCapacity` past the memory limit or when the allocator fails.
-    /// Also `mnav_errorBusy` when called back in from host code the navmesh
-    /// runs (its allocator, a clearance test), one misuse counted.
+    /// Also `mnav_errorBusy` when called back in from the navmesh's
+    /// allocator, one misuse counted; a link generation's clearance test may
+    /// call it.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
+    /// Staging changes nothing queries read, but it may not run beside
+    /// another call that stages or commits.
     MNAV_NODISCARD MNAV_API mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX,
                                                             int32_t tileZ);
 

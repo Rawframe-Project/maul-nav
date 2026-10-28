@@ -2,9 +2,10 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Host code calling back in: from a navmesh's allocator, as it allocates
-// and as it frees, and from a link generation's clearance test, every call
-// that would change the navmesh or use the generating context is refused
-// with mnav_errorBusy and counted as misuse, and the outer call gives what
+// and as it frees, every call that would change the navmesh is refused
+// with mnav_errorBusy and counted as misuse; from a link generation's
+// clearance test, every such call but staging a tile or its removal, and
+// every call that uses the generating context. The outer call gives what
 // it gives with no call back in.
 
 #include "counting_allocator.h"
@@ -27,6 +28,8 @@ enum
     LINKS = 512,
     // The navmesh's stage, commit and destroy calls.
     NAVMESH_CALLS = 8,
+    // Those a clearance test may make: staging a tile and its removal.
+    STAGING_CALLS = 2,
     // The calls that take a query context to search with.
     QUERY_CALLS = 27,
 };
@@ -46,9 +49,11 @@ typedef struct Reentry
     // Whether the next allocation or release calls back in, once.
     bool onAlloc;
     bool onFree;
-    // Calls made back in, and those refused with mnav_errorBusy.
+    // Calls made back in, those refused with mnav_errorBusy, and those
+    // that succeeded.
     int32_t made;
     int32_t busy;
+    int32_t succeeded;
 } Reentry;
 
 static Reentry s_reentry;
@@ -57,10 +62,12 @@ static void Count(mnavResult result)
 {
     s_reentry.made += 1;
     s_reentry.busy += result == mnav_errorBusy ? 1 : 0;
+    s_reentry.succeeded += result == mnav_success ? 1 : 0;
 }
 
-// Every call that would change the navmesh, the destroy call last, which
-// returns nothing and is seen only in the misuse count.
+// Every call that would change the navmesh, the two staging calls first
+// and the destroy call last, which returns nothing and is seen only in the
+// misuse count. The tile removal is of the place the tile is staged at.
 static void CallNavmesh(mnavNavmesh* navmesh)
 {
     const Reentry* r = &s_reentry;
@@ -230,6 +237,21 @@ static mnavPolygonId Polygon(const mnavNavmesh* navmesh)
     return nearest.polygon;
 }
 
+// A tile staged over a committed one and committed, on the navmesh with
+// no call back in and on the reentrant one: the commit allocates the new
+// tile's tables and frees the old tile. Stops where the call back in came.
+static mnavResult Restage(mnavNavmesh* plain, mnavNavmesh* navmesh, mnavResult* expected)
+{
+    *expected = mnavStageTile(plain, s_trench0, sizeof(s_trench0)).result;
+    mnavResult got = mnavStageTile(navmesh, s_trench0, sizeof(s_trench0)).result;
+    if (got == mnav_success && s_reentry.made == 0)
+    {
+        *expected = *expected == mnav_success ? mnavCommit(plain) : *expected;
+        got = mnavCommit(navmesh);
+    }
+    return got;
+}
+
 // One outer call on two navmeshes, the reentrant one's allocator calling
 // back in at the first allocation or release: the same result and tiles,
 // every call back in refused, each a misuse.
@@ -239,17 +261,10 @@ static void TestAllocator(bool onAlloc)
     mnavLinkId link;
     mnavNavmesh* plain = Load(false, &plainLink);
     mnavNavmesh* navmesh = Load(true, &link);
-    s_reentry = (Reentry){navmesh, nullptr, link, Polygon(navmesh), onAlloc, !onAlloc, 0, 0};
+    s_reentry = (Reentry){navmesh, nullptr, link, Polygon(navmesh), onAlloc, !onAlloc, 0, 0, 0};
     uint64_t before = mnavGetNavmeshMisuse(navmesh);
-    // A tile staged over a committed one and committed: the commit
-    // allocates the new tile's tables and frees the old tile.
-    mnavResult expected = mnavStageTile(plain, s_trench0, sizeof(s_trench0)).result;
-    mnavResult got = mnavStageTile(navmesh, s_trench0, sizeof(s_trench0)).result;
-    if (got == mnav_success && s_reentry.made == 0)
-    {
-        expected = expected == mnav_success ? mnavCommit(plain) : expected;
-        got = mnavCommit(navmesh);
-    }
+    mnavResult expected = mnav_success;
+    mnavResult got = Restage(plain, navmesh, &expected);
     CHECK(s_reentry.made == NAVMESH_CALLS, "called back in");
     CHECK(s_reentry.busy == NAVMESH_CALLS - 1, "every call refused as busy");
     CHECK(mnavGetNavmeshMisuse(navmesh) - before == NAVMESH_CALLS, "each a misuse");
@@ -283,7 +298,9 @@ static bool Clearance(void* context, mnavPos3 from, mnavPos3 to)
 }
 
 // Link generation, its clearance test calling back into the navmesh and
-// the generating context: the same links as with no call back in.
+// the generating context: the same links as with no call back in. The two
+// staging calls succeed with no misuse, staging what the next commit
+// applies; every other call is refused.
 static void TestClearance(void)
 {
     mnavLinkId link;
@@ -297,7 +314,8 @@ static void TestClearance(void)
     CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_again, LINKS, &expected) ==
               mnav_success,
           "links with a clearance test");
-    s_reentry = (Reentry){navmesh, query, link, Polygon(navmesh), false, false, 0, 0};
+    s_reentry = (Reentry){navmesh, query, link, Polygon(navmesh), false, false, 0, 0, 0};
+    uint64_t tiles = Tiles(navmesh);
     uint64_t navmeshBefore = mnavGetNavmeshMisuse(navmesh);
     uint64_t queryBefore = mnavGetQueryMisuse(query);
     int32_t count = 0;
@@ -309,16 +327,20 @@ static void TestClearance(void)
               memcmp(s_links, s_again, (size_t)count * sizeof(s_links[0])) == 0,
           "the same links");
     CHECK(s_reentry.made == NAVMESH_CALLS + QUERY_CALLS, "called back in");
-    CHECK(s_reentry.busy == NAVMESH_CALLS + QUERY_CALLS - 2, "every call refused as busy");
-    CHECK(mnavGetNavmeshMisuse(navmesh) - navmeshBefore == NAVMESH_CALLS &&
+    CHECK(s_reentry.succeeded == STAGING_CALLS, "staging allowed");
+    CHECK(s_reentry.busy == NAVMESH_CALLS - STAGING_CALLS - 1 + QUERY_CALLS - 1,
+          "every other call refused as busy");
+    CHECK(mnavGetNavmeshMisuse(navmesh) - navmeshBefore == NAVMESH_CALLS - STAGING_CALLS &&
               mnavGetQueryMisuse(query) - queryBefore == QUERY_CALLS,
           "each a misuse, on the object it was made against");
-    // The test may read the navmesh with a context of its own.
+    // What was staged waits for the commit: the removal, staged last.
     s_reentry.navmesh = nullptr;
     s_reentry.query = nullptr;
-    CHECK(mnavStageLinkRemoval(navmesh, link) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
-          "changes after");
+    mnavTileId tile;
+    CHECK(Tiles(navmesh) == tiles && mnavCommit(navmesh) == mnav_success &&
+              mnavGetTile(navmesh, 0, 0, &tile) == mnav_errorNotLoaded &&
+              mnavGetTile(navmesh, 1, 0, &tile) == mnav_success,
+          "staged, then committed");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
