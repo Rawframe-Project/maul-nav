@@ -438,10 +438,10 @@ extern "C"
     /// @param openOut  Receives whether the point is open; false on
     ///                 failure.
     /// @return `mnav_success`; `mnav_errorNotLoaded` when no tile is committed
-    /// under the point; `mnav_errorInvalid` for a NULL argument, or a point
-    /// with a NaN coordinate or below or above the volume; `mnav_errorLimit`
-    /// for a point more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an
-    /// infinity included.
+    /// under the point; `mnav_errorInvalid` for a NULL argument or a point with
+    /// a NaN coordinate; `mnav_errorOutside` for a point below or above the
+    /// volume, openOut false; `mnav_errorLimit` for a point more than
+    /// MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an infinity included.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the volume at
     /// once between commits; none may while a stage or commit call runs.
@@ -470,13 +470,13 @@ extern "C"
     ///                 within 512 blocks and the node budget: the search
     ///                 looks over the end's space that far first.
     ///                 `mnav_pathNone`, with the start alone.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, or a
-    /// point with a NaN coordinate or below or above the volume;
-    /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
-    /// from the origin, an infinity included. Also `mnav_errorBusy` when called
-    /// back in from host code a call using the context runs (a link
-    /// generation's clearance test, a hierarchy's allocator as it builds), one
-    /// misuse counted.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// point with a NaN coordinate; `mnav_errorOutside` for a point below or
+    /// above the volume, pathOut left as it was; `mnav_errorLimit` for a point
+    /// more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an infinity
+    /// included. Also `mnav_errorBusy` when called back in from host code a
+    /// call using the context runs (a link generation's clearance test, a
+    /// hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and the volume is not changed during the search.
@@ -497,13 +497,13 @@ extern "C"
     /// @param volume  The flight volume.
     /// @param start   The start, in world coordinates.
     /// @param end     The end, in world coordinates.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, or a
-    /// point with a NaN coordinate or below or above the volume;
-    /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
-    /// from the origin, an infinity included. Also `mnav_errorBusy` when called
-    /// back in from host code a call using the context runs (a link
-    /// generation's clearance test, a hierarchy's allocator as it builds), one
-    /// misuse counted.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
+    /// point with a NaN coordinate; `mnav_errorOutside` for a point below or
+    /// above the volume, the context's search left as it was; `mnav_errorLimit`
+    /// for a point more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an
+    /// infinity included. Also `mnav_errorBusy` when called back in from host
+    /// code a call using the context runs (a link generation's clearance test,
+    /// a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBeginFlightPath(mnavQuery* query,

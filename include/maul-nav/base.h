@@ -139,7 +139,8 @@ extern "C"
         mnav_errorNotLoaded = -32,
         // The place asked about is outside what the object covers: a point
         // off the polygon given, a cell or polygon outside a flow field's
-        // region. A correct program meets it; it counts no misuse.
+        // region, a point below or above a flight volume. A correct program
+        // meets it; it counts no misuse.
         mnav_errorOutside = -33,
     };
 

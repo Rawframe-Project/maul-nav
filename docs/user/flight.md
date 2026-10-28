@@ -7,7 +7,7 @@ Agents that fly or swim are not bound to the ground, so a navmesh does not descr
 `mnavDefaultFlightDef` gives 1 m voxels, tiles of 32 voxels, a volume from 0 to 64 m and a flier 0.5 m in radius. Then set:
 
 - **The voxel size and tile side.** A tile's side is 4 times a power of 2, from 16 to 512 voxels. Smaller voxels thread narrower gaps and cost more memory.
-- **The floor and ceiling,** in meters from the origin. Fliers never leave this range.
+- **The floor and ceiling,** in meters from the origin. Fliers never leave this range: a point below or above it given to `mnavIsFlightOpen` or a flight path search is `mnav_errorOutside`.
 - **The radius.** The flier is a sphere: every voxel within its radius of something solid is closed to its center. A long, flat flier takes the sphere that holds it.
 - **`groundBelow`.** On, the space under each column's lowest solid voxel is solid too, so the space beneath a terrain is not open. Turn it off for open space, such as a field of floating debris, where it would fill below every floating piece.
 
