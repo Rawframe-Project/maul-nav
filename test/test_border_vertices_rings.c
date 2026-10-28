@@ -4,8 +4,9 @@
 // Removing tile-border vertices from hand-built rings, for what the
 // public bakes do not reach: a vertex inside the mesh, a lone polygon's
 // tip, polygons of two areas or touching only at the vertex, a slit, a
-// corner of the outline, the polygon limit, and a second vertex among the
-// polygons the first removal left. test_border_vertices.c bakes the case
+// corner of the outline, the polygon limit, a second vertex among the
+// polygons the first removal left, and two vertices welded apart at one
+// ground place. test_border_vertices.c bakes the case
 // bakes reach, and test_alloc_failures.c refuses its allocations.
 
 #include "allocator.h"
@@ -18,6 +19,7 @@
 #include "maul-nav/bake.h"
 
 #include <stdint.h>
+#include <string.h>
 
 // Marks every ring vertex at (x, z) as a tile-border vertex.
 static void Flag(mnavContourSet* set, int32_t x, int32_t z)
@@ -73,6 +75,32 @@ static mnavResult Run(mnavMemory* memory, mnavContourSet* set, int32_t maxPolygo
         CHECK(mnavLinkPolyMesh(memory, mesh) == mnav_success, "linked");
     }
     return result;
+}
+
+// Whether some polygon has no area on the ground, or an edge with no
+// length there.
+static bool HasFlatPolygon(const mnavPolyMesh* mesh)
+{
+    for (int32_t p = 0; p < mesh->polygonCount; ++p)
+    {
+        const mnavPolygon* polygon = &mesh->polygons[p];
+        int64_t area = 0;
+        for (int32_t k = 0; k < polygon->count; ++k)
+        {
+            const mnavMeshVertex* a = &mesh->vertices[polygon->vertices[k]];
+            const mnavMeshVertex* b = &mesh->vertices[polygon->vertices[(k + 1) % polygon->count]];
+            area += (int64_t)a->x * b->z - (int64_t)b->x * a->z;
+            if (a->x == b->x && a->z == b->z)
+            {
+                return true;
+            }
+        }
+        if (area == 0)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 static void Finish(mnavMemory* memory, mnavContourSet* set, mnavPolyMesh* mesh)
@@ -223,6 +251,49 @@ static void TestCornerOfTheOutlineStays(void)
     Finish(&memory, &set, &mesh);
 }
 
+static void TestVerticesWeldedApartLeaveNoFlatPolygon(void)
+{
+    // Eight triangles round (5, 5) wind twice round the square from
+    // (0, 0) to (10, 10), the second time 10 higher, more than the weld's
+    // reach: each corner is two vertices at one ground place. The hole's
+    // ring passes each place twice, and ear clipping cuts two triangles
+    // with no area between (0, 0) low and (0, 0) high.
+    const int32_t square[8] = {0, 0, 0, 10, 10, 10, 10, 0};
+    int32_t points[48];
+    for (int32_t t = 0; t < 8; ++t)
+    {
+        const int32_t triangle[6] = {5,
+                                     5,
+                                     square[2 * (t % 4)],
+                                     square[2 * (t % 4) + 1],
+                                     square[2 * ((t + 1) % 4)],
+                                     square[2 * ((t + 1) % 4) + 1]};
+        memcpy(&points[6 * t], triangle, sizeof(triangle));
+    }
+    const int32_t counts[8] = {3, 3, 3, 3, 3, 3, 3, 3};
+    mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, UINT64_MAX);
+    mnavContourSet set = Rings(&memory, points, counts, 8);
+    for (int32_t t = 0; t < 8; ++t)
+    {
+        // Corner k of the second winding is high; the last triangle
+        // closes back to the first winding's (0, 0).
+        set.contours[t].region = 1;
+        set.vertices[3 * t + 1].y = t >= 4 ? 110 : 100;
+        set.vertices[3 * t + 2].y = t >= 3 && t < 7 ? 110 : 100;
+    }
+    Flag(&set, 5, 5);
+    mnavPolyMesh mesh;
+    CHECK(mnavBuildPolyMesh(&memory, &set, 20, 100, 100, &mesh) == mnav_success, "built");
+    CHECK(mesh.polygonCount == 8 && mesh.vertexCount == 9, "eight triangles, two of each corner");
+    int64_t area = TwiceArea(&mesh);
+    CHECK(mnavRemoveBorderVertices(&memory, &mesh, 100) == mnav_success, "ran");
+    CHECK(!HasVertex(&mesh, 5, 5) && TwiceArea(&mesh) == area, "the vertex gone, the area kept");
+    CHECK(!HasFlatPolygon(&mesh), "no polygon without area or with an edge of no length");
+    CHECK(mesh.polygonCount == 4, "the two windings' four triangles");
+    CHECK(mnavLinkPolyMesh(&memory, &mesh) == mnav_success, "linked");
+    Finish(&memory, &set, &mesh);
+}
+
 int main(void)
 {
     TestNewPolygonsCountAgainstTheLimit();
@@ -233,5 +304,6 @@ int main(void)
     TestPolygonsTouchingOnlyAtTheVertexStay();
     TestCornerOfTheOutlineStays();
     TestVertexAtTheEndOfASlitStays();
+    TestVerticesWeldedApartLeaveNoFlatPolygon();
     return s_failures == 0 ? 0 : 1;
 }
