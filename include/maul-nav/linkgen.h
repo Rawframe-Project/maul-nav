@@ -130,7 +130,7 @@ extern "C"
     ///                  the capacity.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a def
     /// not from mnavDefaultLinkGenDef, a def value NaN or below 0, a spacing of
-    /// 0 or below the navmesh\'s cell size, a detour other than 0 below 1 or
+    /// 0 or below the navmesh's cell size, a detour other than 0 below 1 or
     /// past 10^6, a kind of MNAV_LINK_KINDS or more, a tile range backward, or
     /// a filter not built from mnavDefaultQueryFilter or with a NaN cost;
     /// `mnav_errorLimit` for a def value past its MNAV_MAX_ bound, an infinity
