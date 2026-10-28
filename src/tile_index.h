@@ -46,6 +46,11 @@ struct mnavTileIndex
     mnavHostCode host;
 };
 
+// The index's host code mark, which a bake reading the index sets for
+// the whole call; NULL for NULL. An index is never changed after it is
+// made: its mark is the only field a bake writes.
+mnavHostCode* mnavTileIndexHost(const mnavTileIndex* index);
+
 // Whether an index was built for this grid and these meshes' counts.
 bool mnavTileIndexFits(const mnavTileIndex* index, const mnavBakeDef* def,
                        const mnavBakeCells* cells, const mnavTriangleMesh* meshes,

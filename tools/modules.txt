@@ -37,7 +37,7 @@ tile: allocator bytes detail fields invariant polymesh
 flight_def: bake_def fpenv scalar
 flight: allocator bake_def flight_def heightfield invariant raster
 flight_tile: allocator bytes fields flight flight_def invariant
-flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def flight_tile fpenv host_code raster
+flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def flight_tile fpenv host_code raster tile_index
 flight_volume: allocator flight flight_def flight_tile fpenv host_code
 flight_space: flight flight_volume invariant
 flight_frame: flight_volume

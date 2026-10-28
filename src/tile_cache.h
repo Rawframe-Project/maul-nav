@@ -11,6 +11,7 @@
 #include "allocator.h"
 #include "compact.h"
 #include "field_pack.h"
+#include "host_code.h"
 #include "raster.h"
 
 #include "maul-nav/bake.h"
@@ -65,8 +66,11 @@ mnavResult mnavCacheTile(mnavTileCache* cache, mnavMemory* scratch, const mnavCa
 // What the cache holds for a tile, or NULL.
 const mnavCachedTile* mnavFindCachedTile(const mnavTileCache* cache, int32_t tileX, int32_t tileZ);
 
-// Whether a call that uses the cache came back in from its allocator:
-// then one misuse is counted on it and the call refuses.
-bool mnavTileCacheCalledBack(mnavTileCache* cache);
+// Drops what the cache holds for a tile, as mnavDropCachedTile does, for
+// a call that has marked the cache itself.
+void mnavUncacheTile(mnavTileCache* cache, int32_t tileX, int32_t tileZ);
+
+// The cache's host code mark, for the calls that use it; NULL for NULL.
+mnavHostCode* mnavTileCacheHost(mnavTileCache* cache);
 
 #endif // MAUL_NAV_SRC_TILE_CACHE_H

@@ -472,8 +472,9 @@ extern "C"
     /// point with a NaN coordinate or below or above the volume;
     /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
     /// from the origin, an infinity included. Also `mnav_errorBusy` when called
-    /// back in from a clearance test whose link generation uses the context,
-    /// one misuse counted.
+    /// back in from host code a call using the context runs (a link
+    /// generation's clearance test, a hierarchy's allocator as it builds), one
+    /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and the volume is not changed during the search.
@@ -498,8 +499,9 @@ extern "C"
     /// point with a NaN coordinate or below or above the volume;
     /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
     /// from the origin, an infinity included. Also `mnav_errorBusy` when called
-    /// back in from a clearance test whose link generation uses the context,
-    /// one misuse counted.
+    /// back in from host code a call using the context runs (a link
+    /// generation's clearance test, a hierarchy's allocator as it builds), one
+    /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBeginFlightPath(mnavQuery* query,
@@ -516,8 +518,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, fewer
     /// than 1 node, or a volume other than the search's; `mnav_errorState` for
     /// no flight search begun, or a volume committed to since the search began:
-    /// begin again. Also `mnav_errorBusy` when called back in from a clearance
-    /// test whose link generation uses the context, one misuse counted.
+    /// begin again. Also `mnav_errorBusy` when called back in from host code a
+    /// call using the context runs (a link generation's clearance test, a
+    /// hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and the volume is not changed during the call.
@@ -535,8 +538,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// volume other than the search's; `mnav_errorState` for no flight search
     /// begun, or a volume committed to since the search began. Also
-    /// `mnav_errorBusy` when called back in from a clearance test whose link
-    /// generation uses the context, one misuse counted.
+    /// `mnav_errorBusy` when called back in from host code a call using the
+    /// context runs (a link generation's clearance test, a hierarchy's
+    /// allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and the volume is not changed during the call.

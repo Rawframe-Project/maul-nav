@@ -138,9 +138,9 @@ const mnavCachedTile* mnavFindCachedTile(const mnavTileCache* cache, int32_t til
     return i >= 0 ? &cache->tiles[i] : nullptr;
 }
 
-bool mnavTileCacheCalledBack(mnavTileCache* cache)
+mnavHostCode* mnavTileCacheHost(mnavTileCache* cache)
 {
-    return mnavHostCalledBack(&cache->host);
+    return cache != nullptr ? &cache->host : nullptr;
 }
 
 uint64_t mnavGetTileCacheMisuse(const mnavTileCache* cache)
@@ -148,12 +148,8 @@ uint64_t mnavGetTileCacheMisuse(const mnavTileCache* cache)
     return cache != nullptr ? mnavHostMisuse(&cache->host) : 0;
 }
 
-void mnavDropCachedTile(mnavTileCache* cache, int32_t tileX, int32_t tileZ)
+void mnavUncacheTile(mnavTileCache* cache, int32_t tileX, int32_t tileZ)
 {
-    if (cache != nullptr && mnavHostCalledBack(&cache->host))
-    {
-        return;
-    }
     int32_t i = cache != nullptr ? IndexOf(cache, tileX, tileZ) : -1;
     if (i < 0)
     {
@@ -162,6 +158,14 @@ void mnavDropCachedTile(mnavTileCache* cache, int32_t tileX, int32_t tileZ)
     Release(&cache->memory, &cache->tiles[i]);
     cache->tiles[i] = cache->tiles[cache->count - 1];
     cache->count -= 1;
+}
+
+void mnavDropCachedTile(mnavTileCache* cache, int32_t tileX, int32_t tileZ)
+{
+    if (cache != nullptr && !mnavHostCalledBack(&cache->host))
+    {
+        mnavUncacheTile(cache, tileX, tileZ);
+    }
 }
 
 uint64_t mnavGetTileCacheBytes(const mnavTileCache* cache)
@@ -236,7 +240,7 @@ mnavResult mnavCacheTile(mnavTileCache* cache, mnavMemory* scratch, const mnavCa
                          const mnavCompactField* field, const mnavBakeVolume* volumes,
                          int32_t volumeCount)
 {
-    mnavDropCachedTile(cache, tile->tileX, tile->tileZ);
+    mnavUncacheTile(cache, tile->tileX, tile->tileZ);
     if (cache->count == cache->def.limits.tiles)
     {
         return mnav_errorCapacity;

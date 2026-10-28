@@ -472,12 +472,14 @@ static void Aim(int32_t kind, void* object)
 }
 
 // Whether the call back in came and every call made was refused, each
-// counting one misuse on top of what the object had counted.
-static bool Refused(int32_t kind, uint64_t before)
+// counting one misuse on top of what the object had counted, but for
+// those allowed: calls that leave what the outer call reads alone.
+static bool Refused(int32_t kind, uint64_t before, int32_t allowed)
 {
     const int32_t calls = s_callCounts[kind];
-    return s_object == nullptr && s_made == calls && s_refused == calls - s_voidCounts[kind] &&
-           s_misuse - before == (uint64_t)calls;
+    return s_object == nullptr && s_made == calls &&
+           s_refused == calls - s_voidCounts[kind] - allowed &&
+           s_misuse - before == (uint64_t)(calls - allowed);
 }
 
 // An object of each kind destroyed, its allocator calling back in at each
@@ -496,7 +498,7 @@ static void TestDestroy(int32_t kind)
         s_freeAt = at;
         Destroy(kind, object);
         s_freeAt = -1;
-        CHECK(Refused(kind, 0), s_names[kind]);
+        CHECK(Refused(kind, 0, 0), s_names[kind]);
         CHECK(s_held == 0, s_names[kind]);
     }
 }
@@ -579,7 +581,7 @@ static void TestOuter(int32_t kind, Outcome (*outer)(void*))
         s_allocAt = ats[k];
         const Outcome got = outer(object);
         s_allocAt = -1;
-        CHECK(Refused(kind, before), s_names[kind]);
+        CHECK(Refused(kind, before, 0), s_names[kind]);
         CHECK(got.result == expected.result && got.hash == expected.hash, s_names[kind]);
         Destroy(kind, object);
         CHECK(s_held == 0, s_names[kind]);
@@ -611,10 +613,99 @@ static void TestClock(void)
     Aim(BAKER, baker);
     s_clockCalls = true;
     const Outcome got = BakeOuter(baker);
-    CHECK(Refused(BAKER, 0), "the clock's calls refused");
+    CHECK(Refused(BAKER, 0, 0), "the clock's calls refused");
     CHECK(got.result == expected.result && got.hash == expected.hash, "the same tile");
     mnavDestroyBaker(baker);
     CHECK(s_held == 0, "every byte given back");
+}
+
+// A cache and a tile index made with the C library's allocator, which a
+// call on another object reads or fills.
+static mnavTileCache* s_heldCache;
+static mnavTileIndex* s_heldIndex;
+
+static Outcome Hashed(mnavResult result, const mnavBaker* baker)
+{
+    Outcome out = {result, 0};
+    size_t size = 0;
+    if (mnavCopyBakedTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
+    {
+        out.hash = mnavHash64(0, s_bytes, (int32_t)size);
+    }
+    return out;
+}
+
+static Outcome RebuildOuter(void* object)
+{
+    return Hashed(mnavRebuildTile(object, s_heldCache, 0, 0, nullptr, 0, nullptr), object);
+}
+
+static Outcome CachedOuter(void* object)
+{
+    const mnavBakeInput input = Input();
+    return Hashed(mnavBakeTileCached(object, s_heldCache, &input, 1, 0, nullptr), object);
+}
+
+static Outcome IndexedOuter(void* object)
+{
+    mnavBakeInput input = Input();
+    input.index = s_heldIndex;
+    return Hashed(mnavBakeTile(object, &input, 1, 0, nullptr), object);
+}
+
+static Outcome FlightIndexedOuter(void* object)
+{
+    mnavBakeInput input = Input();
+    input.index = s_heldIndex;
+    Outcome out = {mnavBakeFlightTile(object, &input, 1, 0, nullptr), 0};
+    size_t size = 0;
+    if (mnavCopyFlightTile(object, s_bytes, sizeof(s_bytes), &size) == mnav_success)
+    {
+        out.hash = mnavHash64(0, s_bytes, (int32_t)size);
+    }
+    return out;
+}
+
+// An outer call on an object whose allocator calls back, at its first,
+// middle and last allocation, into another object the call reads or
+// fills: every call refused, the other object as it was, and the outer
+// call gives what it gives with no call back in.
+static void TestAcross(int32_t kind, int32_t targetKind, void* target, Outcome (*outer)(void*),
+                       int32_t allowed)
+{
+    void* plain = s_makes[kind]();
+    s_allocs = 0;
+    const Outcome expected = outer(plain);
+    const int32_t allocs = s_allocs;
+    Destroy(kind, plain);
+    CHECK(expected.result == mnav_success && allocs > 0, s_names[targetKind]);
+    const int32_t ats[3] = {0, allocs / 2, allocs - 1};
+    for (int32_t k = 0; k < 3; ++k)
+    {
+        void* object = s_makes[kind]();
+        uint64_t before = Misuse(targetKind, target);
+        Aim(targetKind, target);
+        s_allocAt = ats[k];
+        const Outcome got = outer(object);
+        s_allocAt = -1;
+        CHECK(Refused(targetKind, before, allowed), s_names[targetKind]);
+        CHECK(got.result == expected.result && got.hash == expected.hash, s_names[targetKind]);
+        Destroy(kind, object);
+        CHECK(s_held == 0, s_names[targetKind]);
+    }
+}
+
+// A context and a navmesh with the trench, made with the C library's
+// allocator, which a hierarchy's build uses.
+static mnavQuery* s_heldQuery;
+static mnavNavmesh* s_heldNavmesh;
+
+static Outcome BuildOuter(void* object)
+{
+    mnavHierarchyReport report = {0};
+    Outcome out = {mnavBuildHierarchy(object, s_heldQuery, s_heldNavmesh, nullptr, &report), 0};
+    out.hash = mnavHash64(0, &report, (int32_t)sizeof(report));
+    return out;
 }
 
 static void Setup(void)
@@ -631,6 +722,20 @@ static void Setup(void)
               mnavCopyFlightTile(baker, s_flight, sizeof(s_flight), &s_flightSize) == mnav_success,
           "a flight tile");
     mnavDestroyFlightBaker(baker);
+    mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();
+    cacheDef.limits.tiles = 4;
+    CHECK(mnavCreateTileCache(&cacheDef, &s_heldCache) == mnav_success &&
+              mnavBakeTileCached(s_plainBaker, s_heldCache, &input, 0, 0, nullptr) ==
+                  mnav_success &&
+              mnavCreateTileIndex(&def, &s_trench, 1, &s_heldIndex, nullptr) == mnav_success,
+          "a cache with a tile, and an index");
+    mnavQueryDef queryDef = mnavDefaultQueryDef();
+    CHECK(mnavCreateQuery(&queryDef, &s_heldQuery) == mnav_success &&
+              mnavCreateNavmesh(&def, &s_heldNavmesh).result == mnav_success &&
+              mnavStageTile(s_heldNavmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
+              mnavStageTile(s_heldNavmesh, s_trench1, sizeof(s_trench1)).result == mnav_success &&
+              mnavCommit(s_heldNavmesh) == mnav_success,
+          "a context, and a navmesh with the trench");
 }
 
 int main(void)
@@ -645,6 +750,20 @@ int main(void)
     TestOuter(FLIGHT_BAKER, FlightBakeOuter);
     TestOuter(VOLUME, VolumeOuter);
     TestClock();
+    // Host code calling into the other objects a call uses.
+    TestAcross(BAKER, CACHE, s_heldCache, RebuildOuter, 0);
+    TestAcross(BAKER, CACHE, s_heldCache, CachedOuter, 0);
+    TestAcross(CACHE, BAKER, s_plainBaker, CacheOuter, 0);
+    TestAcross(BAKER, INDEX, s_heldIndex, IndexedOuter, 0);
+    TestAcross(FLIGHT_BAKER, INDEX, s_heldIndex, FlightIndexedOuter, 0);
+    TestOuter(HIERARCHY, BuildOuter);
+    // The navmesh is read: staging a tile and its removal stay allowed.
+    TestAcross(HIERARCHY, QUERY, s_heldQuery, BuildOuter, 0);
+    TestAcross(HIERARCHY, NAVMESH, s_heldNavmesh, BuildOuter, 2);
+    mnavDestroyNavmesh(s_heldNavmesh);
+    mnavDestroyQuery(s_heldQuery);
+    mnavDestroyTileIndex(s_heldIndex);
+    mnavDestroyTileCache(s_heldCache);
     mnavDestroyBaker(s_plainBaker);
     return s_failures == 0 ? 0 : 1;
 }

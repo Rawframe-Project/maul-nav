@@ -46,21 +46,47 @@ static mnavResult CheckDef(const mnavHierarchyDef* def)
                : mnav_success;
 }
 
+// Marks the context and the navmesh a build or update uses while the
+// hierarchy's allocator runs: host code may change neither while the build
+// holds pointers into them. The navmesh is marked as a reader, as link
+// generation marks it.
+static void Hold(const mnavHierarchy* h)
+{
+    if (h->building != nullptr)
+    {
+        mnavHostEnter(&h->building->host);
+        mnavHostEnterReader((mnavHostCode*)&h->reading->host);
+    }
+}
+
+static void LetGo(const mnavHierarchy* h)
+{
+    if (h->building != nullptr)
+    {
+        mnavHostLeaveReader((mnavHostCode*)&h->reading->host);
+        mnavHostLeave(&h->building->host);
+    }
+}
+
 // An array of count items for the hierarchy, kept going on a failure.
 static void Take(mnavHierarchy* h, mnavResult* result, size_t count, size_t size, size_t align,
                  void** out)
 {
     if (*result == mnav_success)
     {
+        Hold(h);
         *result = mnavAllocate(&h->memory, count, size, align, out);
+        LetGo(h);
     }
 }
 
 static void Give(mnavHierarchy* h, void* block, size_t count, size_t size, size_t align)
 {
+    Hold(h);
     mnavMemory memory = h->memory;
     mnavRelease(&memory, block, count, size, align);
     h->memory = memory;
+    LetGo(h);
 }
 
 // The sizes each array is allocated with: tiles, transitions and edges.
@@ -873,6 +899,14 @@ static mnavResult Finish(mnavHierarchy* h, const mnavNavmesh* navmesh, mnavResul
     return mnav_success;
 }
 
+// Sets the context and the navmesh a build or update uses, to be marked
+// while the hierarchy's allocator runs; NULL for both when it ends.
+static void Use(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh)
+{
+    h->building = query;
+    h->reading = navmesh;
+}
+
 static MNAV_NOINLINE mnavResult BuildHierarchyWork(mnavHierarchy* hierarchy, mnavQuery* query,
                                                    const mnavNavmesh* navmesh,
                                                    const mnavQueryFilter* filter,
@@ -895,7 +929,10 @@ static MNAV_NOINLINE mnavResult BuildHierarchyWork(mnavHierarchy* hierarchy, mna
         return result;
     }
     hierarchy->filter = *usable;
-    return Finish(hierarchy, navmesh, Rebuild(hierarchy, query, navmesh), reportOut);
+    Use(hierarchy, query, navmesh);
+    result = Finish(hierarchy, navmesh, Rebuild(hierarchy, query, navmesh), reportOut);
+    Use(hierarchy, nullptr, nullptr);
+    return result;
 }
 
 mnavResult mnavBuildHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
@@ -932,15 +969,16 @@ static MNAV_NOINLINE mnavResult UpdateHierarchyWork(mnavHierarchy* hierarchy, mn
     mnavHierarchy* h = hierarchy;
     h->navmesh = nullptr;
     h->searches = 0;
-    if (h->commits == navmesh->commits)
+    Use(h, query, navmesh);
+    mnavResult result = mnav_success;
+    if (h->commits != navmesh->commits)
     {
-        return Finish(h, navmesh, mnav_success, reportOut);
+        result = !SameShape(h, navmesh) || MarkDirty(h, navmesh) ? Rebuild(h, query, navmesh)
+                                                                 : Research(h, query, navmesh);
     }
-    if (!SameShape(h, navmesh) || MarkDirty(h, navmesh))
-    {
-        return Finish(h, navmesh, Rebuild(h, query, navmesh), reportOut);
-    }
-    return Finish(h, navmesh, Research(h, query, navmesh), reportOut);
+    result = Finish(h, navmesh, result, reportOut);
+    Use(h, nullptr, nullptr);
+    return result;
 }
 
 mnavResult mnavUpdateHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,

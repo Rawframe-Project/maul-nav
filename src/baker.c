@@ -321,19 +321,38 @@ static MNAV_NOINLINE uint64_t HostNow(const mnavClock* clock)
     return now;
 }
 
-// The clock's ticks now, or 0 without a clock; the baker is marked while
-// the clock runs.
-static uint64_t Now(mnavBaker* baker)
+// The clock's ticks now, or 0 without a clock.
+static uint64_t Now(const mnavBaker* baker)
 {
     const mnavClock* clock = &baker->def.clock;
-    if (clock->now == nullptr)
-    {
-        return 0;
-    }
-    mnavHostEnter(&baker->host);
-    uint64_t now = HostNow(clock);
-    mnavHostLeave(&baker->host);
-    return now;
+    return clock->now != nullptr ? HostNow(clock) : 0;
+}
+
+// The objects a bake holds pointers into, marked for the whole call: host
+// code it runs (an allocator, the clock) may change none of them. Each is
+// NULL for none.
+typedef struct Held
+{
+    mnavHostCode* baker;
+    mnavHostCode* index;
+    mnavHostCode* cache;
+} Held;
+
+static Held Hold(mnavBaker* baker, const mnavTileIndex* index, mnavTileCache* cache)
+{
+    Held held = {baker != nullptr ? &baker->host : nullptr, mnavTileIndexHost(index),
+                 mnavTileCacheHost(cache)};
+    mnavHostEnter(held.baker);
+    mnavHostEnter(held.index);
+    mnavHostEnter(held.cache);
+    return held;
+}
+
+static void LetGo(Held held)
+{
+    mnavHostLeave(held.cache);
+    mnavHostLeave(held.index);
+    mnavHostLeave(held.baker);
 }
 
 // Ends the stage being run: its ticks and the most memory held while it
@@ -540,8 +559,8 @@ static mnavResult Finish(mnavBaker* baker, int32_t tileX, int32_t tileZ, Stages*
 }
 
 // Bakes a tile; with a cache, keeps its field before the volumes apply.
-static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t tileZ,
-                       mnavTileCache* cache, mnavBakeReport* reportOut)
+static mnavResult RunBake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t tileZ,
+                          mnavTileCache* cache, mnavBakeReport* reportOut)
 {
     mnavBakeReport report;
     if (!Start(baker, &report, reportOut))
@@ -595,8 +614,18 @@ static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t
     MNAV_ASSERT(baker->memory.used == held + (uint64_t)baker->tileSize);
     if (result != mnav_success)
     {
-        mnavDropCachedTile(cache, tileX, tileZ);
+        mnavUncacheTile(cache, tileX, tileZ);
     }
+    return result;
+}
+
+// A bake with the baker, the index it reads and the cache it fills held.
+static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t tileZ,
+                       mnavTileCache* cache, mnavBakeReport* reportOut)
+{
+    Held held = Hold(baker, in->flat ? in->outlineIndex : in->solid.index, cache);
+    mnavResult result = RunBake(baker, in, tileX, tileZ, cache, reportOut);
+    LetGo(held);
     return result;
 }
 
@@ -658,7 +687,7 @@ static MNAV_NOINLINE mnavResult BakeTileCachedWork(mnavBaker* baker, mnavTileCac
                                                    int32_t tileZ, mnavBakeReport* reportOut)
 {
     if ((baker != nullptr && mnavHostCalledBack(&baker->host)) ||
-        (cache != nullptr && mnavTileCacheCalledBack(cache)))
+        (cache != nullptr && mnavHostCalledBack(mnavTileCacheHost(cache))))
     {
         return mnav_errorBusy;
     }
@@ -706,16 +735,10 @@ static mnavResult CheckObstacles(const mnavBaker* baker, const mnavCachedTile* t
     return total > baker->def.limits.inputTriangles ? mnav_errorCapacity : mnav_success;
 }
 
-static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache* cache,
-                                                int32_t tileX, int32_t tileZ,
-                                                const mnavBakeVolume* obstacles,
-                                                int32_t obstacleCount, mnavBakeReport* reportOut)
+static mnavResult Rebuild(mnavBaker* baker, mnavTileCache* cache, int32_t tileX, int32_t tileZ,
+                          const mnavBakeVolume* obstacles, int32_t obstacleCount,
+                          mnavBakeReport* reportOut)
 {
-    if ((baker != nullptr && mnavHostCalledBack(&baker->host)) ||
-        (cache != nullptr && mnavTileCacheCalledBack(cache)))
-    {
-        return mnav_errorBusy;
-    }
     mnavBakeReport report;
     if (!Start(baker, &report, reportOut))
     {
@@ -768,6 +791,23 @@ static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache*
                 alignof(mnavBakeVolume));
     result = Finish(baker, tileX, tileZ, &stages, result, &report, reportOut);
     MNAV_ASSERT(baker->memory.used == held + (uint64_t)baker->tileSize);
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache* cache,
+                                                int32_t tileX, int32_t tileZ,
+                                                const mnavBakeVolume* obstacles,
+                                                int32_t obstacleCount, mnavBakeReport* reportOut)
+{
+    if ((baker != nullptr && mnavHostCalledBack(&baker->host)) ||
+        (cache != nullptr && mnavHostCalledBack(mnavTileCacheHost(cache))))
+    {
+        return mnav_errorBusy;
+    }
+    // The cached tile is read through the whole call.
+    Held held = Hold(baker, nullptr, cache);
+    mnavResult result = Rebuild(baker, cache, tileX, tileZ, obstacles, obstacleCount, reportOut);
+    LetGo(held);
     return result;
 }
 

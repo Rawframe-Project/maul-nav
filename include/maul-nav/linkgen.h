@@ -146,8 +146,9 @@ extern "C"
     /// and the first capacity written: at a link past MNAV_MAX_LINKS, the most
     /// a navmesh holds, or at a landing's search box meeting more than
     /// MNAV_MAX_LINK_LANDINGS polygons. Also `mnav_errorBusy` when called back
-    /// in from a clearance test whose link generation uses the context, one
-    /// misuse counted.
+    /// in from host code a call using the context runs (a link generation's
+    /// clearance test, a hierarchy's allocator as it builds), one misuse
+    /// counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and no commit runs on the navmesh. The def's clearance test runs on

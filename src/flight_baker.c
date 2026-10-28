@@ -15,6 +15,7 @@
 #include "fpenv.h"
 #include "host_code.h"
 #include "raster.h"
+#include "tile_index.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
@@ -189,7 +190,11 @@ static MNAV_NOINLINE mnavResult BakeFlightTileWork(mnavFlightBaker* baker,
     {
         DropTile(baker);
         baker->memory.peak = baker->memory.used;
+        // The index the bake reads is held through the whole call.
+        mnavHostCode* index = mnavTileIndexHost(input->index);
+        mnavHostEnter(index);
         result = Bake(baker, input, tileX, tileZ, &report);
+        mnavHostLeave(index);
         report.tileBytes = result == mnav_success ? baker->tileSize : 0;
         report.memoryPeak = baker->memory.peak;
     }
