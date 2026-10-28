@@ -241,7 +241,7 @@ static void TestChecks(void)
           "a point that is not finite");
     outline.points = far;
     checked = mnavValidateOutline(&def, &outline);
-    CHECK(checked.result == mnav_errorRange && checked.index == 2, "a point past the extent");
+    CHECK(checked.result == mnav_errorLimit && checked.index == 2, "a point past the extent");
     outline.points = fine;
     outline.pointCount = 2;
     CHECK(mnavValidateOutline(&def, &outline).result == mnav_errorInvalid, "two points");
@@ -254,7 +254,7 @@ static void TestChecks(void)
               mnavValidateOutline(&def, nullptr).result == mnav_errorInvalid,
           "fine, and NULL arguments");
     def.limits.inputTriangles = 2;
-    CHECK(mnavValidateOutline(&def, &outline).result == mnav_errorLimit, "past the limit");
+    CHECK(mnavValidateOutline(&def, &outline).result == mnav_errorCapacity, "past the limit");
     def = mnavDefaultBakeDef();
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
@@ -269,7 +269,7 @@ static void TestChecks(void)
     def.limits.tileTriangles = 3;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0, &report) ==
-                  mnav_errorLimit &&
+                  mnav_errorCapacity &&
               report.stage == mnav_stageRasterize,
           "more outlines on the tile than the limit");
     def.limits.tileTriangles = 4;

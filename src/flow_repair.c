@@ -153,8 +153,15 @@ static mnavResult Check(const mnavFlowField* field, const mnavGrid* grid, const 
 {
     if (field == nullptr || grid == nullptr || goalCount < 0 ||
         (goalCount > 0 && goals == nullptr) || changedCount < 0 ||
-        (changedCount > 0 && changed == nullptr) || field->state == mnav_flowNone ||
-        !mnavFlowSameGrid(field, grid))
+        (changedCount > 0 && changed == nullptr))
+    {
+        return mnav_errorInvalid;
+    }
+    if (field->state == mnav_flowNone)
+    {
+        return mnav_errorState;
+    }
+    if (!mnavFlowSameGrid(field, grid))
     {
         return mnav_errorInvalid;
     }
@@ -166,7 +173,7 @@ static mnavResult Check(const mnavFlowField* field, const mnavGrid* grid, const 
             return mnav_errorInvalid;
         }
     }
-    return field->state == mnav_flowWorking ? mnav_errorStale : mnav_success;
+    return field->state != mnav_flowEnded ? mnav_errorState : mnav_success;
 }
 
 // Marks the new goals, raises the old ones no longer goals, and keeps the

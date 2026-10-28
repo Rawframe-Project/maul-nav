@@ -154,7 +154,7 @@ static void TestChecks(mnavBaker* baker)
     CHECK(Refused(baker, &t, mnav_errorInvalid, mnav_elementNone) == -1, "one column");
     t = good;
     t.rows = MNAV_MAX_TERRAIN_SIDE + 1;
-    CHECK(Refused(baker, &t, mnav_errorInvalid, mnav_elementNone) == -1, "too many rows");
+    CHECK(Refused(baker, &t, mnav_errorLimit, mnav_elementNone) == -1, "too many rows");
     t = good;
     t.spacingZ = 0.0f;
     CHECK(Refused(baker, &t, mnav_errorInvalid, mnav_elementNone) == -1, "no spacing");
@@ -171,11 +171,11 @@ static void TestChecks(mnavBaker* baker)
     CHECK(Refused(baker, &good, mnav_errorInvalid, mnav_elementSample) == 77, "a NaN height");
     s_terrainHeights[77] = 0.0f;
     s_terrainHeights[78] = 1e9f;
-    CHECK(Refused(baker, &good, mnav_errorRange, mnav_elementSample) == 78, "a height too far");
+    CHECK(Refused(baker, &good, mnav_errorLimit, mnav_elementSample) == 78, "a height too far");
     s_terrainHeights[78] = 0.0f;
     t = good;
     t.spacingX = 1e7f;
-    CHECK(Refused(baker, &t, mnav_errorRange, mnav_elementSample) == 1, "a sample too far");
+    CHECK(Refused(baker, &t, mnav_errorLimit, mnav_elementSample) == 1, "a sample too far");
     memset(s_areas, mnav_areaWalkable, sizeof(s_areas));
     s_areas[5] = MNAV_AREA_TYPES;
     t = good;
@@ -196,7 +196,7 @@ static void TestLimits(void)
     mnavTerrain terrain = Terrain();
     const mnavBakeInput input = {nullptr, 0, &terrain, 1, nullptr, 0, nullptr};
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &input, 0, 0, &report) == mnav_errorLimit && report.mesh == 0,
+    CHECK(mnavBakeTile(baker, &input, 0, 0, &report) == mnav_errorCapacity && report.mesh == 0,
           "one triangle over the input limit");
     // A mesh's triangles and a terrain's count together.
     mnavTriangleMesh mesh = Mesh(&terrain);
@@ -206,13 +206,13 @@ static void TestLimits(void)
     mnavDestroyBaker(baker);
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success &&
-              mnavBakeTile(baker, &both, 0, 0, &report) == mnav_errorLimit,
+              mnavBakeTile(baker, &both, 0, 0, &report) == mnav_errorCapacity,
           "a mesh's and a terrain's triangles together over the input limit");
     mnavDestroyBaker(baker);
     def = mnavDefaultBakeDef();
     def.limits.tileTriangles = 100;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
-    CHECK(mnavBakeTile(baker, &input, 0, 0, &report) == mnav_errorLimit &&
+    CHECK(mnavBakeTile(baker, &input, 0, 0, &report) == mnav_errorCapacity &&
               report.stage == mnav_stageRasterize,
           "over the tile's triangle limit");
     mnavDestroyBaker(baker);

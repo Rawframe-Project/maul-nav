@@ -48,9 +48,9 @@ mnavAttachment mnavAttachmentOf(uint64_t key)
                             (int32_t)(key >> 1 & ((1u << LINK_BITS) - 1)), (key & 1u) != 0};
 }
 
-static bool FinitePoint(mnavPos3 p)
+static bool HasNaN(mnavPos3 p)
 {
-    return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
+    return isnan(p.x) || isnan(p.y) || isnan(p.z);
 }
 
 // The slot an id names, or the reason it names none; links in their last
@@ -88,20 +88,23 @@ static bool InExtent(const mnavNavmesh* navmesh, mnavPos3 p)
 
 static mnavResult CheckDef(const mnavNavmesh* navmesh, const mnavLinkDef* def)
 {
-    if (!FinitePoint(def->start) || !FinitePoint(def->end))
+    if (HasNaN(def->start) || HasNaN(def->end))
     {
         return mnav_errorInvalid;
     }
     if (!InExtent(navmesh, def->start) || !InExtent(navmesh, def->end))
     {
-        return mnav_errorRange;
+        return mnav_errorLimit;
     }
-    bool radius = def->radius >= 0.0f && def->radius <= MNAV_MAX_LINK_RADIUS;
-    bool cost = def->cost >= 0.0f && def->cost <= MNAV_MAX_LINK_COST;
-    bool width = def->width >= 0.0f && def->width <= MNAV_MAX_LINK_WIDTH;
-    if (!(radius && cost && width && def->kind < MNAV_LINK_KINDS))
+    if (!(def->radius >= 0.0f && def->cost >= 0.0f && def->width >= 0.0f) ||
+        def->kind >= MNAV_LINK_KINDS)
     {
-        return mnav_errorRange;
+        return mnav_errorInvalid;
+    }
+    if (def->radius > MNAV_MAX_LINK_RADIUS || def->cost > MNAV_MAX_LINK_COST ||
+        def->width > MNAV_MAX_LINK_WIDTH)
+    {
+        return mnav_errorLimit;
     }
     // An edge link needs a direction on the ground: ends so near that the
     // square of their distance rounds to 0 give none.
@@ -178,7 +181,7 @@ static MNAV_NOINLINE mnavResult StageLinkWork(mnavNavmesh* navmesh, const mnavLi
     int32_t n = Crossings(navmesh, def);
     if (navmesh->linksHeld + n > navmesh->def.limits.links)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     // The crossings take the lowest free slots, then new ones; a key holds
     // slots below the limit, MNAV_MAX_LINKS, which only worn slots can
@@ -320,7 +323,7 @@ static MNAV_NOINLINE mnavResult GetLinkWork(const mnavNavmesh* navmesh, mnavLink
     mnavResult result = Find(navmesh, id, &s);
     if (result == mnav_success && navmesh->links[s].phase == MNAV_LINK_ADDING)
     {
-        result = mnav_errorNotLoaded;
+        result = mnav_errorState;
     }
     *stateOut = (mnavLinkState){0};
     if (result != mnav_success)

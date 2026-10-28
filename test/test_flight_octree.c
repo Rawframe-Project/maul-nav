@@ -323,7 +323,7 @@ static void TestPayloadStructure(void)
         }
         Rehash(size);
         mnavTileResult got = StageBad(size);
-        bool right = got.result == mnav_errorInvalid && got.section == cases[k].section &&
+        bool right = got.result == mnav_errorFormat && got.section == cases[k].section &&
                      got.index == cases[k].index;
         printf("case %zu: section %d, element %d\n", k, got.section, got.index);
         wrong += right ? 0 : 1;

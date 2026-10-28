@@ -34,7 +34,7 @@ mnavResult searched =
 
 ## Spreading searches over frames
 
-- **Sliced searches.** `mnavBeginPath`, then `mnavContinuePath` with a budget of nodes each frame, then `mnavFinishPath`. The result is the one `mnavFindPath` gives, bit for bit, for any budgets. A commit in between makes the search stale (`mnav_errorStale`); begin it again.
+- **Sliced searches.** `mnavBeginPath`, then `mnavContinuePath` with a budget of nodes each frame, then `mnavFinishPath`. The result is the one `mnavFindPath` gives, bit for bit, for any budgets. A commit in between leaves the search out of date (`mnav_errorState`); begin it again.
 - **Long paths.** On a large world a long search needs many nodes. A hierarchy groups tiles into clusters and keeps the costs between their entrances: `mnavCreateHierarchy` and `mnavBuildHierarchy` once, `mnavUpdateHierarchy` after commits (it redoes only what an area change touched), and `mnavFindHierarchicalPath` with a small node budget. Its paths are close to the cheapest, not always the cheapest; on test worlds most come within 2% of the plain search's.
 
 ## Spatial queries

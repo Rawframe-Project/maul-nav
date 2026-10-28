@@ -94,7 +94,8 @@ static mnavPos2 Pos(Reader* r)
 
 static bool Typed(mnavResult result)
 {
-    return result == mnav_success || result == mnav_errorInvalid || result == mnav_errorLimit;
+    return result == mnav_success || result == mnav_errorInvalid || result == mnav_errorLimit ||
+           result == mnav_errorCapacity;
 }
 
 static mnavAgent s_agents[MOST_AGENTS];
@@ -199,9 +200,10 @@ static void Space(Reader* r, mnavAvoidance* avoidance)
                               s_lines,         1 << 14,    0};
     mnavResult drawn =
         mnavDebugAvoidance3D(avoidance, s_fliers, agents, s_spheres, spheres, &buffer);
-    Expect(Typed(drawn) || drawn == mnav_errorCapacity);
-    Expect(!GoodStep(step) ||
-           (drawn == mnav_errorCapacity ? result == mnav_success : drawn == result));
+    Expect(Typed(drawn));
+    // A full buffer is mnav_errorCapacity too.
+    Expect(!GoodStep(step) || drawn == result ||
+           (drawn == mnav_errorCapacity && result == mnav_success));
     if (result != mnav_success)
     {
         return;
@@ -283,7 +285,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     mnavDebugBuffer buffer = {{0.0, 0.0, 0.0}, s_vertices, 1 << 14, 0, nullptr, 0, 0,
                               s_lines,         1 << 14,    0};
     mnavResult drawn = mnavDebugAvoidance(avoidance, s_agents, agents, Value(&r), &buffer);
-    Expect(Typed(drawn) || drawn == mnav_errorCapacity);
+    Expect(Typed(drawn));
     if (r.at < r.size)
     {
         Space(&r, avoidance);

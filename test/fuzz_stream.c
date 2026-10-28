@@ -67,7 +67,8 @@ static mnavPos3 Point(Reader* r)
 
 static bool Typed(mnavResult result)
 {
-    return result <= mnav_success && result >= mnav_errorTier;
+    // Every status the library defines has a name.
+    return strcmp(mnavResultName(result), "unknown result") != 0;
 }
 
 static bool Finite(mnavPos3 p)

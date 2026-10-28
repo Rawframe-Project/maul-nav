@@ -67,5 +67,5 @@ mnavResult mnavCheckSolidInput(const mnavBakeDef* def, const mnavBakeInput* inpu
         }
         total += input->volumes[i].pointCount;
     }
-    return total > def->limits.inputTriangles ? mnav_errorLimit : mnav_success;
+    return total > def->limits.inputTriangles ? mnav_errorCapacity : mnav_success;
 }

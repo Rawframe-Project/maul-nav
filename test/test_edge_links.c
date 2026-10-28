@@ -182,7 +182,7 @@ static void TestLimitsAndToggles(mnavQuery* query)
     CHECK(mnavStageLink(navmesh, &def, &point) == mnav_success, "a point link");
     def = Ledge(10.0, 16.0f);
     CHECK(mnavStageLink(navmesh, &def, &edge) == mnav_success &&
-              mnavStageLink(navmesh, &def, &more) == mnav_errorLimit,
+              mnavStageLink(navmesh, &def, &more) == mnav_errorCapacity,
           "crossings count toward the limit");
     // Refused whole: the 6 slots left still take 6 point links, not 7.
     mnavLinkId points[7];
@@ -237,11 +237,11 @@ static void TestChecks(void)
     mnavNavmesh* navmesh = Load(4096, mnav_tierStatic);
     mnavLinkId id;
     mnavLinkDef def = Ledge(10.0, -1.0f);
-    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_errorRange, "a negative width");
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_errorInvalid, "a negative width");
     def.width = (float)NAN;
-    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_errorRange, "no width");
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_errorInvalid, "no width");
     def.width = MNAV_MAX_LINK_WIDTH * 1.01f;
-    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_errorRange, "too wide");
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_errorLimit, "too wide");
     // A ladder straight up: a point link only.
     def = (mnavLinkDef){{5, 0, 5}, {5, 3, 5}, 0.5f, 1.0f, mnav_linkLadder, true, 2.0f};
     CHECK(mnavStageLink(navmesh, &def, &id) == mnav_errorInvalid, "an edge link straight up");

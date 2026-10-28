@@ -254,7 +254,7 @@ static MNAV_NOINLINE mnavResult CorridorCornersWork(mnavQuery* query, const mnav
     }
     if (corridor->count > query->limits.nodes)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     // Every link kind: the corridor came from a search that chose them.
     const mnavQueryFilter* all = nullptr;

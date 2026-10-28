@@ -129,15 +129,18 @@ extern "C"
     /// @param countOut  Receives the number of links generated, also beyond
     ///                  the capacity.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a def
-    /// not from mnavDefaultLinkGenDef, a spacing below the navmesh's cell
-    /// size, a tile range backward, or a filter not built from
-    /// mnavDefaultQueryFilter; `mnav_errorRange` for a def value or filter
-    /// cost out of its range; `mnav_errorCapacity` when more links were
-    /// generated than the buffer holds, the first capacity written;
-    /// `mnav_errorLimit` when generation stops, the links found so far
-    /// counted and the first capacity written: at a link past
-    /// MNAV_MAX_LINKS, the most a navmesh holds, or at a landing's search
-    /// box meeting more than MNAV_MAX_LINK_LANDINGS polygons.
+    /// not from mnavDefaultLinkGenDef, a def value NaN or below 0, a spacing of
+    /// 0 or below the navmesh\'s cell size, a detour other than 0 below 1 or
+    /// past 10^6, a kind of MNAV_LINK_KINDS or more, a tile range backward, or
+    /// a filter not built from mnavDefaultQueryFilter or with a NaN cost;
+    /// `mnav_errorLimit` for a def value past its MNAV_MAX_ bound, an infinity
+    /// included, or a filter cost past MNAV_MIN_AREA_COST or
+    /// MNAV_MAX_AREA_COST, an infinity included; `mnav_errorCapacity` when more
+    /// links were generated than the buffer holds, the first capacity written;
+    /// `mnav_errorLimit` when generation stops, the links found so far counted
+    /// and the first capacity written: at a link past MNAV_MAX_LINKS, the most
+    /// a navmesh holds, or at a landing's search box meeting more than
+    /// MNAV_MAX_LINK_LANDINGS polygons.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and no commit runs on the navmesh. The def's clearance test runs on

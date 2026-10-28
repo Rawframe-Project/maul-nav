@@ -49,10 +49,13 @@ static MNAV_NOINLINE mnavResult CreateTileCacheWork(const mnavTileCacheDef* def,
     {
         return mnav_errorInvalid;
     }
-    if (def->limits.tiles < 1 || def->limits.tiles > MNAV_MAX_CACHED_TILES ||
-        def->limits.memoryBytes < 1)
+    if (def->limits.tiles < 1 || def->limits.memoryBytes < 1)
     {
-        return mnav_errorRange;
+        return mnav_errorInvalid;
+    }
+    if (def->limits.tiles > MNAV_MAX_CACHED_TILES)
+    {
+        return mnav_errorLimit;
     }
     mnavMemory memory = mnavMakeMemory(def->allocator, def->limits.memoryBytes);
     mnavTileCache* cache = nullptr;
@@ -214,7 +217,7 @@ mnavResult mnavCacheTile(mnavTileCache* cache, mnavMemory* scratch, const mnavCa
     mnavDropCachedTile(cache, tile->tileX, tile->tileZ);
     if (cache->count == cache->def.limits.tiles)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     // The volumes kept are marked in the cache's memory for the while.
     bool* keep = nullptr;

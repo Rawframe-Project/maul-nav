@@ -285,17 +285,17 @@ static void TestChecks(void)
     mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
     mnavAvoidance* avoidance = nullptr;
     def.limits.neighbors = 0;
-    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorRange && avoidance == nullptr,
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid && avoidance == nullptr,
           "no neighbours");
     def = mnavDefaultAvoidanceDef();
     def.timeHorizon = 0.0;
-    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorRange, "no horizon");
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorLimit, "no horizon");
     def = mnavDefaultAvoidanceDef();
     def.neighborDistance = (double)INFINITY;
-    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorRange, "an endless range");
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid, "an endless range");
     def = mnavDefaultAvoidanceDef();
     def.limits.agents = MNAV_MAX_AVOIDANCE_AGENTS + 1;
-    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorRange, "too many agents");
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorLimit, "too many agents");
     def = mnavDefaultAvoidanceDef();
     def.cookie = 0;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid &&
@@ -305,12 +305,12 @@ static void TestChecks(void)
     avoidance = Make(2, 4, 2.0);
     mnavAgent agents[3] = {Agent(0.0, 0.0, 1), Agent(3.0, 0.0, 2), Agent(6.0, 0.0, 3)};
     mnavPos2 velocities[3];
-    CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.1, velocities) == mnav_errorLimit,
+    CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.1, velocities) == mnav_errorCapacity,
           "more agents than the limit");
     CHECK(mnavAvoid(avoidance, agents, 0, nullptr, 0, 0.1, nullptr) == mnav_success, "none at all");
-    CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.0, velocities) == mnav_errorInvalid &&
+    CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.0, velocities) == mnav_errorLimit &&
               mnavAvoid(avoidance, agents, 2, nullptr, 0, MNAV_MIN_AVOIDANCE_TIME * 0.5,
-                        velocities) == mnav_errorInvalid &&
+                        velocities) == mnav_errorLimit &&
               mnavAvoid(avoidance, agents, -1, nullptr, 0, 0.1, velocities) == mnav_errorInvalid &&
               mnavAvoid(avoidance, nullptr, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid &&
               mnavAvoid(nullptr, agents, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid,
@@ -336,7 +336,10 @@ static void TestChecks(void)
         broken[1].velocity.y = k == 7 ? bad[k] : broken[1].velocity.y;
         broken[1].preferred.x = k == 8 ? bad[k] : broken[1].preferred.x;
         broken[1].priority = k == 3 ? bad[k] : broken[1].priority;
-        CHECK(mnavAvoid(avoidance, broken, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid,
+        // Not finite, a radius of 0, a negative speed or a priority of 0
+        // is wrong; past an MNAV_MAX_AVOIDANCE_ value is a bound.
+        mnavResult refused = k < 4 ? mnav_errorInvalid : mnav_errorLimit;
+        CHECK(mnavAvoid(avoidance, broken, 2, nullptr, 0, 0.1, velocities) == refused,
               "a broken agent");
     }
     mnavDestroyAvoidance(avoidance);
@@ -593,13 +596,15 @@ static void TestObstacleChecks(void)
         {square, 4, 0.0, {0.0, -fast}, 1, 0}};
     for (int32_t k = 0; k < 7; ++k)
     {
-        CHECK(mnavAvoid(avoidance, &agent, 1, &bad[k], 1, 0.1, &velocity) == mnav_errorInvalid,
+        // The last two pass an MNAV_MAX_AVOIDANCE_ bound.
+        mnavResult refused = k < 5 ? mnav_errorInvalid : mnav_errorLimit;
+        CHECK(mnavAvoid(avoidance, &agent, 1, &bad[k], 1, 0.1, &velocity) == refused,
               "a bad obstacle");
     }
     const mnavObstacle two[2] = {{square, 4, 0.0, {0.0, 0.0}, 1, 0},
                                  {&point, 1, 0.5, {0.0, 0.0}, 2, 0}};
     CHECK(mnavAvoid(avoidance, &agent, 1, two, 1, 0.1, &velocity) == mnav_success &&
-              mnavAvoid(avoidance, &agent, 1, two, 2, 0.1, &velocity) == mnav_errorLimit,
+              mnavAvoid(avoidance, &agent, 1, two, 2, 0.1, &velocity) == mnav_errorCapacity,
           "four points, then five past the limit");
     CHECK(mnavAvoid(avoidance, &agent, 1, nullptr, 1, 0.1, &velocity) == mnav_errorInvalid &&
               mnavAvoid(avoidance, &agent, 1, two, -1, 0.1, &velocity) == mnav_errorInvalid,
@@ -607,13 +612,19 @@ static void TestObstacleChecks(void)
     mnavDestroyAvoidance(avoidance);
     def = mnavDefaultAvoidanceDef();
     def.obstacleTimeHorizon = 0.0;
-    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorRange, "no obstacle horizon");
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorLimit, "no obstacle horizon");
+    // Minus infinity is below MNAV_MIN_AVOIDANCE_TIME; plus infinity passes
+    // no bound and is wrong.
+    def.obstacleTimeHorizon = -(double)INFINITY;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorLimit, "a horizon of minus infinity");
+    def.obstacleTimeHorizon = (double)INFINITY;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid, "an endless horizon");
     def = mnavDefaultAvoidanceDef();
     def.limits.obstacleNeighbors = 0;
-    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorRange, "no obstacle neighbours");
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid, "no obstacle neighbours");
     def = mnavDefaultAvoidanceDef();
     def.obstacleTimeHorizon = MNAV_MIN_AVOIDANCE_TIME * 0.5;
-    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorRange,
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorLimit,
           "an obstacle horizon under the shortest");
 }
 

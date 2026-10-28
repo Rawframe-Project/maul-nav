@@ -90,7 +90,7 @@ static void TestNewPolygonsCountAgainstTheLimit(void)
     mnavContourSet set = Rings(&memory, points, counts, 2);
     Flag(&set, 5, 0);
     mnavPolyMesh mesh;
-    CHECK(Run(&memory, &set, 1, &mesh) == mnav_errorLimit, "two polygons past a limit of one");
+    CHECK(Run(&memory, &set, 1, &mesh) == mnav_errorCapacity, "two polygons past a limit of one");
     mnavReleasePolyMesh(&memory, &mesh);
     CHECK(Run(&memory, &set, 2, &mesh) == mnav_success, "at the limit");
     Finish(&memory, &set, &mesh);

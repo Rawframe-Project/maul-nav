@@ -70,11 +70,18 @@ struct mnavNavFlow
     bool ended;
 };
 
-static bool GoodLimits(const mnavNavFlowLimits* l)
+// The def's limits: mnav_errorInvalid below 1, mnav_errorLimit past their
+// MNAV_MAX_ values.
+static mnavResult CheckLimits(const mnavNavFlowLimits* l)
 {
-    return l->polygons >= 1 && l->polygons <= MNAV_MAX_NAVFLOW_POLYGONS && l->tiles >= 1 &&
-           l->tiles <= MNAV_MAX_NAVFLOW_TILES && l->links >= 1 &&
-           l->links <= MNAV_MAX_NAVFLOW_LINKS;
+    if (l->polygons < 1 || l->tiles < 1 || l->links < 1)
+    {
+        return mnav_errorInvalid;
+    }
+    return l->polygons > MNAV_MAX_NAVFLOW_POLYGONS || l->tiles > MNAV_MAX_NAVFLOW_TILES ||
+                   l->links > MNAV_MAX_NAVFLOW_LINKS
+               ? mnav_errorLimit
+               : mnav_success;
 }
 
 // The landing array's length: two attachments a link, and scratch.
@@ -102,9 +109,10 @@ static MNAV_NOINLINE mnavResult CreateNavFlowWork(const mnavNavFlowDef* def, mna
     {
         return mnav_errorInvalid;
     }
-    if (!GoodLimits(&def->limits))
+    mnavResult checked = CheckLimits(&def->limits);
+    if (checked != mnav_success)
     {
-        return mnav_errorRange;
+        return checked;
     }
     mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
     mnavNavFlow* f = nullptr;
@@ -423,7 +431,7 @@ static mnavResult Index(mnavNavFlow* f, const mnavNavmesh* navmesh)
     int32_t count = navmesh->attachmentCount;
     mnavResult result = navmesh->slotCount > f->def.limits.tiles ||
                                 (int64_t)count > 2 * (int64_t)f->def.limits.links
-                            ? mnav_errorLimit
+                            ? mnav_errorCapacity
                             : mnav_success;
     int64_t total = 0;
     for (int32_t s = 0; result == mnav_success && s < navmesh->slotCount; ++s)
@@ -432,7 +440,7 @@ static mnavResult Index(mnavNavFlow* f, const mnavNavmesh* navmesh)
         total += InRegion(f, navmesh, s) ? navmesh->slots[s].tile->mesh.polygonCount : 0;
         if (total > f->def.limits.polygons)
         {
-            result = mnav_errorLimit;
+            result = mnav_errorCapacity;
         }
     }
     if (result != mnav_success)
@@ -536,16 +544,33 @@ mnavResult mnavBeginNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
     return result;
 }
 
-static MNAV_NOINLINE mnavResult ContinueNavFlowWork(mnavNavFlow* field, const mnavNavmesh* navmesh,
-                                                    int32_t polygons, bool* endedOut)
+// Whether the field was built on this navmesh, unchanged since:
+// mnav_errorState for none built or a commit to the navmesh since,
+// mnav_errorInvalid for another navmesh.
+static mnavResult Built(const mnavNavFlow* field, const mnavNavmesh* navmesh)
 {
-    if (field == nullptr || navmesh == nullptr || field->navmesh == nullptr || polygons < 1)
+    if (field->navmesh == nullptr)
+    {
+        return mnav_errorState;
+    }
+    if (field->navmesh != navmesh)
     {
         return mnav_errorInvalid;
     }
-    if (navmesh != field->navmesh || navmesh->commits != field->commits)
+    return field->commits == navmesh->commits ? mnav_success : mnav_errorState;
+}
+
+static MNAV_NOINLINE mnavResult ContinueNavFlowWork(mnavNavFlow* field, const mnavNavmesh* navmesh,
+                                                    int32_t polygons, bool* endedOut)
+{
+    if (field == nullptr || navmesh == nullptr || polygons < 1)
     {
-        return mnav_errorStale;
+        return mnav_errorInvalid;
+    }
+    mnavResult built = Built(field, navmesh);
+    if (built != mnav_success)
+    {
+        return built;
     }
     for (int32_t n = 0; n < polygons && field->heapCount > 0; ++n)
     {
@@ -596,15 +621,16 @@ mnavResult mnavBuildNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
 static MNAV_NOINLINE mnavResult NavFlowAtWork(const mnavNavFlow* field, const mnavNavmesh* navmesh,
                                               mnavPolygonId polygon, mnavPolygonFlow* flowOut)
 {
-    if (field == nullptr || navmesh == nullptr || flowOut == nullptr || field->navmesh == nullptr)
+    if (field == nullptr || navmesh == nullptr || flowOut == nullptr)
     {
         return mnav_errorInvalid;
     }
-    if (navmesh != field->navmesh || navmesh->commits != field->commits)
+    mnavResult result = Built(field, navmesh);
+    if (result != mnav_success)
     {
-        return mnav_errorStale;
+        return result;
     }
-    mnavResult result = mnavCheckPolygon(navmesh, polygon);
+    result = mnavCheckPolygon(navmesh, polygon);
     if (result != mnav_success)
     {
         return result;
@@ -615,7 +641,7 @@ static MNAV_NOINLINE mnavResult NavFlowAtWork(const mnavNavFlow* field, const mn
     }
     if (!field->ended)
     {
-        return mnav_errorStale;
+        return mnav_errorState;
     }
     const Way* way = &field->ways[field->firsts[polygon.slot - 1] + (int32_t)polygon.polygon];
     *flowOut = (mnavPolygonFlow){way->cost, {0, 0, 0}, way->left, way->right, {0, 0}};
@@ -691,9 +717,14 @@ static MNAV_NOINLINE mnavResult DebugNavFlowWork(const mnavNavFlow* field,
     {
         return mnav_success;
     }
-    if (navmesh != field->navmesh || navmesh->commits != field->commits || !field->ended)
+    mnavResult result = Built(field, navmesh);
+    if (result != mnav_success)
     {
-        return mnav_errorStale;
+        return result;
+    }
+    if (!field->ended)
+    {
+        return mnav_errorState;
     }
     for (int32_t s = 0; s < navmesh->slotCount; ++s)
     {

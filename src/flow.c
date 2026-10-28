@@ -49,9 +49,13 @@ static MNAV_NOINLINE mnavResult CreateFlowFieldWork(const mnavFlowFieldDef* def,
     {
         return mnav_errorInvalid;
     }
-    if (def->cells < 1 || def->cells > MNAV_MAX_FLOW_CELLS)
+    if (def->cells < 1)
     {
-        return mnav_errorRange;
+        return mnav_errorInvalid;
+    }
+    if (def->cells > MNAV_MAX_FLOW_CELLS)
+    {
+        return mnav_errorLimit;
     }
     mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
     mnavFlowField* f = nullptr;
@@ -307,9 +311,8 @@ static void Expand(const mnavFlowSearch* s, int32_t cell)
 
 static bool GoodGrid(const mnavGrid* grid)
 {
-    return grid->areas != nullptr && grid->width >= 1 && grid->width <= MNAV_MAX_GRID_SIDE &&
-           grid->height >= 1 && grid->height <= MNAV_MAX_GRID_SIDE && isfinite(grid->cellSize) &&
-           grid->cellSize > 0.0f;
+    return grid->areas != nullptr && grid->width >= 1 && grid->height >= 1 &&
+           isfinite(grid->cellSize) && grid->cellSize > 0.0f;
 }
 
 static bool GoodGoals(const mnavGrid* grid, const mnavCell* goals, int32_t count)
@@ -340,9 +343,13 @@ static mnavResult Check(mnavFlowField* field, const mnavGrid* grid, const mnavFl
     {
         return mnav_errorInvalid;
     }
+    if (grid->width > MNAV_MAX_GRID_SIDE || grid->height > MNAV_MAX_GRID_SIDE)
+    {
+        return mnav_errorLimit;
+    }
     int64_t cells = region != nullptr ? (int64_t)region->width * (int64_t)region->height
                                       : (int64_t)grid->width * (int64_t)grid->height;
-    return cells > (int64_t)field->def.cells ? mnav_errorLimit : mnav_success;
+    return cells > (int64_t)field->def.cells ? mnav_errorCapacity : mnav_success;
 }
 
 static MNAV_NOINLINE mnavResult BeginFlowFieldWork(mnavFlowField* field, const mnavGrid* grid,
@@ -422,8 +429,15 @@ bool mnavFlowSameGrid(const mnavFlowField* f, const mnavGrid* grid)
 static MNAV_NOINLINE mnavResult ContinueFlowFieldWork(mnavFlowField* field, const mnavGrid* grid,
                                                       int32_t cells, bool* endedOut)
 {
-    if (field == nullptr || grid == nullptr || field->state == mnav_flowNone || cells < 1 ||
-        !mnavFlowSameGrid(field, grid))
+    if (field == nullptr || grid == nullptr || cells < 1)
+    {
+        return mnav_errorInvalid;
+    }
+    if (field->state == mnav_flowNone)
+    {
+        return mnav_errorState;
+    }
+    if (!mnavFlowSameGrid(field, grid))
     {
         return mnav_errorInvalid;
     }
@@ -476,9 +490,13 @@ mnavResult mnavBuildFlowField(mnavFlowField* field, const mnavGrid* grid,
 static MNAV_NOINLINE mnavResult FlowAtWork(const mnavFlowField* field, mnavCell cell,
                                            mnavFlow* flowOut)
 {
-    if (field == nullptr || flowOut == nullptr || field->state == mnav_flowNone)
+    if (field == nullptr || flowOut == nullptr)
     {
         return mnav_errorInvalid;
+    }
+    if (field->state == mnav_flowNone)
+    {
+        return mnav_errorState;
     }
     const mnavFlowRegion* r = &field->region;
     if (cell.x < r->x || cell.y < r->y || cell.x >= r->x + r->width || cell.y >= r->y + r->height)
@@ -487,7 +505,7 @@ static MNAV_NOINLINE mnavResult FlowAtWork(const mnavFlowField* field, mnavCell 
     }
     if (field->state != mnav_flowEnded)
     {
-        return mnav_errorStale;
+        return mnav_errorState;
     }
     int32_t at = (cell.y - r->y) * r->width + (cell.x - r->x);
     int32_t next = field->next[at];
@@ -512,7 +530,7 @@ static MNAV_NOINLINE mnavResult DebugFlowFieldWork(const mnavFlowField* field, d
     }
     if (field->state == mnav_flowWorking)
     {
-        return mnav_errorStale;
+        return mnav_errorState;
     }
     const mnavFlowRegion* r = &field->region;
     int32_t cells = field->state == mnav_flowEnded ? r->width * r->height : 0;

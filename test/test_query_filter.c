@@ -178,18 +178,21 @@ static void TestFiltersAreChecked(void)
     mnavPath path;
     mnavRay ray;
     filter.costs[5] = 0.0f;
-    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorRange &&
+    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorLimit &&
               mnavFindPath(query, navmesh, &filter, a.polygon, a.point, a.polygon, a.point,
-                           &path) == mnav_errorRange &&
+                           &path) == mnav_errorLimit &&
               mnavRaycast(query, navmesh, &filter, a.polygon, a.point, a.point, &ray) ==
-                  mnav_errorRange,
+                  mnav_errorLimit,
           "a cost of 0");
     filter.costs[5] = NAN;
-    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorRange,
+    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorInvalid,
           "a NaN cost");
     filter.costs[5] = MNAV_MAX_AREA_COST * 2.0f;
-    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorRange,
+    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorLimit,
           "too dear");
+    filter.costs[5] = INFINITY;
+    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorLimit,
+          "an infinite cost, past the bound");
     filter.costs[5] = MNAV_MIN_AREA_COST;
     filter.costs[6] = MNAV_MAX_AREA_COST;
     CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_success,

@@ -244,13 +244,14 @@ static void TestChecks(void)
     mnavFlowField* field = Make(100);
     mnavFlow flow;
     const mnavCell goal = {1, 1};
-    CHECK(mnavFlowAt(field, goal, &flow) == mnav_errorInvalid, "nothing built");
-    CHECK(mnavBuildFlowField(field, &grid, nullptr, &goal, 1) == mnav_errorLimit, "too many cells");
+    CHECK(mnavFlowAt(field, goal, &flow) == mnav_errorState, "nothing built");
+    CHECK(mnavBuildFlowField(field, &grid, nullptr, &goal, 1) == mnav_errorCapacity,
+          "too many cells");
     grid.width = 101;
     grid.height = 1;
     CHECK(mnavBuildFlowField(field, &grid, nullptr, &goal, 1) == mnav_errorInvalid, "goal off");
     const mnavCell first = {0, 0};
-    CHECK(mnavBuildFlowField(field, &grid, nullptr, &first, 1) == mnav_errorLimit,
+    CHECK(mnavBuildFlowField(field, &grid, nullptr, &first, 1) == mnav_errorCapacity,
           "one cell past the limit");
     grid.width = 10;
     grid.height = 10;
@@ -261,7 +262,7 @@ static void TestChecks(void)
           "cells inside the grid");
     const mnavCell outside = {10, 3};
     CHECK(mnavBuildFlowField(field, &grid, nullptr, &outside, 1) == mnav_errorInvalid &&
-              mnavFlowAt(field, goal, &flow) == mnav_errorInvalid,
+              mnavFlowAt(field, goal, &flow) == mnav_errorState,
           "a goal outside; the field holds no grid after");
     CHECK(mnavBuildFlowField(field, &grid, nullptr, nullptr, 1) == mnav_errorInvalid &&
               mnavBuildFlowField(field, &grid, nullptr, &goal, -1) == mnav_errorInvalid &&
@@ -276,16 +277,19 @@ static void TestChecks(void)
     bad = grid;
     bad.areas = nullptr;
     CHECK(mnavBuildFlowField(field, &bad, nullptr, &goal, 1) == mnav_errorInvalid, "no areas");
+    bad = grid;
+    bad.width = MNAV_MAX_GRID_SIDE + 1;
+    CHECK(mnavBuildFlowField(field, &bad, nullptr, &goal, 1) == mnav_errorLimit, "too wide");
     mnavQueryFilter broken = mnavDefaultQueryFilter();
     broken.costs[1] = -1.0f;
-    CHECK(mnavBuildFlowField(field, &grid, &broken, &goal, 1) == mnav_errorRange, "a bad cost");
+    CHECK(mnavBuildFlowField(field, &grid, &broken, &goal, 1) == mnav_errorLimit, "a bad cost");
     mnavDestroyFlowField(field);
     mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
     mnavFlowField* none = nullptr;
     def.cells = 0;
-    CHECK(mnavCreateFlowField(&def, &none) == mnav_errorRange && none == nullptr, "no cells");
+    CHECK(mnavCreateFlowField(&def, &none) == mnav_errorInvalid && none == nullptr, "no cells");
     def.cells = MNAV_MAX_FLOW_CELLS + 1;
-    CHECK(mnavCreateFlowField(&def, &none) == mnav_errorRange, "too many");
+    CHECK(mnavCreateFlowField(&def, &none) == mnav_errorLimit, "too many");
     def = mnavDefaultFlowFieldDef();
     def.cookie = 0;
     CHECK(mnavCreateFlowField(&def, &none) == mnav_errorInvalid, "not a def");
@@ -331,7 +335,7 @@ static void TestRegion(void)
     s_window[15 * r.width + 21] = 1;
     mnavFlowField* field = Make(r.width * r.height);
     mnavFlowField* alone = Make(r.width * r.height);
-    CHECK(mnavBuildFlowField(field, &grid, &filter, goals, 3) == mnav_errorLimit,
+    CHECK(mnavBuildFlowField(field, &grid, &filter, goals, 3) == mnav_errorCapacity,
           "the whole grid is past the limit");
     bool ended = false;
     CHECK(mnavBeginFlowField(field, &grid, &filter, &r, goals, 3) == mnav_success &&
@@ -367,7 +371,7 @@ static void TestRegion(void)
           "arrows at their grid places");
     mnavFlowRegion bad = {40, 0, 9, 1};
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid &&
-              mnavFlowAt(field, goals[0], &flow) == mnav_errorInvalid,
+              mnavFlowAt(field, goals[0], &flow) == mnav_errorState,
           "a region past the grid's side; the field holds nothing after");
     bad = (mnavFlowRegion){0, 30, 5, 7};
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid,
@@ -379,7 +383,7 @@ static void TestRegion(void)
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid,
           "a region before the grid");
     bad = (mnavFlowRegion){0, 0, 31, 22};
-    CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorLimit,
+    CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorCapacity,
           "a region past the limit");
     mnavDestroyFlowField(field);
     mnavDestroyFlowField(alone);
@@ -400,7 +404,7 @@ static void TestSteps(void)
         CHECK(mnavBeginFlowField(field, &grid, &filter, nullptr, goals, 3) == mnav_success,
               "begun");
         mnavFlow flow;
-        CHECK(mnavFlowAt(field, goals[0], &flow) == mnav_errorStale, "no reads while working");
+        CHECK(mnavFlowAt(field, goals[0], &flow) == mnav_errorState, "no reads while working");
         bool ended = false;
         int32_t steps = 0;
         while (!ended)
@@ -441,10 +445,10 @@ static void TestSteps(void)
     uint32_t index;
     mnavDebugBuffer buffer = {{0, 0, 0}, &vertex, 1, 0, nullptr, 0, 0, &index, 1, 0};
     CHECK(mnavBeginFlowField(field, &grid, &filter, nullptr, goals, 3) == mnav_success &&
-              mnavDebugFlowField(field, 0.0, &buffer) == mnav_errorStale,
+              mnavDebugFlowField(field, 0.0, &buffer) == mnav_errorState,
           "no debug output while working");
     mnavFlowField* fresh = Make(10);
-    CHECK(mnavContinueFlowField(fresh, &grid, 1, &ended) == mnav_errorInvalid, "nothing begun");
+    CHECK(mnavContinueFlowField(fresh, &grid, 1, &ended) == mnav_errorState, "nothing begun");
     CHECK(mnavDebugFlowField(fresh, 0.0, &buffer) == mnav_success && buffer.vertexCount == 0,
           "nothing to draw");
     // A begin refused after a field was built leaves nothing to draw.
@@ -552,10 +556,10 @@ static void TestRepairChecks(void)
     mnavFlowField* field = Make(WIDTH * HEIGHT);
     const mnavCell goal = {4, 4};
     const mnavCell off = {WIDTH, 0};
-    CHECK(mnavUpdateFlowField(field, &grid, &goal, 1, nullptr, 0) == mnav_errorInvalid,
+    CHECK(mnavUpdateFlowField(field, &grid, &goal, 1, nullptr, 0) == mnav_errorState,
           "nothing begun");
     CHECK(mnavBeginFlowField(field, &grid, nullptr, nullptr, &goal, 1) == mnav_success &&
-              mnavUpdateFlowField(field, &grid, &goal, 1, nullptr, 0) == mnav_errorStale,
+              mnavUpdateFlowField(field, &grid, &goal, 1, nullptr, 0) == mnav_errorState,
           "work not ended");
     CHECK(mnavContinueFlowField(field, &grid, INT32_MAX, nullptr) == mnav_success, "ended");
     mnavGrid other = grid;
@@ -575,7 +579,7 @@ static void TestRepairChecks(void)
     // Nothing changed: the same field, ended at once.
     bool ended = false;
     CHECK(mnavUpdateFlowField(field, &grid, &goal, 1, nullptr, 0) == mnav_success &&
-              mnavFlowAt(field, goal, &flow) == mnav_errorStale &&
+              mnavFlowAt(field, goal, &flow) == mnav_errorState &&
               mnavContinueFlowField(field, &grid, 1, &ended) == mnav_success && ended &&
               At(field, 10, 4).next.x == 9,
           "a repair of nothing");

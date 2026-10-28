@@ -39,9 +39,10 @@ typedef struct mnavHeightfield
 // Rasterizes every triangle of the meshes, which must be valid for def,
 // and then the terrains' triangles of the cells that may reach the tile,
 // into tile (tileX, tileZ), which must lie within the input's extent.
-// Returns mnav_errorLimit for a tile with more triangles than the
-// tileTriangles limit or more fragments than tileSpans, or for the memory
-// limit, and mnav_errorCapacity when the allocator fails. Whatever the
+// Returns mnav_errorCapacity for a tile with more triangles than the
+// tileTriangles limit or more fragments than tileSpans, for the memory
+// limit or when the allocator fails, and mnav_errorLimit for a piece past
+// MNAV_MAX_PIECE_CORNERS. Whatever the
 // result, mnavReleaseHeightfield frees what the heightfield holds.
 mnavResult mnavBuildHeightfieldInput(mnavMemory* memory, const mnavBakeDef* def,
                                      const mnavBakeCells* cells, const mnavBakeInput* input,
@@ -50,7 +51,7 @@ mnavResult mnavBuildHeightfieldInput(mnavMemory* memory, const mnavBakeDef* def,
 // The same from 2D outlines, which must be valid for def: every cell one
 // holds becomes a span at height 0. With a tile index of the
 // outlines, only those it lists for the tile are read. Returns
-// mnav_errorLimit past the tileTriangles limit on outlines touching the
+// mnav_errorCapacity past the tileTriangles limit on outlines touching the
 // tile, otherwise as above.
 mnavResult mnavBuildHeightfield2D(mnavMemory* memory, const mnavBakeDef* def,
                                   const mnavBakeCells* cells, const mnavOutline* outlines,

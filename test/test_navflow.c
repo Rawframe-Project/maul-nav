@@ -234,7 +234,7 @@ static void TestLinks(mnavNavFlow* field, mnavNavmesh* navmesh)
     fewDef.limits.links = 1;
     mnavNavFlow* few = nullptr;
     CHECK(mnavCreateNavFlow(&fewDef, &few) == mnav_success &&
-              mnavBuildNavFlow(few, navmesh, nullptr, &goal, 1) == mnav_errorLimit,
+              mnavBuildNavFlow(few, navmesh, nullptr, &goal, 1) == mnav_errorCapacity,
           "past the link limit");
     mnavDestroyNavFlow(few);
     // Within it, and with every byte taken when the field was made.
@@ -250,7 +250,7 @@ static void TestLinks(mnavNavFlow* field, mnavNavmesh* navmesh)
     // A commit makes the field stale.
     CHECK(mnavStageLinkRemoval(navmesh, link) == mnav_success &&
               mnavCommit(navmesh) == mnav_success &&
-              mnavNavFlowAt(field, navmesh, far.polygon, &f) == mnav_errorStale,
+              mnavNavFlowAt(field, navmesh, far.polygon, &f) == mnav_errorState,
           "stale after a commit");
 }
 
@@ -357,7 +357,7 @@ static void TestStepsAndRegions(mnavNavFlow* field)
         mnavPolygonFlow f;
         bool ended = false;
         CHECK(mnavBeginNavFlow(field, navmesh, nullptr, nullptr, goals, 2) == mnav_success &&
-                  mnavNavFlowAt(field, navmesh, goals[0].polygon, &f) == mnav_errorStale,
+                  mnavNavFlowAt(field, navmesh, goals[0].polygon, &f) == mnav_errorState,
               "no reads while working");
         while (!ended)
         {
@@ -403,7 +403,7 @@ static void TestStepsAndRegions(mnavNavFlow* field)
           "the part's field");
     mnavNavFlow* regional = nullptr;
     CHECK(mnavCreateNavFlow(&small, &regional) == mnav_success &&
-              mnavBuildNavFlow(regional, navmesh, nullptr, goals, 2) == mnav_errorLimit &&
+              mnavBuildNavFlow(regional, navmesh, nullptr, goals, 2) == mnav_errorCapacity &&
               mnavBeginNavFlow(regional, navmesh, nullptr, &region, near, 2) == mnav_success &&
               mnavContinueNavFlow(regional, navmesh, INT32_MAX, &ended) == mnav_success && ended,
           "a region within the limit the whole navmesh passes, the far goal left out");
@@ -422,7 +422,7 @@ static void TestStepsAndRegions(mnavNavFlow* field)
     CHECK(mnavBeginNavFlow(field, navmesh, nullptr, nullptr, goals, 2) == mnav_success &&
               mnavStageLink(navmesh, &jump, &link) == mnav_success &&
               mnavCommit(navmesh) == mnav_success &&
-              mnavContinueNavFlow(field, navmesh, 1, &ended) == mnav_errorStale,
+              mnavContinueNavFlow(field, navmesh, 1, &ended) == mnav_errorState,
           "a commit while working");
     mnavDestroyNavFlow(regional);
     mnavDestroyNavFlow(alone);
@@ -442,15 +442,16 @@ static mnavPos3 At(const mnavDebugBuffer* b, uint32_t i)
 
 // The arrows over the 8 m tiles: one for each polygon with a way on, its
 // head at that polygon's portal midpoint.
-static void TestDebug(mnavNavFlow* field)
+static void TestDebug(mnavNavFlow* field, const mnavNavmesh* other)
 {
     mnavNavmesh* navmesh = LoadSmall();
     mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_vertices3, 8192, 0, nullptr, 0, 0, s_lines, 8192, 0};
-    CHECK(mnavDebugNavFlow(field, navmesh, &b) == mnav_errorStale && b.lineCount == 0,
+    CHECK(mnavBuildNavFlow(field, other, nullptr, nullptr, 0) == mnav_success &&
+              mnavDebugNavFlow(field, navmesh, &b) == mnav_errorInvalid && b.lineCount == 0,
           "a field of another navmesh");
     const mnavNavFlowGoal goals[2] = {Goal(navmesh, 18, 30), Goal(navmesh, 60, 6)};
     CHECK(mnavBeginNavFlow(field, navmesh, nullptr, nullptr, goals, 2) == mnav_success &&
-              mnavDebugNavFlow(field, navmesh, &b) == mnav_errorStale,
+              mnavDebugNavFlow(field, navmesh, &b) == mnav_errorState,
           "work not ended");
     CHECK(mnavBuildNavFlow(field, navmesh, nullptr, goals, 2) == mnav_success &&
               mnavDebugNavFlow(field, navmesh, &b) == mnav_success,
@@ -510,7 +511,7 @@ static void TestDebug(mnavNavFlow* field)
     b.vertexCount = 0;
     CHECK(mnavStageLink(navmesh, &jump, &link) == mnav_success &&
               mnavCommit(navmesh) == mnav_success &&
-              mnavDebugNavFlow(field, navmesh, &b) == mnav_errorStale,
+              mnavDebugNavFlow(field, navmesh, &b) == mnav_errorState,
           "stale after a commit");
     mnavDestroyNavmesh(navmesh);
     // A field over a region draws its polygons alone.
@@ -546,7 +547,7 @@ static void TestChecks(mnavNavFlow* field, const mnavNavmesh* navmesh)
     mnavNavFlowGoal bad = goal;
     bad.point.x = (double)NAN;
     CHECK(mnavBuildNavFlow(field, navmesh, nullptr, &bad, 1) == mnav_errorInvalid &&
-              mnavNavFlowAt(field, navmesh, goal.polygon, &f) == mnav_errorInvalid,
+              mnavNavFlowAt(field, navmesh, goal.polygon, &f) == mnav_errorState,
           "a goal not finite; nothing held after");
     bad = goal;
     bad.polygon.slot = 999;
@@ -578,14 +579,14 @@ static void TestChecks(mnavNavFlow* field, const mnavNavmesh* navmesh)
     def.limits.polygons = 4;
     mnavNavFlow* small = nullptr;
     CHECK(mnavCreateNavFlow(&def, &small) == mnav_success &&
-              mnavBuildNavFlow(small, navmesh, nullptr, &goal, 1) == mnav_errorLimit,
+              mnavBuildNavFlow(small, navmesh, nullptr, &goal, 1) == mnav_errorCapacity,
           "past the polygon limit");
     mnavDestroyNavFlow(small);
     // The navmesh's 4 slots: 3 are too few.
     def = mnavDefaultNavFlowDef();
     def.limits.tiles = 3;
     CHECK(mnavCreateNavFlow(&def, &small) == mnav_success &&
-              mnavBuildNavFlow(small, navmesh, nullptr, &goal, 1) == mnav_errorLimit,
+              mnavBuildNavFlow(small, navmesh, nullptr, &goal, 1) == mnav_errorCapacity,
           "past the tile limit");
     mnavDestroyNavFlow(small);
     def.limits.tiles = 4;
@@ -596,11 +597,13 @@ static void TestChecks(mnavNavFlow* field, const mnavNavmesh* navmesh)
     const mnavNavFlowLimits outOfRange[6] = {{0, 1, 1}, {MNAV_MAX_NAVFLOW_POLYGONS + 1, 1, 1},
                                              {1, 0, 1}, {1, MNAV_MAX_NAVFLOW_TILES + 1, 1},
                                              {1, 1, 0}, {1, 1, MNAV_MAX_NAVFLOW_LINKS + 1}};
+    // Below 1 is wrong; past an MNAV_MAX_NAVFLOW_ value is a bound.
     bool refused = true;
     for (int32_t i = 0; i < 6; ++i)
     {
         def.limits = outOfRange[i];
-        refused = refused && mnavCreateNavFlow(&def, &small) == mnav_errorRange && small == nullptr;
+        mnavResult expected = i % 2 == 0 ? mnav_errorInvalid : mnav_errorLimit;
+        refused = refused && mnavCreateNavFlow(&def, &small) == expected && small == nullptr;
     }
     def.limits = (mnavNavFlowLimits){1, 1, 1};
     CHECK(refused && mnavCreateNavFlow(&def, &small) == mnav_success, "every limit's range");
@@ -625,7 +628,7 @@ int main(void)
     TestLinks(field, navmesh);
     TestAreas(field);
     TestStepsAndRegions(field);
-    TestDebug(field);
+    TestDebug(field, navmesh);
     mnavDestroyNavFlow(field);
     mnavDestroyNavmesh(navmesh);
     return s_failures == 0 ? 0 : 1;

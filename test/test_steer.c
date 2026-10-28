@@ -138,18 +138,20 @@ static void TestRefusals(void)
     CHECK(mnavSteer(&c, &bad, &s) == mnav_errorInvalid, "a def not from the default");
     bad = def;
     bad.maxSpeed = -1.0f;
-    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorRange, "a negative speed");
+    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorInvalid, "a negative speed");
     bad.maxSpeed = MNAV_MAX_STEER_SPEED * 2.0f;
-    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorRange, "too fast");
+    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorLimit, "too fast");
+    bad.maxSpeed = INFINITY;
+    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorLimit, "an infinite speed");
     bad = def;
     bad.slowDistance = (float)NAN;
-    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorRange, "a slowing distance of NaN");
+    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorInvalid, "a slowing distance of NaN");
     bad = def;
     bad.arriveDistance = MNAV_MAX_STEER_DISTANCE * 2.0f;
-    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorRange, "an arrival distance too long");
+    CHECK(mnavSteer(&c, &bad, &s) == mnav_errorLimit, "an arrival distance too long");
     const mnavPos3 nan[2] = {At(0, 0), At((double)NAN, 0)};
     c = Corners(nan, 2);
-    CHECK(mnavSteer(&c, &def, &s) == mnav_errorRange, "a corner not finite");
+    CHECK(mnavSteer(&c, &def, &s) == mnav_errorInvalid, "a corner not finite");
 }
 
 int main(void)

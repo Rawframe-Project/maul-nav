@@ -87,34 +87,48 @@ extern "C"
     // C and C++.
     typedef int32_t mnavResult;
 
+    // The errors the Maul family shares keep the family's values
+    // (docs/internals/maul-conventions.md); the library's own errors are
+    // numbered from -32 down.
     enum
     {
         // The call did what was asked.
         mnav_success = 0,
-        // An argument is invalid: a null pointer where one is required, a
-        // value out of range, data that is malformed.
+        // An argument a correct program never passes: a null pointer where
+        // one is required, a NaN, a value (an infinity included) outside a
+        // range its documentation gives with no named constant, a
+        // combination the call does not take.
         mnav_errorInvalid = -1,
-        // A caller buffer is too small for the result, or the allocator
-        // failed.
+        // Room is too small for the result: a caller's buffer, the
+        // allocator, or a limit the caller set (a def's limits and memory,
+        // a query's nodes). More room would succeed.
         mnav_errorCapacity = -2,
-        // A named limit the caller set was reached: the work it bounds was
-        // not done.
-        mnav_errorLimit = -3,
-        // A coordinate is finite but lies past what the library can
-        // represent in the frame it belongs to.
-        mnav_errorRange = -4,
-        // Data was written in a format version this library does not
-        // read, or a def was built against headers of another library
-        // version (MNAV_ABI_VERSION).
-        mnav_errorVersion = -5,
+        // An id names a tile, polygon or link that has been replaced or
+        // removed since it was handed out.
+        mnav_errorStale = -3,
+        // The call is not allowed in the object's current state, which only
+        // another call of the program changes: work begun and not ended,
+        // a link not yet committed, or an object built on a navmesh or a
+        // flight volume that has been committed since.
+        mnav_errorState = -6,
+        // A def was built against headers of another library version
+        // (MNAV_ABI_VERSION), or stored bytes are of a format version this
+        // library does not read.
+        mnav_errorVersion = -7,
+        // Stored bytes (a tile, a flight tile) are malformed: every check a
+        // reader makes on them fails with this, or with mnav_errorVersion.
+        mnav_errorFormat = -8,
+        // An argument, or its content, passes a fixed bound the library
+        // publishes as a named constant (MNAV_MAX_* or MNAV_MIN_*), an
+        // infinity included: a coordinate past the extent, a count past its
+        // most. More room would not help.
+        mnav_errorLimit = -9,
         // The place asked about has no tile loaded: not a wall, nothing
         // is known there.
-        mnav_errorNotLoaded = -6,
-        // An id names a tile or polygon that has been replaced or
-        // removed since it was handed out.
-        mnav_errorStale = -7,
-        // The navmesh's runtime tier does not allow the change.
-        mnav_errorTier = -8,
+        mnav_errorNotLoaded = -32,
+        // The navmesh's runtime tier, chosen when it was made, does not
+        // allow the change.
+        mnav_errorTier = -33,
     };
 
     // A library version: major, minor and patch.

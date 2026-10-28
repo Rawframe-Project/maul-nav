@@ -379,11 +379,12 @@ static void TestRefusals2D(void)
           "an outline its check refuses, named");
     MakeOutlines(&def, (Place){0, 0, 3, 3});
     s_points[2][1].x = -1e30f;
-    CHECK(mnavCreateTileIndex2D(&def, s_outlines, OUTLINES, &none, &report) == mnav_errorRange &&
+    CHECK(mnavCreateTileIndex2D(&def, s_outlines, OUTLINES, &none, &report) == mnav_errorLimit &&
               report.mesh == 2 && none == nullptr,
           "a point past the extent, named");
     MakeOutlines(&def, (Place){0, 0, 3, 3});
-    CHECK(mnavCreateTileIndex2D(&tight, s_outlines, OUTLINES, &none, &report) == mnav_errorLimit &&
+    CHECK(mnavCreateTileIndex2D(&tight, s_outlines, OUTLINES, &none, &report) ==
+                  mnav_errorCapacity &&
               none == nullptr,
           "past the memory limit");
     mnavDestroyBaker(baker);
@@ -413,13 +414,13 @@ static void TestRefusals(void)
           "a mesh its check refuses, named");
     mnavVec3 corner = s_vertices[2][5];
     s_vertices[2][5].z = 1e30f;
-    CHECK(mnavCreateTileIndex(&def, meshes, MESHES, &index, &report) == mnav_errorRange &&
+    CHECK(mnavCreateTileIndex(&def, meshes, MESHES, &index, &report) == mnav_errorLimit &&
               report.mesh == 2 && report.input.element == mnav_elementVertex && index == nullptr,
           "a vertex past the extent, named");
     s_vertices[2][5] = corner;
     mnavBakeDef tight = def;
     tight.limits.memoryBytes = 256;
-    CHECK(mnavCreateTileIndex(&tight, meshes, MESHES, &index, &report) == mnav_errorLimit &&
+    CHECK(mnavCreateTileIndex(&tight, meshes, MESHES, &index, &report) == mnav_errorCapacity &&
               index == nullptr,
           "past the memory limit");
     // Two triangles near opposite corners of the extent, in tiles of 16
@@ -498,7 +499,7 @@ static void TestRefusals(void)
     {
         s_vertices[2][v].x = 1e30f;
     }
-    CHECK(mnavBakeTile(baker, &input, 1, 1, &report) == mnav_errorRange && report.mesh == 2 &&
+    CHECK(mnavBakeTile(baker, &input, 1, 1, &report) == mnav_errorLimit && report.mesh == 2 &&
               report.input.element == mnav_elementVertex,
           "a third corner past the extent, refused as read");
     memcpy(s_vertices[2], kept, sizeof(kept));

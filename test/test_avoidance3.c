@@ -518,10 +518,10 @@ static void TestChecks(void)
           "no spheres");
     CHECK(mnavAvoid3D(avoidance, agents, 2, &sphere, -1, 0.1, out) == mnav_errorInvalid,
           "a negative sphere count");
-    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.0, out) == mnav_errorInvalid, "no step");
+    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.0, out) == mnav_errorLimit, "no step");
     CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, (double)NAN, out) == mnav_errorInvalid,
           "a step not finite");
-    CHECK(mnavAvoid3D(avoidance, agents, 3, nullptr, 0, 0.1, out) == mnav_errorLimit,
+    CHECK(mnavAvoid3D(avoidance, agents, 3, nullptr, 0, 0.1, out) == mnav_errorCapacity,
           "too many agents");
     CHECK(mnavAvoid3D(avoidance, nullptr, 0, nullptr, 0, 0.1, nullptr) == mnav_success,
           "nothing to do");
@@ -532,16 +532,16 @@ static void TestChecks(void)
           "a position not finite");
     pair[1] = agents[1];
     pair[1].position.z = 2.0 * MNAV_MAX_AVOIDANCE_COORDINATE;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
           "a position out of range");
     pair[1] = agents[1];
     pair[1].preferred.z = 2.0 * MNAV_MAX_AVOIDANCE_SPEED;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
           "a preferred velocity out of range");
     pair[1] = agents[1];
     pair[1].velocity.y = (double)INFINITY;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
-          "a velocity not finite");
+    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
+          "an infinite velocity, past the speed bound");
     pair[1] = agents[1];
     pair[1].radius = 0.0;
     CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid, "no radius");
@@ -563,7 +563,7 @@ static void TestChecks(void)
           "a sphere's velocity not finite");
     wrong = sphere;
     wrong.center.y = -2.0 * MNAV_MAX_AVOIDANCE_COORDINATE;
-    CHECK(mnavAvoid3D(avoidance, agents, 2, &wrong, 1, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoid3D(avoidance, agents, 2, &wrong, 1, 0.1, out) == mnav_errorLimit,
           "a sphere out of range");
     mnavDestroyAvoidance(avoidance);
     // Spheres count against the set's obstacle points.
@@ -573,7 +573,7 @@ static void TestChecks(void)
     mnavSphere two[2] = {sphere, sphere};
     two[1].id = 10;
     CHECK(mnavAvoid3D(avoidance, agents, 2, two, 1, 0.1, out) == mnav_success, "one sphere");
-    CHECK(mnavAvoid3D(avoidance, agents, 2, two, 2, 0.1, out) == mnav_errorLimit,
+    CHECK(mnavAvoid3D(avoidance, agents, 2, two, 2, 0.1, out) == mnav_errorCapacity,
           "too many spheres");
     mnavDestroyAvoidance(avoidance);
 }

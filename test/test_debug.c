@@ -253,7 +253,7 @@ static void TestFlowAndAvoidance(void)
               Count(&b, mnav_debugNeighbor, -1) == 2,
           "one line, the one that sees");
     agents[0].ignores = 0;
-    CHECK(mnavDebugAvoidance(avoidance, agents, 9, 0.1, &b) == mnav_errorLimit &&
+    CHECK(mnavDebugAvoidance(avoidance, agents, 9, 0.1, &b) == mnav_errorCapacity &&
               mnavDebugAvoidance(avoidance, agents, 3, (double)INFINITY, &b) == mnav_errorInvalid,
           "the limit; a bad height");
     mnavDestroyAvoidance(avoidance);
@@ -286,8 +286,8 @@ static void TestFliers(void)
     int32_t first = b.vertexCount - 48 * 2;
     CHECK(b.vertices[first].x == 7.0f && b.vertices[first].kind == mnav_debugObstacle,
           "the sphere's ring on its radius");
-    CHECK(mnavDebugAvoidance3D(avoidance, agents, 9, nullptr, 0, &b) == mnav_errorLimit &&
-              mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 2, &b) == mnav_errorLimit,
+    CHECK(mnavDebugAvoidance3D(avoidance, agents, 9, nullptr, 0, &b) == mnav_errorCapacity &&
+              mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 2, &b) == mnav_errorCapacity,
           "the limits");
     mnavAgent3D bad = agents[0];
     bad.radius = 0.0;

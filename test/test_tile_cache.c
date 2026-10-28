@@ -341,7 +341,7 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
     // The tile's triangles and the obstacles' points count as input.
     Rebuilt(other, cache, 0, obstacles, 0, mnav_success);
     obstacles[1] = obstacles[0];
-    Rebuilt(other, cache, 0, obstacles, 2, mnav_errorLimit);
+    Rebuilt(other, cache, 0, obstacles, 2, mnav_errorCapacity);
     mnavDestroyBaker(other);
     // The cached volumes' points count too.
     const mnavBakeInput shaped = {&world, 1, nullptr, 0, obstacles, 1, nullptr};
@@ -353,7 +353,7 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
     def.limits.inputTriangles -= 1;
     mnavDestroyBaker(other);
     CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "a baker past it");
-    Rebuilt(other, cache, 0, obstacles, 1, mnav_errorLimit);
+    Rebuilt(other, cache, 0, obstacles, 1, mnav_errorCapacity);
     mnavDestroyBaker(other);
     // A cached bake that fails leaves nothing cached for the tile.
     const mnavBakeInput missing = {&world, 1, nullptr, 0, nullptr, 1, nullptr};
@@ -381,14 +381,14 @@ static void TestCreate(void)
     CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorInvalid, "an allocator without free");
     def = mnavDefaultTileCacheDef();
     def.limits.tiles = 0;
-    CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorRange, "no tiles");
+    CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorInvalid, "no tiles");
     def.limits.tiles = MNAV_MAX_CACHED_TILES + 1;
-    CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorRange, "too many tiles");
+    CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorLimit, "too many tiles");
     def.limits.tiles = 1;
     def.limits.memoryBytes = 0;
-    CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorRange, "no bytes");
+    CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorInvalid, "no bytes");
     def.limits.memoryBytes = 16;
-    CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorLimit && cache == nullptr,
+    CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorCapacity && cache == nullptr,
           "too few bytes for the cache itself");
     CHECK(mnavGetTileCacheBytes(nullptr) == 0, "a NULL cache holds nothing");
     mnavDestroyTileCache(nullptr);
@@ -413,8 +413,8 @@ static void TestLimits(mnavBaker* baker)
            (unsigned long long)empty, (unsigned long long)(one - empty));
     CHECK(one > empty, "a tile takes bytes");
     size_t size = 0;
-    CHECK(mnavBakeTileCached(baker, cache, &input, 1, 0, &report) == mnav_errorLimit &&
-              report.result == mnav_errorLimit &&
+    CHECK(mnavBakeTileCached(baker, cache, &input, 1, 0, &report) == mnav_errorCapacity &&
+              report.result == mnav_errorCapacity &&
               mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_errorInvalid,
           "a second tile over the limit, not baked");
     Rebuilt(baker, cache, 1, nullptr, 0, mnav_errorNotLoaded);
@@ -425,7 +425,7 @@ static void TestLimits(mnavBaker* baker)
     def.limits.memoryBytes = empty + (one - empty) / 2;
     CHECK(mnavCreateTileCache(&def, &cache) == mnav_success, "a small cache");
     uint64_t small = mnavGetTileCacheBytes(cache);
-    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, &report) == mnav_errorLimit &&
+    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, &report) == mnav_errorCapacity &&
               mnavGetTileCacheBytes(cache) == small,
           "a tile over the bytes, nothing kept");
     Rebuilt(baker, cache, 0, nullptr, 0, mnav_errorNotLoaded);

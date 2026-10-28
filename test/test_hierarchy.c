@@ -290,7 +290,7 @@ static void TestLinksBetweenClusters(void)
     tight.limits.transitions = before.transitions;
     mnavHierarchy* full = nullptr;
     CHECK(mnavCreateHierarchy(&tight, &full) == mnav_success &&
-              mnavBuildHierarchy(full, query, navmesh, nullptr, nullptr) == mnav_errorLimit,
+              mnavBuildHierarchy(full, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
           "no room for the link's transition");
     mnavDestroyHierarchy(full);
     mnavNearest a = On(navmesh, 40.0, 30.0);
@@ -671,7 +671,7 @@ static void TestUpdatePastTheEdgeLimit(void)
     mnavHierarchyReport opened;
     mnavResult result = mnavUpdateHierarchy(tight, query, navmesh, &opened);
     printf("edge limit: %d edges closed\n", closed.edges);
-    CHECK(result == mnav_errorLimit, "the opened gap's edges past the limit");
+    CHECK(result == mnav_errorCapacity, "the opened gap's edges past the limit");
     mnavDestroyHierarchy(tight);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -720,7 +720,7 @@ static void TestStaleAndFallbacks(void)
     mnavNearest b = On(navmesh, 254.0, 254.0);
     mnavPath path;
     CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                   b.point, &path) == mnav_errorInvalid,
+                                   b.point, &path) == mnav_errorState,
           "no graph yet");
     CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success, "built");
     CHECK(mnavFindHierarchicalPath(query, hierarchy, other, a.polygon, a.point, b.polygon, b.point,
@@ -743,7 +743,7 @@ static void TestStaleAndFallbacks(void)
               mnavCommit(navmesh) == mnav_success,
           "committed");
     CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                   b.point, &path) == mnav_errorStale,
+                                   b.point, &path) == mnav_errorState,
           "stale");
     CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
               mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
@@ -774,29 +774,29 @@ static void TestLimitsAndChecks(void)
     mnavHierarchy* hierarchy = nullptr;
     def.limits.transitions = 4;
     CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_errorLimit,
+              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
           "too many transitions");
     mnavNearest a = On(navmesh, 2.0, 2.0);
     mnavPath path;
     CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, a.polygon,
-                                   a.point, &path) == mnav_errorInvalid,
+                                   a.point, &path) == mnav_errorState,
           "no graph after a failed build");
     mnavDestroyHierarchy(hierarchy);
     def = Small();
     def.limits.edges = 4;
     CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_errorLimit,
+              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
           "too many edges");
     mnavDestroyHierarchy(hierarchy);
     def = Small();
     def.limits.tiles = 63;
     CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_errorLimit,
+              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
           "too many tiles");
     mnavDestroyHierarchy(hierarchy);
     mnavQuery* tiny = Query(16);
     hierarchy = Hierarchy(2);
-    CHECK(mnavBuildHierarchy(hierarchy, tiny, navmesh, nullptr, nullptr) == mnav_errorLimit,
+    CHECK(mnavBuildHierarchy(hierarchy, tiny, navmesh, nullptr, nullptr) == mnav_errorCapacity,
           "a cluster needing more nodes");
     mnavQueryFilter broken = mnavDefaultQueryFilter();
     broken.cookie = 0;
@@ -816,10 +816,10 @@ static void TestLimitsAndChecks(void)
     mnavDestroyQuery(tiny);
     def = mnavDefaultHierarchyDef();
     def.clusterTiles = 0;
-    CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_errorRange && hierarchy == nullptr,
+    CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_errorInvalid && hierarchy == nullptr,
           "no cluster side");
     def.clusterTiles = MNAV_MAX_CLUSTER_TILES + 1;
-    CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_errorRange, "too wide");
+    CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_errorLimit, "too wide");
     def = mnavDefaultHierarchyDef();
     def.cookie = 0;
     CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_errorInvalid, "not a def");
@@ -942,9 +942,9 @@ static void TestUpdatePastTheTileLimit(void)
     CHECK(mnavStageTile(navmesh, s_bytes[8], s_sizes[8]).result == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "a ninth tile");
-    CHECK(mnavUpdateHierarchy(hierarchy, query, navmesh, nullptr) == mnav_errorLimit,
+    CHECK(mnavUpdateHierarchy(hierarchy, query, navmesh, nullptr) == mnav_errorCapacity,
           "an update past the tile limit refused");
-    CHECK(mnavUpdateHierarchy(hierarchy, query, navmesh, nullptr) == mnav_errorInvalid,
+    CHECK(mnavUpdateHierarchy(hierarchy, query, navmesh, nullptr) == mnav_errorState,
           "no graph after it to bring up to date");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(query);

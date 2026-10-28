@@ -480,8 +480,8 @@ static void TestSlices(const mnavFlightVolume* volume)
               early.points[0].x == from.x && early.points[0].y == from.y &&
               early.points[0].z == from.z,
           "unfinished, from the start");
-    CHECK(mnavContinueFlightPath(query, volume, 1, &ended) == mnav_errorInvalid &&
-              mnavFinishFlightPath(query, volume, &early) == mnav_errorInvalid,
+    CHECK(mnavContinueFlightPath(query, volume, 1, &ended) == mnav_errorState &&
+              mnavFinishFlightPath(query, volume, &early) == mnav_errorState,
           "finished: no search left");
     CHECK(mnavBeginFlightPath(query, volume, from, to) == mnav_success &&
               mnavContinueFlightPath(query, volume, 0, &ended) == mnav_errorInvalid &&
@@ -499,19 +499,19 @@ static void TestSlices(const mnavFlightVolume* volume)
     CHECK(mnavBeginFlightPath(query, volume, from, to) == mnav_success &&
               mnavFindGridPath(query, &grid, nullptr, (mnavCell){0, 0}, (mnavCell){1, 1},
                                &gridPath) == mnav_success &&
-              mnavContinueFlightPath(query, volume, 1, &ended) == mnav_errorInvalid,
+              mnavContinueFlightPath(query, volume, 1, &ended) == mnav_errorState,
           "another search ends it");
     // Another volume, then the same one committed to.
     mnavFlightVolume* other = Volume(0, 0);
     CHECK(mnavBeginFlightPath(query, volume, from, to) == mnav_success &&
-              mnavContinueFlightPath(query, other, 1, &ended) == mnav_errorStale &&
-              mnavFinishFlightPath(query, other, &early) == mnav_errorStale,
-          "another volume: stale");
+              mnavContinueFlightPath(query, other, 1, &ended) == mnav_errorInvalid &&
+              mnavFinishFlightPath(query, other, &early) == mnav_errorInvalid,
+          "another volume");
     CHECK(mnavBeginFlightPath(query, other, from, to) == mnav_success &&
               mnavStageFlightTileRemoval(other, 3, 3) == mnav_success &&
               mnavCommitFlight(other) == mnav_success &&
-              mnavContinueFlightPath(query, other, 1, &ended) == mnav_errorStale,
-          "committed to since: stale");
+              mnavContinueFlightPath(query, other, 1, &ended) == mnav_errorState,
+          "committed to since");
     mnavDestroyFlightVolume(other);
     mnavDestroyQuery(query);
 }
@@ -613,7 +613,7 @@ static void TestCheck(const mnavFlightVolume* volume)
     // Refusals change nothing; no steps is clear.
     mnavPos3 bad[2] = {from, {(double)NAN, 0.0, 0.0}};
     step = 7;
-    CHECK(mnavCheckFlightPath(volume, bad, 2, &step, nullptr) == mnav_errorRange && step == 7 &&
+    CHECK(mnavCheckFlightPath(volume, bad, 2, &step, nullptr) == mnav_errorInvalid && step == 7 &&
               mnavCheckFlightPath(nullptr, bad, 1, &step, nullptr) == mnav_errorInvalid &&
               mnavCheckFlightPath(volume, nullptr, 2, &step, nullptr) == mnav_errorInvalid &&
               mnavCheckFlightPath(volume, bad, -1, &step, nullptr) == mnav_errorInvalid &&
@@ -734,9 +734,9 @@ static void TestDebug(const mnavFlightVolume* volume)
               mnavDebugFlight(volume, low, (mnavPos3){(double)NAN, 0.0, 0.0}, &b) ==
                   mnav_errorInvalid &&
               mnavDebugFlight(volume, low, high, nullptr) == mnav_errorInvalid &&
-              mnavDebugFlight(volume, low, (mnavPos3){1e30, 1.0, 1.0}, &b) == mnav_errorRange &&
+              mnavDebugFlight(volume, low, (mnavPos3){1e30, 1.0, 1.0}, &b) == mnav_errorLimit &&
               mnavDebugFlight(volume, (mnavPos3){-4000.0, -10.0, -4000.0},
-                              (mnavPos3){4000.0, 100.0, 4000.0}, &b) == mnav_errorRange &&
+                              (mnavPos3){4000.0, 100.0, 4000.0}, &b) == mnav_errorLimit &&
               mnavDebugFlightPath(nullptr, &b) == mnav_errorInvalid,
           "refusals");
     // A box's voxels count within the floor and ceiling: a column to far
@@ -922,8 +922,10 @@ static void Refusals(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 
     int32_t wrong = 0;
     for (int32_t k = 0; k < 3; ++k)
     {
-        wrong += mnavFindFlightPath(query, volume, bad[k], open, &path) == mnav_errorRange ? 0 : 1;
-        wrong += mnavFindFlightPath(query, volume, open, bad[k], &path) == mnav_errorRange ? 0 : 1;
+        wrong +=
+            mnavFindFlightPath(query, volume, bad[k], open, &path) == mnav_errorInvalid ? 0 : 1;
+        wrong +=
+            mnavFindFlightPath(query, volume, open, bad[k], &path) == mnav_errorInvalid ? 0 : 1;
     }
     CHECK(wrong == 0, "points not finite, below or above the volume");
     CHECK(mnavFindFlightPath(nullptr, volume, open, open, &path) == mnav_errorInvalid &&
@@ -1027,16 +1029,17 @@ static void TestRefusals(const mnavFlightVolume* volume)
     mnavFlightHit hit;
     mnavPos3 p = At(5.5, 20.5, 5.5);
     mnavPos3 nan = {(double)NAN, 0.0, 0.0};
-    CHECK(mnavFlightRaycast(volume, nan, p, &hit) == mnav_errorRange &&
-              mnavFlightRaycast(volume, p, (mnavPos3){1e12, 0.0, 0.0}, &hit) == mnav_errorRange &&
+    CHECK(mnavFlightRaycast(volume, nan, p, &hit) == mnav_errorInvalid &&
+              mnavFlightRaycast(volume, p, (mnavPos3){1e12, 0.0, 0.0}, &hit) == mnav_errorLimit &&
               mnavFlightRaycast(nullptr, p, p, &hit) == mnav_errorInvalid &&
               mnavFlightRaycast(volume, p, p, nullptr) == mnav_errorInvalid,
           "raycast refusals");
     mnavPos3 out;
     bool found = false;
-    CHECK(mnavFindNearestFlightPoint(volume, p, -1.0f, &out, &found) == mnav_errorRange &&
-              mnavFindNearestFlightPoint(volume, p, (float)NAN, &out, &found) == mnav_errorRange &&
-              mnavFindNearestFlightPoint(volume, nan, 1.0f, &out, &found) == mnav_errorRange &&
+    CHECK(mnavFindNearestFlightPoint(volume, p, -1.0f, &out, &found) == mnav_errorInvalid &&
+              mnavFindNearestFlightPoint(volume, p, (float)NAN, &out, &found) ==
+                  mnav_errorInvalid &&
+              mnavFindNearestFlightPoint(volume, nan, 1.0f, &out, &found) == mnav_errorInvalid &&
               mnavFindNearestFlightPoint(nullptr, p, 1.0f, &out, &found) == mnav_errorInvalid &&
               mnavFindNearestFlightPoint(volume, p, 1.0f, nullptr, &found) == mnav_errorInvalid &&
               mnavFindNearestFlightPoint(volume, p, 1.0f, &out, nullptr) == mnav_errorInvalid,

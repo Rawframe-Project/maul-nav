@@ -66,7 +66,7 @@ mnavFieldsResult mnavReadFields(const uint8_t* bytes, size_t size, uint64_t coun
         size_t length = (size_t)mnavGetU32(&r);
         if (r.exhausted)
         {
-            return Refuse(mnav_errorInvalid, -1, f);
+            return Refuse(mnav_errorFormat, -1, f);
         }
         int32_t k = 0;
         while (k < knownCount && known[k] != tag)
@@ -82,7 +82,7 @@ mnavFieldsResult mnavReadFields(const uint8_t* bytes, size_t size, uint64_t coun
         // default, which the writer leaves out.
         if (k <= last || length == 0 || length > r.left || Pad(length) > r.left - length)
         {
-            return Refuse(mnav_errorInvalid, k, f);
+            return Refuse(mnav_errorFormat, k, f);
         }
         fields[k] = (mnavField){r.at, length};
         r.at += length;
@@ -91,11 +91,11 @@ mnavFieldsResult mnavReadFields(const uint8_t* bytes, size_t size, uint64_t coun
         {
             if (mnavGetU8(&r) != 0)
             {
-                return Refuse(mnav_errorInvalid, k, f);
+                return Refuse(mnav_errorFormat, k, f);
             }
         }
         last = k;
     }
     return r.left == 0 ? (mnavFieldsResult){mnav_success, -1, -1}
-                       : Refuse(mnav_errorInvalid, -1, count);
+                       : Refuse(mnav_errorFormat, -1, count);
 }

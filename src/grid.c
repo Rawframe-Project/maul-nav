@@ -445,10 +445,10 @@ static mnavGridPath PathTo(const Grid* g, int32_t last, mnavPathEnd end)
 
 static bool GoodGrid(const mnavGrid* grid, mnavCell a, mnavCell b)
 {
-    return grid->areas != nullptr && grid->width >= 1 && grid->width <= MNAV_MAX_GRID_SIDE &&
-           grid->height >= 1 && grid->height <= MNAV_MAX_GRID_SIDE && isfinite(grid->cellSize) &&
-           grid->cellSize > 0.0f && a.x >= 0 && a.y >= 0 && a.x < grid->width &&
-           a.y < grid->height && b.x >= 0 && b.y >= 0 && b.x < grid->width && b.y < grid->height;
+    return grid->areas != nullptr && grid->width >= 1 && grid->height >= 1 &&
+           isfinite(grid->cellSize) && grid->cellSize > 0.0f && a.x >= 0 && a.y >= 0 &&
+           a.x < grid->width && a.y < grid->height && b.x >= 0 && b.y >= 0 && b.x < grid->width &&
+           b.y < grid->height;
 }
 
 static MNAV_NOINLINE mnavResult FindGridPathWork(mnavQuery* query, const mnavGrid* grid,
@@ -458,6 +458,10 @@ static MNAV_NOINLINE mnavResult FindGridPathWork(mnavQuery* query, const mnavGri
     if (query == nullptr || grid == nullptr || pathOut == nullptr || !GoodGrid(grid, start, end))
     {
         return mnav_errorInvalid;
+    }
+    if (grid->width > MNAV_MAX_GRID_SIDE || grid->height > MNAV_MAX_GRID_SIDE)
+    {
+        return mnav_errorLimit;
     }
     const mnavQueryFilter* usable = nullptr;
     mnavResult checked = mnavCheckFilter(filter, &usable);

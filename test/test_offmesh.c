@@ -85,7 +85,7 @@ static void TestLinksAttachAtTheCommit(void)
     mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
     mnavLinkState state;
-    CHECK(mnavGetLink(navmesh, id, &state) == mnav_errorNotLoaded && !state.attached,
+    CHECK(mnavGetLink(navmesh, id, &state) == mnav_errorState && !state.attached,
           "not before the commit");
     CHECK(mnavCommit(navmesh) == mnav_success, "committed");
     state = Get(navmesh, id);
@@ -262,17 +262,19 @@ static void TestDefsAndLimits(void)
     mnavLinkId id;
     mnavLinkDef link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
     link.radius = -1.0f;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "a negative radius");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "a negative radius");
     link.radius = MNAV_MAX_LINK_RADIUS * 2.0f;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "too wide");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "too wide");
+    link.radius = INFINITY;
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "an infinite radius");
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
     link.cost = NAN;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "a NaN cost");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "a NaN cost");
     link.cost = -1.0f;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "a negative cost");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "a negative cost");
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
     link.kind = MNAV_LINK_KINDS;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "no such kind");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "no such kind");
     // Ends farther than bake input may lie: past the extent on the ground
     // or in height, and an edge link whose ends are far enough apart that
     // their difference overflows.
@@ -284,19 +286,22 @@ static void TestDefsAndLimits(void)
               mnavStageLinkRemoval(navmesh, id) == mnav_success,
           "at the extent");
     link.end.x = def.origin.x + ground * 1.001;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "past the extent");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "past the extent");
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
     link.start.y = def.origin.y - height * 1.001;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "below the extent");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "below the extent");
     link = Link(-1.0e308, 7.5, 1.0e308, 7.5, 0.5f);
     link.width = 2.0f;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorRange, "an overflowing edge link");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "an overflowing edge link");
     link = Link(7.5, 7.5, 7.5 + 1.0e-200, 7.5, 0.5f);
     link.width = 2.0f;
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid,
           "an edge link of ends too near for a direction");
     link = Link(7.5, 7.5, (double)INFINITY, 7.5, 0.5f);
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "an end not finite");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit,
+          "an infinite end, past the extent");
+    link = Link(7.5, 7.5, (double)NAN, 7.5, 0.5f);
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "a NaN end");
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
     CHECK(mnavStageLink(nullptr, &link, &id) == mnav_errorInvalid &&
               mnavStageLink(navmesh, nullptr, &id) == mnav_errorInvalid &&
@@ -306,7 +311,7 @@ static void TestDefsAndLimits(void)
           "NULL arguments");
     mnavLinkId a = Stage(navmesh, link);
     (void)Stage(navmesh, link);
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "past the links limit");
+    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorCapacity, "past the links limit");
     CHECK(mnavStageLinkRemoval(navmesh, a) == mnav_success &&
               mnavStageLink(navmesh, &link, &id) == mnav_success,
           "room again");
@@ -321,10 +326,10 @@ static void TestFailedCommitKeepsLinksStaged(void)
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
     CHECK(mnavStageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
                   mnav_success &&
-              mnavCommit(navmesh) == mnav_errorLimit,
+              mnavCommit(navmesh) == mnav_errorCapacity,
           "past the tiles limit");
     mnavLinkState state;
-    CHECK(mnavGetLink(navmesh, id, &state) == mnav_errorNotLoaded, "the link still staged");
+    CHECK(mnavGetLink(navmesh, id, &state) == mnav_errorState, "the link still staged");
     CHECK(mnavStageTileRemoval(navmesh, 1, 0) == mnav_success &&
               mnavCommit(navmesh) == mnav_success && Get(navmesh, id).attached,
           "committed with the tile unstaged");

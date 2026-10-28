@@ -22,7 +22,7 @@ Terms the code, the tests and the documentation use with one meaning.
 - **Golden value:** a hash of a promised output, committed in a test.
 - **Hierarchy:** clusters of tiles and the costs between their entrances, for long paths.
 - **Layer region:** a region of open space that never lies over itself, so multi-floor buildings stay apart.
-- **Limit:** a named bound in a def on work or memory, never on time. Reaching it is `mnav_errorLimit`.
+- **Limit:** a named bound in a def on work or memory, never on time. Reaching it is `mnav_errorCapacity`; a fixed bound of the library, published as an `MNAV_MAX_` or `MNAV_MIN_` constant, is `mnav_errorLimit`.
 - **Not loaded:** a place with no committed tile. Not a wall: nothing is known there.
 - **Off-mesh link:** a way between two points the ground does not join (a jump, a ladder, a door), snapped to polygons at each commit.
 - **Open space:** the walkable span tops of a tile's heightfield, linked to the spans an agent can step to.

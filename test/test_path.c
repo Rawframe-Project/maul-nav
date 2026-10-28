@@ -305,17 +305,19 @@ static void TestQueryDefsAreChecked(void)
     mnavQueryDef def = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     def.limits.nodes = 0;
-    CHECK(mnavCreateQuery(&def, &query) == mnav_errorRange && query == nullptr, "no nodes");
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid && query == nullptr, "no nodes");
     def = mnavDefaultQueryDef();
     def.limits.nodes = MNAV_MAX_QUERY_NODES + 1;
-    CHECK(mnavCreateQuery(&def, &query) == mnav_errorRange, "too many nodes");
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorLimit, "too many nodes");
     def = mnavDefaultQueryDef();
     def.limits.pathLength = 0.0f;
-    CHECK(mnavCreateQuery(&def, &query) == mnav_errorRange, "no length");
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid, "no length");
     def.limits.pathLength = NAN;
-    CHECK(mnavCreateQuery(&def, &query) == mnav_errorRange, "a NaN length");
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid, "a NaN length");
     def.limits.pathLength = MNAV_MAX_PATH_LENGTH * 2.0f;
-    CHECK(mnavCreateQuery(&def, &query) == mnav_errorRange, "too long");
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorLimit, "too long");
+    def.limits.pathLength = INFINITY;
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorLimit, "an infinite length");
     def = (mnavQueryDef){0};
     CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid, "not from the default");
     CHECK(mnavCreateQuery(nullptr, &query) == mnav_errorInvalid &&

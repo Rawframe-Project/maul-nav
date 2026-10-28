@@ -333,7 +333,7 @@ static mnavResult Commit(Work* work, int32_t added, int32_t maxPolygons)
     int32_t kept = mesh->polygonCount - work->touchingCount;
     if (kept + added > maxPolygons)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     mnavResult result =
         mnavReserve(work->memory, (void**)&mesh->polygons, &mesh->polygonCapacity,

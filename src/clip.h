@@ -10,13 +10,15 @@
 #include "polymesh.h"
 
 #include "maul-nav/base.h"
+#include "maul-nav/query.h"
 
 #include <stdint.h>
 
 // The corners a polygon clipped to the 32-gon has in exact arithmetic:
 // each of the 32 cuts adds at most one. Rounding can add a second at a
 // cut, so the clip checks its room at every write.
-#define MNAV_CLIP_CORNERS (MNAV_POLYGON_VERTICES + 32)
+#define MNAV_CLIP_CORNERS MNAV_MAX_CLIP_CORNERS
+static_assert(MNAV_CLIP_CORNERS == MNAV_POLYGON_VERTICES + 32, "a cut adds a corner");
 
 // Clips the convex polygon of count corners, at most
 // MNAV_POLYGON_VERTICES, to the 32-gon inscribed in the circle on the

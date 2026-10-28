@@ -235,7 +235,7 @@ static void TestChecksAndBuffer(const mnavNavmesh* navmesh)
     def = Def();
     def.spacing = 0.0f;
     CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_errorRange,
+              mnav_errorInvalid,
           "no spacing");
     float cell = mnavDefaultBakeDef().cellSize;
     def.spacing = nextafterf(cell, 0.0f);
@@ -247,9 +247,18 @@ static void TestChecksAndBuffer(const mnavNavmesh* navmesh)
               mnav_success,
           "a spacing of one cell");
     def = Def();
+    def.dropMax = MNAV_MAX_LINK_REACH * 2.0f;
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
+              mnav_errorLimit,
+          "a drop past the reach");
+    def.dropMax = INFINITY;
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
+              mnav_errorLimit,
+          "an infinite drop");
+    def = Def();
     def.detour = 0.5f;
     CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_errorRange,
+              mnav_errorInvalid,
           "a detour under 1");
     def = Def();
     def.cookie = 0;

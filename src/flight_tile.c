@@ -186,7 +186,7 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, const mnavFl
 {
     if (size < MNAV_FLIGHT_HEADER_BYTES || memcmp(bytes, MAGIC, sizeof(MAGIC)) != 0)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileHeader, -1);
+        return Refuse(mnav_errorFormat, mnav_tileHeader, -1);
     }
     mnavByteReader r = {bytes + sizeof(MAGIC), MNAV_FLIGHT_HEADER_BYTES - sizeof(MAGIC), false};
     if (mnavGetU16(&r) != MNAV_FLIGHT_FORMAT)
@@ -201,7 +201,7 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, const mnavFl
     if (payload != size - MNAV_FLIGHT_HEADER_BYTES || payload > INT32_MAX ||
         mnavHash64(MNAV_HASH_INIT, bytes + MNAV_FLIGHT_HEADER_BYTES, (int32_t)payload) != hash)
     {
-        return Refuse(mnav_errorInvalid, mnav_tilePayload, -1);
+        return Refuse(mnav_errorFormat, mnav_tilePayload, -1);
     }
     mnavFieldsResult read =
         mnavReadFields(bytes + MNAV_FLIGHT_HEADER_BYTES, payload, count, TAGS, FIELDS, fields);
@@ -214,32 +214,32 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, const mnavFl
     const mnavField* flight = &fields[FIELD_FLIGHT];
     if (flight->size != FLIGHT_BYTES)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileHeader, -1);
+        return Refuse(mnav_errorFormat, mnav_tileHeader, -1);
     }
     r = (mnavByteReader){flight->bytes, flight->size, false};
     tile->tileX = (int32_t)(uint32_t)mnavGetU32(&r);
     tile->tileZ = (int32_t)(uint32_t)mnavGetU32(&r);
     if (!SameSettings(&r, def, shape))
     {
-        return Refuse(mnav_errorInvalid, mnav_tileHeader, -1);
+        return Refuse(mnav_errorFormat, mnav_tileHeader, -1);
     }
     if (fields[FIELD_ROOTS].size != (size_t)shape->cubeCount * ROOT_BYTES)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileFlightRoots, -1);
+        return Refuse(mnav_errorFormat, mnav_tileFlightRoots, -1);
     }
     if (fields[FIELD_NODES].size % NODE_BYTES != 0)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileFlightNodes, -1);
+        return Refuse(mnav_errorFormat, mnav_tileFlightNodes, -1);
     }
     if (fields[FIELD_LEAVES].size % LEAF_BYTES != 0)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileFlightLeaves, -1);
+        return Refuse(mnav_errorFormat, mnav_tileFlightLeaves, -1);
     }
     size_t nodes = fields[FIELD_NODES].size / NODE_BYTES;
     size_t leaves = fields[FIELD_LEAVES].size / LEAF_BYTES;
     if (nodes > (size_t)def->limits.tileNodes || leaves > (size_t)def->limits.tileLeaves)
     {
-        return Refuse(mnav_errorLimit, mnav_tileHeader, -1);
+        return Refuse(mnav_errorFormat, mnav_tileHeader, -1);
     }
     tile->side = def->tileVoxels;
     tile->floorVoxel = shape->floorVoxel;
@@ -291,12 +291,12 @@ static mnavTileResult ReadCube(mnavByteReader* r, mnavFlightTile* tile, int32_t 
         {
             if (w->node >= tile->nodeCount)
             {
-                return Refuse(mnav_errorInvalid, mnav_tileFlightNodes, tile->nodeCount);
+                return Refuse(mnav_errorFormat, mnav_tileFlightNodes, tile->nodeCount);
             }
             uint32_t mask = (uint32_t)mnavGetU16(r);
             if (!MixedMask(mask))
             {
-                return Refuse(mnav_errorInvalid, mnav_tileFlightNodes, w->node);
+                return Refuse(mnav_errorFormat, mnav_tileFlightNodes, w->node);
             }
             bool last = l == levels - 1;
             int64_t first = last ? w->leaf + next : base + count + next;
@@ -336,11 +336,11 @@ static mnavTileResult ReadNodes(mnavByteReader* r, mnavFlightTile* tile)
     }
     if (w.node != tile->nodeCount)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileFlightNodes, w.node);
+        return Refuse(mnav_errorFormat, mnav_tileFlightNodes, w.node);
     }
     if (w.leaf != tile->leafCount)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileFlightLeaves, -1);
+        return Refuse(mnav_errorFormat, mnav_tileFlightLeaves, -1);
     }
     return Accept();
 }
@@ -358,7 +358,7 @@ static mnavTileResult ReadPayload(const mnavField fields[FIELDS], mnavFlightTile
         tile->roots[c] = (uint8_t)mnavGetU8(&r);
         if (tile->roots[c] > MNAV_FLIGHT_MIXED)
         {
-            return Refuse(mnav_errorInvalid, mnav_tileFlightRoots, c);
+            return Refuse(mnav_errorFormat, mnav_tileFlightRoots, c);
         }
     }
     r = Over(&fields[FIELD_NODES]);
@@ -369,7 +369,7 @@ static mnavTileResult ReadPayload(const mnavField fields[FIELDS], mnavFlightTile
         tile->leaves[k] = mnavGetU64(&r);
         if (tile->leaves[k] == 0 || tile->leaves[k] == UINT64_MAX)
         {
-            result = Refuse(mnav_errorInvalid, mnav_tileFlightLeaves, k);
+            result = Refuse(mnav_errorFormat, mnav_tileFlightLeaves, k);
         }
     }
     return result;

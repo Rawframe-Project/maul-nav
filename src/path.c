@@ -567,16 +567,25 @@ void mnavRestartSearch(mnavQuery* query, int32_t n)
     s->best = last;
 }
 
-// Whether a search began and may go on on this navmesh: no commit to it
-// since.
+// Whether a search began and may go on on this navmesh: mnav_errorState
+// for none begun or a commit to the navmesh since, mnav_errorInvalid for
+// another navmesh.
 static mnavResult CheckSearch(const mnavQuery* query, const mnavNavmesh* navmesh)
 {
-    if (query == nullptr || navmesh == nullptr || !query->search.active)
+    if (query == nullptr || navmesh == nullptr)
     {
         return mnav_errorInvalid;
     }
     const mnavSearch* s = &query->search;
-    return s->navmesh == navmesh && s->commits == navmesh->commits ? mnav_success : mnav_errorStale;
+    if (!s->active)
+    {
+        return mnav_errorState;
+    }
+    if (s->navmesh != navmesh)
+    {
+        return mnav_errorInvalid;
+    }
+    return s->commits == navmesh->commits ? mnav_success : mnav_errorState;
 }
 
 static bool Ended(const mnavQuery* query)

@@ -61,7 +61,7 @@ static void GuideBake(void)
     mnavBakeDef def = mnavDefaultBakeDef();   // agent, cells, limits, tier
     mnavBaker* baker = NULL;
     mnavBakeDefResult made = mnavCreateBaker(&def, &baker);
-    // made.result; on mnav_errorInvalid, made.setting names the bad setting.
+    // made.result; on a refused def, made.setting names the bad setting.
 
     mnavTriangleMesh mesh = {vertices, vertexCount, indices, triangleCount, NULL};
     mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};   // meshes, terrains, volumes, index

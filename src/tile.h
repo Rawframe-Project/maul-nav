@@ -55,7 +55,7 @@ void mnavReleaseTileBytes(mnavMemory* memory, uint8_t* bytes, size_t size);
 
 // Reads a tile from size bytes. On success the meshes hold what was
 // written (regions are not stored and read as 0); on failure nothing is
-// held. A malformed tile is mnav_errorInvalid, another format version
+// held. A malformed tile is mnav_errorFormat, another format version
 // mnav_errorVersion.
 mnavTileResult mnavDecodeTile(mnavMemory* memory, const uint8_t* bytes, size_t size,
                               mnavTileInfo* info, mnavPolyMesh* mesh, mnavDetailMesh* detail);

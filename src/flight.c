@@ -246,7 +246,7 @@ static mnavResult Room(mnavMemory* memory, const mnavFlightLimits* limits, mnavF
 {
     if (nodes > limits->tileNodes || leaves > limits->tileLeaves)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     mnavResult r = mnavReserve(memory, (void**)&t->nodes, &t->nodeCapacity, t->nodeCount, nodes,
                                sizeof(mnavFlightNode), alignof(mnavFlightNode));

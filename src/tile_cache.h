@@ -56,7 +56,7 @@ typedef struct mnavCachedTile
 
 // Keeps a tile's field, packed, and its volumes, replacing what the
 // cache held for it; tile gives the tile's place and hashes, scratch the
-// memory packing works in. mnav_errorLimit when the cache holds its most
+// memory packing works in. mnav_errorCapacity when the cache holds its most
 // tiles or bytes, the tile's old entry then dropped.
 mnavResult mnavCacheTile(mnavTileCache* cache, mnavMemory* scratch, const mnavCachedTile* tile,
                          const mnavCompactField* field, const mnavBakeVolume* volumes,

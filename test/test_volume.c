@@ -322,10 +322,10 @@ static void TestChecks(mnavBaker* baker)
     r = Refused(baker, v, mnav_errorInvalid);
     CHECK(r.input.element == mnav_elementPoint && r.input.index == 2, "a NaN point");
     points[2] = (mnavVec2){1e9f, 4};
-    r = Refused(baker, v, mnav_errorRange);
+    r = Refused(baker, v, mnav_errorLimit);
     CHECK(r.input.element == mnav_elementPoint && r.input.index == 2, "a point too far");
     points[2] = (mnavVec2){4, -1e9f};
-    r = Refused(baker, v, mnav_errorRange);
+    r = Refused(baker, v, mnav_errorLimit);
     CHECK(r.input.element == mnav_elementPoint && r.input.index == 2, "a point too far along Z");
     // After a terrain too.
     const float heights[4] = {0, 0, 0, 0};
@@ -399,7 +399,7 @@ static void TestBake(mnavBaker* baker)
     mnavBaker* small = nullptr;
     CHECK(mnavCreateBaker(&def, &small).result == mnav_success, "baker");
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, all, 3, nullptr};
-    CHECK(mnavBakeTile(small, &input, 0, 0, &report) == mnav_errorLimit && report.mesh == -1,
+    CHECK(mnavBakeTile(small, &input, 0, 0, &report) == mnav_errorCapacity && report.mesh == -1,
           "points over the input limit");
     mnavVec2 many[16];
     for (int32_t k = 0; k < 16; ++k)
@@ -408,7 +408,7 @@ static void TestBake(mnavBaker* baker)
     }
     const mnavBakeVolume big = {many, 16, -1, 1, mnav_volumeExclude, 0};
     const mnavBakeInput alone = {nullptr, 0, nullptr, 0, &big, 1, nullptr};
-    CHECK(mnavBakeTile(small, &alone, 0, 0, &report) == mnav_errorLimit && report.mesh == 0,
+    CHECK(mnavBakeTile(small, &alone, 0, 0, &report) == mnav_errorCapacity && report.mesh == 0,
           "one volume over the input limit, named");
     mnavDestroyBaker(small);
     def.limits.inputTriangles += 1;

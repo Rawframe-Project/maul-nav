@@ -54,8 +54,8 @@ static uint8_t Byte(Reader* r)
 
 static bool Typed(mnavResult result)
 {
-    return result == mnav_success || result == mnav_errorInvalid || result == mnav_errorRange ||
-           result == mnav_errorLimit || result == mnav_errorStale || result == mnav_errorCapacity;
+    return result == mnav_success || result == mnav_errorInvalid || result == mnav_errorLimit ||
+           result == mnav_errorState || result == mnav_errorCapacity;
 }
 
 // An area: mostly walkable, some dearer, some blocked, now and then one
@@ -248,7 +248,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         // A repair before the work ends is stale.
         Expect(mnavBeginFlowField(whole, &grid, &filter, window, goals, goalCount) ==
                    mnav_success &&
-               mnavUpdateFlowField(whole, &grid, goals, goalCount, nullptr, 0) == mnav_errorStale);
+               mnavUpdateFlowField(whole, &grid, goals, goalCount, nullptr, 0) == mnav_errorState);
     }
     mnavDestroyFlowField(stepped);
     mnavDestroyFlowField(whole);

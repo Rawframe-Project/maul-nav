@@ -256,7 +256,7 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, mnavTileInfo
 {
     if (size < MNAV_TILE_HEADER_BYTES || memcmp(bytes, MAGIC, sizeof(MAGIC)) != 0)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileHeader, -1);
+        return Refuse(mnav_errorFormat, mnav_tileHeader, -1);
     }
     mnavByteReader r = {bytes + sizeof(MAGIC), MNAV_TILE_HEADER_BYTES - sizeof(MAGIC), false};
     if (mnavGetU16(&r) != MNAV_TILE_FORMAT)
@@ -273,7 +273,7 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, mnavTileInfo
     if (payload != size - MNAV_TILE_HEADER_BYTES || payload > INT32_MAX ||
         mnavHash64(MNAV_HASH_INIT, bytes + MNAV_TILE_HEADER_BYTES, (int32_t)payload) != hash)
     {
-        return Refuse(mnav_errorInvalid, mnav_tilePayload, -1);
+        return Refuse(mnav_errorFormat, mnav_tilePayload, -1);
     }
     mnavFieldsResult read =
         mnavReadFields(bytes + MNAV_TILE_HEADER_BYTES, payload, count, TAGS, FIELDS, fields);
@@ -286,7 +286,7 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, mnavTileInfo
     const mnavField* tile = &fields[FIELD_INFO];
     if (tile->size != INFO_BYTES)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileHeader, -1);
+        return Refuse(mnav_errorFormat, mnav_tileHeader, -1);
     }
     r = (mnavByteReader){tile->bytes, tile->size, false};
     info->x = (int32_t)(uint32_t)mnavGetU32(&r);
@@ -300,7 +300,7 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, mnavTileInfo
     info->origin.x = mnavBitsDouble(mnavGetU64(&r));
     info->origin.y = mnavBitsDouble(mnavGetU64(&r));
     info->origin.z = mnavBitsDouble(mnavGetU64(&r));
-    return ValidInfo(info) ? Accept() : Refuse(mnav_errorInvalid, mnav_tileHeader, -1);
+    return ValidInfo(info) ? Accept() : Refuse(mnav_errorFormat, mnav_tileHeader, -1);
 }
 
 // Counts each field's records from its length, which must hold whole
@@ -311,7 +311,7 @@ static mnavTileResult Count(const mnavField fields[FIELDS], Counts* counts)
     const mnavField* vertices = &fields[FIELD_VERTICES];
     if (vertices->size % VERTEX_BYTES != 0 || vertices->size / VERTEX_BYTES > UINT16_MAX)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileVertices, -1);
+        return Refuse(mnav_errorFormat, mnav_tileVertices, -1);
     }
     counts->vertices = (int32_t)(vertices->size / VERTEX_BYTES);
     const mnavField* polygons = &fields[FIELD_POLYGONS];
@@ -324,7 +324,7 @@ static mnavTileResult Count(const mnavField fields[FIELDS], Counts* counts)
         if (corners < 3 || corners > MNAV_POLYGON_VERTICES || record > polygons->size - at ||
             count == UINT16_MAX)
         {
-            return Refuse(mnav_errorInvalid, mnav_tilePolygons, count);
+            return Refuse(mnav_errorFormat, mnav_tilePolygons, count);
         }
         at += record;
         count += 1;
@@ -332,15 +332,15 @@ static mnavTileResult Count(const mnavField fields[FIELDS], Counts* counts)
     counts->polygons = count;
     if (fields[FIELD_PARTS].size != (size_t)count * PART_BYTES)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileDetailParts, -1);
+        return Refuse(mnav_errorFormat, mnav_tileDetailParts, -1);
     }
     if (fields[FIELD_DETAIL_VERTICES].size % VERTEX_BYTES != 0)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileDetailVertices, -1);
+        return Refuse(mnav_errorFormat, mnav_tileDetailVertices, -1);
     }
     if (fields[FIELD_TRIANGLES].size % TRIANGLE_BYTES != 0)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileDetailTriangles, -1);
+        return Refuse(mnav_errorFormat, mnav_tileDetailTriangles, -1);
     }
     counts->detailVertices = (int64_t)(fields[FIELD_DETAIL_VERTICES].size / VERTEX_BYTES);
     counts->detailTriangles = (int64_t)(fields[FIELD_TRIANGLES].size / TRIANGLE_BYTES);
@@ -393,7 +393,7 @@ static mnavTileResult ReadVertices(mnavByteReader* r, mnavPolyMesh* mesh, int32_
         vertex->z = (uint16_t)mnavGetU16(r);
         if (r->exhausted || vertex->x > mesh->tileCells || vertex->z > mesh->tileCells)
         {
-            return Refuse(mnav_errorInvalid, mnav_tileVertices, v);
+            return Refuse(mnav_errorFormat, mnav_tileVertices, v);
         }
         mesh->vertexCount += 1;
     }
@@ -525,7 +525,7 @@ static mnavTileResult ReadPolygons(mnavByteReader* r, mnavPolyMesh* mesh, int32_
     {
         if (!ReadPolygon(r, mesh, count, &mesh->polygons[p]))
         {
-            return Refuse(mnav_errorInvalid, mnav_tilePolygons, p);
+            return Refuse(mnav_errorFormat, mnav_tilePolygons, p);
         }
         mesh->polygonCount += 1;
     }
@@ -533,7 +533,7 @@ static mnavTileResult ReadPolygons(mnavByteReader* r, mnavPolyMesh* mesh, int32_
     {
         if (!Convex(mesh, &mesh->polygons[p]) || !Linked(mesh, p))
         {
-            return Refuse(mnav_errorInvalid, mnav_tilePolygons, p);
+            return Refuse(mnav_errorFormat, mnav_tilePolygons, p);
         }
     }
     return Accept();
@@ -554,7 +554,7 @@ static mnavTileResult ReadParts(mnavByteReader* r, const mnavPolyMesh* mesh, con
         if (r->exhausted || count > MNAV_DETAIL_VERTICES || parts < 1 ||
             parts > 2 * MNAV_DETAIL_VERTICES)
         {
-            return Refuse(mnav_errorInvalid, mnav_tileDetailParts, p);
+            return Refuse(mnav_errorFormat, mnav_tileDetailParts, p);
         }
         detail->parts[p] =
             (mnavDetailPart){(int32_t)vertices, (int32_t)triangles, (uint8_t)count, (uint8_t)parts};
@@ -564,7 +564,7 @@ static mnavTileResult ReadParts(mnavByteReader* r, const mnavPolyMesh* mesh, con
     }
     if (extra != counts->detailVertices || triangles != counts->detailTriangles)
     {
-        return Refuse(mnav_errorInvalid, mnav_tileDetailParts, -1);
+        return Refuse(mnav_errorFormat, mnav_tileDetailParts, -1);
     }
     return Accept();
 }
@@ -604,7 +604,7 @@ static mnavTileResult ReadDetailVertices(mnavMemory* memory, mnavByteReader* r,
             out[k].z = (int32_t)mnavGetU16(r);
             if (r->exhausted || out[k].x > limit || out[k].z > limit)
             {
-                return Refuse(mnav_errorInvalid, mnav_tileDetailVertices, extra);
+                return Refuse(mnav_errorFormat, mnav_tileDetailVertices, extra);
             }
             extra += 1;
         }
@@ -639,7 +639,7 @@ static mnavTileResult ReadDetailTriangles(mnavMemory* memory, mnavByteReader* r,
             }
             if (r->exhausted || !inside)
             {
-                return Refuse(mnav_errorInvalid, mnav_tileDetailTriangles, t);
+                return Refuse(mnav_errorFormat, mnav_tileDetailTriangles, t);
             }
         }
     }

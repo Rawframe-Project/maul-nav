@@ -108,8 +108,8 @@ static void Load(const uint8_t* data, size_t size)
     }
     else
     {
-        Expect(result.result == mnav_errorInvalid || result.result == mnav_errorVersion ||
-               result.result == mnav_errorLimit);
+        Expect(result.result == mnav_errorFormat || result.result == mnav_errorVersion ||
+               result.result == mnav_errorCapacity);
     }
     Expect(memory.used == 0);
     free(bytes);
@@ -367,7 +367,7 @@ static void CheckPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3
     Expect(mnavDebugFlightPath(&path, &buffer) == mnav_success && buffer.lineCount == 2 * last);
     mnavResult drawn = mnavDebugFlight(volume, (mnavPos3){a.x - 4.0, a.y - 4.0, a.z - 4.0},
                                        (mnavPos3){a.x + 4.0, a.y + 4.0, a.z + 4.0}, &buffer);
-    Expect(drawn == mnav_success || drawn == mnav_errorCapacity || drawn == mnav_errorRange);
+    Expect(drawn == mnav_success || drawn == mnav_errorCapacity || drawn == mnav_errorLimit);
     // A path found is clear by the path check too.
     int32_t step = 0;
     Expect(mnavCheckFlightPath(volume, path.points, path.pointCount, &step, nullptr) ==

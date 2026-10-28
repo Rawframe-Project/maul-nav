@@ -62,7 +62,7 @@ typedef struct mnavFieldsResult
 // known[i] lands in fields[i]. An unknown tag is mnav_errorVersion; a
 // head or payload past the end, a field out of order or repeated, a
 // field of no bytes, a padding byte not 0, or bytes after the last field
-// is mnav_errorInvalid.
+// is mnav_errorFormat.
 mnavFieldsResult mnavReadFields(const uint8_t* bytes, size_t size, uint64_t count,
                                 const uint32_t* known, int32_t knownCount, mnavField* fields);
 

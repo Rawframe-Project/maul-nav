@@ -254,9 +254,10 @@ static MNAV_NOINLINE mnavTileResult StageTileWork(mnavNavmesh* navmesh, const ui
     *tile = (mnavTile){0};
     mnavTileResult result =
         mnavDecodeTile(memory, bytes, size, &tile->info, &tile->mesh, &tile->detail);
+    // Settings of another def are a check on the bytes too.
     if (result.result == mnav_success && !Matches(navmesh, &tile->info))
     {
-        result = (mnavTileResult){mnav_errorInvalid, mnav_tileHeader, -1};
+        result = (mnavTileResult){mnav_errorFormat, mnav_tileHeader, -1};
     }
     int32_t held = 0;
     if (result.result == mnav_success && navmesh->def.tier < mnav_tierDynamic &&
@@ -460,7 +461,7 @@ static mnavResult BuildLinks(mnavNavmesh* navmesh, mnavTilePlan* plan, int32_t s
         relink.firstLink[p + 1] += relink.firstLink[p];
     }
     relink.linkCount = relink.firstLink[polygons];
-    result = relink.linkCount > navmesh->def.limits.tileLinks ? mnav_errorLimit : mnav_success;
+    result = relink.linkCount > navmesh->def.limits.tileLinks ? mnav_errorCapacity : mnav_success;
     if (result == mnav_success)
     {
         result = mnavAllocate(memory, (size_t)relink.linkCount, sizeof(mnavLink), alignof(mnavLink),
@@ -662,7 +663,7 @@ static mnavResult MakePlan(mnavNavmesh* navmesh, mnavTilePlan* plan)
     PlanPlaces(navmesh, plan);
     if (plan->placeCount > navmesh->def.limits.tiles)
     {
-        return mnav_errorLimit;
+        return mnav_errorCapacity;
     }
     for (int32_t s = 0; s < plan->slotCount && result == mnav_success; ++s)
     {

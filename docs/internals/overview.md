@@ -52,7 +52,7 @@ host geometry ── bake_input, input (checks) ── tile_index (optional, sha
 
 Every creation takes a def from its `mnavDefault...Def` function, which is `static inline`, so it is built in the program. Each def carries a cookie, checked first, so an uninitialized def is refused instead of read. Maul Nav has no single root object: a program may start with a baker, a navmesh, a query context, an avoidance set or a flow field. So every creation that takes no other library object, and `mnavSteer`, is a root: its def also carries `MNAV_ABI_VERSION`, the version of the headers the program was built with, checked second, before anything else is read. The query filter and the link generation def carry only a cookie, since every call that reads them also takes an object a root made.
 
-A def's named limits count work, never time: nodes per search, polygons per tile, agents per step, bytes held. Each object takes the memory its limits need when it is made, so a call cannot fail for memory midway, and reaching a limit is `mnav_errorLimit` with no work half done. A limit in seconds would make a bake's outcome depend on the machine.
+A def's named limits count work, never time: nodes per search, polygons per tile, agents per step, bytes held. Each object takes the memory its limits need when it is made, so a call cannot fail for memory midway, and reaching a limit is `mnav_errorCapacity` with no work half done. A limit in seconds would make a bake's outcome depend on the machine.
 
 ## Hostile input and invariants
 

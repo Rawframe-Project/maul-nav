@@ -72,11 +72,10 @@ extern "C"
     ///
     /// @param def          The def the tiles are baked with.
     /// @param navmeshOut   Receives the navmesh, or NULL on failure.
-    /// @return `mnav_success`; `mnav_errorInvalid` with the setting for an
-    /// invalid def or a NULL argument; `mnav_errorVersion` for a def built
-    /// against another version of the headers; `mnav_errorLimit` when the
-    /// navmesh does not fit the def's memory limit; `mnav_errorCapacity` when
-    /// the allocator fails.
+    /// @return `mnav_success`; for a def mnavValidateBakeDef refuses, the
+    /// status and setting it gives; `mnav_errorInvalid` for a NULL
+    /// navmeshOut; `mnav_errorCapacity` when the navmesh does not fit the
+    /// def's memory limit or the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavCreateNavmesh(const mnavBakeDef* def,
@@ -97,12 +96,13 @@ extern "C"
     /// @param navmesh  The navmesh.
     /// @param bytes    The tile's bytes, as mnavCopyBakedTile gives them.
     /// @param size     Their size in bytes.
-    /// @return `mnav_success`; `mnav_errorInvalid` naming the section and
-    /// element for malformed bytes, a tile baked with other settings
-    /// (the header) or a NULL argument; `mnav_errorVersion` for another
-    /// tile format version; `mnav_errorLimit` past the memory limit;
-    /// `mnav_errorCapacity` when the allocator fails; `mnav_errorTier` for
-    /// a tile at a place where one is committed, below mnav_tierDynamic.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument;
+    /// `mnav_errorFormat` naming the section and element for malformed
+    /// bytes, or a tile baked with other settings (the header);
+    /// `mnav_errorVersion` for another tile format version;
+    /// `mnav_errorCapacity` past the memory limit or when the allocator
+    /// fails; `mnav_errorTier` for a tile at a place where one is
+    /// committed, below mnav_tierDynamic.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
     /// Staging changes nothing queries read, but it may not run beside
@@ -117,8 +117,8 @@ extern "C"
     /// @param tileX    The tile's column.
     /// @param tileZ    The tile's row.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
-    /// `mnav_errorLimit` past the memory limit; `mnav_errorCapacity` when
-    /// the allocator fails.
+    /// `mnav_errorCapacity` past the memory limit or when the allocator
+    /// fails.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX,
@@ -133,9 +133,9 @@ extern "C"
     ///
     /// @param navmesh  The navmesh.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
-    /// `mnav_errorLimit` when the tiles would pass the tiles limit, a tile
-    /// its tileLinks limit, or memory its limit; `mnav_errorCapacity` when
-    /// the allocator fails.
+    /// `mnav_errorCapacity` when the tiles would pass the tiles limit, a
+    /// tile its tileLinks limit, or memory its limit, or when the allocator
+    /// fails.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a commit.
@@ -292,18 +292,19 @@ extern "C"
     /// @param navmesh  The navmesh.
     /// @param def      The link.
     /// @param linkOut  Receives its id, usable once it is committed.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// point that is not finite, or an edge link whose ends lie at one
-    /// place on the ground or so near that the square of their distance
-    /// rounds to 0; `mnav_errorRange` for a point farther from the
-    /// def's origin than bake input may lie (MNAV_MAX_EXTENT_CELLS cells
-    /// on the ground, MNAV_MAX_HEIGHT_CELLS cell heights up or down), or a
-    /// radius, cost, kind or width out of its range; `mnav_errorLimit` when the links' crossings,
-    /// staged and committed, would pass the links limit, when a crossing
-    /// would need a slot from MNAV_MAX_LINKS on (left only by slots worn
-    /// out by 2^32 links each), or memory its limit: the link is refused
-    /// whole, none of its crossings taken;
-    /// `mnav_errorCapacity` when the allocator fails.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
+    /// with a NaN coordinate, or an edge link whose ends lie at one place on
+    /// the ground or so near that the square of their distance rounds to 0, a
+    /// radius, cost or width below 0 or NaN, or a kind of MNAV_LINK_KINDS or
+    /// more; `mnav_errorLimit` for a point farther from the def's origin than
+    /// bake input may lie (MNAV_MAX_EXTENT_CELLS cells on the ground,
+    /// MNAV_MAX_HEIGHT_CELLS cell heights up or down), a radius, cost or width
+    /// past its MNAV_MAX_ bound, an infinity included, or when a crossing would
+    /// need a slot from MNAV_MAX_LINKS on (left only by slots worn out by 2^32
+    /// links each); `mnav_errorCapacity` when the links' crossings, staged and
+    /// committed, would pass the links limit, or memory its limit, or when the
+    /// allocator fails. A refused link is refused whole, none of its crossings
+    /// taken.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run while a link is staged.
@@ -344,8 +345,8 @@ extern "C"
     /// @param link     The link.
     /// @param stateOut Receives its state.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or an
-    /// id never handed out; `mnav_errorNotLoaded` for a link staged and not
-    /// yet committed; `mnav_errorStale` for a link removed.
+    /// id never handed out; `mnav_errorState` for a link staged and not yet
+    /// committed; `mnav_errorStale` for a link removed.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read links and
     /// query at once between commits; none may while a stage or commit
