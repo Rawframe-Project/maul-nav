@@ -846,9 +846,13 @@ mnavResult mnavRebuildTile(mnavBaker* baker, mnavTileCache* cache, int32_t tileX
 static mnavResult CopyBakedTileWork(const mnavBaker* baker, uint8_t* bufferOut, size_t capacity,
                                     size_t* sizeOut)
 {
-    if (baker == nullptr || (bufferOut == nullptr && capacity > 0) || baker->tile == nullptr)
+    if (baker == nullptr || (bufferOut == nullptr && capacity > 0))
     {
         return mnav_errorInvalid;
+    }
+    if (baker->tile == nullptr)
+    {
+        return mnav_errorState;
     }
     if (sizeOut != nullptr)
     {

@@ -415,7 +415,7 @@ static void TestLimits(mnavBaker* baker)
     size_t size = 0;
     CHECK(mnavBakeTileCached(baker, cache, &input, 1, 0, &report) == mnav_errorCapacity &&
               report.result == mnav_errorCapacity &&
-              mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_errorInvalid,
+              mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_errorState,
           "a second tile over the limit, not baked");
     Rebuilt(baker, cache, 1, nullptr, 0, mnav_errorNotLoaded);
     Rebuilt(baker, cache, 0, nullptr, 0, mnav_success);
