@@ -1,6 +1,7 @@
 # The internal module graph: each module and the modules it may use, so
 # dependencies stay one-way. tools/check_modules.py enforces it.
-allocator: fpenv
+host_code:
+allocator: fpenv host_code
 bytes:
 fields: bytes invariant
 base:
@@ -49,12 +50,12 @@ baker: allocator bake_def bake_input border_vertices bytes compact contour detai
 tile_cache: allocator compact field_pack fpenv outline raster
 field_pack: allocator compact invariant lz raster
 lz: invariant
-navmesh: allocator bake_def detail fpenv invariant polymesh tile
+navmesh: allocator bake_def detail fpenv host_code invariant polymesh tile
 nearest: detail fpenv navmesh polymesh query_filter raster
 path: allocator fpenv funnel invariant navmesh offmesh polymesh query query_filter raster
 raycast: fpenv navmesh polymesh query query_filter
 shortest: fpenv invariant navmesh offmesh polymesh query query_filter
-query: allocator fpenv
+query: allocator fpenv host_code
 query_filter:
 offmesh: allocator fpenv invariant navmesh nearest sort
 commit: fpenv invariant modifiers navmesh offmesh

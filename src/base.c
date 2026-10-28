@@ -32,6 +32,8 @@ const char* mnavResultName(mnavResult result)
         return "mnav_errorFormat";
     case mnav_errorLimit:
         return "mnav_errorLimit";
+    case mnav_errorBusy:
+        return "mnav_errorBusy";
     case mnav_errorNotLoaded:
         return "mnav_errorNotLoaded";
     default:

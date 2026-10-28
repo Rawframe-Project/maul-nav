@@ -97,12 +97,13 @@ extern "C"
     /// @param bytes    The tile's bytes, as mnavCopyBakedTile gives them.
     /// @param size     Their size in bytes.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument;
-    /// `mnav_errorFormat` naming the section and element for malformed
-    /// bytes, or a tile baked with other settings (the header);
-    /// `mnav_errorVersion` for another tile format version;
-    /// `mnav_errorCapacity` past the memory limit or when the allocator
-    /// fails; `mnav_errorUnsupported` for a tile at a place where one is
-    /// committed, below mnav_tierDynamic.
+    /// `mnav_errorFormat` naming the section and element for malformed bytes,
+    /// or a tile baked with other settings (the header); `mnav_errorVersion`
+    /// for another tile format version; `mnav_errorCapacity` past the memory
+    /// limit or when the allocator fails; `mnav_errorUnsupported` for a tile at
+    /// a place where one is committed, below mnav_tierDynamic. Also
+    /// `mnav_errorBusy` when called back in from host code the navmesh runs
+    /// (its allocator, a clearance test), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
     /// Staging changes nothing queries read, but it may not run beside
@@ -117,8 +118,9 @@ extern "C"
     /// @param tileX    The tile's column.
     /// @param tileZ    The tile's row.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
-    /// `mnav_errorCapacity` past the memory limit or when the allocator
-    /// fails.
+    /// `mnav_errorCapacity` past the memory limit or when the allocator fails.
+    /// Also `mnav_errorBusy` when called back in from host code the navmesh
+    /// runs (its allocator, a clearance test), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX,
@@ -133,9 +135,10 @@ extern "C"
     ///
     /// @param navmesh  The navmesh.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
-    /// `mnav_errorCapacity` when the tiles would pass the tiles limit, a
-    /// tile its tileLinks limit, or memory its limit, or when the allocator
-    /// fails.
+    /// `mnav_errorCapacity` when the tiles would pass the tiles limit, a tile
+    /// its tileLinks limit, or memory its limit, or when the allocator fails.
+    /// Also `mnav_errorBusy` when called back in from host code the navmesh
+    /// runs (its allocator, a clearance test), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a commit.
@@ -151,6 +154,17 @@ extern "C"
     /// runs.
     MNAV_API mnavTier mnavGetTier(const mnavNavmesh* navmesh);
 
+    /// Returns how many calls against the navmesh were refused because they
+    /// came back in from host code it ran (`mnav_errorBusy`), since it was
+    /// made.
+    ///
+    /// @param navmesh The navmesh.
+    /// @return The count; 0 for NULL.
+    /// @par Thread safety
+    /// Safe from any thread. It may be read at any time, also while host
+    /// code the object runs calls back in.
+    MNAV_API uint64_t mnavGetNavmeshMisuse(const mnavNavmesh* navmesh);
+
     /// Stages a change of a polygon's area, applied at the next commit;
     /// mnav_areaNone blocks it. The change lasts while the polygon's tile
     /// is loaded, and is dropped when the commit replaces or removes it.
@@ -159,11 +173,12 @@ extern "C"
     /// @param navmesh The navmesh, of mnav_tierModifiers or above.
     /// @param polygon The polygon.
     /// @param area    Its new area, below MNAV_AREA_TYPES.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh, an
-    /// area out of range or an id never handed out; `mnav_errorStale` for
-    /// a polygon whose tile has been replaced or removed;
-    /// `mnav_errorUnsupported` for a static navmesh; `mnav_errorCapacity` when
-    /// memory runs out.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh, an area
+    /// out of range or an id never handed out; `mnav_errorStale` for a polygon
+    /// whose tile has been replaced or removed; `mnav_errorUnsupported` for a
+    /// static navmesh; `mnav_errorCapacity` when memory runs out. Also
+    /// `mnav_errorBusy` when called back in from host code the navmesh runs
+    /// (its allocator, a clearance test), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a stage call.
@@ -304,7 +319,8 @@ extern "C"
     /// links each); `mnav_errorCapacity` when the links' crossings, staged and
     /// committed, would pass the links limit, or memory its limit, or when the
     /// allocator fails. A refused link is refused whole, none of its crossings
-    /// taken.
+    /// taken. Also `mnav_errorBusy` when called back in from host code the
+    /// navmesh runs (its allocator, a clearance test), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run while a link is staged.
@@ -316,8 +332,10 @@ extern "C"
     ///
     /// @param navmesh  The navmesh.
     /// @param link     The link.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh or an
-    /// id never handed out; `mnav_errorStale` for a link already removed.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh or an id
+    /// never handed out; `mnav_errorStale` for a link already removed. Also
+    /// `mnav_errorBusy` when called back in from host code the navmesh runs
+    /// (its allocator, a clearance test), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run while a removal is staged.
@@ -330,9 +348,11 @@ extern "C"
     /// @param navmesh The navmesh, of mnav_tierModifiers or above.
     /// @param link    The link, committed or staged.
     /// @param enabled Whether it may be crossed.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh or an
-    /// id never handed out; `mnav_errorStale` for a link removed or staged
-    /// for removal; `mnav_errorUnsupported` for a static navmesh.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh or an id
+    /// never handed out; `mnav_errorStale` for a link removed or staged for
+    /// removal; `mnav_errorUnsupported` for a static navmesh. Also
+    /// `mnav_errorBusy` when called back in from host code the navmesh runs
+    /// (its allocator, a clearance test), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a stage call.

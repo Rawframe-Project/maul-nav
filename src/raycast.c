@@ -134,19 +134,33 @@ static void Wall(mnavRay* ray, mnavPos3 a, mnavPos3 b)
     ray->normalZ = -ex / length;
 }
 
-static MNAV_NOINLINE mnavResult RaycastWork(mnavQuery* query, const mnavNavmesh* navmesh,
-                                            const mnavQueryFilter* filter,
-                                            mnavPolygonId startPolygon, mnavPos3 start,
-                                            mnavPos3 end, mnavRay* rayOut)
+// A ray's arguments: a call back in from host code, then the arguments
+// themselves; the filter to use goes to usable.
+static mnavResult CheckRay(mnavQuery* query, const mnavNavmesh* navmesh,
+                           const mnavQueryFilter* filter, mnavPolygonId startPolygon,
+                           mnavPos3 start, mnavPos3 end, const mnavRay* rayOut,
+                           const mnavQueryFilter** usable)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (query == nullptr || navmesh == nullptr || rayOut == nullptr || !isfinite(start.x) ||
         !isfinite(start.y) || !isfinite(start.z) || !isfinite(end.x) || !isfinite(end.z))
     {
         return mnav_errorInvalid;
     }
     mnavResult result = mnavCheckPolygon(navmesh, startPolygon);
+    return result == mnav_success ? mnavCheckFilter(filter, usable) : result;
+}
+
+static MNAV_NOINLINE mnavResult RaycastWork(mnavQuery* query, const mnavNavmesh* navmesh,
+                                            const mnavQueryFilter* filter,
+                                            mnavPolygonId startPolygon, mnavPos3 start,
+                                            mnavPos3 end, mnavRay* rayOut)
+{
     const mnavQueryFilter* usable = nullptr;
-    result = result == mnav_success ? mnavCheckFilter(filter, &usable) : result;
+    mnavResult result = CheckRay(query, navmesh, filter, startPolygon, start, end, rayOut, &usable);
     if (result != mnav_success)
     {
         return result;

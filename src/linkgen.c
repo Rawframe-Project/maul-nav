@@ -169,11 +169,30 @@ static bool Near(const Gen* g, mnavPos3 start, mnavPos3 end)
     return false;
 }
 
+// The host's clearance test between two points, true without one. The
+// navmesh and the context are marked while it runs, so that a call back
+// into either that would change them is refused; the navmesh is only
+// read, and its mark is the one field this writes through it.
+static bool Clear(const Gen* g, mnavPos3 from, mnavPos3 to)
+{
+    const mnavLinkGenDef* d = g->def;
+    if (d->clear == nullptr)
+    {
+        return true;
+    }
+    mnavHostCode* navmesh = (mnavHostCode*)&g->navmesh->host;
+    mnavHostEnter(navmesh);
+    mnavHostEnter(&g->query->host);
+    bool clear = d->clear(d->context, from, to);
+    mnavHostLeave(&g->query->host);
+    mnavHostLeave(navmesh);
+    return clear;
+}
+
 static void Keep(Gen* g, Spot from, Spot to, bool drop)
 {
     const mnavLinkGenDef* d = g->def;
-    if ((d->clear != nullptr && !d->clear(d->context, from.point, to.point)) ||
-        Near(g, from.point, to.point) || Walks(g, from, to))
+    if (!Clear(g, from.point, to.point) || Near(g, from.point, to.point) || Walks(g, from, to))
     {
         return;
     }
@@ -371,6 +390,10 @@ static MNAV_NOINLINE mnavResult GenerateLinksWork(mnavQuery* query, const mnavNa
                                                   mnavLinkDef* linksOut, int32_t capacity,
                                                   int32_t* countOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     return Generate(query, navmesh, filter, def, (mnavTileRange){tileX0, tileZ0, tileX1, tileZ1},
                     linksOut, capacity, countOut,
                     (mnavLinkGenLimits){MNAV_MAX_LINKS, MNAV_MAX_LINK_LANDINGS});
@@ -393,6 +416,10 @@ GenerateLinksWithinWork(mnavQuery* query, const mnavNavmesh* navmesh, const mnav
                         const mnavLinkGenDef* def, mnavTileRange range, mnavLinkDef* linksOut,
                         int32_t capacity, int32_t* countOut, mnavLinkGenLimits limits)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     return Generate(query, navmesh, filter, def, range, linksOut, capacity, countOut, limits);
 }
 

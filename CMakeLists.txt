@@ -227,6 +227,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(clip WHITEBOX)
     maul_add_test(steer)
     maul_add_test(linkgen)
+    maul_add_test(busy)
     # Generation stopping at its limits, run small here.
     maul_add_test(linkgen_limits WHITEBOX)
     maul_add_test(debug)

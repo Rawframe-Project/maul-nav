@@ -9,6 +9,7 @@
 
 #include "allocator.h"
 #include "detail.h"
+#include "host_code.h"
 #include "polymesh.h"
 #include "tile.h"
 
@@ -111,6 +112,9 @@ struct mnavNavmesh
     mnavBakeDef def;
     mnavBakeCells cells;
     mnavMemory memory;
+    // Marked while its allocator or a link generation's clearance test
+    // runs; mutable through a const navmesh, which link generation reads.
+    mnavHostCode host;
     mnavSlot* slots;
     int32_t slotCount;
     int32_t slotCapacity;

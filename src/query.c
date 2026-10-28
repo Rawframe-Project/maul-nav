@@ -18,7 +18,7 @@
 
 void mnavDestroyQuery(mnavQuery* query)
 {
-    if (query == nullptr)
+    if (query == nullptr || mnavHostCalledBack(&query->host))
     {
         return;
     }
@@ -32,8 +32,15 @@ void mnavDestroyQuery(mnavQuery* query)
                 alignof(int32_t));
     mnavRelease(memory, query->heap, nodes, sizeof(mnavHeapEntry), alignof(mnavHeapEntry));
     mnavRelease(memory, query->nodes, nodes, sizeof(mnavSearchNode), alignof(mnavSearchNode));
+    // The mark lives in the block being freed.
     mnavMemory last = *memory;
+    last.host = nullptr;
     mnavRelease(&last, query, 1, sizeof(mnavQuery), alignof(mnavQuery));
+}
+
+uint64_t mnavGetQueryMisuse(const mnavQuery* query)
+{
+    return query != nullptr ? mnavHostMisuse(&query->host) : 0;
 }
 
 static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQuery** queryOut)
@@ -68,8 +75,8 @@ static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQue
     {
         return result;
     }
-    *query = (mnavQuery){0};
-    query->memory = memory;
+    *query = (mnavQuery){.memory = memory};
+    query->memory.host = &query->host;
     query->limits = *limits;
     // A table at least twice the nodes keeps probes short.
     uint32_t table = 2;

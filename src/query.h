@@ -7,6 +7,7 @@
 #define MAUL_NAV_SRC_QUERY_H
 
 #include "allocator.h"
+#include "host_code.h"
 
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
@@ -172,6 +173,9 @@ typedef struct mnavFlightSliced
 struct mnavQuery
 {
     mnavMemory memory;
+    // Marked while its allocator or a link generation's clearance test
+    // runs.
+    mnavHostCode host;
     mnavQueryLimits limits;
     // One block of nodes serves a navmesh, grid or flight search,
     // whichever ran last; grid and flight nodes are the smaller.

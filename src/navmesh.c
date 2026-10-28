@@ -52,6 +52,7 @@ static MNAV_NOINLINE mnavBakeDefResult CreateNavmeshWork(const mnavBakeDef* def,
     navmesh->cells = cells;
     navmesh->linkSlotLimit = MNAV_MAX_LINKS;
     navmesh->memory = memory;
+    navmesh->memory.host = &navmesh->host;
     *navmeshOut = navmesh;
     return (mnavBakeDefResult){mnav_success, mnav_settingNone};
 }
@@ -62,6 +63,11 @@ mnavBakeDefResult mnavCreateNavmesh(const mnavBakeDef* def, mnavNavmesh** navmes
     mnavBakeDefResult result = CreateNavmeshWork(def, navmeshOut);
     mnavFloatEnvLeave(env);
     return result;
+}
+
+uint64_t mnavGetNavmeshMisuse(const mnavNavmesh* navmesh)
+{
+    return navmesh != nullptr ? mnavHostMisuse(&navmesh->host) : 0;
 }
 
 static void ReleaseLinks(mnavMemory* memory, mnavTile* tile)
@@ -88,7 +94,7 @@ static void FreeTile(mnavMemory* memory, mnavTile* tile)
 
 void mnavDestroyNavmesh(mnavNavmesh* navmesh)
 {
-    if (navmesh == nullptr)
+    if (navmesh == nullptr || mnavHostCalledBack(&navmesh->host))
     {
         return;
     }
@@ -115,7 +121,9 @@ void mnavDestroyNavmesh(mnavNavmesh* navmesh)
                 alignof(mnavPlace));
     mnavRelease(memory, navmesh->slots, (size_t)navmesh->slotCapacity, sizeof(mnavSlot),
                 alignof(mnavSlot));
+    // The mark lives in the block being freed.
     mnavMemory last = *memory;
+    last.host = nullptr;
     mnavRelease(&last, navmesh, 1, sizeof(mnavNavmesh), alignof(mnavNavmesh));
 }
 
@@ -239,6 +247,10 @@ static mnavResult Stage(mnavNavmesh* navmesh, int32_t x, int32_t z, mnavTile* ti
 static MNAV_NOINLINE mnavTileResult StageTileWork(mnavNavmesh* navmesh, const uint8_t* bytes,
                                                   size_t size)
 {
+    if (navmesh != nullptr && mnavHostCalledBack(&navmesh->host))
+    {
+        return (mnavTileResult){mnav_errorBusy, mnav_tileHeader, -1};
+    }
     if (navmesh == nullptr)
     {
         return (mnavTileResult){mnav_errorInvalid, mnav_tileHeader, -1};
@@ -288,6 +300,10 @@ mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX, int32_t til
     if (navmesh == nullptr)
     {
         return mnav_errorInvalid;
+    }
+    if (mnavHostCalledBack(&navmesh->host))
+    {
+        return mnav_errorBusy;
     }
     return Stage(navmesh, tileX, tileZ, nullptr);
 }

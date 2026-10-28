@@ -442,7 +442,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, or a
     /// point with a NaN coordinate or below or above the volume;
     /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
-    /// from the origin, an infinity included.
+    /// from the origin, an infinity included. Also `mnav_errorBusy` when called
+    /// back in from a clearance test whose link generation uses the context,
+    /// one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and the volume is not changed during the search.
@@ -466,7 +468,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, or a
     /// point with a NaN coordinate or below or above the volume;
     /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels
-    /// from the origin, an infinity included.
+    /// from the origin, an infinity included. Also `mnav_errorBusy` when called
+    /// back in from a clearance test whose link generation uses the context,
+    /// one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBeginFlightPath(mnavQuery* query,
@@ -480,10 +484,11 @@ extern "C"
     /// @param volume   The volume the search began on.
     /// @param nodes    The most nodes to close, at least 1.
     /// @param endedOut Receives whether the search has ended.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument,
-    /// fewer than 1 node, or a volume other than the search's;
-    /// `mnav_errorState` for no flight search begun, or a volume committed
-    /// to since the search began: begin again.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, fewer
+    /// than 1 node, or a volume other than the search's; `mnav_errorState` for
+    /// no flight search begun, or a volume committed to since the search began:
+    /// begin again. Also `mnav_errorBusy` when called back in from a clearance
+    /// test whose link generation uses the context, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and the volume is not changed during the call.
@@ -499,8 +504,10 @@ extern "C"
     /// @param volume   The volume the search began on.
     /// @param pathOut  Receives the path.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
-    /// volume other than the search's; `mnav_errorState` for no flight
-    /// search begun, or a volume committed to since the search began.
+    /// volume other than the search's; `mnav_errorState` for no flight search
+    /// begun, or a volume committed to since the search began. Also
+    /// `mnav_errorBusy` when called back in from a clearance test whose link
+    /// generation uses the context, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time,
     /// and the volume is not changed during the call.

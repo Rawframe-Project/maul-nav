@@ -591,6 +591,10 @@ static MNAV_NOINLINE mnavResult FindWallDistanceWork(mnavQuery* query, const mna
                                                      mnavPolygonId polygon, mnavPos3 center,
                                                      double radius, mnavWall* wallOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (wallOut == nullptr || !GoodRing(query, navmesh, center, radius))
     {
         return mnav_errorInvalid;
@@ -627,6 +631,10 @@ static MNAV_NOINLINE mnavResult FindWallsWork(mnavQuery* query, const mnavNavmes
                                               mnavWallSegment* wallsOut, int32_t capacity,
                                               mnavWallsFound* foundOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (foundOut == nullptr || capacity < 0 || (wallsOut == nullptr && capacity > 0) ||
         !GoodRing(query, navmesh, center, radius))
     {
@@ -662,6 +670,10 @@ static MNAV_NOINLINE mnavResult FindRandomPointAroundWork(
     mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
     mnavPolygonId polygon, mnavPos3 center, double radius, uint64_t seed, mnavRandomPoint* pointOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (pointOut == nullptr || !GoodRing(query, navmesh, center, radius))
     {
         return mnav_errorInvalid;

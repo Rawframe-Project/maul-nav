@@ -13,6 +13,8 @@ reads or copies stored integers and bytes:
     mnavGetArea
     mnavGetTier
     mnavGetTileCacheBytes
+    mnavGetNavmeshMisuse
+    mnavGetQueryMisuse
 
 gives memory back, which the allocator does in the host's environment:
     mnavDestroyAvoidance
