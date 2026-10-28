@@ -106,8 +106,9 @@ extern "C"
     /// @param polygonsOut Receives up to capacity ids; NULL when capacity
     ///                    is 0.
     /// @param capacity    The room, at least 0.
-    /// @param foundOut    Receives the count and whether the box was all
-    ///                    loaded.
+    /// @param foundOut    Receives the count and whether the box was all loaded.
+    ///                    Zeroed on any failure but mnav_errorCapacity, which gives
+    ///                    the total.
     /// @return `mnav_success`; `mnav_errorCapacity` when more polygons meet the
     /// box than the buffer holds: it holds the first ones and foundOut counts
     /// all; `mnav_errorInvalid` for a NULL argument, a negative capacity, a
@@ -135,7 +136,7 @@ extern "C"
     /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param point        The query point.
     /// @param halfExtents  The box's half sizes, in meters, at least 0.
-    /// @param nearestOut   Receives the result.
+    /// @param nearestOut   Receives the result. Zeroed on any failure.
     /// @return `mnav_success`, also when no polygon's nearest point lies in the
     /// box (the polygon's slot is then 0); `mnav_errorInvalid` for a NULL
     /// argument, a point or extent that is not finite, a negative extent, or a
@@ -328,7 +329,7 @@ extern "C"
     /// @param start        The start point.
     /// @param endPolygon   The polygon the end point lies on.
     /// @param end          The end point.
-    /// @param pathOut      Receives the result.
+    /// @param pathOut      Receives the result. Zeroed on any failure.
     /// @return `mnav_success` whenever a search ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
     /// polygon id that never existed, or a filter not built from
@@ -374,7 +375,7 @@ extern "C"
     /// @param start        The start point.
     /// @param endPolygon   The polygon the end point lies on.
     /// @param end          The end point.
-    /// @param pathOut      Receives the result.
+    /// @param pathOut      Receives the result. Zeroed on any failure.
     /// @return `mnav_success` whenever a search ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
     /// polygon id that never existed, a filter not built from
@@ -430,7 +431,8 @@ extern "C"
     /// @param query    The context.
     /// @param navmesh  The navmesh the search began on.
     /// @param nodes    The most nodes to close, at least 1.
-    /// @param endedOut Receives whether the search has ended.
+    /// @param endedOut Receives whether the search has ended. Zeroed on any
+    ///                 failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, fewer
     /// than 1 node, or a navmesh other than the search's; `mnav_errorState` for
     /// no search begun, or a navmesh committed to since the search began: begin
@@ -449,7 +451,7 @@ extern "C"
     ///
     /// @param query    The context; its memory holds the result.
     /// @param navmesh  The navmesh the search began on.
-    /// @param pathOut  Receives the result.
+    /// @param pathOut  Receives the result. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// navmesh other than the search's; `mnav_errorState` for no search begun,
     /// or a navmesh committed to since the search began. Also `mnav_errorBusy`
@@ -505,7 +507,7 @@ extern "C"
     /// @param start        The start point.
     /// @param end          The wanted point; only its ground position
     ///                     counts.
-    /// @param moveOut      Receives the result.
+    /// @param moveOut      Receives the result. Zeroed on any failure.
     /// @return `mnav_success` whenever the move ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
     /// polygon id that never existed or a filter not built from
@@ -598,7 +600,7 @@ extern "C"
     /// @param navmesh  The navmesh.
     /// @param filter   The areas and kinds usable, or NULL for all.
     /// @param corridor The corridor.
-    /// @param validOut Receives the count.
+    /// @param validOut Receives the count. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor not well formed or a filter not built from
     /// mnavDefaultQueryFilter or with a NaN cost; `mnav_errorLimit` for a
@@ -618,7 +620,7 @@ extern "C"
     /// @param query    The context; its memory holds the corners.
     /// @param navmesh  The navmesh.
     /// @param corridor The corridor.
-    /// @param cornersOut Receives the straight path.
+    /// @param cornersOut Receives the straight path. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor not well formed or polygons not joined; `mnav_errorStale` for a
     /// polygon whose tile has been replaced or removed; `mnav_errorCapacity`
@@ -643,12 +645,14 @@ extern "C"
     /// @param query      The context; its memory holds the corners.
     /// @param navmesh    The navmesh.
     /// @param corridor   The corridor.
-    /// @param cornersOut Receives the straight path, or NULL.
+    /// @param cornersOut Receives the straight path, or NULL. Zeroed on any
+    ///                   failure.
     /// @param runsOut    Receives the runs, in order. May be NULL when
     ///                   capacity is 0.
     /// @param capacity   How many runs fit, at least 0.
-    /// @param countOut   Receives how many runs there are, also when they
-    ///                   do not all fit.
+    /// @param countOut   Receives how many runs there are, also when they do not
+    ///                   all fit. Zeroed on any failure but mnav_errorCapacity,
+    ///                   which gives the total.
     /// @return As mnavCorridorCorners; also `mnav_errorInvalid` for a NULL
     /// countOut, a negative capacity or NULL runs with a positive one, and
     /// `mnav_errorCapacity` when the runs do not fit, the first capacity of
@@ -747,7 +751,8 @@ extern "C"
     ///
     /// @param corners     The corners, the agent's position first.
     /// @param def         The def, from mnavDefaultSteerDef.
-    /// @param steeringOut Receives the velocity and state.
+    /// @param steeringOut Receives the velocity and state. Left as it was on
+    ///                    failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, corners
     /// with no points or a def not from mnavDefaultSteerDef;
     /// `mnav_errorVersion` for one built against another version of the
@@ -772,7 +777,7 @@ extern "C"
     /// @param corridor The corridor.
     /// @param wanted   Where the agent would be; only its ground position
     ///                 counts.
-    /// @param moveOut  Receives the walk, or NULL.
+    /// @param moveOut  Receives the walk, or NULL. Zeroed on any failure.
     /// @return As mnavMoveAlongSurface; also `mnav_errorInvalid` for a corridor
     /// not well formed, and `mnav_errorCapacity` when the merged corridor would
     /// outgrow its buffer, which leaves it unchanged. Also `mnav_errorBusy`
@@ -799,7 +804,7 @@ extern "C"
     /// @param corridor The corridor.
     /// @param wanted   Where the target would be; only its ground position
     ///                 counts.
-    /// @param moveOut  Receives the walk, or NULL.
+    /// @param moveOut  Receives the walk, or NULL. Zeroed on any failure.
     /// @return As mnavMoveCorridor. Also `mnav_errorBusy` when called back in
     /// from host code a call using the context runs (a link generation's
     /// clearance test, a hierarchy's allocator as it builds), one misuse
@@ -823,7 +828,8 @@ extern "C"
     /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param corridor     The corridor.
     /// @param toward       The point to look toward.
-    /// @param shortenedOut Receives whether the corridor changed.
+    /// @param shortenedOut Receives whether the corridor changed. Zeroed on any
+    ///                     failure.
     /// @return As mnavRaycast; also `mnav_errorInvalid` for a corridor not well
     /// formed or a NULL shortenedOut. Also `mnav_errorBusy` when called back in
     /// from host code a call using the context runs (a link generation's
@@ -850,8 +856,8 @@ extern "C"
     /// @param corridor    The corridor.
     /// @param halfExtents The box's half sizes for finding polygons again.
     /// @param pathOut     Receives the path, or an empty one ended
-    ///                    mnav_pathNotLoaded or mnav_pathNone when an end
-    ///                    found no polygon.
+    ///                    mnav_pathNotLoaded or mnav_pathNone when an end found no
+    ///                    polygon. Zeroed on any failure.
     /// @return `mnav_success` whenever the corridor was looked at;
     /// `mnav_errorInvalid` for a NULL argument or a corridor not well formed;
     /// `mnav_errorCapacity` when the path has more polygons than the buffer,
@@ -918,8 +924,8 @@ extern "C"
     /// @param filter  The areas usable and their costs, or NULL.
     /// @param start   The start cell.
     /// @param end     The end cell.
-    /// @param pathOut Receives the path; mnav_pathNone with the start
-    ///                alone when the start is blocked.
+    /// @param pathOut Receives the path; mnav_pathNone with the start alone when
+    ///                the start is blocked. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a grid
     /// with no areas, a side below 1 or a cell size not more than 0 or not
     /// finite, a cell outside the grid, or a filter not built from
@@ -943,11 +949,11 @@ extern "C"
     /// @param polygon   The polygon.
     /// @param x         The point's X.
     /// @param z         The point's Z.
-    /// @param heightOut Receives the height.
+    /// @param heightOut Receives the height. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// coordinate not finite or a polygon id never handed out;
-    /// `mnav_errorOutside` for a point outside the polygon on the ground,
-    /// heightOut left as it was; `mnav_errorStale` for a polygon whose tile has
+    /// `mnav_errorOutside` for a point outside the polygon on the ground;
+    /// `mnav_errorStale` for a polygon whose tile has
     /// gone.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
@@ -988,7 +994,7 @@ extern "C"
     /// @param polygon The polygon the center lies in.
     /// @param center  The point.
     /// @param radius  How far to look, in meters, at least 0 and finite.
-    /// @param wallOut Receives the wall.
+    /// @param wallOut Receives the wall. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// or radius not finite, a negative radius, a polygon id never handed out,
     /// or a filter not built from mnavDefaultQueryFilter or with a NaN cost;
@@ -1044,8 +1050,9 @@ extern "C"
     /// @param wallsOut Receives up to capacity walls, the nearest; NULL when
     ///                 capacity is 0.
     /// @param capacity The room, at least 0.
-    /// @param foundOut Receives the count and whether the node limit cut
-    ///                 the search short.
+    /// @param foundOut Receives the count and whether the node limit cut the search
+    ///                 short. Zeroed on any failure but mnav_errorCapacity, which
+    ///                 gives the total.
     /// @return `mnav_success`; `mnav_errorCapacity` when more walls lie within
     /// the radius than the buffer holds: it holds the nearest and foundOut
     /// counts all; `mnav_errorInvalid` for a NULL argument, a negative
@@ -1081,7 +1088,7 @@ extern "C"
     /// @param navmesh  The navmesh.
     /// @param filter   The areas usable, or NULL.
     /// @param seed     Any value.
-    /// @param pointOut Receives the point.
+    /// @param pointOut Receives the point. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// filter not built from mnavDefaultQueryFilter or with a NaN cost;
     /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
@@ -1105,7 +1112,7 @@ extern "C"
     /// @param center   The center.
     /// @param radius   How far to search, in meters, at least 0 and finite.
     /// @param seed     Any value.
-    /// @param pointOut Receives the point.
+    /// @param pointOut Receives the point. Zeroed on any failure.
     /// @return As mnavFindWallDistance; also `mnav_errorLimit` when a polygon
     /// clipped to the circle, its 32-gon, has more than MNAV_MAX_CLIP_CORNERS
     /// corners, which rounding alone can cause. Also `mnav_errorBusy` when
@@ -1131,7 +1138,7 @@ extern "C"
     /// @param start        The start point.
     /// @param endPolygon   The polygon the end lies in.
     /// @param end          The end point.
-    /// @param endOut       Receives how the search ended.
+    /// @param endOut       Receives how the search ended. Zeroed on any failure.
     /// @return As mnavFindPath. Also `mnav_errorBusy` when called back in from
     /// host code a call using the context runs (a link generation's clearance
     /// test, a hierarchy's allocator as it builds), one misuse counted.
@@ -1193,7 +1200,7 @@ extern "C"
     ///                     mnavFindNearest gives it.
     /// @param start        The start point.
     /// @param end          The end point; only its ground position counts.
-    /// @param rayOut       Receives the result.
+    /// @param rayOut       Receives the result. Zeroed on any failure.
     /// @return `mnav_success` whenever the ray was cast, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
     /// polygon id that never existed, or a filter not built from

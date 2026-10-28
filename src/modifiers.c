@@ -9,6 +9,7 @@
 #include "allocator.h"
 #include "fpenv.h"
 #include "navmesh.h"
+#include "outputs.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
@@ -83,7 +84,10 @@ static mnavResult GetAreaWork(const mnavNavmesh* navmesh, mnavPolygonId polygon,
 
 mnavResult mnavGetArea(const mnavNavmesh* navmesh, mnavPolygonId polygon, mnavAreaType* areaOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(navmesh), GetAreaWork(navmesh, polygon, areaOut));
+    mnavClearOutput(areaOut, sizeof(*areaOut));
+    mnavResult result =
+        mnavHostCountInvalid(MNAV_HOST(navmesh), GetAreaWork(navmesh, polygon, areaOut));
+    return mnavClearOnFailure(result, areaOut, sizeof(*areaOut));
 }
 
 void mnavApplyAreas(mnavNavmesh* navmesh)

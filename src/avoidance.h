@@ -13,11 +13,13 @@
 #include "obstacle.h"
 #include "orca.h"
 #include "orca3.h"
+#include "outputs.h"
 
 #include "maul-nav/avoidance.h"
 
 #include <math.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 // How far right of its preferred velocity a held-back agent aims, as a
@@ -104,6 +106,20 @@ static inline mnavResult mnavAvoidRadius(double v)
 // Fills the set's obstacle grid with spheres, by their bounds on the
 // ground (X and Z), its fastest speed their fastest in space; count is
 // within the set's obstacle points.
+// Clears the velocities of a call that failed, when the set's agent limit
+// holds them; a count past it, or no set, writes nothing, since the count
+// is all that bounds the caller's array.
+static inline mnavResult mnavAvoidClear(mnavResult result, const mnavAvoidance* avoidance,
+                                        int32_t agentCount, void* velocities, size_t size)
+{
+    if (result != mnav_success && avoidance != nullptr && agentCount > 0 &&
+        agentCount <= avoidance->def.limits.agents)
+    {
+        mnavClearOutput(velocities, (size_t)agentCount * size);
+    }
+    return result;
+}
+
 void mnavBuildSphereGrid(mnavAvoidance* avoidance, const mnavSphere* spheres, int32_t count);
 
 // The spheres an agent may meet within the obstacle horizon, the nearest

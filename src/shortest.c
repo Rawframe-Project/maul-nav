@@ -19,6 +19,7 @@
 #include "invariant.h"
 #include "navmesh.h"
 #include "offmesh.h"
+#include "outputs.h"
 #include "polymesh.h"
 #include "query.h"
 #include "query_filter.h"
@@ -917,9 +918,12 @@ static MNAV_NOINLINE mnavResult FindShortestPathCounted(mnavQuery* query,
                                                         mnavPolygonId endPolygon, mnavPos3 end,
                                                         mnavPath* pathOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                                FindShortestPathWork(query, navmesh, filter, startPolygon, start,
-                                                     endPolygon, end, pathOut));
+    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                             FindShortestPathWork(query, navmesh, filter, startPolygon, start,
+                                                  endPolygon, end, pathOut));
+    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
 mnavResult mnavFindShortestPath(mnavQuery* query, const mnavNavmesh* navmesh,

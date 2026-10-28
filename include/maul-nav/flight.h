@@ -293,7 +293,8 @@ extern "C"
     ///                  mnavBakeTile reads them.
     /// @param tileX     The tile's column.
     /// @param tileZ     The tile's row.
-    /// @param reportOut Receives the report. May be NULL.
+    /// @param reportOut Receives the report. May be NULL. Written on failure too,
+    ///                  naming it.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or input;
     /// for input mnavBakeTile refuses, the status it gives, the mesh named in
     /// the report; `mnav_errorLimit` for a tile past the extent, or when
@@ -315,7 +316,8 @@ extern "C"
     /// @param bufferOut Receives the bytes: at least capacity bytes; may be
     ///                  NULL when capacity is 0.
     /// @param capacity  The buffer's size in bytes.
-    /// @param sizeOut   Receives the tile's size in bytes. May be NULL.
+    /// @param sizeOut   Receives the tile's size in bytes. May be NULL. Zeroed on
+    ///                  any failure but mnav_errorCapacity, which gives the size.
     /// @return `mnav_success`; `mnav_errorCapacity` when the buffer is
     /// smaller than the tile, with the size still written;
     /// `mnav_errorInvalid` for a NULL baker, a NULL buffer with a
@@ -419,7 +421,8 @@ extern "C"
     /// @param volume          The volume.
     /// @param tileX           The tile's column.
     /// @param tileZ           The tile's row.
-    /// @param fingerprintOut  Receives the fingerprint, or 0.
+    /// @param fingerprintOut  Receives the fingerprint, or 0. Zeroed on any
+    ///                        failure.
     /// @return `mnav_success`; `mnav_errorNotLoaded` when no tile is
     /// committed there; `mnav_errorInvalid` for a NULL argument.
     /// @par Thread safety
@@ -435,7 +438,7 @@ extern "C"
     ///
     /// @param volume   The volume.
     /// @param point    The point, in world coordinates.
-    /// @param openOut  Receives whether the point is open; false on
+    /// @param openOut  Receives whether the point is open; false on any
     ///                 failure.
     /// @return `mnav_success`; `mnav_errorNotLoaded` when no tile is committed
     /// under the point; `mnav_errorInvalid` for a NULL argument or a point with
@@ -461,18 +464,18 @@ extern "C"
     /// @param volume   The flight volume.
     /// @param start    The start, in world coordinates.
     /// @param end      The end, in world coordinates.
-    /// @param pathOut  Receives the path. A start or end not open ends the
-    ///                 search at once: `mnav_pathNone` for a blocked voxel,
-    ///                 `mnav_pathNotLoaded` for a place with no tile, with
-    ///                 the start alone as its path. So does an end in a
-    ///                 closed space without the start, such as the inside
-    ///                 of a closed mesh, when the space is found closed
-    ///                 within 512 blocks and the node budget: the search
-    ///                 looks over the end's space that far first.
-    ///                 `mnav_pathNone`, with the start alone.
+    /// @param pathOut  Receives the path. A start or end not open ends the search
+    ///                 at once: `mnav_pathNone` for a blocked voxel,
+    ///                 `mnav_pathNotLoaded` for a place with no tile, with the
+    ///                 start alone as its path. So does an end in a closed space
+    ///                 without the start, such as the inside of a closed mesh, when
+    ///                 the space is found closed within 512 blocks and the node
+    ///                 budget: the search looks over the end's space that far
+    ///                 first. `mnav_pathNone`, with the start alone. Zeroed on any
+    ///                 failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// point with a NaN coordinate; `mnav_errorOutside` for a point below or
-    /// above the volume, pathOut left as it was; `mnav_errorLimit` for a point
+    /// above the volume; `mnav_errorLimit` for a point
     /// more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an infinity
     /// included. Also `mnav_errorBusy` when called back in from host code a
     /// call using the context runs (a link generation's clearance test, a
@@ -516,7 +519,8 @@ extern "C"
     /// @param query    The query context.
     /// @param volume   The volume the search began on.
     /// @param nodes    The most nodes to close, at least 1.
-    /// @param endedOut Receives whether the search has ended.
+    /// @param endedOut Receives whether the search has ended. Zeroed on any
+    ///                 failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, fewer
     /// than 1 node, or a volume other than the search's; `mnav_errorState` for
     /// no flight search begun, or a volume committed to since the search began:
@@ -536,7 +540,7 @@ extern "C"
     ///
     /// @param query    The query context; its memory holds the path.
     /// @param volume   The volume the search began on.
-    /// @param pathOut  Receives the path.
+    /// @param pathOut  Receives the path. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// volume other than the search's; `mnav_errorState` for no flight search
     /// begun, or a volume committed to since the search began. Also
@@ -557,7 +561,8 @@ extern "C"
     /// @param volume  The flight volume.
     /// @param from    The ray's start, in world coordinates.
     /// @param to      Its end.
-    /// @param hitOut  Receives what stopped it, where and at what fraction.
+    /// @param hitOut  Receives what stopped it, where and at what fraction. Zeroed
+    ///                on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// point with a NaN coordinate; `mnav_errorLimit` for a point more than
     /// MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an infinity included.
@@ -579,12 +584,12 @@ extern "C"
     /// @param points      The path's points, in world coordinates; may be
     ///                    NULL when pointCount is 0.
     /// @param pointCount  How many, at least 0.
-    /// @param stepOut     Receives the first step not clear, i for the
-    ///                    one from point i to point i + 1, or -1 when every
-    ///                    step is clear.
-    /// @param hitOut      Receives what stopped that step, as
-    ///                    mnavFlightRaycast gives it; may be NULL, and is
-    ///                    left alone when every step is clear.
+    /// @param stepOut     Receives the first step not clear, i for the one from
+    ///                    point i to point i + 1, or -1 when every step is clear.
+    ///                    Zeroed on any failure.
+    /// @param hitOut      Receives what stopped that step, as mnavFlightRaycast
+    ///                    gives it; may be NULL, and is left alone when every step
+    ///                    is clear. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// negative count or a point with a NaN coordinate; `mnav_errorLimit` for a
     /// point more than MNAV_MAX_FLIGHT_VOXELS voxels from the origin, an
@@ -605,8 +610,9 @@ extern "C"
     /// @param volume      The flight volume.
     /// @param point       The point, in world coordinates.
     /// @param radius      How far to look, in meters, at least 0.
-    /// @param nearestOut  Receives the nearest open point.
-    /// @param foundOut    Receives whether one lies within the radius.
+    /// @param nearestOut  Receives the nearest open point. Zeroed on any failure.
+    /// @param foundOut    Receives whether one lies within the radius. Zeroed on
+    ///                    any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// with a NaN coordinate, or a radius below 0 or not finite;
     /// `mnav_errorLimit` for a point more than MNAV_MAX_FLIGHT_VOXELS voxels

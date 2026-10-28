@@ -8,6 +8,7 @@
 #include "detail.h"
 #include "fpenv.h"
 #include "navmesh.h"
+#include "outputs.h"
 #include "polymesh.h"
 #include "query_filter.h"
 #include "raster.h"
@@ -402,9 +403,11 @@ static MNAV_NOINLINE mnavResult FindPolygonsCounted(const mnavNavmesh* navmesh,
                                                     mnavPolygonId* polygonsOut, int32_t capacity,
                                                     mnavFound* foundOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(navmesh),
-                                mnavFindPolygonsWork(navmesh, filter, center, halfExtents,
-                                                     polygonsOut, capacity, foundOut));
+    mnavClearOutput(foundOut, sizeof(*foundOut));
+    mnavResult result = mnavHostCountInvalid(
+        MNAV_HOST(navmesh), mnavFindPolygonsWork(navmesh, filter, center, halfExtents, polygonsOut,
+                                                 capacity, foundOut));
+    return mnavClearUnlessCapacity(result, foundOut, sizeof(*foundOut));
 }
 
 mnavResult mnavFindPolygons(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
@@ -470,8 +473,10 @@ static MNAV_NOINLINE mnavResult FindNearestCounted(const mnavNavmesh* navmesh,
                                                    const mnavQueryFilter* filter, mnavPos3 point,
                                                    mnavVec3 halfExtents, mnavNearest* nearestOut)
 {
-    return mnavHostCountInvalid(
+    mnavClearOutput(nearestOut, sizeof(*nearestOut));
+    mnavResult result = mnavHostCountInvalid(
         MNAV_HOST(navmesh), mnavFindNearestWork(navmesh, filter, point, halfExtents, nearestOut));
+    return mnavClearOnFailure(result, nearestOut, sizeof(*nearestOut));
 }
 
 mnavResult mnavFindNearest(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,

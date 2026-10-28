@@ -11,6 +11,7 @@
 #include "invariant.h"
 #include "navmesh.h"
 #include "nearest.h"
+#include "outputs.h"
 #include "sort.h"
 
 #include "maul-nav/bake.h"
@@ -230,7 +231,10 @@ static MNAV_NOINLINE mnavResult StageLinkWork(mnavNavmesh* navmesh, const mnavLi
 static MNAV_NOINLINE mnavResult StageLinkCounted(mnavNavmesh* navmesh, const mnavLinkDef* def,
                                                  mnavLinkId* linkOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(navmesh), StageLinkWork(navmesh, def, linkOut));
+    mnavClearOutput(linkOut, sizeof(*linkOut));
+    mnavResult result =
+        mnavHostCountInvalid(MNAV_HOST(navmesh), StageLinkWork(navmesh, def, linkOut));
+    return mnavClearOnFailure(result, linkOut, sizeof(*linkOut));
 }
 
 mnavResult mnavStageLink(mnavNavmesh* navmesh, const mnavLinkDef* def, mnavLinkId* linkOut)
@@ -381,7 +385,10 @@ static MNAV_NOINLINE mnavResult GetLinkWork(const mnavNavmesh* navmesh, mnavLink
 static MNAV_NOINLINE mnavResult GetLinkCounted(const mnavNavmesh* navmesh, mnavLinkId id,
                                                mnavLinkState* stateOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(navmesh), GetLinkWork(navmesh, id, stateOut));
+    mnavClearOutput(stateOut, sizeof(*stateOut));
+    mnavResult result =
+        mnavHostCountInvalid(MNAV_HOST(navmesh), GetLinkWork(navmesh, id, stateOut));
+    return mnavClearOnFailure(result, stateOut, sizeof(*stateOut));
 }
 
 mnavResult mnavGetLink(const mnavNavmesh* navmesh, mnavLinkId id, mnavLinkState* stateOut)

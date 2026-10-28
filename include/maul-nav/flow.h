@@ -158,7 +158,8 @@ extern "C"
     /// @param grid     The grid the work began on, its areas unchanged;
     ///                 it may lie elsewhere in memory.
     /// @param cells    The most cells to settle, at least 1.
-    /// @param endedOut Receives whether the work has ended. May be NULL.
+    /// @param endedOut Receives whether the work has ended. May be NULL. Zeroed on
+    ///                 any failure.
     /// @return `mnav_success`, also when the work had already ended;
     /// `mnav_errorInvalid` for a NULL field or grid, fewer than 1 cell, or a
     /// grid of another size or cell size; `mnav_errorState` for no work begun.
@@ -222,10 +223,11 @@ extern "C"
     ///
     /// @param field   The field.
     /// @param cell    The cell, in grid places.
-    /// @param flowOut Receives the cell's way, its next cell in grid places.
+    /// @param flowOut Receives the cell's way, its next cell in grid places. Zeroed
+    ///                on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument;
-    /// `mnav_errorOutside` for a cell outside the field's region, flowOut left
-    /// as it was; `mnav_errorState` for nothing begun, or while work begun on
+    /// `mnav_errorOutside` for a cell outside the field's region;
+    /// `mnav_errorState` for nothing begun, or while work begun on
     /// the field has not ended.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read a field at once

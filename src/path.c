@@ -9,6 +9,7 @@
 #include "invariant.h"
 #include "navmesh.h"
 #include "offmesh.h"
+#include "outputs.h"
 #include "polymesh.h"
 #include "query.h"
 #include "query_filter.h"
@@ -652,8 +653,10 @@ mnavResult mnavContinuePathWork(mnavQuery* query, const mnavNavmesh* navmesh, in
 static MNAV_NOINLINE mnavResult ContinuePathCounted(mnavQuery* query, const mnavNavmesh* navmesh,
                                                     int32_t nodes, bool* endedOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                                mnavContinuePathWork(query, navmesh, nodes, endedOut));
+    mnavClearOutput(endedOut, sizeof(*endedOut));
+    mnavResult result = mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                                             mnavContinuePathWork(query, navmesh, nodes, endedOut));
+    return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
 }
 
 mnavResult mnavContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, int32_t nodes,
@@ -703,8 +706,10 @@ mnavResult mnavFinishPathWork(mnavQuery* query, const mnavNavmesh* navmesh, mnav
 static MNAV_NOINLINE mnavResult FinishPathCounted(mnavQuery* query, const mnavNavmesh* navmesh,
                                                   mnavPath* pathOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                                mnavFinishPathWork(query, navmesh, pathOut));
+    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavResult result = mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                                             mnavFinishPathWork(query, navmesh, pathOut));
+    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
 mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPath* pathOut)
@@ -744,9 +749,11 @@ static MNAV_NOINLINE mnavResult FindPathCounted(mnavQuery* query, const mnavNavm
                                                 mnavPolygonId endPolygon, mnavPos3 end,
                                                 mnavPath* pathOut)
 {
-    return mnavHostCountInvalid(
+    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
         mnavFindPathWork(query, navmesh, filter, startPolygon, start, endPolygon, end, pathOut));
+    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
 mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
@@ -796,9 +803,12 @@ static MNAV_NOINLINE mnavResult CheckReachableCounted(mnavQuery* query, const mn
                                                       mnavPolygonId endPolygon, mnavPos3 end,
                                                       mnavPathEnd* endOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                                mnavCheckReachableWork(query, navmesh, filter, startPolygon, start,
-                                                       endPolygon, end, endOut));
+    mnavClearOutput(endOut, sizeof(*endOut));
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                             mnavCheckReachableWork(query, navmesh, filter, startPolygon, start,
+                                                    endPolygon, end, endOut));
+    return mnavClearOnFailure(result, endOut, sizeof(*endOut));
 }
 
 mnavResult mnavCheckReachable(mnavQuery* query, const mnavNavmesh* navmesh,

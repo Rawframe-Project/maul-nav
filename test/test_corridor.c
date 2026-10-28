@@ -204,9 +204,9 @@ static void TestMalformedCorridors(void)
                 mnav_errorInvalid &&
             mnavReplanCorridor(query, navmesh, nullptr, &c, (mnavVec3){1.0f, 1.0f, 1.0f}, &path) ==
                 mnav_errorInvalid;
-        CHECK(refused && c.count == bad[k].count && c.capacity == bad[k].capacity && valid == -1 &&
+        CHECK(refused && c.count == bad[k].count && c.capacity == bad[k].capacity && valid == 0 &&
                   !shortened,
-              "a malformed corridor refused by every call, unchanged");
+              "a malformed corridor refused by every call, unchanged, the outputs zeroed");
     }
     mnavPath path;
     CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, a.polygon, a.point, &path) ==

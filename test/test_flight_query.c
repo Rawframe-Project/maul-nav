@@ -610,10 +610,10 @@ static void TestCheck(const mnavFlightVolume* volume)
           "stopped where the tile is gone");
     mnavDestroyQuery(query);
     mnavDestroyFlightVolume(changed);
-    // Refusals change nothing; no steps is clear.
+    // Refusals zero the step; no steps is clear.
     mnavPos3 bad[2] = {from, {(double)NAN, 0.0, 0.0}};
     step = 7;
-    CHECK(mnavCheckFlightPath(volume, bad, 2, &step, nullptr) == mnav_errorInvalid && step == 7 &&
+    CHECK(mnavCheckFlightPath(volume, bad, 2, &step, nullptr) == mnav_errorInvalid && step == 0 &&
               mnavCheckFlightPath(nullptr, bad, 1, &step, nullptr) == mnav_errorInvalid &&
               mnavCheckFlightPath(volume, nullptr, 2, &step, nullptr) == mnav_errorInvalid &&
               mnavCheckFlightPath(volume, bad, -1, &step, nullptr) == mnav_errorInvalid &&

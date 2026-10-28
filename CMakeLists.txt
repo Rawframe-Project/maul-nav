@@ -213,6 +213,7 @@ if(MAUL_NAV_BUILD_TESTS)
     # (test_query_table.c).
     maul_add_test(query_table WHITEBOX)
     maul_add_test(walls)
+    maul_add_test(outputs)
     maul_add_test(corridor)
     maul_add_test(tiers)
     maul_add_test(resnap)

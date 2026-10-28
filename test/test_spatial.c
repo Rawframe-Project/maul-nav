@@ -154,8 +154,8 @@ static void TestHeights(const mnavNavmesh* navmesh)
     mnavNearest n = On(navmesh, 5.0, 5.0);
     double height = -1.0;
     CHECK(mnavGetHeight(navmesh, n.polygon, 500.0, 5.0, &height) == mnav_errorOutside &&
-              height == -1.0,
-          "outside the polygon, the height left as it was");
+              height == 0.0,
+          "outside the polygon, the height zeroed");
     CHECK(mnavGetHeight(navmesh, n.polygon, (double)NAN, 5.0, &height) == mnav_errorInvalid &&
               mnavGetHeight(nullptr, n.polygon, 5.0, 5.0, &height) == mnav_errorInvalid &&
               mnavGetHeight(navmesh, n.polygon, 5.0, 5.0, nullptr) == mnav_errorInvalid,

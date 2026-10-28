@@ -5,6 +5,7 @@
 
 #include "fpenv.h"
 #include "navmesh.h"
+#include "outputs.h"
 #include "polymesh.h"
 #include "query.h"
 #include "query_filter.h"
@@ -229,9 +230,11 @@ static MNAV_NOINLINE mnavResult RaycastCounted(mnavQuery* query, const mnavNavme
                                                mnavPolygonId startPolygon, mnavPos3 start,
                                                mnavPos3 end, mnavRay* rayOut)
 {
-    return mnavHostCountInvalid(
+    mnavClearOutput(rayOut, sizeof(*rayOut));
+    mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
         mnavRaycastWork(query, navmesh, filter, startPolygon, start, end, rayOut));
+    return mnavClearOnFailure(result, rayOut, sizeof(*rayOut));
 }
 
 mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,

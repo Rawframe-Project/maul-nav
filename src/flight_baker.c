@@ -14,6 +14,7 @@
 #include "flight_tile.h"
 #include "fpenv.h"
 #include "host_code.h"
+#include "outputs.h"
 #include "raster.h"
 #include "tile_index.h"
 
@@ -242,6 +243,8 @@ static mnavResult CopyFlightTileWork(const mnavFlightBaker* baker, uint8_t* buff
 mnavResult mnavCopyFlightTile(const mnavFlightBaker* baker, uint8_t* bufferOut, size_t capacity,
                               size_t* sizeOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(baker),
-                                CopyFlightTileWork(baker, bufferOut, capacity, sizeOut));
+    mnavClearOutput(sizeOut, sizeof(*sizeOut));
+    mnavResult result = mnavHostCountInvalid(
+        MNAV_HOST(baker), CopyFlightTileWork(baker, bufferOut, capacity, sizeOut));
+    return mnavClearUnlessCapacity(result, sizeOut, sizeof(*sizeOut));
 }

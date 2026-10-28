@@ -7,6 +7,7 @@
 #include "fpenv.h"
 #include "navmesh.h"
 #include "nearest.h"
+#include "outputs.h"
 #include "polymesh.h"
 #include "query.h"
 #include "query_filter.h"
@@ -351,9 +352,11 @@ static MNAV_NOINLINE mnavResult MoveAlongSurfaceCounted(mnavQuery* query,
                                                         mnavPolygonId startPolygon, mnavPos3 start,
                                                         mnavPos3 end, mnavMove* moveOut)
 {
-    return mnavHostCountInvalid(
+    mnavClearOutput(moveOut, sizeof(*moveOut));
+    mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
         mnavMoveAlongSurfaceWork(query, navmesh, filter, startPolygon, start, end, moveOut));
+    return mnavClearOnFailure(result, moveOut, sizeof(*moveOut));
 }
 
 mnavResult mnavMoveAlongSurface(mnavQuery* query, const mnavNavmesh* navmesh,

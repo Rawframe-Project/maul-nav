@@ -11,6 +11,7 @@
 #include "flight_def.h"
 #include "flight_tile.h"
 #include "fpenv.h"
+#include "outputs.h"
 
 #include "maul-nav/base.h"
 #include "maul-nav/flight.h"
@@ -333,8 +334,10 @@ static mnavResult GetFlightTileWork(const mnavFlightVolume* volume, int32_t tile
 mnavResult mnavGetFlightTile(const mnavFlightVolume* volume, int32_t tileX, int32_t tileZ,
                              uint64_t* fingerprintOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(volume),
-                                GetFlightTileWork(volume, tileX, tileZ, fingerprintOut));
+    mnavClearOutput(fingerprintOut, sizeof(*fingerprintOut));
+    mnavResult result = mnavHostCountInvalid(
+        MNAV_HOST(volume), GetFlightTileWork(volume, tileX, tileZ, fingerprintOut));
+    return mnavClearOnFailure(result, fingerprintOut, sizeof(*fingerprintOut));
 }
 
 // The voxel holding a distance from the origin; false past
@@ -400,7 +403,10 @@ static MNAV_NOINLINE mnavResult IsFlightOpenWork(const mnavFlightVolume* volume,
 static MNAV_NOINLINE mnavResult IsFlightOpenCounted(const mnavFlightVolume* volume, mnavPos3 point,
                                                     bool* openOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(volume), IsFlightOpenWork(volume, point, openOut));
+    mnavClearOutput(openOut, sizeof(*openOut));
+    mnavResult result =
+        mnavHostCountInvalid(MNAV_HOST(volume), IsFlightOpenWork(volume, point, openOut));
+    return mnavClearOnFailure(result, openOut, sizeof(*openOut));
 }
 
 mnavResult mnavIsFlightOpen(const mnavFlightVolume* volume, mnavPos3 point, bool* openOut)

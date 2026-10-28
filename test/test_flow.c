@@ -356,8 +356,8 @@ static void TestRegion(void)
     mnavFlow flow = {-1.0, {-1, -1}};
     CHECK(mnavFlowAt(field, (mnavCell){r.x - 1, r.y}, &flow) == mnav_errorOutside &&
               mnavFlowAt(field, (mnavCell){r.x, r.y + r.height}, &flow) == mnav_errorOutside &&
-              flow.cost == -1.0 && flow.next.x == -1 && flow.next.y == -1,
-          "cells outside the region, the way left as it was");
+              flow.cost == 0.0 && flow.next.x == 0 && flow.next.y == 0,
+          "cells outside the region, the way zeroed");
     static mnavDebugVertex vertices[WIDTH * HEIGHT * 6];
     static uint32_t lines[WIDTH * HEIGHT * 6];
     mnavDebugBuffer buffer = {{0, 0, 0}, vertices, WIDTH * HEIGHT * 6, 0, nullptr, 0,
