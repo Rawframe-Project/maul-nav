@@ -223,9 +223,10 @@ extern "C"
     /// Safe from any thread; the set is used by one thread at a time.
     MNAV_API void mnavDestroyAvoidance(mnavAvoidance* avoidance);
 
-    /// Returns how many calls against the avoidance set were refused because
-    /// they came back in from host code it ran (`mnav_errorBusy`), since it was
-    /// made.
+    /// Returns how many calls against the avoidance set were refused as misuse
+    /// since it was made: an argument refused with `mnav_errorInvalid` when the
+    /// avoidance set was the first object the call was given, and a call back
+    /// in from host code it ran (`mnav_errorBusy`).
     ///
     /// @param avoidance The avoidance set.
     /// @return The count; 0 for NULL.

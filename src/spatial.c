@@ -76,8 +76,8 @@ static double Area(const mnavPos3* corners, int32_t count)
     return area * 0.5;
 }
 
-static MNAV_NOINLINE mnavResult GetHeightWork(const mnavNavmesh* navmesh, mnavPolygonId polygon,
-                                              double x, double z, double* heightOut)
+mnavResult mnavGetHeightWork(const mnavNavmesh* navmesh, mnavPolygonId polygon, double x, double z,
+                             double* heightOut)
 {
     if (navmesh == nullptr || heightOut == nullptr || !isfinite(x) || !isfinite(z))
     {
@@ -109,11 +109,18 @@ static MNAV_NOINLINE mnavResult GetHeightWork(const mnavNavmesh* navmesh, mnavPo
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult GetHeightCounted(const mnavNavmesh* navmesh, mnavPolygonId polygon,
+                                                 double x, double z, double* heightOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh),
+                                mnavGetHeightWork(navmesh, polygon, x, z, heightOut));
+}
+
 mnavResult mnavGetHeight(const mnavNavmesh* navmesh, mnavPolygonId polygon, double x, double z,
                          double* heightOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = GetHeightWork(navmesh, polygon, x, z, heightOut);
+    mnavResult result = GetHeightCounted(navmesh, polygon, x, z, heightOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -218,11 +225,19 @@ static MNAV_NOINLINE mnavResult FindRandomPointWork(const mnavNavmesh* navmesh,
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult FindRandomPointCounted(const mnavNavmesh* navmesh,
+                                                       const mnavQueryFilter* filter, uint64_t seed,
+                                                       mnavRandomPoint* pointOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh),
+                                FindRandomPointWork(navmesh, filter, seed, pointOut));
+}
+
 mnavResult mnavFindRandomPoint(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
                                uint64_t seed, mnavRandomPoint* pointOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = FindRandomPointWork(navmesh, filter, seed, pointOut);
+    mnavResult result = FindRandomPointCounted(navmesh, filter, seed, pointOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -614,13 +629,24 @@ static MNAV_NOINLINE mnavResult FindWallDistanceWork(mnavQuery* query, const mna
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult FindWallDistanceCounted(mnavQuery* query,
+                                                        const mnavNavmesh* navmesh,
+                                                        const mnavQueryFilter* filter,
+                                                        mnavPolygonId polygon, mnavPos3 center,
+                                                        double radius, mnavWall* wallOut)
+{
+    return mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        FindWallDistanceWork(query, navmesh, filter, polygon, center, radius, wallOut));
+}
+
 mnavResult mnavFindWallDistance(mnavQuery* query, const mnavNavmesh* navmesh,
                                 const mnavQueryFilter* filter, mnavPolygonId polygon,
                                 mnavPos3 center, double radius, mnavWall* wallOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
-        FindWallDistanceWork(query, navmesh, filter, polygon, center, radius, wallOut);
+        FindWallDistanceCounted(query, navmesh, filter, polygon, center, radius, wallOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -654,14 +680,25 @@ static MNAV_NOINLINE mnavResult FindWallsWork(mnavQuery* query, const mnavNavmes
     return r.count > capacity ? mnav_errorCapacity : mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult FindWallsCounted(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                 const mnavQueryFilter* filter,
+                                                 mnavPolygonId polygon, mnavPos3 center,
+                                                 double radius, mnavWallSegment* wallsOut,
+                                                 int32_t capacity, mnavWallsFound* foundOut)
+{
+    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                                FindWallsWork(query, navmesh, filter, polygon, center, radius,
+                                              wallsOut, capacity, foundOut));
+}
+
 mnavResult mnavFindWalls(mnavQuery* query, const mnavNavmesh* navmesh,
                          const mnavQueryFilter* filter, mnavPolygonId polygon, mnavPos3 center,
                          double radius, mnavWallSegment* wallsOut, int32_t capacity,
                          mnavWallsFound* foundOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = FindWallsWork(query, navmesh, filter, polygon, center, radius, wallsOut,
-                                      capacity, foundOut);
+    mnavResult result = FindWallsCounted(query, navmesh, filter, polygon, center, radius, wallsOut,
+                                         capacity, foundOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -732,14 +769,23 @@ static MNAV_NOINLINE mnavResult FindRandomPointAroundWork(
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult FindRandomPointAroundCounted(
+    mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+    mnavPolygonId polygon, mnavPos3 center, double radius, uint64_t seed, mnavRandomPoint* pointOut)
+{
+    return mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        FindRandomPointAroundWork(query, navmesh, filter, polygon, center, radius, seed, pointOut));
+}
+
 mnavResult mnavFindRandomPointAround(mnavQuery* query, const mnavNavmesh* navmesh,
                                      const mnavQueryFilter* filter, mnavPolygonId polygon,
                                      mnavPos3 center, double radius, uint64_t seed,
                                      mnavRandomPoint* pointOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result =
-        FindRandomPointAroundWork(query, navmesh, filter, polygon, center, radius, seed, pointOut);
+    mnavResult result = FindRandomPointAroundCounted(query, navmesh, filter, polygon, center,
+                                                     radius, seed, pointOut);
     mnavFloatEnvLeave(env);
     return result;
 }

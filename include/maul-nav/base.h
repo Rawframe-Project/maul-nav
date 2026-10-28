@@ -97,7 +97,9 @@ extern "C"
         // An argument a correct program never passes: a null pointer where
         // one is required, a NaN, a value (an infinity included) outside a
         // range its documentation gives with no named constant, a
-        // combination the call does not take.
+        // combination the call does not take. One misuse is counted on the
+        // first owner object the call is given, unless a bake's report names
+        // the input element refused.
         mnav_errorInvalid = -1,
         // Room is too small for the result: a caller's buffer, the
         // allocator, or a limit the caller set (a def's limits and memory,

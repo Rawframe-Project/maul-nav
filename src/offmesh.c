@@ -227,10 +227,16 @@ static MNAV_NOINLINE mnavResult StageLinkWork(mnavNavmesh* navmesh, const mnavLi
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult StageLinkCounted(mnavNavmesh* navmesh, const mnavLinkDef* def,
+                                                 mnavLinkId* linkOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), StageLinkWork(navmesh, def, linkOut));
+}
+
 mnavResult mnavStageLink(mnavNavmesh* navmesh, const mnavLinkDef* def, mnavLinkId* linkOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = StageLinkWork(navmesh, def, linkOut);
+    mnavResult result = StageLinkCounted(navmesh, def, linkOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -273,10 +279,15 @@ static MNAV_NOINLINE mnavResult StageLinkRemovalWork(mnavNavmesh* navmesh, mnavL
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult StageLinkRemovalCounted(mnavNavmesh* navmesh, mnavLinkId id)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), StageLinkRemovalWork(navmesh, id));
+}
+
 mnavResult mnavStageLinkRemoval(mnavNavmesh* navmesh, mnavLinkId id)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = StageLinkRemovalWork(navmesh, id);
+    mnavResult result = StageLinkRemovalCounted(navmesh, id);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -316,10 +327,16 @@ static MNAV_NOINLINE mnavResult StageLinkEnabledWork(mnavNavmesh* navmesh, mnavL
     return result;
 }
 
+static MNAV_NOINLINE mnavResult StageLinkEnabledCounted(mnavNavmesh* navmesh, mnavLinkId id,
+                                                        bool enabled)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), StageLinkEnabledWork(navmesh, id, enabled));
+}
+
 mnavResult mnavStageLinkEnabled(mnavNavmesh* navmesh, mnavLinkId id, bool enabled)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = StageLinkEnabledWork(navmesh, id, enabled);
+    mnavResult result = StageLinkEnabledCounted(navmesh, id, enabled);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -361,10 +378,16 @@ static MNAV_NOINLINE mnavResult GetLinkWork(const mnavNavmesh* navmesh, mnavLink
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult GetLinkCounted(const mnavNavmesh* navmesh, mnavLinkId id,
+                                               mnavLinkState* stateOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), GetLinkWork(navmesh, id, stateOut));
+}
+
 mnavResult mnavGetLink(const mnavNavmesh* navmesh, mnavLinkId id, mnavLinkState* stateOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = GetLinkWork(navmesh, id, stateOut);
+    mnavResult result = GetLinkCounted(navmesh, id, stateOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -467,7 +490,7 @@ static bool Snap(const mnavNavmesh* navmesh, mnavPos3 p, float radius, mnavPolyg
 {
     mnavPos3 half = SnapHalf(navmesh, radius);
     mnavNearest n;
-    if (mnavFindNearest(navmesh, nullptr, p, (mnavVec3){radius, (float)half.y, radius}, &n) !=
+    if (mnavFindNearestWork(navmesh, nullptr, p, (mnavVec3){radius, (float)half.y, radius}, &n) !=
             mnav_success ||
         n.polygon.slot == 0)
     {

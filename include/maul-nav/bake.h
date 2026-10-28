@@ -623,8 +623,10 @@ extern "C"
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_API void mnavDestroyBaker(mnavBaker* baker);
 
-    /// Returns how many calls against the baker were refused because they came
-    /// back in from host code it ran (`mnav_errorBusy`), since it was made.
+    /// Returns how many calls against the baker were refused as misuse since it
+    /// was made: an argument refused with `mnav_errorInvalid` when the baker
+    /// was the first object the call was given, and a call back in from host
+    /// code it ran (`mnav_errorBusy`).
     ///
     /// @param baker The baker.
     /// @return The count; 0 for NULL.
@@ -749,9 +751,10 @@ extern "C"
     /// No bake may be reading it.
     MNAV_API void mnavDestroyTileIndex(mnavTileIndex* index);
 
-    /// Returns how many calls against the tile index were refused because they
-    /// came back in from host code it ran (`mnav_errorBusy`), since it was
-    /// made.
+    /// Returns how many calls against the tile index were refused as misuse
+    /// since it was made: an argument refused with `mnav_errorInvalid` when the
+    /// tile index was the first object the call was given, and a call back in
+    /// from host code it ran (`mnav_errorBusy`).
     ///
     /// @param index The index.
     /// @return The count; 0 for NULL.
@@ -881,9 +884,10 @@ extern "C"
     /// Safe from any thread; the cache is used by one thread at a time.
     MNAV_API void mnavDestroyTileCache(mnavTileCache* cache);
 
-    /// Returns how many calls against the tile cache were refused because they
-    /// came back in from host code it ran (`mnav_errorBusy`), since it was
-    /// made.
+    /// Returns how many calls against the tile cache were refused as misuse
+    /// since it was made: an argument refused with `mnav_errorInvalid` when the
+    /// tile cache was the first object the call was given, and a call back in
+    /// from host code it ran (`mnav_errorBusy`).
     ///
     /// @param cache The cache.
     /// @return The count; 0 for NULL.

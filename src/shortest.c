@@ -901,13 +901,25 @@ static MNAV_NOINLINE mnavResult FindShortestPathWork(mnavQuery* query, const mna
     // uses the nodes, never the path written.
     mnavPathEnd reach = mnav_pathOutOfNodes;
     if (ending == mnav_pathOutOfNodes &&
-        mnavCheckReachable(query, navmesh, filter, startPolygon, start, endPolygon, end, &reach) ==
-            mnav_success &&
+        mnavCheckReachableWork(query, navmesh, filter, startPolygon, start, endPolygon, end,
+                               &reach) == mnav_success &&
         reach != mnav_pathFound && reach != mnav_pathOutOfNodes)
     {
         pathOut->end = reach;
     }
     return mnav_success;
+}
+
+static MNAV_NOINLINE mnavResult FindShortestPathCounted(mnavQuery* query,
+                                                        const mnavNavmesh* navmesh,
+                                                        const mnavQueryFilter* filter,
+                                                        mnavPolygonId startPolygon, mnavPos3 start,
+                                                        mnavPolygonId endPolygon, mnavPos3 end,
+                                                        mnavPath* pathOut)
+{
+    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                                FindShortestPathWork(query, navmesh, filter, startPolygon, start,
+                                                     endPolygon, end, pathOut));
 }
 
 mnavResult mnavFindShortestPath(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -916,8 +928,8 @@ mnavResult mnavFindShortestPath(mnavQuery* query, const mnavNavmesh* navmesh,
                                 mnavPath* pathOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result =
-        FindShortestPathWork(query, navmesh, filter, startPolygon, start, endPolygon, end, pathOut);
+    mnavResult result = FindShortestPathCounted(query, navmesh, filter, startPolygon, start,
+                                                endPolygon, end, pathOut);
     mnavFloatEnvLeave(env);
     return result;
 }

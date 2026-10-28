@@ -130,9 +130,10 @@ extern "C"
     /// Safe from any thread; the field is used by one thread at a time.
     MNAV_API void mnavDestroyNavFlow(mnavNavFlow* field);
 
-    /// Returns how many calls against the navmesh flow field were refused
-    /// because they came back in from host code it ran (`mnav_errorBusy`),
-    /// since it was made.
+    /// Returns how many calls against the navmesh flow field were refused as
+    /// misuse since it was made: an argument refused with `mnav_errorInvalid`
+    /// when the navmesh flow field was the first object the call was given, and
+    /// a call back in from host code it ran (`mnav_errorBusy`).
     ///
     /// @param field The field.
     /// @return The count; 0 for NULL.

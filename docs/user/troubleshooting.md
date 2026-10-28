@@ -4,7 +4,7 @@
 
 | Result | Meaning | What to do |
 |---|---|---|
-| `mnav_errorInvalid` | An argument a correct program never passes: a NULL pointer, a def not made by its default, a NaN, a value outside a range its documentation gives without a named constant, an object other than the one the call needs, malformed input geometry. | The result struct, where there is one, names the setting or the input element refused. |
+| `mnav_errorInvalid` | An argument a correct program never passes: a NULL pointer, a def not made by its default, a NaN, a value outside a range its documentation gives without a named constant, an object other than the one the call needs, malformed input geometry. One misuse is counted on the first owner object the call is given (`mnavGetNavmeshMisuse` and the like), except for input geometry a bake's report names. | The result struct, where there is one, names the setting or the input element refused. A misuse count above 0 in a release build points at a bug in the calling code. |
 | `mnav_errorCapacity` | Room is too small: a caller buffer, the allocator, or a limit the def sets (memory, polygons per tile, nodes per search, agents per step) was reached, and the work it bounds was not done. | A buffer call reports the size it needed; grow the buffer, raise the limit in the def, or split the work. A bake's report says which stage hit it. |
 | `mnav_errorStale` | An id names a tile, polygon or link replaced or removed since it was handed out. | Find the polygon again. |
 | `mnav_errorUnsupported` | The navmesh was made without what the change needs: its tier does not allow it, and no later call can add it. | Make the navmesh with the tier the change needs. |

@@ -8,6 +8,7 @@
 #include "funnel.h"
 #include "invariant.h"
 #include "navmesh.h"
+#include "nearest.h"
 #include "offmesh.h"
 #include "polymesh.h"
 #include "query.h"
@@ -235,11 +236,20 @@ static MNAV_NOINLINE mnavResult CheckCorridorWork(const mnavNavmesh* navmesh,
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult CheckCorridorCounted(const mnavNavmesh* navmesh,
+                                                     const mnavQueryFilter* filter,
+                                                     const mnavCorridor* corridor,
+                                                     int32_t* validOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh),
+                                CheckCorridorWork(navmesh, filter, corridor, validOut));
+}
+
 mnavResult mnavCheckCorridor(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
                              const mnavCorridor* corridor, int32_t* validOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = CheckCorridorWork(navmesh, filter, corridor, validOut);
+    mnavResult result = CheckCorridorCounted(navmesh, filter, corridor, validOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -284,11 +294,19 @@ static MNAV_NOINLINE mnavResult CorridorCornersWork(mnavQuery* query, const mnav
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult CorridorCornersCounted(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                       const mnavCorridor* corridor,
+                                                       mnavCorners* cornersOut)
+{
+    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                                CorridorCornersWork(query, navmesh, corridor, cornersOut));
+}
+
 mnavResult mnavCorridorCorners(mnavQuery* query, const mnavNavmesh* navmesh,
                                const mnavCorridor* corridor, mnavCorners* cornersOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = CorridorCornersWork(query, navmesh, corridor, cornersOut);
+    mnavResult result = CorridorCornersCounted(query, navmesh, corridor, cornersOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -381,7 +399,7 @@ static MNAV_NOINLINE mnavResult CorridorAreasWork(mnavQuery* query, const mnavNa
         return mnav_errorInvalid;
     }
     mnavCorners corners;
-    mnavResult result = mnavCorridorCorners(query, navmesh, corridor, &corners);
+    mnavResult result = CorridorCornersWork(query, navmesh, corridor, &corners);
     if (result != mnav_success)
     {
         return result;
@@ -422,13 +440,23 @@ static MNAV_NOINLINE mnavResult CorridorAreasWork(mnavQuery* query, const mnavNa
     return count <= capacity ? mnav_success : mnav_errorCapacity;
 }
 
+static MNAV_NOINLINE mnavResult CorridorAreasCounted(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                     const mnavCorridor* corridor,
+                                                     mnavCorners* cornersOut, mnavAreaRun* runsOut,
+                                                     int32_t capacity, int32_t* countOut)
+{
+    return mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        CorridorAreasWork(query, navmesh, corridor, cornersOut, runsOut, capacity, countOut));
+}
+
 mnavResult mnavCorridorAreas(mnavQuery* query, const mnavNavmesh* navmesh,
                              const mnavCorridor* corridor, mnavCorners* cornersOut,
                              mnavAreaRun* runsOut, int32_t capacity, int32_t* countOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
-        CorridorAreasWork(query, navmesh, corridor, cornersOut, runsOut, capacity, countOut);
+        CorridorAreasCounted(query, navmesh, corridor, cornersOut, runsOut, capacity, countOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -519,8 +547,8 @@ static MNAV_NOINLINE mnavResult MoveCorridorWork(mnavQuery* query, const mnavNav
         return mnav_errorInvalid;
     }
     mnavMove move;
-    mnavResult result = mnavMoveAlongSurface(query, navmesh, filter, corridor->polygons[0],
-                                             corridor->position, wanted, &move);
+    mnavResult result = mnavMoveAlongSurfaceWork(query, navmesh, filter, corridor->polygons[0],
+                                                 corridor->position, wanted, &move);
     result = result == mnav_success ? MergeStart(corridor, &move) : result;
     if (result == mnav_success)
     {
@@ -534,12 +562,22 @@ static MNAV_NOINLINE mnavResult MoveCorridorWork(mnavQuery* query, const mnavNav
     return result;
 }
 
+static MNAV_NOINLINE mnavResult MoveCorridorCounted(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                    const mnavQueryFilter* filter,
+                                                    mnavCorridor* corridor, mnavPos3 wanted,
+                                                    mnavMove* moveOut)
+{
+    return mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        MoveCorridorWork(query, navmesh, filter, corridor, wanted, moveOut));
+}
+
 mnavResult mnavMoveCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
                             const mnavQueryFilter* filter, mnavCorridor* corridor, mnavPos3 wanted,
                             mnavMove* moveOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = MoveCorridorWork(query, navmesh, filter, corridor, wanted, moveOut);
+    mnavResult result = MoveCorridorCounted(query, navmesh, filter, corridor, wanted, moveOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -559,8 +597,8 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetWork(mnavQuery* query, const m
     }
     mnavMove move;
     mnavResult result =
-        mnavMoveAlongSurface(query, navmesh, filter, corridor->polygons[corridor->count - 1],
-                             corridor->target, wanted, &move);
+        mnavMoveAlongSurfaceWork(query, navmesh, filter, corridor->polygons[corridor->count - 1],
+                                 corridor->target, wanted, &move);
     result = result == mnav_success ? MergeEnd(corridor, &move) : result;
     if (result == mnav_success)
     {
@@ -574,12 +612,24 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetWork(mnavQuery* query, const m
     return result;
 }
 
+static MNAV_NOINLINE mnavResult MoveCorridorTargetCounted(mnavQuery* query,
+                                                          const mnavNavmesh* navmesh,
+                                                          const mnavQueryFilter* filter,
+                                                          mnavCorridor* corridor, mnavPos3 wanted,
+                                                          mnavMove* moveOut)
+{
+    return mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        MoveCorridorTargetWork(query, navmesh, filter, corridor, wanted, moveOut));
+}
+
 mnavResult mnavMoveCorridorTarget(mnavQuery* query, const mnavNavmesh* navmesh,
                                   const mnavQueryFilter* filter, mnavCorridor* corridor,
                                   mnavPos3 wanted, mnavMove* moveOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = MoveCorridorTargetWork(query, navmesh, filter, corridor, wanted, moveOut);
+    mnavResult result =
+        MoveCorridorTargetCounted(query, navmesh, filter, corridor, wanted, moveOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -599,8 +649,8 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorWork(mnavQuery* query, const mna
     }
     *shortenedOut = false;
     mnavRay ray;
-    mnavResult result = mnavRaycast(query, navmesh, filter, corridor->polygons[0],
-                                    corridor->position, toward, &ray);
+    mnavResult result = mnavRaycastWork(query, navmesh, filter, corridor->polygons[0],
+                                        corridor->position, toward, &ray);
     if (result != mnav_success || ray.end != mnav_rayReached)
     {
         return result;
@@ -628,13 +678,24 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorWork(mnavQuery* query, const mna
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult ShortcutCorridorCounted(mnavQuery* query,
+                                                        const mnavNavmesh* navmesh,
+                                                        const mnavQueryFilter* filter,
+                                                        mnavCorridor* corridor, mnavPos3 toward,
+                                                        bool* shortenedOut)
+{
+    return mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        ShortcutCorridorWork(query, navmesh, filter, corridor, toward, shortenedOut));
+}
+
 mnavResult mnavShortcutCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
                                 const mnavQueryFilter* filter, mnavCorridor* corridor,
                                 mnavPos3 toward, bool* shortenedOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
-        ShortcutCorridorWork(query, navmesh, filter, corridor, toward, shortenedOut);
+        ShortcutCorridorCounted(query, navmesh, filter, corridor, toward, shortenedOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -650,7 +711,7 @@ static mnavResult EndPolygon(const mnavNavmesh* navmesh, const mnavQueryFilter* 
         *nearest = (mnavNearest){own, *point, true, false};
         return mnav_success;
     }
-    mnavResult result = mnavFindNearest(navmesh, filter, *point, halfExtents, nearest);
+    mnavResult result = mnavFindNearestWork(navmesh, filter, *point, halfExtents, nearest);
     *point = nearest->polygon.slot != 0 ? nearest->point : *point;
     return result;
 }
@@ -698,8 +759,19 @@ static MNAV_NOINLINE mnavResult ReplanCorridorWork(mnavQuery* query, const mnavN
                               0};
         return mnav_success;
     }
-    result = mnavFindPath(query, navmesh, filter, from.polygon, start, to.polygon, end, pathOut);
+    result =
+        mnavFindPathWork(query, navmesh, filter, from.polygon, start, to.polygon, end, pathOut);
     return result == mnav_success ? mnavSetCorridor(corridor, pathOut) : result;
+}
+
+static MNAV_NOINLINE mnavResult ReplanCorridorCounted(mnavQuery* query, const mnavNavmesh* navmesh,
+                                                      const mnavQueryFilter* filter,
+                                                      mnavCorridor* corridor, mnavVec3 halfExtents,
+                                                      mnavPath* pathOut)
+{
+    return mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        ReplanCorridorWork(query, navmesh, filter, corridor, halfExtents, pathOut));
 }
 
 mnavResult mnavReplanCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -707,7 +779,8 @@ mnavResult mnavReplanCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
                               mnavVec3 halfExtents, mnavPath* pathOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = ReplanCorridorWork(query, navmesh, filter, corridor, halfExtents, pathOut);
+    mnavResult result =
+        ReplanCorridorCounted(query, navmesh, filter, corridor, halfExtents, pathOut);
     mnavFloatEnvLeave(env);
     return result;
 }

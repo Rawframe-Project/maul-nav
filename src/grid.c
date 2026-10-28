@@ -532,11 +532,19 @@ static MNAV_NOINLINE mnavResult FindGridPathWork(mnavQuery* query, const mnavGri
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult FindGridPathCounted(mnavQuery* query, const mnavGrid* grid,
+                                                    const mnavQueryFilter* filter, mnavCell start,
+                                                    mnavCell end, mnavGridPath* pathOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(query),
+                                FindGridPathWork(query, grid, filter, start, end, pathOut));
+}
+
 mnavResult mnavFindGridPath(mnavQuery* query, const mnavGrid* grid, const mnavQueryFilter* filter,
                             mnavCell start, mnavCell end, mnavGridPath* pathOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = FindGridPathWork(query, grid, filter, start, end, pathOut);
+    mnavResult result = FindGridPathCounted(query, grid, filter, start, end, pathOut);
     mnavFloatEnvLeave(env);
     return result;
 }

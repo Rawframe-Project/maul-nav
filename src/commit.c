@@ -138,10 +138,15 @@ static MNAV_NOINLINE mnavResult CommitWork(mnavNavmesh* navmesh)
     return result;
 }
 
+static MNAV_NOINLINE mnavResult CommitCounted(mnavNavmesh* navmesh)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), CommitWork(navmesh));
+}
+
 mnavResult mnavCommit(mnavNavmesh* navmesh)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = CommitWork(navmesh);
+    mnavResult result = CommitCounted(navmesh);
     mnavFloatEnvLeave(env);
     return result;
 }

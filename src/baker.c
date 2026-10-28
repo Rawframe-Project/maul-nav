@@ -620,13 +620,31 @@ static mnavResult RunBake(mnavBaker* baker, const Input* in, int32_t tileX, int3
 }
 
 // A bake with the baker, the index it reads and the cache it fills held.
+// Counts one misuse on the first object given when a bake refused an
+// argument as invalid; a refused input element, which the report names,
+// is input, not misuse, and counts none.
+static mnavResult Counted(mnavBaker* baker, mnavTileCache* cache, const mnavBakeReport* report,
+                          mnavBakeReport* reportOut, mnavResult result)
+{
+    if (reportOut != nullptr)
+    {
+        *reportOut = *report;
+    }
+    if (report->input.result != mnav_success)
+    {
+        return result;
+    }
+    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(baker), mnavTileCacheHost(cache)), result);
+}
+
 static mnavResult Bake(mnavBaker* baker, const Input* in, int32_t tileX, int32_t tileZ,
                        mnavTileCache* cache, mnavBakeReport* reportOut)
 {
+    mnavBakeReport report;
     Held held = Hold(baker, in->flat ? in->outlineIndex : in->solid.index, cache);
-    mnavResult result = RunBake(baker, in, tileX, tileZ, cache, reportOut);
+    mnavResult result = RunBake(baker, in, tileX, tileZ, cache, &report);
     LetGo(held);
-    return result;
+    return Counted(baker, cache, &report, reportOut, result);
 }
 
 static MNAV_NOINLINE mnavResult BakeTileWork(mnavBaker* baker, const mnavBakeInput* input,
@@ -805,10 +823,11 @@ static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache*
         return mnav_errorBusy;
     }
     // The cached tile is read through the whole call.
+    mnavBakeReport report;
     Held held = Hold(baker, nullptr, cache);
-    mnavResult result = Rebuild(baker, cache, tileX, tileZ, obstacles, obstacleCount, reportOut);
+    mnavResult result = Rebuild(baker, cache, tileX, tileZ, obstacles, obstacleCount, &report);
     LetGo(held);
-    return result;
+    return Counted(baker, cache, &report, reportOut, result);
 }
 
 mnavResult mnavRebuildTile(mnavBaker* baker, mnavTileCache* cache, int32_t tileX, int32_t tileZ,
@@ -822,8 +841,8 @@ mnavResult mnavRebuildTile(mnavBaker* baker, mnavTileCache* cache, int32_t tileX
     return result;
 }
 
-mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* bufferOut, size_t capacity,
-                             size_t* sizeOut)
+static mnavResult CopyBakedTileWork(const mnavBaker* baker, uint8_t* bufferOut, size_t capacity,
+                                    size_t* sizeOut)
 {
     if (baker == nullptr || (bufferOut == nullptr && capacity > 0) || baker->tile == nullptr)
     {
@@ -842,4 +861,11 @@ mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* bufferOut, size_t 
         memcpy(bufferOut, baker->tile, baker->tileSize);
     }
     return mnav_success;
+}
+
+mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* bufferOut, size_t capacity,
+                             size_t* sizeOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(baker),
+                                CopyBakedTileWork(baker, bufferOut, capacity, sizeOut));
 }

@@ -425,12 +425,21 @@ static MNAV_NOINLINE mnavResult BeginFlowFieldWork(mnavFlowField* field, const m
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult BeginFlowFieldCounted(mnavFlowField* field, const mnavGrid* grid,
+                                                      const mnavQueryFilter* filter,
+                                                      const mnavFlowRegion* region,
+                                                      const mnavCell* goals, int32_t goalCount)
+{
+    return mnavHostCountInvalid(MNAV_HOST(field),
+                                BeginFlowFieldWork(field, grid, filter, region, goals, goalCount));
+}
+
 mnavResult mnavBeginFlowField(mnavFlowField* field, const mnavGrid* grid,
                               const mnavQueryFilter* filter, const mnavFlowRegion* region,
                               const mnavCell* goals, int32_t goalCount)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = BeginFlowFieldWork(field, grid, filter, region, goals, goalCount);
+    mnavResult result = BeginFlowFieldCounted(field, grid, filter, region, goals, goalCount);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -479,11 +488,18 @@ static MNAV_NOINLINE mnavResult ContinueFlowFieldWork(mnavFlowField* field, cons
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult ContinueFlowFieldCounted(mnavFlowField* field, const mnavGrid* grid,
+                                                         int32_t cells, bool* endedOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(field),
+                                ContinueFlowFieldWork(field, grid, cells, endedOut));
+}
+
 mnavResult mnavContinueFlowField(mnavFlowField* field, const mnavGrid* grid, int32_t cells,
                                  bool* endedOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = ContinueFlowFieldWork(field, grid, cells, endedOut);
+    mnavResult result = ContinueFlowFieldCounted(field, grid, cells, endedOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -492,8 +508,16 @@ static MNAV_NOINLINE mnavResult BuildFlowFieldWork(mnavFlowField* field, const m
                                                    const mnavQueryFilter* filter,
                                                    const mnavCell* goals, int32_t goalCount)
 {
-    mnavResult result = mnavBeginFlowField(field, grid, filter, nullptr, goals, goalCount);
-    return result == mnav_success ? mnavContinueFlowField(field, grid, INT32_MAX, nullptr) : result;
+    mnavResult result = BeginFlowFieldWork(field, grid, filter, nullptr, goals, goalCount);
+    return result == mnav_success ? ContinueFlowFieldWork(field, grid, INT32_MAX, nullptr) : result;
+}
+
+static MNAV_NOINLINE mnavResult BuildFlowFieldCounted(mnavFlowField* field, const mnavGrid* grid,
+                                                      const mnavQueryFilter* filter,
+                                                      const mnavCell* goals, int32_t goalCount)
+{
+    return mnavHostCountInvalid(MNAV_HOST(field),
+                                BuildFlowFieldWork(field, grid, filter, goals, goalCount));
 }
 
 mnavResult mnavBuildFlowField(mnavFlowField* field, const mnavGrid* grid,
@@ -501,7 +525,7 @@ mnavResult mnavBuildFlowField(mnavFlowField* field, const mnavGrid* grid,
                               int32_t goalCount)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = BuildFlowFieldWork(field, grid, filter, goals, goalCount);
+    mnavResult result = BuildFlowFieldCounted(field, grid, filter, goals, goalCount);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -532,10 +556,16 @@ static MNAV_NOINLINE mnavResult FlowAtWork(const mnavFlowField* field, mnavCell 
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult FlowAtCounted(const mnavFlowField* field, mnavCell cell,
+                                              mnavFlow* flowOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(field), FlowAtWork(field, cell, flowOut));
+}
+
 mnavResult mnavFlowAt(const mnavFlowField* field, mnavCell cell, mnavFlow* flowOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = FlowAtWork(field, cell, flowOut);
+    mnavResult result = FlowAtCounted(field, cell, flowOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -586,10 +616,16 @@ static MNAV_NOINLINE mnavResult DebugFlowFieldWork(const mnavFlowField* field, d
     return mnavDrawResult(buffer);
 }
 
+static MNAV_NOINLINE mnavResult DebugFlowFieldCounted(const mnavFlowField* field, double height,
+                                                      mnavDebugBuffer* buffer)
+{
+    return mnavHostCountInvalid(MNAV_HOST(field), DebugFlowFieldWork(field, height, buffer));
+}
+
 mnavResult mnavDebugFlowField(const mnavFlowField* field, double height, mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = DebugFlowFieldWork(field, height, buffer);
+    mnavResult result = DebugFlowFieldCounted(field, height, buffer);
     mnavFloatEnvLeave(env);
     return result;
 }

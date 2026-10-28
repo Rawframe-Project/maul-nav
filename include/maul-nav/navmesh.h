@@ -162,9 +162,10 @@ extern "C"
     /// runs.
     MNAV_API mnavTier mnavGetTier(const mnavNavmesh* navmesh);
 
-    /// Returns how many calls against the navmesh were refused because they
-    /// came back in from host code it ran (`mnav_errorBusy`), since it was
-    /// made.
+    /// Returns how many calls against the navmesh were refused as misuse since
+    /// it was made: an argument refused with `mnav_errorInvalid` when the
+    /// navmesh was the first object the call was given, and a call back in from
+    /// host code it ran (`mnav_errorBusy`).
     ///
     /// @param navmesh The navmesh.
     /// @return The count; 0 for NULL.
