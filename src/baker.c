@@ -18,6 +18,7 @@
 #include "fpenv.h"
 #include "heightfield.h"
 #include "holes.h"
+#include "host_code.h"
 #include "input.h"
 #include "invariant.h"
 #include "outline.h"
@@ -48,6 +49,7 @@ struct mnavBaker
     size_t tileSize;
     // The clock's ticks when the stage being run began.
     uint64_t stageStart;
+    mnavHostCode host;
 };
 
 // The stages' results for one tile, released together.
@@ -93,7 +95,8 @@ static MNAV_NOINLINE mnavBakeDefResult CreateBakerWork(const mnavBakeDef* def, m
     {
         return (mnavBakeDefResult){result, mnav_settingNone};
     }
-    *baker = (mnavBaker){*def, cells, memory, nullptr, 0, 0};
+    *baker = (mnavBaker){*def, cells, memory, nullptr, 0, 0, {0}};
+    baker->memory.host = &baker->host;
     *bakerOut = baker;
     return (mnavBakeDefResult){mnav_success, mnav_settingNone};
 }
@@ -113,14 +116,24 @@ static void DropTile(mnavBaker* baker)
     baker->tileSize = 0;
 }
 
+uint64_t mnavGetBakerMisuse(const mnavBaker* baker)
+{
+    return baker != nullptr ? mnavHostMisuse(&baker->host) : 0;
+}
+
 void mnavDestroyBaker(mnavBaker* baker)
 {
-    if (baker == nullptr)
+    if (baker == nullptr || mnavHostCalledBack(&baker->host))
     {
         return;
     }
     DropTile(baker);
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&baker->host);
     mnavMemory memory = baker->memory;
+    memory.host = nullptr;
     mnavRelease(&memory, baker, 1, sizeof(mnavBaker), alignof(mnavBaker));
 }
 
@@ -308,11 +321,19 @@ static MNAV_NOINLINE uint64_t HostNow(const mnavClock* clock)
     return now;
 }
 
-// The clock's ticks now, or 0 without a clock.
-static uint64_t Now(const mnavBaker* baker)
+// The clock's ticks now, or 0 without a clock; the baker is marked while
+// the clock runs.
+static uint64_t Now(mnavBaker* baker)
 {
     const mnavClock* clock = &baker->def.clock;
-    return clock->now != nullptr ? HostNow(clock) : 0;
+    if (clock->now == nullptr)
+    {
+        return 0;
+    }
+    mnavHostEnter(&baker->host);
+    uint64_t now = HostNow(clock);
+    mnavHostLeave(&baker->host);
+    return now;
 }
 
 // Ends the stage being run: its ticks and the most memory held while it
@@ -583,6 +604,10 @@ static MNAV_NOINLINE mnavResult BakeTileWork(mnavBaker* baker, const mnavBakeInp
                                              int32_t tileX, int32_t tileZ,
                                              mnavBakeReport* reportOut)
 {
+    if (baker != nullptr && mnavHostCalledBack(&baker->host))
+    {
+        return mnav_errorBusy;
+    }
     if (input == nullptr)
     {
         Input none = {{nullptr, -1, nullptr, 0, nullptr, 0, nullptr}, nullptr, 0, nullptr, false};
@@ -605,6 +630,10 @@ static MNAV_NOINLINE mnavResult BakeTile2DWork(mnavBaker* baker, const mnavBake2
                                                int32_t tileX, int32_t tileZ,
                                                mnavBakeReport* reportOut)
 {
+    if (baker != nullptr && mnavHostCalledBack(&baker->host))
+    {
+        return mnav_errorBusy;
+    }
     const mnavBake2DInput none = {nullptr, -1, nullptr};
     const mnavBake2DInput* in2 = input != nullptr ? input : &none;
     Input in = {{nullptr, 0, nullptr, 0, nullptr, 0, nullptr},
@@ -628,6 +657,11 @@ static MNAV_NOINLINE mnavResult BakeTileCachedWork(mnavBaker* baker, mnavTileCac
                                                    const mnavBakeInput* input, int32_t tileX,
                                                    int32_t tileZ, mnavBakeReport* reportOut)
 {
+    if ((baker != nullptr && mnavHostCalledBack(&baker->host)) ||
+        (cache != nullptr && mnavTileCacheCalledBack(cache)))
+    {
+        return mnav_errorBusy;
+    }
     if (cache == nullptr || input == nullptr)
     {
         Input none = {{nullptr, -1, nullptr, 0, nullptr, 0, nullptr}, nullptr, 0, nullptr, false};
@@ -677,6 +711,11 @@ static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache*
                                                 const mnavBakeVolume* obstacles,
                                                 int32_t obstacleCount, mnavBakeReport* reportOut)
 {
+    if ((baker != nullptr && mnavHostCalledBack(&baker->host)) ||
+        (cache != nullptr && mnavTileCacheCalledBack(cache)))
+    {
+        return mnav_errorBusy;
+    }
     mnavBakeReport report;
     if (!Start(baker, &report, reportOut))
     {

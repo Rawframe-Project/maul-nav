@@ -81,7 +81,9 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavCreateNavmesh(const mnavBakeDef* def,
                                                                 mnavNavmesh** navmeshOut);
 
-    /// Destroys a navmesh, its tiles and everything staged.
+    /// Destroys a navmesh, its tiles and everything staged. Called back in from
+    /// the navmesh's allocator or a clearance test, it does nothing and counts
+    /// one misuse.
     ///
     /// @param navmesh  The navmesh, or NULL.
     /// @par Thread safety

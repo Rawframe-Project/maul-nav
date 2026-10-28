@@ -13,6 +13,7 @@
 #include "flight_def.h"
 #include "flight_tile.h"
 #include "fpenv.h"
+#include "host_code.h"
 #include "raster.h"
 
 #include "maul-nav/bake.h"
@@ -33,6 +34,7 @@ struct mnavFlightBaker
     mnavMemory memory;
     uint8_t* tile;
     size_t tileSize;
+    mnavHostCode host;
 };
 
 static MNAV_NOINLINE mnavFlightDefResult CreateFlightBakerWork(const mnavFlightDef* def,
@@ -63,7 +65,8 @@ static MNAV_NOINLINE mnavFlightDefResult CreateFlightBakerWork(const mnavFlightD
     {
         return (mnavFlightDefResult){result, mnav_flightSettingNone};
     }
-    *baker = (mnavFlightBaker){*def, shape, voxels, cells, memory, nullptr, 0};
+    *baker = (mnavFlightBaker){*def, shape, voxels, cells, memory, nullptr, 0, {0}};
+    baker->memory.host = &baker->host;
     *bakerOut = baker;
     return (mnavFlightDefResult){mnav_success, mnav_flightSettingNone};
 }
@@ -83,14 +86,24 @@ static void DropTile(mnavFlightBaker* baker)
     baker->tileSize = 0;
 }
 
+uint64_t mnavGetFlightBakerMisuse(const mnavFlightBaker* baker)
+{
+    return baker != nullptr ? mnavHostMisuse(&baker->host) : 0;
+}
+
 void mnavDestroyFlightBaker(mnavFlightBaker* baker)
 {
-    if (baker == nullptr)
+    if (baker == nullptr || mnavHostCalledBack(&baker->host))
     {
         return;
     }
     DropTile(baker);
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&baker->host);
     mnavMemory memory = baker->memory;
+    memory.host = nullptr;
     mnavRelease(&memory, baker, 1, sizeof(mnavFlightBaker), alignof(mnavFlightBaker));
 }
 
@@ -164,6 +177,10 @@ static MNAV_NOINLINE mnavResult BakeFlightTileWork(mnavFlightBaker* baker,
                                                    const mnavBakeInput* input, int32_t tileX,
                                                    int32_t tileZ, mnavFlightBakeReport* reportOut)
 {
+    if (baker != nullptr && mnavHostCalledBack(&baker->host))
+    {
+        return mnav_errorBusy;
+    }
     mnavFlightBakeReport report = {0};
     report.mesh = -1;
     report.input = (mnavInputResult){mnav_success, mnav_elementNone, -1};

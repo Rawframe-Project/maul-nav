@@ -13,6 +13,7 @@
 #include "allocator.h"
 #include "draw.h"
 #include "fpenv.h"
+#include "host_code.h"
 #include "invariant.h"
 #include "navmesh.h"
 #include "offmesh.h"
@@ -48,6 +49,7 @@ typedef struct Way
 struct mnavNavFlow
 {
     mnavMemory memory;
+    mnavHostCode host;
     mnavNavFlowDef def;
     Way* ways;
     int32_t* places;
@@ -124,6 +126,7 @@ static MNAV_NOINLINE mnavResult CreateNavFlowWork(const mnavNavFlowDef* def, mna
     }
     *f = (mnavNavFlow){0};
     f->memory = memory;
+    f->memory.host = &f->host;
     f->def = *def;
     size_t n = (size_t)def->limits.polygons;
     result = mnavAllocate(&f->memory, n, sizeof(Way), alignof(Way), (void**)&f->ways);
@@ -162,9 +165,14 @@ mnavResult mnavCreateNavFlow(const mnavNavFlowDef* def, mnavNavFlow** fieldOut)
     return result;
 }
 
+uint64_t mnavGetNavFlowMisuse(const mnavNavFlow* field)
+{
+    return field != nullptr ? mnavHostMisuse(&field->host) : 0;
+}
+
 void mnavDestroyNavFlow(mnavNavFlow* field)
 {
-    if (field == nullptr)
+    if (field == nullptr || mnavHostCalledBack(&field->host))
     {
         return;
     }
@@ -177,6 +185,11 @@ void mnavDestroyNavFlow(mnavNavFlow* field)
                 alignof(int32_t));
     mnavRelease(&memory, field->landings, Landings(&field->def.limits), sizeof(uint64_t),
                 alignof(uint64_t));
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&field->host);
+    memory.host = nullptr;
     mnavRelease(&memory, field, 1, sizeof(mnavNavFlow), alignof(mnavNavFlow));
 }
 
@@ -499,6 +512,10 @@ static MNAV_NOINLINE mnavResult BeginNavFlowWork(mnavNavFlow* field, const mnavN
                                                  const mnavNavFlowRegion* region,
                                                  const mnavNavFlowGoal* goals, int32_t goalCount)
 {
+    if (field != nullptr && mnavHostCalledBack(&field->host))
+    {
+        return mnav_errorBusy;
+    }
     if (field == nullptr)
     {
         return mnav_errorInvalid;
@@ -563,6 +580,10 @@ static mnavResult Built(const mnavNavFlow* field, const mnavNavmesh* navmesh)
 static MNAV_NOINLINE mnavResult ContinueNavFlowWork(mnavNavFlow* field, const mnavNavmesh* navmesh,
                                                     int32_t polygons, bool* endedOut)
 {
+    if (field != nullptr && mnavHostCalledBack(&field->host))
+    {
+        return mnav_errorBusy;
+    }
     if (field == nullptr || navmesh == nullptr || polygons < 1)
     {
         return mnav_errorInvalid;

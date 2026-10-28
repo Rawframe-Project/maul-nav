@@ -11,6 +11,7 @@
 #include "compact.h"
 #include "field_pack.h"
 #include "fpenv.h"
+#include "host_code.h"
 #include "outline.h"
 
 #include "maul-nav/bake.h"
@@ -27,6 +28,7 @@ struct mnavTileCache
     mnavTileCacheDef def;
     mnavCachedTile* tiles;
     int32_t count;
+    mnavHostCode host;
 };
 
 static MNAV_NOINLINE mnavResult CreateTileCacheWork(const mnavTileCacheDef* def,
@@ -66,6 +68,7 @@ static MNAV_NOINLINE mnavResult CreateTileCacheWork(const mnavTileCacheDef* def,
         return result;
     }
     *cache = (mnavTileCache){.memory = memory, .def = *def};
+    cache->memory.host = &cache->host;
     result = mnavAllocate(&cache->memory, (size_t)def->limits.tiles, sizeof(mnavCachedTile),
                           alignof(mnavCachedTile), (void**)&cache->tiles);
     if (result != mnav_success)
@@ -98,7 +101,7 @@ static void Release(mnavMemory* memory, mnavCachedTile* tile)
 
 void mnavDestroyTileCache(mnavTileCache* cache)
 {
-    if (cache == nullptr)
+    if (cache == nullptr || mnavHostCalledBack(&cache->host))
     {
         return;
     }
@@ -109,6 +112,11 @@ void mnavDestroyTileCache(mnavTileCache* cache)
     mnavMemory memory = cache->memory;
     mnavRelease(&memory, cache->tiles, (size_t)cache->def.limits.tiles, sizeof(mnavCachedTile),
                 alignof(mnavCachedTile));
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&cache->host);
+    memory.host = nullptr;
     mnavRelease(&memory, cache, 1, sizeof(mnavTileCache), alignof(mnavTileCache));
 }
 
@@ -130,8 +138,22 @@ const mnavCachedTile* mnavFindCachedTile(const mnavTileCache* cache, int32_t til
     return i >= 0 ? &cache->tiles[i] : nullptr;
 }
 
+bool mnavTileCacheCalledBack(mnavTileCache* cache)
+{
+    return mnavHostCalledBack(&cache->host);
+}
+
+uint64_t mnavGetTileCacheMisuse(const mnavTileCache* cache)
+{
+    return cache != nullptr ? mnavHostMisuse(&cache->host) : 0;
+}
+
 void mnavDropCachedTile(mnavTileCache* cache, int32_t tileX, int32_t tileZ)
 {
+    if (cache != nullptr && mnavHostCalledBack(&cache->host))
+    {
+        return;
+    }
     int32_t i = cache != nullptr ? IndexOf(cache, tileX, tileZ) : -1;
     if (i < 0)
     {

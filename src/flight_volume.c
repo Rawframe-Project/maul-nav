@@ -44,6 +44,7 @@ static MNAV_NOINLINE mnavFlightDefResult CreateFlightVolumeWork(const mnavFlight
         return (mnavFlightDefResult){result, mnav_flightSettingNone};
     }
     *volume = (mnavFlightVolume){.def = *def, .shape = shape, .memory = memory};
+    volume->memory.host = &volume->host;
     *volumeOut = volume;
     return (mnavFlightDefResult){mnav_success, mnav_flightSettingNone};
 }
@@ -64,9 +65,14 @@ static void DropEntries(mnavMemory* memory, mnavFlightEntry* entries, int32_t co
     }
 }
 
+uint64_t mnavGetFlightVolumeMisuse(const mnavFlightVolume* volume)
+{
+    return volume != nullptr ? mnavHostMisuse(&volume->host) : 0;
+}
+
 void mnavDestroyFlightVolume(mnavFlightVolume* volume)
 {
-    if (volume == nullptr)
+    if (volume == nullptr || mnavHostCalledBack(&volume->host))
     {
         return;
     }
@@ -76,7 +82,12 @@ void mnavDestroyFlightVolume(mnavFlightVolume* volume)
                 alignof(mnavFlightEntry));
     mnavRelease(&volume->memory, volume->staged, (size_t)volume->stagedCapacity,
                 sizeof(mnavFlightEntry), alignof(mnavFlightEntry));
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&volume->host);
     mnavMemory memory = volume->memory;
+    memory.host = nullptr;
     mnavRelease(&memory, volume, 1, sizeof(mnavFlightVolume), alignof(mnavFlightVolume));
 }
 
@@ -138,6 +149,10 @@ static mnavResult Stage(mnavFlightVolume* volume, mnavFlightEntry change)
 static MNAV_NOINLINE mnavTileResult StageFlightTileWork(mnavFlightVolume* volume,
                                                         const uint8_t* bytes, size_t size)
 {
+    if (volume != nullptr && mnavHostCalledBack(&volume->host))
+    {
+        return (mnavTileResult){mnav_errorBusy, mnav_tileHeader, -1};
+    }
     if (volume == nullptr || bytes == nullptr)
     {
         return (mnavTileResult){mnav_errorInvalid, mnav_tileHeader, -1};
@@ -168,6 +183,10 @@ mnavResult mnavStageFlightTileRemoval(mnavFlightVolume* volume, int32_t tileX, i
     if (volume == nullptr)
     {
         return mnav_errorInvalid;
+    }
+    if (mnavHostCalledBack(&volume->host))
+    {
+        return mnav_errorBusy;
     }
     return Stage(volume, (mnavFlightEntry){.x = tileX, .z = tileZ, .removal = true});
 }
@@ -226,6 +245,10 @@ static void Merge(mnavFlightVolume* volume, mnavFlightEntry* next)
 
 static MNAV_NOINLINE mnavResult CommitFlightWork(mnavFlightVolume* volume)
 {
+    if (volume != nullptr && mnavHostCalledBack(&volume->host))
+    {
+        return mnav_errorBusy;
+    }
     if (volume == nullptr)
     {
         return mnav_errorInvalid;

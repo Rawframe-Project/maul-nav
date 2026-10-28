@@ -212,6 +212,10 @@ static MNAV_NOINLINE mnavResult UpdateFlowFieldWork(mnavFlowField* field, const 
                                                     const mnavCell* goals, int32_t goalCount,
                                                     const mnavCell* changed, int32_t changedCount)
 {
+    if (field != nullptr && mnavHostCalledBack(&field->host))
+    {
+        return mnav_errorBusy;
+    }
     mnavResult result = Check(field, grid, goals, goalCount, changed, changedCount);
     if (result != mnav_success)
     {

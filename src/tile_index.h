@@ -8,6 +8,7 @@
 
 #include "allocator.h"
 #include "bake_def.h"
+#include "host_code.h"
 
 #include "maul-nav/bake.h"
 
@@ -42,6 +43,7 @@ struct mnavTileIndex
     int32_t* first;
     mnavIndexEntry* entries;
     int32_t entryCount;
+    mnavHostCode host;
 };
 
 // Whether an index was built for this grid and these meshes' counts.

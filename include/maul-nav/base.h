@@ -148,7 +148,9 @@ extern "C"
     // The allocator an owner object takes in its def and keeps for its
     // lifetime. Alignment is a power of two. A zeroed allocator means the C
     // library's functions, which serve alignments up to that of max_align_t.
-    // Its calls run in the host's own floating-point environment.
+    // Its calls run in the host's own floating-point environment. They may
+    // call nothing of the object they serve: such a call is refused with
+    // mnav_errorBusy, one misuse counted.
     typedef struct mnavAllocator
     {
         void* (*alloc)(size_t size, size_t alignment, void* context);

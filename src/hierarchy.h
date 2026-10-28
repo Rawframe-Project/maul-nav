@@ -8,6 +8,7 @@
 #define MAUL_NAV_SRC_HIERARCHY_H
 
 #include "allocator.h"
+#include "host_code.h"
 #include "query.h"
 
 #include "maul-nav/base.h"
@@ -54,6 +55,7 @@ typedef struct mnavEdge
 struct mnavHierarchy
 {
     mnavMemory memory;
+    mnavHostCode host;
     mnavHierarchyDef def;
     // The graph's navmesh and its commits when built; NULL with no graph.
     const mnavNavmesh* navmesh;

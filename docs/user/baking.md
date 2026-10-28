@@ -48,7 +48,7 @@ Input is hostile: a NaN coordinate, an index out of range or an area past 63 is 
 
 ## The report
 
-`mnavBakeReport` gives the stage a bake ended in, the tile's counts and size, the memory peak, and the work it gave up on rather than fail: holes no bridge reached, triangulations cut short (`partialRings`, usually from a `maxEdgeError` of a cell or more, whose walls can cross), detail samples with no height, and walkable islands smaller than `minRegionArea` dropped (`droppedRegions`), which usually point at geometry the host did not mean to be walkable. With a clock in the def (`mnavClock`), it also gives each stage's ticks. The clock never shapes the tile.
+`mnavBakeReport` gives the stage a bake ended in, the tile's counts and size, the memory peak, and the work it gave up on rather than fail: holes no bridge reached, triangulations cut short (`partialRings`, usually from a `maxEdgeError` of a cell or more, whose walls can cross), detail samples with no height, and walkable islands smaller than `minRegionArea` dropped (`droppedRegions`), which usually point at geometry the host did not mean to be walkable. With a clock in the def (`mnavClock`), it also gives each stage's ticks. The clock never shapes the tile, and may call nothing of the baker: such a call is refused with `mnav_errorBusy`.
 
 ## Obstacles
 

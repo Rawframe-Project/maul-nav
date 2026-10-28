@@ -175,6 +175,7 @@ static MNAV_NOINLINE mnavResult CreateAvoidanceWork(const mnavAvoidanceDef* def,
     }
     *a = (mnavAvoidance){0};
     a->memory = memory;
+    a->memory.host = &a->host;
     a->def = *def;
     result = AllocateCrowd(a);
     if (result == mnav_success)
@@ -202,9 +203,14 @@ mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoi
     return result;
 }
 
+uint64_t mnavGetAvoidanceMisuse(const mnavAvoidance* avoidance)
+{
+    return avoidance != nullptr ? mnavHostMisuse(&avoidance->host) : 0;
+}
+
 void mnavDestroyAvoidance(mnavAvoidance* avoidance)
 {
-    if (avoidance == nullptr)
+    if (avoidance == nullptr || mnavHostCalledBack(&avoidance->host))
     {
         return;
     }
@@ -236,6 +242,11 @@ void mnavDestroyAvoidance(mnavAvoidance* avoidance)
     mnavRelease(&memory, avoidance->projected, lines, sizeof(mnavLine), alignof(mnavLine));
     mnavRelease(&memory, avoidance->planes, lines, sizeof(mnavPlane), alignof(mnavPlane));
     mnavRelease(&memory, avoidance->projectedPlanes, lines, sizeof(mnavPlane), alignof(mnavPlane));
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&avoidance->host);
+    memory.host = nullptr;
     mnavRelease(&memory, avoidance, 1, sizeof(mnavAvoidance), alignof(mnavAvoidance));
 }
 
@@ -337,6 +348,10 @@ static MNAV_NOINLINE mnavResult AvoidWork(mnavAvoidance* avoidance, const mnavAg
                                           int32_t obstacleCount, double step,
                                           mnavPos2* velocitiesOut)
 {
+    if (avoidance != nullptr && mnavHostCalledBack(&avoidance->host))
+    {
+        return mnav_errorBusy;
+    }
     if (avoidance == nullptr || agentCount < 0 || obstacleCount < 0 ||
         (agentCount > 0 && (agents == nullptr || velocitiesOut == nullptr)) ||
         (obstacleCount > 0 && obstacles == nullptr))
@@ -409,6 +424,10 @@ static MNAV_NOINLINE mnavResult DebugAvoidanceWork(mnavAvoidance* avoidance,
                                                    const mnavAgent* agents, int32_t agentCount,
                                                    double height, mnavDebugBuffer* buffer)
 {
+    if (avoidance != nullptr && mnavHostCalledBack(&avoidance->host))
+    {
+        return mnav_errorBusy;
+    }
     if (avoidance == nullptr || agentCount < 0 || (agentCount > 0 && agents == nullptr) ||
         !isfinite(height) || !mnavGoodBuffer(buffer))
     {

@@ -260,12 +260,24 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavFlightDefResult mnavCreateFlightBaker(const mnavFlightDef* def,
                                                                       mnavFlightBaker** bakerOut);
 
-    /// Destroys a flight baker and the tile it holds.
+    /// Destroys a flight baker and the tile it holds. Called back in from the
+    /// flight baker's allocator, it does nothing and counts one misuse.
     ///
     /// @param baker  The baker, or NULL.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_API void mnavDestroyFlightBaker(mnavFlightBaker* baker);
+
+    /// Returns how many calls against the flight baker were refused because
+    /// they came back in from host code it ran (`mnav_errorBusy`), since it was
+    /// made.
+    ///
+    /// @param baker The flight baker.
+    /// @return The count; 0 for NULL.
+    /// @par Thread safety
+    /// Safe from any thread. It may be read at any time, also while host
+    /// code the object runs calls back in.
+    MNAV_API uint64_t mnavGetFlightBakerMisuse(const mnavFlightBaker* baker);
 
     /// Bakes one flight tile from the input a navmesh bake reads:
     /// every triangle is rasterized at the voxel size, and a
@@ -281,13 +293,14 @@ extern "C"
     /// @param tileX     The tile's column.
     /// @param tileZ     The tile's row.
     /// @param reportOut Receives the report. May be NULL.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or
-    /// input; for input mnavBakeTile refuses, the status it gives, the mesh
-    /// named in the report; `mnav_errorLimit` for a tile past the extent,
-    /// or when rasterizing cuts a triangle into a piece of more than
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or input;
+    /// for input mnavBakeTile refuses, the status it gives, the mesh named in
+    /// the report; `mnav_errorLimit` for a tile past the extent, or when
+    /// rasterizing cuts a triangle into a piece of more than
     /// MNAV_MAX_PIECE_CORNERS corners, as for mnavBakeTile;
-    /// `mnav_errorCapacity` past a named limit or the memory limit, or
-    /// when the allocator fails.
+    /// `mnav_errorCapacity` past a named limit or the memory limit, or when the
+    /// allocator fails. Also `mnav_errorBusy` when called back in from the
+    /// flight baker's allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBakeFlightTile(mnavFlightBaker* baker,
@@ -326,12 +339,25 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavFlightDefResult
     mnavCreateFlightVolume(const mnavFlightDef* def, mnavFlightVolume** volumeOut);
 
-    /// Destroys a flight volume, its tiles and everything staged.
+    /// Destroys a flight volume, its tiles and everything staged. Called back
+    /// in from the flight volume's allocator, it does nothing and counts one
+    /// misuse.
     ///
     /// @param volume  The volume, or NULL.
     /// @par Thread safety
     /// Safe from any thread; the volume is used by one thread at a time.
     MNAV_API void mnavDestroyFlightVolume(mnavFlightVolume* volume);
+
+    /// Returns how many calls against the flight volume were refused because
+    /// they came back in from host code it ran (`mnav_errorBusy`), since it was
+    /// made.
+    ///
+    /// @param volume The flight volume.
+    /// @return The count; 0 for NULL.
+    /// @par Thread safety
+    /// Safe from any thread. It may be read at any time, also while host
+    /// code the object runs calls back in.
+    MNAV_API uint64_t mnavGetFlightVolumeMisuse(const mnavFlightVolume* volume);
 
     /// Loads flight tile bytes, checking every field as hostile input and
     /// the tile's settings against the volume's def, and stages the tile
@@ -342,11 +368,12 @@ extern "C"
     /// @param bytes   The tile's bytes, as mnavCopyFlightTile gives them.
     /// @param size    Their size in bytes.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument;
-    /// `mnav_errorFormat` naming the section and element for malformed
-    /// bytes, a tile baked with other settings or past the def's node or
-    /// leaf limit (the header); `mnav_errorVersion` for another flight tile
-    /// format version; `mnav_errorCapacity` past the memory limit or when
-    /// the allocator fails.
+    /// `mnav_errorFormat` naming the section and element for malformed bytes, a
+    /// tile baked with other settings or past the def's node or leaf limit (the
+    /// header); `mnav_errorVersion` for another flight tile format version;
+    /// `mnav_errorCapacity` past the memory limit or when the allocator fails.
+    /// Also `mnav_errorBusy` when called back in from the flight volume's
+    /// allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the volume is used by one thread at a time.
     /// Staging changes nothing queries read, but it may not run beside
@@ -361,8 +388,9 @@ extern "C"
     /// @param tileX   The tile's column.
     /// @param tileZ   The tile's row.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL volume;
-    /// `mnav_errorCapacity` past the memory limit or when the allocator
-    /// fails.
+    /// `mnav_errorCapacity` past the memory limit or when the allocator fails.
+    /// Also `mnav_errorBusy` when called back in from the flight volume's
+    /// allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the volume is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavStageFlightTileRemoval(mnavFlightVolume* volume,
@@ -374,8 +402,9 @@ extern "C"
     ///
     /// @param volume  The volume.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL volume;
-    /// `mnav_errorCapacity` when the tiles would pass the tiles limit or
-    /// memory its limit, or when the allocator fails.
+    /// `mnav_errorCapacity` when the tiles would pass the tiles limit or memory
+    /// its limit, or when the allocator fails. Also `mnav_errorBusy` when
+    /// called back in from the flight volume's allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the volume is used by one thread at a time,
     /// so no query may run during a commit.
