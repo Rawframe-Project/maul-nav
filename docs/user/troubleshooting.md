@@ -4,7 +4,7 @@
 
 | Result | Meaning | What to do |
 |---|---|---|
-| `mnav_errorInvalid` | An argument a correct program never passes: a NULL pointer, a def not made by its default, a NaN, a value outside a range its documentation gives without a named constant, an object other than the one the call needs, malformed input geometry. | The result struct, where there is one, names the setting or the input element refused. |
+| `mnav_errorInvalid` | An argument a correct program never passes: a NULL pointer, a def not made by its default, a NaN, a value outside a range its documentation gives without a named constant, an object other than the one the call needs, malformed input geometry. One misuse is counted on the first owner object the call is given (`mnavGetNavmeshMisuse` and the like), except for input geometry a bake's report names. | The result struct, where there is one, names the setting or the input element refused. A misuse count above 0 in a release build points at a bug in the calling code. |
 | `mnav_errorCapacity` | Room is too small: a caller buffer, the allocator, or a limit the def sets (memory, polygons per tile, nodes per search, agents per step) was reached, and the work it bounds was not done. | A buffer call reports the size it needed; grow the buffer, raise the limit in the def, or split the work. A bake's report says which stage hit it. |
 | `mnav_errorStale` | An id names a tile, polygon or link replaced or removed since it was handed out. | Find the polygon again. |
 | `mnav_errorUnsupported` | The navmesh was made without what the change needs: its tier does not allow it, and no later call can add it. | Make the navmesh with the tier the change needs. |
@@ -13,6 +13,7 @@
 | `mnav_errorFormat` | Tile bytes are malformed, or were baked with other settings. | The tile result names the section and element refused. Rebake the tile. |
 | `mnav_errorLimit` | An argument passes a fixed bound the library publishes as an `MNAV_MAX_` or `MNAV_MIN_` constant, an infinity included: a coordinate past the extent, a def value past its bound. More room would not help. | Keep values within the bound; for coordinates, move the origin nearer the input, or split the world into several origins. |
 | `mnav_errorBusy` | The call came back in from host code the object is running: its allocator, a baker's clock, or a link generation's clearance test. One misuse is counted, which the object's `mnavGet...Misuse` call reads. | Make the call after the host code returns. An allocator or a clock may call nothing of the object it serves, or of another object the running call uses, such as the tile cache a rebuild reads. A clearance test may read the navmesh with a query context of its own and stage a tile or a tile's removal; it may not otherwise change the navmesh, or use the generating context. |
+| `mnav_errorOutside` | The place asked about is outside what the object covers: a point off the polygon given to `mnavGetHeight`, a cell or polygon outside a flow field's region. No misuse is counted. | Find the polygon under the point first (`mnavFindNearest`), or build the field over a region that holds the agent. |
 | `mnav_errorNotLoaded` | The place has no tile loaded. It is not a wall: nothing is known there. | Wait for the tile, then ask again. |
 
 `mnavResultName` gives any result's name for a log.

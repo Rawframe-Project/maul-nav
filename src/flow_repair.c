@@ -265,11 +265,21 @@ static MNAV_NOINLINE mnavResult UpdateFlowFieldWork(mnavFlowField* field, const 
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult UpdateFlowFieldCounted(mnavFlowField* field, const mnavGrid* grid,
+                                                       const mnavCell* goals, int32_t goalCount,
+                                                       const mnavCell* changed,
+                                                       int32_t changedCount)
+{
+    return mnavHostCountInvalid(MNAV_HOST(field), UpdateFlowFieldWork(field, grid, goals, goalCount,
+                                                                      changed, changedCount));
+}
+
 mnavResult mnavUpdateFlowField(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
                                int32_t goalCount, const mnavCell* changed, int32_t changedCount)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = UpdateFlowFieldWork(field, grid, goals, goalCount, changed, changedCount);
+    mnavResult result =
+        UpdateFlowFieldCounted(field, grid, goals, goalCount, changed, changedCount);
     mnavFloatEnvLeave(env);
     return result;
 }

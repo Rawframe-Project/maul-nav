@@ -390,13 +390,23 @@ static MNAV_NOINLINE mnavResult AvoidWork(mnavAvoidance* avoidance, const mnavAg
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult AvoidCounted(mnavAvoidance* avoidance, const mnavAgent* agents,
+                                             int32_t agentCount, const mnavObstacle* obstacles,
+                                             int32_t obstacleCount, double step,
+                                             mnavPos2* velocitiesOut)
+{
+    return mnavHostCountInvalid(
+        MNAV_HOST(avoidance),
+        AvoidWork(avoidance, agents, agentCount, obstacles, obstacleCount, step, velocitiesOut));
+}
+
 mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount,
                      const mnavObstacle* obstacles, int32_t obstacleCount, double step,
                      mnavPos2* velocitiesOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
-        AvoidWork(avoidance, agents, agentCount, obstacles, obstacleCount, step, velocitiesOut);
+        AvoidCounted(avoidance, agents, agentCount, obstacles, obstacleCount, step, velocitiesOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -466,11 +476,19 @@ static MNAV_NOINLINE mnavResult DebugAvoidanceWork(mnavAvoidance* avoidance,
     return mnavDrawResult(buffer);
 }
 
+static MNAV_NOINLINE mnavResult DebugAvoidanceCounted(mnavAvoidance* avoidance,
+                                                      const mnavAgent* agents, int32_t agentCount,
+                                                      double height, mnavDebugBuffer* buffer)
+{
+    return mnavHostCountInvalid(MNAV_HOST(avoidance),
+                                DebugAvoidanceWork(avoidance, agents, agentCount, height, buffer));
+}
+
 mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount,
                               double height, mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = DebugAvoidanceWork(avoidance, agents, agentCount, height, buffer);
+    mnavResult result = DebugAvoidanceCounted(avoidance, agents, agentCount, height, buffer);
     mnavFloatEnvLeave(env);
     return result;
 }

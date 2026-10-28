@@ -295,9 +295,10 @@ extern "C"
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_API void mnavDestroyQuery(mnavQuery* query);
 
-    /// Returns how many calls against the context were refused because they
-    /// came back in from host code it ran (`mnav_errorBusy`), since it was
-    /// made.
+    /// Returns how many calls against the context were refused as misuse since
+    /// it was made: an argument refused with `mnav_errorInvalid` when the
+    /// context was the first object the call was given, and a call back in from
+    /// host code it ran (`mnav_errorBusy`).
     ///
     /// @param query    The context.
     /// @return The count; 0 for NULL.
@@ -944,9 +945,10 @@ extern "C"
     /// @param z         The point's Z.
     /// @param heightOut Receives the height.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// coordinate not finite, a polygon id never handed out, or a point outside
-    /// the polygon on the ground; `mnav_errorStale` for a polygon whose tile
-    /// has gone.
+    /// coordinate not finite or a polygon id never handed out;
+    /// `mnav_errorOutside` for a point outside the polygon on the ground,
+    /// heightOut left as it was; `mnav_errorStale` for a polygon whose tile has
+    /// gone.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it.

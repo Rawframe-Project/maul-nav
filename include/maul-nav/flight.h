@@ -268,9 +268,10 @@ extern "C"
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_API void mnavDestroyFlightBaker(mnavFlightBaker* baker);
 
-    /// Returns how many calls against the flight baker were refused because
-    /// they came back in from host code it ran (`mnav_errorBusy`), since it was
-    /// made.
+    /// Returns how many calls against the flight baker were refused as misuse
+    /// since it was made: an argument refused with `mnav_errorInvalid` when the
+    /// flight baker was the first object the call was given, and a call back in
+    /// from host code it ran (`mnav_errorBusy`).
     ///
     /// @param baker The flight baker.
     /// @return The count; 0 for NULL.
@@ -348,9 +349,10 @@ extern "C"
     /// Safe from any thread; the volume is used by one thread at a time.
     MNAV_API void mnavDestroyFlightVolume(mnavFlightVolume* volume);
 
-    /// Returns how many calls against the flight volume were refused because
-    /// they came back in from host code it ran (`mnav_errorBusy`), since it was
-    /// made.
+    /// Returns how many calls against the flight volume were refused as misuse
+    /// since it was made: an argument refused with `mnav_errorInvalid` when the
+    /// flight volume was the first object the call was given, and a call back
+    /// in from host code it ran (`mnav_errorBusy`).
     ///
     /// @param volume The flight volume.
     /// @return The count; 0 for NULL.

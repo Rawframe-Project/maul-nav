@@ -154,10 +154,9 @@ static mnavResult CheckRay(mnavQuery* query, const mnavNavmesh* navmesh,
     return result == mnav_success ? mnavCheckFilter(filter, usable) : result;
 }
 
-static MNAV_NOINLINE mnavResult RaycastWork(mnavQuery* query, const mnavNavmesh* navmesh,
-                                            const mnavQueryFilter* filter,
-                                            mnavPolygonId startPolygon, mnavPos3 start,
-                                            mnavPos3 end, mnavRay* rayOut)
+mnavResult mnavRaycastWork(mnavQuery* query, const mnavNavmesh* navmesh,
+                           const mnavQueryFilter* filter, mnavPolygonId startPolygon,
+                           mnavPos3 start, mnavPos3 end, mnavRay* rayOut)
 {
     const mnavQueryFilter* usable = nullptr;
     mnavResult result = CheckRay(query, navmesh, filter, startPolygon, start, end, rayOut, &usable);
@@ -225,11 +224,21 @@ static MNAV_NOINLINE mnavResult RaycastWork(mnavQuery* query, const mnavNavmesh*
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult RaycastCounted(mnavQuery* query, const mnavNavmesh* navmesh,
+                                               const mnavQueryFilter* filter,
+                                               mnavPolygonId startPolygon, mnavPos3 start,
+                                               mnavPos3 end, mnavRay* rayOut)
+{
+    return mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        mnavRaycastWork(query, navmesh, filter, startPolygon, start, end, rayOut));
+}
+
 mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
                        mnavPolygonId startPolygon, mnavPos3 start, mnavPos3 end, mnavRay* rayOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = RaycastWork(query, navmesh, filter, startPolygon, start, end, rayOut);
+    mnavResult result = RaycastCounted(query, navmesh, filter, startPolygon, start, end, rayOut);
     mnavFloatEnvLeave(env);
     return result;
 }

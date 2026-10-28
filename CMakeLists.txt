@@ -229,6 +229,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(linkgen)
     maul_add_test(busy)
     maul_add_test(busy_owners)
+    maul_add_test(misuse)
     # Generation stopping at its limits, run small here.
     maul_add_test(linkgen_limits WHITEBOX)
     maul_add_test(debug)

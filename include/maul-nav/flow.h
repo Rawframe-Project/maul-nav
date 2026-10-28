@@ -94,9 +94,10 @@ extern "C"
     /// Safe from any thread; the field is used by one thread at a time.
     MNAV_API void mnavDestroyFlowField(mnavFlowField* field);
 
-    /// Returns how many calls against the flow field were refused because they
-    /// came back in from host code it ran (`mnav_errorBusy`), since it was
-    /// made.
+    /// Returns how many calls against the flow field were refused as misuse
+    /// since it was made: an argument refused with `mnav_errorInvalid` when the
+    /// flow field was the first object the call was given, and a call back in
+    /// from host code it ran (`mnav_errorBusy`).
     ///
     /// @param field The field.
     /// @return The count; 0 for NULL.
@@ -222,9 +223,10 @@ extern "C"
     /// @param field   The field.
     /// @param cell    The cell, in grid places.
     /// @param flowOut Receives the cell's way, its next cell in grid places.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
-    /// cell outside the field's region; `mnav_errorState` for nothing begun,
-    /// or while work begun on the field has not ended.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument;
+    /// `mnav_errorOutside` for a cell outside the field's region, flowOut left
+    /// as it was; `mnav_errorState` for nothing begun, or while work begun on
+    /// the field has not ended.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read a field at once
     /// while no work runs on it.

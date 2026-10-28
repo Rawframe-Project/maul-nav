@@ -179,7 +179,7 @@ static void CallNavmesh(void* object)
     mnavNavmesh* navmesh = object;
     const mnavPolygonId none = {0, 0, 0};
     const mnavLinkId link = {0, 0};
-    Count(mnavStageTile(navmesh, nullptr, 0).result);
+    Count(mnavStageTile(navmesh, s_trench0, sizeof(s_trench0)).result);
     Count(mnavStageTileRemoval(navmesh, 0, 0));
     Count(mnavCommit(navmesh));
     Count(mnavStageArea(navmesh, none, mnav_areaWalkable));

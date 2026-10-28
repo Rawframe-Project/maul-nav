@@ -203,7 +203,9 @@ static MNAV_NOINLINE mnavResult BakeFlightTileWork(mnavFlightBaker* baker,
     {
         *reportOut = report;
     }
-    return result;
+    // A refused input element, which the report names, counts no misuse.
+    return report.input.result == mnav_success ? mnavHostCountInvalid(MNAV_HOST(baker), result)
+                                               : result;
 }
 
 mnavResult mnavBakeFlightTile(mnavFlightBaker* baker, const mnavBakeInput* input, int32_t tileX,
@@ -215,8 +217,8 @@ mnavResult mnavBakeFlightTile(mnavFlightBaker* baker, const mnavBakeInput* input
     return result;
 }
 
-mnavResult mnavCopyFlightTile(const mnavFlightBaker* baker, uint8_t* bufferOut, size_t capacity,
-                              size_t* sizeOut)
+static mnavResult CopyFlightTileWork(const mnavFlightBaker* baker, uint8_t* bufferOut,
+                                     size_t capacity, size_t* sizeOut)
 {
     if (baker == nullptr || (bufferOut == nullptr && capacity > 0) || baker->tile == nullptr)
     {
@@ -235,4 +237,11 @@ mnavResult mnavCopyFlightTile(const mnavFlightBaker* baker, uint8_t* bufferOut, 
         memcpy(bufferOut, baker->tile, baker->tileSize);
     }
     return mnav_success;
+}
+
+mnavResult mnavCopyFlightTile(const mnavFlightBaker* baker, uint8_t* bufferOut, size_t capacity,
+                              size_t* sizeOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(baker),
+                                CopyFlightTileWork(baker, bufferOut, capacity, sizeOut));
 }

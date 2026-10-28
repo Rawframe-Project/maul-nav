@@ -52,15 +52,22 @@ static MNAV_NOINLINE mnavResult StageAreaWork(mnavNavmesh* navmesh, mnavPolygonI
     return result;
 }
 
+static MNAV_NOINLINE mnavResult StageAreaCounted(mnavNavmesh* navmesh, mnavPolygonId polygon,
+                                                 mnavAreaType area)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), StageAreaWork(navmesh, polygon, area));
+}
+
 mnavResult mnavStageArea(mnavNavmesh* navmesh, mnavPolygonId polygon, mnavAreaType area)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = StageAreaWork(navmesh, polygon, area);
+    mnavResult result = StageAreaCounted(navmesh, polygon, area);
     mnavFloatEnvLeave(env);
     return result;
 }
 
-mnavResult mnavGetArea(const mnavNavmesh* navmesh, mnavPolygonId polygon, mnavAreaType* areaOut)
+static mnavResult GetAreaWork(const mnavNavmesh* navmesh, mnavPolygonId polygon,
+                              mnavAreaType* areaOut)
 {
     if (navmesh == nullptr || areaOut == nullptr)
     {
@@ -72,6 +79,11 @@ mnavResult mnavGetArea(const mnavNavmesh* navmesh, mnavPolygonId polygon, mnavAr
         *areaOut = navmesh->slots[polygon.slot - 1].tile->mesh.polygons[polygon.polygon].area;
     }
     return result;
+}
+
+mnavResult mnavGetArea(const mnavNavmesh* navmesh, mnavPolygonId polygon, mnavAreaType* areaOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), GetAreaWork(navmesh, polygon, areaOut));
 }
 
 void mnavApplyAreas(mnavNavmesh* navmesh)

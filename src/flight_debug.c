@@ -7,6 +7,7 @@
 #include "draw.h"
 #include "flight_frame.h"
 #include "flight_space.h"
+#include "flight_volume.h"
 #include "fpenv.h"
 
 #include "maul-nav/base.h"
@@ -105,11 +106,17 @@ static MNAV_NOINLINE mnavResult DebugFlightWork(const mnavFlightVolume* volume, 
     return mnavDrawResult(buffer);
 }
 
+static MNAV_NOINLINE mnavResult DebugFlightCounted(const mnavFlightVolume* volume, mnavPos3 low,
+                                                   mnavPos3 high, mnavDebugBuffer* buffer)
+{
+    return mnavHostCountInvalid(MNAV_HOST(volume), DebugFlightWork(volume, low, high, buffer));
+}
+
 mnavResult mnavDebugFlight(const mnavFlightVolume* volume, mnavPos3 low, mnavPos3 high,
                            mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = DebugFlightWork(volume, low, high, buffer);
+    mnavResult result = DebugFlightCounted(volume, low, high, buffer);
     mnavFloatEnvLeave(env);
     return result;
 }

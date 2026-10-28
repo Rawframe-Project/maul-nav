@@ -257,8 +257,8 @@ static void TestChecks(void)
     grid.height = 10;
     CHECK(mnavBuildFlowField(field, &grid, nullptr, &goal, 1) == mnav_success &&
               mnavFlowAt(field, (mnavCell){9, 9}, &flow) == mnav_success &&
-              mnavFlowAt(field, (mnavCell){10, 0}, &flow) == mnav_errorInvalid &&
-              mnavFlowAt(field, (mnavCell){0, -1}, &flow) == mnav_errorInvalid,
+              mnavFlowAt(field, (mnavCell){10, 0}, &flow) == mnav_errorOutside &&
+              mnavFlowAt(field, (mnavCell){0, -1}, &flow) == mnav_errorOutside,
           "cells inside the grid");
     const mnavCell outside = {10, 3};
     CHECK(mnavBuildFlowField(field, &grid, nullptr, &outside, 1) == mnav_errorInvalid &&
@@ -353,10 +353,11 @@ static void TestRegion(void)
         }
     }
     CHECK(same == r.width * r.height, "the region's own field");
-    mnavFlow flow;
-    CHECK(mnavFlowAt(field, (mnavCell){r.x - 1, r.y}, &flow) == mnav_errorInvalid &&
-              mnavFlowAt(field, (mnavCell){r.x, r.y + r.height}, &flow) == mnav_errorInvalid,
-          "cells outside the region");
+    mnavFlow flow = {-1.0, {-1, -1}};
+    CHECK(mnavFlowAt(field, (mnavCell){r.x - 1, r.y}, &flow) == mnav_errorOutside &&
+              mnavFlowAt(field, (mnavCell){r.x, r.y + r.height}, &flow) == mnav_errorOutside &&
+              flow.cost == -1.0 && flow.next.x == -1 && flow.next.y == -1,
+          "cells outside the region, the way left as it was");
     static mnavDebugVertex vertices[WIDTH * HEIGHT * 6];
     static uint32_t lines[WIDTH * HEIGHT * 6];
     mnavDebugBuffer buffer = {{0, 0, 0}, vertices, WIDTH * HEIGHT * 6, 0, nullptr, 0,

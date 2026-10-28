@@ -41,7 +41,7 @@ flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def 
 flight_volume: allocator flight flight_def flight_tile fpenv host_code
 flight_space: flight flight_volume invariant
 flight_frame: flight_volume
-flight_debug: draw flight_frame flight_space fpenv
+flight_debug: draw flight_frame flight_space flight_volume fpenv
 flight_search: flight_frame flight_space flight_volume fpenv invariant query
 flight_probe: flight flight_frame flight_space flight_volume fpenv
 fingerprint: bytes outline raster terrain tile_index
@@ -61,12 +61,12 @@ offmesh: allocator fpenv invariant navmesh nearest sort
 commit: fpenv invariant modifiers navmesh offmesh
 funnel: invariant navmesh query
 surface: fpenv navmesh nearest polymesh query query_filter
-corridor: fpenv funnel invariant navmesh offmesh polymesh query query_filter
+corridor: fpenv funnel invariant navmesh nearest offmesh polymesh query query_filter
 modifiers: allocator fpenv navmesh
 grid: fpenv invariant query query_filter
 clip: polymesh
 spatial: clip fpenv invariant navmesh nearest query query_filter
-linkgen: fpenv navmesh path query query_filter
+linkgen: fpenv navmesh nearest path query query_filter
 flow: allocator draw fpenv host_code invariant query_filter
 flow_repair: flow fpenv invariant
 navflow: allocator draw fpenv host_code invariant navmesh offmesh query_filter sort

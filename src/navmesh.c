@@ -180,8 +180,8 @@ const mnavPolygon* mnavPolygonOf(const mnavNavmesh* navmesh, mnavPolygonId id,
     return &slot->tile->mesh.polygons[id.polygon];
 }
 
-mnavResult mnavGetTile(const mnavNavmesh* navmesh, int32_t tileX, int32_t tileZ,
-                       mnavTileId* tileOut)
+static mnavResult GetTileWork(const mnavNavmesh* navmesh, int32_t tileX, int32_t tileZ,
+                              mnavTileId* tileOut)
 {
     if (navmesh == nullptr || tileOut == nullptr)
     {
@@ -192,6 +192,12 @@ mnavResult mnavGetTile(const mnavNavmesh* navmesh, int32_t tileX, int32_t tileZ,
     *tileOut = tile != nullptr ? (mnavTileId){(uint32_t)slot + 1, navmesh->slots[slot].generation}
                                : (mnavTileId){0, 0};
     return tile != nullptr ? mnav_success : mnav_errorNotLoaded;
+}
+
+mnavResult mnavGetTile(const mnavNavmesh* navmesh, int32_t tileX, int32_t tileZ,
+                       mnavTileId* tileOut)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), GetTileWork(navmesh, tileX, tileZ, tileOut));
 }
 
 static uint32_t FloatBits(float f)
@@ -290,15 +296,23 @@ static MNAV_NOINLINE mnavTileResult StageTileWork(mnavNavmesh* navmesh, const ui
     return result;
 }
 
+static MNAV_NOINLINE mnavTileResult StageTileCounted(mnavNavmesh* navmesh, const uint8_t* bytes,
+                                                     size_t size)
+{
+    mnavTileResult result = StageTileWork(navmesh, bytes, size);
+    result.result = mnavHostCountInvalid(MNAV_HOST(navmesh), result.result);
+    return result;
+}
+
 mnavTileResult mnavStageTile(mnavNavmesh* navmesh, const uint8_t* bytes, size_t size)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavTileResult result = StageTileWork(navmesh, bytes, size);
+    mnavTileResult result = StageTileCounted(navmesh, bytes, size);
     mnavFloatEnvLeave(env);
     return result;
 }
 
-mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX, int32_t tileZ)
+static mnavResult StageTileRemovalWork(mnavNavmesh* navmesh, int32_t tileX, int32_t tileZ)
 {
     if (navmesh == nullptr)
     {
@@ -309,6 +323,11 @@ mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX, int32_t til
         return mnav_errorBusy;
     }
     return Stage(navmesh, tileX, tileZ, nullptr);
+}
+
+mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX, int32_t tileZ)
+{
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), StageTileRemovalWork(navmesh, tileX, tileZ));
 }
 
 void mnavAcross(int32_t side, int32_t* x, int32_t* z, int32_t* facing)

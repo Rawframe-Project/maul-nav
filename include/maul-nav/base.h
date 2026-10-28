@@ -97,7 +97,9 @@ extern "C"
         // An argument a correct program never passes: a null pointer where
         // one is required, a NaN, a value (an infinity included) outside a
         // range its documentation gives with no named constant, a
-        // combination the call does not take.
+        // combination the call does not take. One misuse is counted on the
+        // first owner object the call is given, unless a bake's report names
+        // the input element refused.
         mnav_errorInvalid = -1,
         // Room is too small for the result: a caller's buffer, the
         // allocator, or a limit the caller set (a def's limits and memory,
@@ -135,6 +137,10 @@ extern "C"
         // The place asked about has no tile loaded: not a wall, nothing
         // is known there.
         mnav_errorNotLoaded = -32,
+        // The place asked about is outside what the object covers: a point
+        // off the polygon given, a cell or polygon outside a flow field's
+        // region. A correct program meets it; it counts no misuse.
+        mnav_errorOutside = -33,
     };
 
     // A library version: major, minor and patch.

@@ -551,12 +551,21 @@ static MNAV_NOINLINE mnavResult BeginNavFlowWork(mnavNavFlow* field, const mnavN
     return result;
 }
 
+static MNAV_NOINLINE mnavResult BeginNavFlowCounted(mnavNavFlow* field, const mnavNavmesh* navmesh,
+                                                    const mnavQueryFilter* filter,
+                                                    const mnavNavFlowRegion* region,
+                                                    const mnavNavFlowGoal* goals, int32_t goalCount)
+{
+    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
+                                BeginNavFlowWork(field, navmesh, filter, region, goals, goalCount));
+}
+
 mnavResult mnavBeginNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
                             const mnavQueryFilter* filter, const mnavNavFlowRegion* region,
                             const mnavNavFlowGoal* goals, int32_t goalCount)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = BeginNavFlowWork(field, navmesh, filter, region, goals, goalCount);
+    mnavResult result = BeginNavFlowCounted(field, navmesh, filter, region, goals, goalCount);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -611,11 +620,19 @@ static MNAV_NOINLINE mnavResult ContinueNavFlowWork(mnavNavFlow* field, const mn
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult ContinueNavFlowCounted(mnavNavFlow* field,
+                                                       const mnavNavmesh* navmesh, int32_t polygons,
+                                                       bool* endedOut)
+{
+    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
+                                ContinueNavFlowWork(field, navmesh, polygons, endedOut));
+}
+
 mnavResult mnavContinueNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh, int32_t polygons,
                                bool* endedOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = ContinueNavFlowWork(field, navmesh, polygons, endedOut);
+    mnavResult result = ContinueNavFlowCounted(field, navmesh, polygons, endedOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -624,9 +641,17 @@ static MNAV_NOINLINE mnavResult BuildNavFlowWork(mnavNavFlow* field, const mnavN
                                                  const mnavQueryFilter* filter,
                                                  const mnavNavFlowGoal* goals, int32_t goalCount)
 {
-    mnavResult result = mnavBeginNavFlow(field, navmesh, filter, nullptr, goals, goalCount);
-    return result == mnav_success ? mnavContinueNavFlow(field, navmesh, INT32_MAX, nullptr)
+    mnavResult result = BeginNavFlowWork(field, navmesh, filter, nullptr, goals, goalCount);
+    return result == mnav_success ? ContinueNavFlowWork(field, navmesh, INT32_MAX, nullptr)
                                   : result;
+}
+
+static MNAV_NOINLINE mnavResult BuildNavFlowCounted(mnavNavFlow* field, const mnavNavmesh* navmesh,
+                                                    const mnavQueryFilter* filter,
+                                                    const mnavNavFlowGoal* goals, int32_t goalCount)
+{
+    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
+                                BuildNavFlowWork(field, navmesh, filter, goals, goalCount));
 }
 
 mnavResult mnavBuildNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
@@ -634,7 +659,7 @@ mnavResult mnavBuildNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
                             int32_t goalCount)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = BuildNavFlowWork(field, navmesh, filter, goals, goalCount);
+    mnavResult result = BuildNavFlowCounted(field, navmesh, filter, goals, goalCount);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -658,7 +683,7 @@ static MNAV_NOINLINE mnavResult NavFlowAtWork(const mnavNavFlow* field, const mn
     }
     if (!InRegion(field, navmesh, (int32_t)polygon.slot - 1))
     {
-        return mnav_errorInvalid;
+        return mnav_errorOutside;
     }
     if (!field->ended)
     {
@@ -682,11 +707,19 @@ static MNAV_NOINLINE mnavResult NavFlowAtWork(const mnavNavFlow* field, const mn
     return mnav_success;
 }
 
+static MNAV_NOINLINE mnavResult NavFlowAtCounted(const mnavNavFlow* field,
+                                                 const mnavNavmesh* navmesh, mnavPolygonId polygon,
+                                                 mnavPolygonFlow* flowOut)
+{
+    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
+                                NavFlowAtWork(field, navmesh, polygon, flowOut));
+}
+
 mnavResult mnavNavFlowAt(const mnavNavFlow* field, const mnavNavmesh* navmesh,
                          mnavPolygonId polygon, mnavPolygonFlow* flowOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = NavFlowAtWork(field, navmesh, polygon, flowOut);
+    mnavResult result = NavFlowAtCounted(field, navmesh, polygon, flowOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -771,11 +804,19 @@ static MNAV_NOINLINE mnavResult DebugNavFlowWork(const mnavNavFlow* field,
     return mnavDrawResult(buffer);
 }
 
+static MNAV_NOINLINE mnavResult DebugNavFlowCounted(const mnavNavFlow* field,
+                                                    const mnavNavmesh* navmesh,
+                                                    mnavDebugBuffer* buffer)
+{
+    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
+                                DebugNavFlowWork(field, navmesh, buffer));
+}
+
 mnavResult mnavDebugNavFlow(const mnavNavFlow* field, const mnavNavmesh* navmesh,
                             mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = DebugNavFlowWork(field, navmesh, buffer);
+    mnavResult result = DebugNavFlowCounted(field, navmesh, buffer);
     mnavFloatEnvLeave(env);
     return result;
 }

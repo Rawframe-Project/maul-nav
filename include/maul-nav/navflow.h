@@ -130,9 +130,10 @@ extern "C"
     /// Safe from any thread; the field is used by one thread at a time.
     MNAV_API void mnavDestroyNavFlow(mnavNavFlow* field);
 
-    /// Returns how many calls against the navmesh flow field were refused
-    /// because they came back in from host code it ran (`mnav_errorBusy`),
-    /// since it was made.
+    /// Returns how many calls against the navmesh flow field were refused as
+    /// misuse since it was made: an argument refused with `mnav_errorInvalid`
+    /// when the navmesh flow field was the first object the call was given, and
+    /// a call back in from host code it ran (`mnav_errorBusy`).
     ///
     /// @param field The field.
     /// @return The count; 0 for NULL.
@@ -240,10 +241,11 @@ extern "C"
     /// @param polygon The polygon.
     /// @param flowOut Receives its way.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// navmesh other than the field's, a polygon id never handed out or a
-    /// polygon outside the region; `mnav_errorState` for nothing begun, a
-    /// navmesh committed to since the work began, or work not yet ended;
-    /// `mnav_errorStale` for a polygon whose tile was replaced or removed.
+    /// navmesh other than the field's or a polygon id never handed out;
+    /// `mnav_errorOutside` for a polygon outside the region, flowOut left as it
+    /// was; `mnav_errorState` for nothing begun, a navmesh committed to since
+    /// the work began, or work not yet ended; `mnav_errorStale` for a polygon
+    /// whose tile was replaced or removed.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read a field at once
     /// while no build runs on it.

@@ -6,6 +6,11 @@
 // object made back in from there is refused with mnav_errorBusy and one
 // misuse counted.
 //
+// The misuse count also counts calls refused with mnav_errorInvalid: an
+// argument a correct program never passes counts one misuse on the first
+// owner object the call is given, so a host can catch bugs in release
+// builds. Bad tile bytes, refused input geometry and stale ids count none.
+//
 // Two counts, so that no call needs to know its thread. The allocator
 // runs inside a call that changes the object, which no other call may
 // run beside: every call that changes the object refuses while it runs.
@@ -16,6 +21,8 @@
 
 #ifndef MAUL_NAV_SRC_HOST_CODE_H
 #define MAUL_NAV_SRC_HOST_CODE_H
+
+#include "maul-nav/base.h"
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -92,6 +99,28 @@ static inline bool mnavHostCalledBackWriting(mnavHostCode* host)
 static inline uint64_t mnavHostMisuse(const mnavHostCode* host)
 {
     return atomic_load_explicit(&host->misuse, memory_order_relaxed);
+}
+
+// The mark of an owner object, NULL for none; the object may be const,
+// since the counts are the one part of it that every call may write.
+#define MNAV_HOST(object) ((object) != nullptr ? (mnavHostCode*)&(object)->host : nullptr)
+
+// The first of two marks that is not NULL: the object a call counts its
+// misuse on is the first one it is given.
+static inline mnavHostCode* mnavHostFirst(mnavHostCode* first, mnavHostCode* second)
+{
+    return first != nullptr ? first : second;
+}
+
+// Counts one misuse on the object when a call refused an argument as
+// invalid, and returns the result; NULL, for no object, counts nothing.
+static inline mnavResult mnavHostCountInvalid(mnavHostCode* host, mnavResult result)
+{
+    if (host != nullptr && result == mnav_errorInvalid)
+    {
+        mnavHostCountMisuse(host);
+    }
+    return result;
 }
 
 #endif // MAUL_NAV_SRC_HOST_CODE_H

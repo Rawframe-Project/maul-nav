@@ -411,7 +411,7 @@ static void TestStepsAndRegions(mnavNavFlow* field)
               TilesHash(alone, part, region.x0, region.z0, region.x1, region.z1),
           "the region's own field");
     mnavPolygonFlow f;
-    CHECK(mnavNavFlowAt(regional, navmesh, goals[1].polygon, &f) == mnav_errorInvalid,
+    CHECK(mnavNavFlowAt(regional, navmesh, goals[1].polygon, &f) == mnav_errorOutside,
           "a polygon outside the region");
     const mnavNavFlowRegion backward = {4, 2, 1, 5};
     CHECK(mnavBeginNavFlow(regional, navmesh, nullptr, &backward, goals, 2) == mnav_errorInvalid,
