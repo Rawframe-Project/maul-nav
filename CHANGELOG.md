@@ -5,35 +5,105 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
-## [0.2.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.1.0...v0.2.0) (2026-10-28)
+## [0.2.0](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.2.0) (2026-10-28)
 
+Tile bytes, fingerprints, paths and velocities do not change, and no
+tile format rises: tiles baked by 0.1.0 load as they are. Flow fields
+change for one call sequence (see Fixed).
 
-### ⚠ BREAKING CHANGES
+### Added
 
-* `mnavIsFlightOpen`, `mnavFindFlightPath` and `mnavBeginFlightPath` return `mnav_errorOutside`, not `mnav_errorInvalid`, for a point below or above the flight volume, and count no misuse for it.
-* a call refused with `mnav_errorInvalid` counts one misuse on the first owner object it is given. `mnavGetHeight`, `mnavFlowAt` and `mnavNavFlowAt` return the new `mnav_errorOutside` (-33), not `mnav_errorInvalid`, for a point off the polygon or a cell or polygon outside the field's region.
-* while a bake or a rebuild runs, its baker, the tile index it reads and the tile cache it uses refuse every call that would change them, from any host code the bake runs. While a hierarchy's allocator runs during a build or update, the context the build searches with refuses every call, and the navmesh it reads refuses every change but staging a tile or its removal. Those that return a status give `mnav_errorBusy`, those that return nothing do nothing, and each counts one misuse.
-* the calls that change a baker, tile cache, tile index, hierarchy, flow field, navmesh flow field, avoidance set, flight baker or flight volume, made back in from that object's allocator (or the baker's clock), are refused with `mnav_errorBusy` and counted as misuse; those that return nothing do nothing. A call back in from the release of an object's own block, the navmesh and query context included, is refused too.
-* **navmesh:** a navmesh's stage, commit and destroy calls, and every search call on a query context, made back in from host code the object is running (its allocator, or a link generation's clearance test), are refused with the new `mnav_errorBusy` (-10) and counted as misuse. The exception is `mnavStageTile` and `mnavStageTileRemoval`, which a clearance test may call. While a clearance test runs, the navmesh's other stage calls are refused on every thread.
-* `mnav_errorTier` is removed. A change the navmesh's tier does not allow is refused with `mnav_errorUnsupported` (-4), the family's error for a feature the object was created without.
-* the result values follow the Maul family's numbering, and `mnav_errorRange` is removed. A limit the caller sets is `mnav_errorCapacity`, a fixed bound `mnav_errorLimit`, tile bytes `mnav_errorFormat`, out-of-date or unfinished work `mnav_errorState`. `mnavIsFlightOpen` refuses a point more than `MNAV_MAX_FLIGHT_VOXELS` (2^28) voxels from the origin, as the other flight calls do; it took up to 2^30 before.
-* **flow:** a flow field repaired after mnavBeginFlowField cut an earlier repair short now matches a fresh build; before, cells the earlier repair had marked could keep their old costs and next cells.
-
-### Fixed
-
-* count an invalid argument as misuse on the object it was given ([#148](https://github.com/Rawframe-Project/maul-nav/issues/148)) ([a4a0f25](https://github.com/Rawframe-Project/maul-nav/commit/a4a0f251fc7f0e3058924b6287cee3293dd4d234))
-* **flow:** clear a cut-short repair's marks when a field begins ([#130](https://github.com/Rawframe-Project/maul-nav/issues/130)) ([b772b2b](https://github.com/Rawframe-Project/maul-nav/commit/b772b2b15d6a947accddba7236e9c5443e1ef167))
-* hold the other objects a call uses while its host code runs ([#147](https://github.com/Rawframe-Project/maul-nav/issues/147)) ([389573d](https://github.com/Rawframe-Project/maul-nav/commit/389573dba42536972f6fd8a9573e70e712de4356))
-* **links:** refuse link slots the attachment keys cannot hold ([#122](https://github.com/Rawframe-Project/maul-nav/issues/122)) ([b084f71](https://github.com/Rawframe-Project/maul-nav/commit/b084f71e15c017d510eaf1721078a3b2c59f1c9f)), closes [#121](https://github.com/Rawframe-Project/maul-nav/issues/121)
-* **navmesh:** refuse calls back in from host code with errorBusy ([#141](https://github.com/Rawframe-Project/maul-nav/issues/141)) ([9cbacfb](https://github.com/Rawframe-Project/maul-nav/commit/9cbacfbd87e2065904623d2862624d8fd584396a))
-* refuse a flight point above or below the volume with errorOutside ([#150](https://github.com/Rawframe-Project/maul-nav/issues/150)) ([1e93576](https://github.com/Rawframe-Project/maul-nav/commit/1e93576479b3bda30ffc3fe7c3e7a57f1db46c2f))
-* refuse calls back into every owner object from its host code ([#145](https://github.com/Rawframe-Project/maul-nav/issues/145)) ([6a130bc](https://github.com/Rawframe-Project/maul-nav/commit/6a130bc603b08c191e612b53dc8f5d62d22347d4))
-
+- A misuse count on every object, read with `mnavGetNavmeshMisuse`,
+  `mnavGetQueryMisuse`, `mnavGetBakerMisuse`, `mnavGetTileCacheMisuse`,
+  `mnavGetTileIndexMisuse`, `mnavGetHierarchyMisuse`,
+  `mnavGetFlowFieldMisuse`, `mnavGetNavFlowMisuse`,
+  `mnavGetAvoidanceMisuse`, `mnavGetFlightBakerMisuse` and
+  `mnavGetFlightVolumeMisuse`. A count rises for each call refused with
+  `mnav_errorInvalid` or `mnav_errorBusy`, so a release build can catch
+  a host's bugs.
+  ([#141](https://github.com/Rawframe-Project/maul-nav/pull/141),
+  [#145](https://github.com/Rawframe-Project/maul-nav/pull/145),
+  [#148](https://github.com/Rawframe-Project/maul-nav/pull/148))
 
 ### Changed
 
-* refuse a change the tier lacks with errorUnsupported ([#138](https://github.com/Rawframe-Project/maul-nav/issues/138)) ([0a2749e](https://github.com/Rawframe-Project/maul-nav/commit/0a2749ebf039ca35f57b7e881af29d73145239de))
-* take the family's result numbering ([#135](https://github.com/Rawframe-Project/maul-nav/issues/135)) ([6f0889c](https://github.com/Rawframe-Project/maul-nav/commit/6f0889c276c4d0ad2b2de7096604bbff91126270))
+- **Breaking:** the results take the Maul family's numbering:
+  `mnav_errorInvalid` -1, `mnav_errorCapacity` -2, `mnav_errorStale` -3,
+  `mnav_errorUnsupported` -4, `mnav_errorState` -6, `mnav_errorVersion`
+  -7, `mnav_errorFormat` -8, `mnav_errorLimit` -9, `mnav_errorBusy` -10,
+  and maul-nav's own `mnav_errorNotLoaded` -32 and `mnav_errorOutside`
+  -33. A host that stored or compared the numbers compares the names.
+  Some calls refuse with a different result:
+  - A limit the caller sets (a def's limits and memory, a query's
+    nodes), `mnavBakeLimits` and `mnavFlightLimits` included, is
+    `mnav_errorCapacity`; it was `mnav_errorLimit`.
+  - `mnav_errorRange` is removed. A coordinate past the extent is
+    `mnav_errorLimit`, as is any value past a published `MNAV_MAX_*` or
+    `MNAV_MIN_*` bound. `MNAV_MAX_PIECE_CORNERS`,
+    `MNAV_MAX_CLIP_CORNERS`, `MNAV_MAX_INDEX_ENTRIES` and
+    `MNAV_MAX_FLIGHT_VOXELS` are new public bounds.
+  - Every check on tile and flight tile bytes is `mnav_errorFormat`.
+  - A search or field not begun, not ended or out of date after a
+    commit, and a link read before its commit, is `mnav_errorState`.
+  - A NaN is `mnav_errorInvalid`. An infinity is `mnav_errorLimit` past
+    a published bound, and `mnav_errorInvalid` elsewhere.
+  - `mnavIsFlightOpen` refuses a point more than 2^28 voxels from the
+    origin, as the other flight calls do; it took up to 2^30.
+
+  ([#135](https://github.com/Rawframe-Project/maul-nav/pull/135))
+- **Breaking:** `mnav_errorTier` is removed. A staged tile, area change
+  or link toggle that the navmesh's tier does not allow is refused with
+  `mnav_errorUnsupported`.
+  ([#138](https://github.com/Rawframe-Project/maul-nav/pull/138))
+- **Breaking:** host code may not call into the objects of a running
+  call. That is an allocator, a baker's clock or a link generation's
+  clearance test. Such a call is refused with `mnav_errorBusy` when it
+  returns a status, does nothing when it returns nothing, and counts one
+  misuse. This holds for the object the host code serves and for the
+  other objects the running call uses: the baker, tile index and tile
+  cache of a bake or rebuild, and the context and navmesh of a
+  hierarchy's build or update. It also holds for the release of an
+  object's own memory. A clearance test or a hierarchy's allocator may
+  still call `mnavStageTile` and `mnavStageTileRemoval`. Before, such a
+  call could read freed memory.
+  ([#141](https://github.com/Rawframe-Project/maul-nav/pull/141),
+  [#145](https://github.com/Rawframe-Project/maul-nav/pull/145),
+  [#147](https://github.com/Rawframe-Project/maul-nav/pull/147))
+- **Breaking:** a call refused with `mnav_errorInvalid` counts one
+  misuse on the first object it is given. Input geometry a bake refuses
+  and its report names counts none.
+  ([#148](https://github.com/Rawframe-Project/maul-nav/pull/148))
+- **Breaking:** a place outside what an object covers is
+  `mnav_errorOutside`, not `mnav_errorInvalid`, and counts no misuse.
+  This covers:
+  - `mnavGetHeight` for a point off the polygon
+  - `mnavFlowAt` and `mnavNavFlowAt` for a cell or polygon outside the
+    field's region
+  - `mnavIsFlightOpen`, `mnavFindFlightPath` and `mnavBeginFlightPath`
+    for a point below or above the flight volume
+
+  A host that handled these as `mnav_errorInvalid` handles
+  `mnav_errorOutside`. The outputs stay as they were, but
+  `mnavIsFlightOpen` sets `openOut` to false.
+  ([#148](https://github.com/Rawframe-Project/maul-nav/pull/148),
+  [#150](https://github.com/Rawframe-Project/maul-nav/pull/150))
+- The troubleshooting table lists the new numbering and results. The
+  getting-started and baking pages say what host code may call.
+
+### Fixed
+
+- **Breaking:** a flow field repaired after `mnavBeginFlowField` cut an
+  earlier repair short now matches a fresh build, as
+  `mnavUpdateFlowField` promises. Before, cells the earlier repair had
+  marked could keep their old costs and next cells. Flow fields change
+  for that sequence only.
+  ([#130](https://github.com/Rawframe-Project/maul-nav/pull/130))
+- `mnavStageLink` refuses a link with `mnav_errorLimit` when a crossing
+  would take a link slot its attachment key cannot hold. This can happen
+  at `MNAV_MAX_LINKS` links once a slot has worn out. Before, the link
+  took a slot that wrapped to slot 0, and a search crossed the wrong
+  link or read out of bounds.
+  ([#122](https://github.com/Rawframe-Project/maul-nav/pull/122))
 
 ## [0.1.0](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.1.0) (2026-10-27)
 
