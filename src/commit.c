@@ -22,9 +22,12 @@ static void CheckLink(const mnavNavmesh* navmesh, int32_t slot, int32_t p, const
     const mnavPolygon* polygon = &own->tile->mesh.polygons[p];
     MNAV_ASSERT(link->polygon == p && link->edge < polygon->count);
     MNAV_ASSERT(link->side >= 1 && link->side <= 4 && polygon->sides[link->edge] == link->side);
+    (void)polygon;
     MNAV_ASSERT(link->low < link->high);
     const mnavTile* across = nullptr;
-    MNAV_ASSERT(mnavPolygonOf(navmesh, link->target, &across) != nullptr);
+    const mnavPolygon* target = mnavPolygonOf(navmesh, link->target, &across);
+    MNAV_ASSERT(target != nullptr);
+    (void)target;
     uint32_t q = link->target.polygon;
     bool back = false;
     for (int32_t k = across->firstLink[q]; k < across->firstLink[q + 1]; ++k)
@@ -46,9 +49,11 @@ static void CheckPlaces(const mnavNavmesh* navmesh)
         const mnavPlace* place = &navmesh->places[i];
         const mnavPlace* last = &navmesh->places[i > 0 ? i - 1 : 0];
         MNAV_ASSERT(i == 0 || last->x < place->x || (last->x == place->x && last->z < place->z));
+        (void)last;
         MNAV_ASSERT(place->slot >= 0 && place->slot < navmesh->slotCount);
         const mnavSlot* slot = &navmesh->slots[place->slot];
         MNAV_ASSERT(slot->tile != nullptr && slot->x == place->x && slot->z == place->z);
+        (void)slot;
     }
 }
 

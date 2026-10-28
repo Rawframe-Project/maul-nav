@@ -11,7 +11,8 @@
 #                            reach. Under two minutes; run it before every
 #                            push.
 #   tools/check.sh pr        what the pull request check runs on this
-#                            machine: every rule on every file, clang-tidy,
+#                            machine: every rule on every file, clang-tidy
+#                            on a Release and a Debug configure,
 #                            the linux-clang-20-asan and linux-gcc-14 presets
 #                            (the Recast differential with it), and ten
 #                            seconds of fuzzing per target.
@@ -133,11 +134,16 @@ source_checks
 step "clang-format on every file"
 all_c_files | xargs clang-format --dry-run -Werror
 
-step "clang-tidy"
-cmake -S "$root" -B "$out/check-tidy" -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-    -DMAUL_NAV_BUILD_TESTS=OFF -DMAUL_NAV_BUILD_BENCH=OFF -DMAUL_NAV_BUILD_SAMPLES=OFF >"$out/check-tidy.log"
-for f in src/*.c; do
-    clang-tidy-20 -p "$out/check-tidy" --quiet --warnings-as-errors='*' "$f" 2>/dev/null
+# As CI's checks job: on the Release preset, where the assertions compile
+# out, and with them live. Each hides findings the other shows.
+for build in Release Debug; do
+    step "clang-tidy, $build"
+    cmake --preset linux-clang-20 -B "$out/check-tidy-$build" -DCMAKE_BUILD_TYPE=$build \
+        --no-warn-unused-cli -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DMAUL_NAV_BUILD_TESTS=OFF \
+        -DMAUL_NAV_BUILD_BENCH=OFF -DMAUL_NAV_BUILD_SAMPLES=OFF >"$out/check-tidy-$build.log"
+    for f in src/*.c; do
+        clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' "$f" 2>/dev/null
+    done
 done
 
 preset linux-clang-20-asan

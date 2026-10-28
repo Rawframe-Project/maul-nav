@@ -612,6 +612,7 @@ static mnavResult RunBake(mnavBaker* baker, const Input* in, int32_t tileX, int3
     // A cache keeps tiles that baked, never what an earlier input left.
     result = Finish(baker, tileX, tileZ, &stages, result, &report, reportOut);
     MNAV_ASSERT(baker->memory.used == held + (uint64_t)baker->tileSize);
+    (void)held;
     if (result != mnav_success)
     {
         mnavUncacheTile(cache, tileX, tileZ);
@@ -809,6 +810,7 @@ static mnavResult Rebuild(mnavBaker* baker, mnavTileCache* cache, int32_t tileX,
                 alignof(mnavBakeVolume));
     result = Finish(baker, tileX, tileZ, &stages, result, &report, reportOut);
     MNAV_ASSERT(baker->memory.used == held + (uint64_t)baker->tileSize);
+    (void)held;
     return result;
 }
 
