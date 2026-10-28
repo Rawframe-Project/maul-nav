@@ -285,9 +285,10 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateQuery(const mnavQueryDef* def,
                                                        mnavQuery** queryOut);
 
-    /// Destroys a query context. NULL is ignored. Called back in from a
-    /// link generation's clearance test that uses the context, it does
-    /// nothing and counts one misuse.
+    /// Destroys a query context. NULL is ignored. Called back in from host code
+    /// a call using the context runs (a link generation's clearance test, a
+    /// hierarchy's allocator as it builds), it does nothing and counts one
+    /// misuse.
     ///
     /// @param query    The context.
     /// @par Thread safety
@@ -333,9 +334,9 @@ extern "C"
     /// mnavDefaultQueryFilter or with a NaN cost; `mnav_errorLimit` for a
     /// filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST, an infinity
     /// included; `mnav_errorStale` for a polygon id whose tile has been
-    /// replaced or removed. Also `mnav_errorBusy` when called back in from a
-    /// clearance test whose link generation uses the context, one misuse
-    /// counted.
+    /// replaced or removed. Also `mnav_errorBusy` when called back in from host
+    /// code a call using the context runs (a link generation's clearance test,
+    /// a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may search one navmesh at once between
@@ -380,8 +381,9 @@ extern "C"
     /// differ in cost; `mnav_errorLimit` for a filter cost past
     /// MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST, an infinity included;
     /// `mnav_errorStale` for a polygon id whose tile has been replaced or
-    /// removed. Also `mnav_errorBusy` when called back in from a clearance test
-    /// whose link generation uses the context, one misuse counted.
+    /// removed. Also `mnav_errorBusy` when called back in from host code a call
+    /// using the context runs (a link generation's clearance test, a
+    /// hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may search one navmesh at once between
@@ -412,8 +414,8 @@ extern "C"
     /// for a filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST, an
     /// infinity included; `mnav_errorStale` for a polygon id whose tile has
     /// been replaced or removed. Also `mnav_errorBusy` when called back in from
-    /// a clearance test whose link generation uses the context, one misuse
-    /// counted.
+    /// host code a call using the context runs (a link generation's clearance
+    /// test, a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -431,8 +433,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, fewer
     /// than 1 node, or a navmesh other than the search's; `mnav_errorState` for
     /// no search begun, or a navmesh committed to since the search began: begin
-    /// again. Also `mnav_errorBusy` when called back in from a clearance test
-    /// whose link generation uses the context, one misuse counted.
+    /// again. Also `mnav_errorBusy` when called back in from host code a call
+    /// using the context runs (a link generation's clearance test, a
+    /// hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavContinuePath(mnavQuery* query,
@@ -449,8 +452,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// navmesh other than the search's; `mnav_errorState` for no search begun,
     /// or a navmesh committed to since the search began. Also `mnav_errorBusy`
-    /// when called back in from a clearance test whose link generation uses the
-    /// context, one misuse counted.
+    /// when called back in from host code a call using the context runs (a link
+    /// generation's clearance test, a hierarchy's allocator as it builds), one
+    /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -507,9 +511,9 @@ extern "C"
     /// mnavDefaultQueryFilter or with a NaN cost; `mnav_errorLimit` for a
     /// filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST, an infinity
     /// included; `mnav_errorStale` for a polygon id whose tile has been
-    /// replaced or removed. Also `mnav_errorBusy` when called back in from a
-    /// clearance test whose link generation uses the context, one misuse
-    /// counted.
+    /// replaced or removed. Also `mnav_errorBusy` when called back in from host
+    /// code a call using the context runs (a link generation's clearance test,
+    /// a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may move on one navmesh at once between
@@ -618,8 +622,9 @@ extern "C"
     /// corridor not well formed or polygons not joined; `mnav_errorStale` for a
     /// polygon whose tile has been replaced or removed; `mnav_errorCapacity`
     /// for a corridor of more polygons than the context's node limit. Also
-    /// `mnav_errorBusy` when called back in from a clearance test whose link
-    /// generation uses the context, one misuse counted.
+    /// `mnav_errorBusy` when called back in from host code a call using the
+    /// context runs (a link generation's clearance test, a hierarchy's
+    /// allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavCorridorCorners(mnavQuery* query,
@@ -646,8 +651,9 @@ extern "C"
     /// @return As mnavCorridorCorners; also `mnav_errorInvalid` for a NULL
     /// countOut, a negative capacity or NULL runs with a positive one, and
     /// `mnav_errorCapacity` when the runs do not fit, the first capacity of
-    /// them written. Also `mnav_errorBusy` when called back in from a clearance
-    /// test whose link generation uses the context, one misuse counted.
+    /// them written. Also `mnav_errorBusy` when called back in from host code a
+    /// call using the context runs (a link generation's clearance test, a
+    /// hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavCorridorAreas(
@@ -769,8 +775,9 @@ extern "C"
     /// @return As mnavMoveAlongSurface; also `mnav_errorInvalid` for a corridor
     /// not well formed, and `mnav_errorCapacity` when the merged corridor would
     /// outgrow its buffer, which leaves it unchanged. Also `mnav_errorBusy`
-    /// when called back in from a clearance test whose link generation uses the
-    /// context, one misuse counted.
+    /// when called back in from host code a call using the context runs (a link
+    /// generation's clearance test, a hierarchy's allocator as it builds), one
+    /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// So is the corridor.
@@ -793,7 +800,8 @@ extern "C"
     ///                 counts.
     /// @param moveOut  Receives the walk, or NULL.
     /// @return As mnavMoveCorridor. Also `mnav_errorBusy` when called back in
-    /// from a clearance test whose link generation uses the context, one misuse
+    /// from host code a call using the context runs (a link generation's
+    /// clearance test, a hierarchy's allocator as it builds), one misuse
     /// counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
@@ -817,7 +825,8 @@ extern "C"
     /// @param shortenedOut Receives whether the corridor changed.
     /// @return As mnavRaycast; also `mnav_errorInvalid` for a corridor not well
     /// formed or a NULL shortenedOut. Also `mnav_errorBusy` when called back in
-    /// from a clearance test whose link generation uses the context, one misuse
+    /// from host code a call using the context runs (a link generation's
+    /// clearance test, a hierarchy's allocator as it builds), one misuse
     /// counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
@@ -846,9 +855,9 @@ extern "C"
     /// `mnav_errorInvalid` for a NULL argument or a corridor not well formed;
     /// `mnav_errorCapacity` when the path has more polygons than the buffer,
     /// which leaves the corridor as it was; the errors of mnavFindNearest and
-    /// mnavFindPath otherwise. Also `mnav_errorBusy` when called back in from a
-    /// clearance test whose link generation uses the context, one misuse
-    /// counted.
+    /// mnavFindPath otherwise. Also `mnav_errorBusy` when called back in from
+    /// host code a call using the context runs (a link generation's clearance
+    /// test, a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// So is the corridor.
@@ -916,8 +925,9 @@ extern "C"
     /// mnavDefaultQueryFilter or with a NaN cost; `mnav_errorLimit` for a side
     /// past MNAV_MAX_GRID_SIDE or a filter cost past MNAV_MIN_AREA_COST or
     /// MNAV_MAX_AREA_COST, an infinity included. Also `mnav_errorBusy` when
-    /// called back in from a clearance test whose link generation uses the
-    /// context, one misuse counted.
+    /// called back in from host code a call using the context runs (a link
+    /// generation's clearance test, a hierarchy's allocator as it builds), one
+    /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavFindGridPath(mnavQuery* query, const mnavGrid* grid,
@@ -982,9 +992,9 @@ extern "C"
     /// or a filter not built from mnavDefaultQueryFilter or with a NaN cost;
     /// `mnav_errorStale` for a polygon whose tile has gone; `mnav_errorLimit`
     /// for a filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST, an
-    /// infinity included. Also `mnav_errorBusy` when called back in from a
-    /// clearance test whose link generation uses the context, one misuse
-    /// counted.
+    /// infinity included. Also `mnav_errorBusy` when called back in from host
+    /// code a call using the context runs (a link generation's clearance test,
+    /// a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavFindWallDistance(mnavQuery* query,
@@ -1042,8 +1052,9 @@ extern "C"
     /// with a NaN cost; `mnav_errorStale` for a polygon whose tile has gone;
     /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
     /// MNAV_MAX_AREA_COST, an infinity included. Also `mnav_errorBusy` when
-    /// called back in from a clearance test whose link generation uses the
-    /// context, one misuse counted.
+    /// called back in from host code a call using the context runs (a link
+    /// generation's clearance test, a hierarchy's allocator as it builds), one
+    /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavFindWalls(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -1096,8 +1107,9 @@ extern "C"
     /// @return As mnavFindWallDistance; also `mnav_errorLimit` when a polygon
     /// clipped to the circle, its 32-gon, has more than MNAV_MAX_CLIP_CORNERS
     /// corners, which rounding alone can cause. Also `mnav_errorBusy` when
-    /// called back in from a clearance test whose link generation uses the
-    /// context, one misuse counted.
+    /// called back in from host code a call using the context runs (a link
+    /// generation's clearance test, a hierarchy's allocator as it builds), one
+    /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult
@@ -1119,8 +1131,8 @@ extern "C"
     /// @param end          The end point.
     /// @param endOut       Receives how the search ended.
     /// @return As mnavFindPath. Also `mnav_errorBusy` when called back in from
-    /// a clearance test whose link generation uses the context, one misuse
-    /// counted.
+    /// host code a call using the context runs (a link generation's clearance
+    /// test, a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavCheckReachable(mnavQuery* query,
@@ -1186,9 +1198,9 @@ extern "C"
     /// mnavDefaultQueryFilter or with a NaN cost; `mnav_errorLimit` for a
     /// filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST, an infinity
     /// included; `mnav_errorStale` for a polygon id whose tile has been
-    /// replaced or removed. Also `mnav_errorBusy` when called back in from a
-    /// clearance test whose link generation uses the context, one misuse
-    /// counted.
+    /// replaced or removed. Also `mnav_errorBusy` when called back in from host
+    /// code a call using the context runs (a link generation's clearance test,
+    /// a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may cast on one navmesh at once between

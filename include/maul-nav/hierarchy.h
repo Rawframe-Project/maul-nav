@@ -210,8 +210,9 @@ extern "C"
     /// with a NaN coordinate, or a hierarchy built for another navmesh;
     /// `mnav_errorState` for a hierarchy with no graph, or a navmesh committed
     /// since the build; the errors of mnavFindPath otherwise. Also
-    /// `mnav_errorBusy` when called back in from a clearance test whose link
-    /// generation uses the context, one misuse counted.
+    /// `mnav_errorBusy` when called back in from host code a call using the
+    /// context runs (a link generation's clearance test, a hierarchy's
+    /// allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context and the hierarchy are used by one
     /// thread at a time.

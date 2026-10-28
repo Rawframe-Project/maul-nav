@@ -82,8 +82,9 @@ extern "C"
                                                                 mnavNavmesh** navmeshOut);
 
     /// Destroys a navmesh, its tiles and everything staged. Called back in from
-    /// the navmesh's allocator or a clearance test, it does nothing and counts
-    /// one misuse.
+    /// host code a call on the navmesh runs (its allocator, a link generation's
+    /// clearance test, a hierarchy's allocator as it builds on it), it does
+    /// nothing and counts one misuse.
     ///
     /// @param navmesh  The navmesh, or NULL.
     /// @par Thread safety
@@ -105,7 +106,8 @@ extern "C"
     /// limit or when the allocator fails; `mnav_errorUnsupported` for a tile at
     /// a place where one is committed, below mnav_tierDynamic. Also
     /// `mnav_errorBusy` when called back in from the navmesh's allocator, one
-    /// misuse counted; a link generation's clearance test may call it.
+    /// misuse counted; a link generation's clearance test, or a hierarchy's
+    /// allocator as it builds on the navmesh, may call it.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
     /// Staging changes nothing queries read, but it may not run beside
@@ -121,9 +123,9 @@ extern "C"
     /// @param tileZ    The tile's row.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
     /// `mnav_errorCapacity` past the memory limit or when the allocator fails.
-    /// Also `mnav_errorBusy` when called back in from the navmesh's
-    /// allocator, one misuse counted; a link generation's clearance test may
-    /// call it.
+    /// Also `mnav_errorBusy` when called back in from the navmesh's allocator,
+    /// one misuse counted; a link generation's clearance test, or a hierarchy's
+    /// allocator as it builds on the navmesh, may call it.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
     /// Staging changes nothing queries read, but it may not run beside
@@ -142,8 +144,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh;
     /// `mnav_errorCapacity` when the tiles would pass the tiles limit, a tile
     /// its tileLinks limit, or memory its limit, or when the allocator fails.
-    /// Also `mnav_errorBusy` when called back in from host code the navmesh
-    /// runs (its allocator, a clearance test), one misuse counted.
+    /// Also `mnav_errorBusy` when called back in from host code a call on the
+    /// navmesh runs (its allocator, a link generation's clearance test, a
+    /// hierarchy's allocator as it builds on it), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a commit.
@@ -182,8 +185,9 @@ extern "C"
     /// out of range or an id never handed out; `mnav_errorStale` for a polygon
     /// whose tile has been replaced or removed; `mnav_errorUnsupported` for a
     /// static navmesh; `mnav_errorCapacity` when memory runs out. Also
-    /// `mnav_errorBusy` when called back in from host code the navmesh runs
-    /// (its allocator, a clearance test), one misuse counted.
+    /// `mnav_errorBusy` when called back in from host code a call on the
+    /// navmesh runs (its allocator, a link generation's clearance test, a
+    /// hierarchy's allocator as it builds on it), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a stage call.
@@ -324,8 +328,9 @@ extern "C"
     /// links each); `mnav_errorCapacity` when the links' crossings, staged and
     /// committed, would pass the links limit, or memory its limit, or when the
     /// allocator fails. A refused link is refused whole, none of its crossings
-    /// taken. Also `mnav_errorBusy` when called back in from host code the
-    /// navmesh runs (its allocator, a clearance test), one misuse counted.
+    /// taken. Also `mnav_errorBusy` when called back in from host code a call
+    /// on the navmesh runs (its allocator, a link generation's clearance test,
+    /// a hierarchy's allocator as it builds on it), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run while a link is staged.
@@ -339,8 +344,9 @@ extern "C"
     /// @param link     The link.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh or an id
     /// never handed out; `mnav_errorStale` for a link already removed. Also
-    /// `mnav_errorBusy` when called back in from host code the navmesh runs
-    /// (its allocator, a clearance test), one misuse counted.
+    /// `mnav_errorBusy` when called back in from host code a call on the
+    /// navmesh runs (its allocator, a link generation's clearance test, a
+    /// hierarchy's allocator as it builds on it), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run while a removal is staged.
@@ -356,8 +362,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh or an id
     /// never handed out; `mnav_errorStale` for a link removed or staged for
     /// removal; `mnav_errorUnsupported` for a static navmesh. Also
-    /// `mnav_errorBusy` when called back in from host code the navmesh runs
-    /// (its allocator, a clearance test), one misuse counted.
+    /// `mnav_errorBusy` when called back in from host code a call on the
+    /// navmesh runs (its allocator, a link generation's clearance test, a
+    /// hierarchy's allocator as it builds on it), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a stage call.
