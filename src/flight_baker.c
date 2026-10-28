@@ -221,9 +221,13 @@ mnavResult mnavBakeFlightTile(mnavFlightBaker* baker, const mnavBakeInput* input
 static mnavResult CopyFlightTileWork(const mnavFlightBaker* baker, uint8_t* bufferOut,
                                      size_t capacity, size_t* sizeOut)
 {
-    if (baker == nullptr || (bufferOut == nullptr && capacity > 0) || baker->tile == nullptr)
+    if (baker == nullptr || (bufferOut == nullptr && capacity > 0))
     {
         return mnav_errorInvalid;
+    }
+    if (baker->tile == nullptr)
+    {
+        return mnav_errorState;
     }
     if (sizeOut != nullptr)
     {

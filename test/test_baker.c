@@ -66,7 +66,9 @@ static void TestLevelBakesAndCopies(void)
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "created");
     size_t size = 0;
-    CHECK(mnavCopyBakedTile(baker, nullptr, 0, &size) == mnav_errorInvalid, "nothing baked yet");
+    CHECK(mnavCopyBakedTile(baker, nullptr, 0, &size) == mnav_errorState &&
+              mnavGetBakerMisuse(baker) == 0,
+          "nothing baked yet: a state, not misuse");
     mnavTriangleMesh level = Level();
     mnavBakeReport report;
     CHECK(mnavBakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
@@ -237,7 +239,9 @@ static void TestBadInputIsNamed(void)
               report.input.element == mnav_elementVertex && report.input.index == 1,
           "the second mesh's second vertex");
     size_t size = 0;
-    CHECK(mnavCopyBakedTile(baker, nullptr, 0, &size) == mnav_errorInvalid,
+    uint64_t misuse = mnavGetBakerMisuse(baker);
+    CHECK(mnavCopyBakedTile(baker, nullptr, 0, &size) == mnav_errorState &&
+              mnavGetBakerMisuse(baker) == misuse,
           "no tile held after a failure");
     CHECK(mnavBakeTile(baker, &(mnavBakeInput){meshes, -1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
                        &report) == mnav_errorInvalid,
