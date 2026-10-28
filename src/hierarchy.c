@@ -798,6 +798,7 @@ static void CheckTransition(const mnavHierarchy* h, int32_t u)
     {
         const mnavTransition* r = &h->transitions[t->reverse];
         MNAV_ASSERT(r->from == t->cluster && r->cluster == t->from);
+        (void)r;
     }
 }
 
@@ -813,7 +814,9 @@ static void CheckEdges(const mnavHierarchy* h, int32_t u)
         MNAV_ASSERT(edge->to >= 0 && edge->to < h->transitionCount && edge->to != t->reverse);
         MNAV_ASSERT(h->transitions[edge->to].from == t->cluster);
         MNAV_ASSERT(isfinite(edge->cost) && edge->cost >= 0.0);
+        (void)edge;
     }
+    (void)t;
 }
 
 // A graph within its limits whose clusters, transitions and edges hold

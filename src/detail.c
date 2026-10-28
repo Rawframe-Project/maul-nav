@@ -144,6 +144,9 @@ static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mn
     // as the edge runs from its lexically first end.
     int64_t steps = Divisor(dx, dz < 0 ? -dz : dz);
     MNAV_ASSERT(steps > 0);
+    // The assertion compiles out of release builds; the divisions below
+    // still see a positive count there.
+    steps = steps > 0 ? steps : 1;
     int64_t segments = 1;
     int64_t sample = builder->settings.sample;
     if (sample > 0)
@@ -515,6 +518,7 @@ static void CheckDetailMesh(const mnavPolyMesh* mesh, const mnavDetailMesh* deta
             MNAV_ASSERT(c[0] < part->vertexCount && c[1] < part->vertexCount &&
                         c[2] < part->vertexCount);
             MNAV_ASSERT(c[0] != c[1] && c[1] != c[2] && c[0] != c[2]);
+            (void)c;
         }
         vertices += part->vertexCount;
         triangles += part->triangleCount;

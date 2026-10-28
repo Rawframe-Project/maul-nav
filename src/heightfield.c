@@ -279,6 +279,7 @@ static void CheckHeightfield(const mnavHeightfield* heightfield)
             const mnavSpan* span = &heightfield->spans[i];
             MNAV_ASSERT(span->bottom < span->top);
             MNAV_ASSERT(i + 1 == end || span->top < heightfield->spans[i + 1].bottom);
+            (void)span;
         }
     }
 }
@@ -327,6 +328,7 @@ mnavResult mnavBuildHeightfieldInput(mnavMemory* memory, const mnavBakeDef* def,
     // The baker refused a tile past the input's extent before any stage.
     bool framed = mnavMakeTileFrame(def, cells, tileX, tileZ, &heightfield->frame);
     MNAV_ASSERT(framed);
+    (void)framed;
     mnavFragmentList list = {nullptr, 0, 0, def->limits.tileSpans};
     mnavResult result =
         Collect(memory, def, cells, input, tileX, tileZ, &heightfield->frame, &list);
@@ -341,6 +343,7 @@ mnavResult mnavBuildHeightfield2D(mnavMemory* memory, const mnavBakeDef* def,
     *heightfield = (mnavHeightfield){0};
     bool framed = mnavMakeTileFrame(def, cells, tileX, tileZ, &heightfield->frame);
     MNAV_ASSERT(framed);
+    (void)framed;
     mnavFragmentList list = {nullptr, 0, 0, def->limits.tileSpans};
     const mnavOutlineSet set = mnavOutlinesFor(outlines, outlineCount, index, tileX, tileZ);
     mnavResult result = mnavCollectOutlines(memory, def, &heightfield->frame, &set, &list);

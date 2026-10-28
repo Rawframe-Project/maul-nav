@@ -61,7 +61,8 @@ jobs:
 
   # The rules no compiler checks: formatting, the family's source, module,
   # API documentation, length and snippet checks, test hygiene and labels,
-  # the documentation site, and clang-tidy. It runs on documentation changes too, since the snippet
+  # the documentation site, and clang-tidy on a Release and a Debug
+  # configure. It runs on documentation changes too, since the snippet
   # check and the site read docs/.
   checks:
     runs-on: ubuntu-24.04
@@ -108,15 +109,28 @@ jobs:
             -D${PREFIX}_BUILD_SAMPLES=OFF
           cmake --build out/hand --target test_hand_tiles
           out/hand/test_hand_tiles --check test/hand_tiles.h
-      - name: clang-tidy
+      # clang-tidy twice: on the Release preset, where the assertions
+      # compile out, and with them live. Each hides findings the other
+      # shows: a value read only by an assertion is a dead store once it
+      # compiles out, and the analyzer follows a path an assertion would
+      # stop; a live assertion's branches count toward a function's
+      # complexity.
+      - name: clang-tidy, assertions compiled out
         run: |
-          cmake -B out/tidy -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+          cmake --preset linux-clang-20 -B out/tidy --no-warn-unused-cli -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -D${PREFIX}_BUILD_TESTS=OFF -D${PREFIX}_BUILD_BENCH=OFF -D${PREFIX}_BUILD_SAMPLES=OFF
-          files=(src/*.c)
-          [ -e "${files[0]}" ] || { echo "::error::no sources for clang-tidy"; exit 1; }
-          for f in "${files[@]}"; do
-            clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*' "$f"
-          done
+          files=$(git ls-files 'src/*.c')
+          [ -n "$files" ] || { echo "::error::no sources for clang-tidy"; exit 1; }
+          echo "$files" | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*'
+      - name: clang-tidy, assertions live
+        run: |
+          cmake --preset linux-clang-20 -B out/tidy-asserts -DCMAKE_BUILD_TYPE=Debug --no-warn-unused-cli \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -D${PREFIX}_BUILD_TESTS=OFF -D${PREFIX}_BUILD_BENCH=OFF \
+            -D${PREFIX}_BUILD_SAMPLES=OFF
+          files=$(git ls-files 'src/*.c')
+          [ -n "$files" ] || { echo "::error::no sources for clang-tidy"; exit 1; }
+          echo "$files" | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p out/tidy-asserts --quiet \
+            --warnings-as-errors='*'
 
   # Every cell builds with warnings as errors and runs the whole suite but
   # the large scenes, the golden values and the header tests included. GCC

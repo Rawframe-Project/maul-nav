@@ -621,7 +621,11 @@ static void CheckCorner(const mnavPolyMesh* mesh, const mnavPolygon* polygon, in
     {
         int32_t c = polygon->vertices[j];
         MNAV_ASSERT(TwiceArea(v, a, b, c) <= 0);
+        (void)c;
     }
+    (void)v;
+    (void)a;
+    (void)b;
 }
 
 // The neighbor across edge k of polygon p, if any, has the same edge the

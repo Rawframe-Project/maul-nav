@@ -58,6 +58,7 @@ mnavFieldsResult mnavReadFields(const uint8_t* bytes, size_t size, uint64_t coun
         rank = next;
         fields[k] = (mnavField){nullptr, 0};
     }
+    (void)rank;
     mnavByteReader r = {bytes, size, false};
     int32_t last = -1;
     for (uint64_t f = 0; f < count; ++f)

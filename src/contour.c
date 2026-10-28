@@ -320,7 +320,9 @@ static void CheckStraight(const Work* work, int32_t at, int32_t end, int32_t ste
         int64_t cross = (int64_t)(to->x - from->x) * (v->z - from->z) -
                         (int64_t)(to->z - from->z) * (v->x - from->x);
         MNAV_ASSERT(cross == 0 && v->neighbor == neighbor);
+        (void)cross;
     }
+    (void)neighbor;
 }
 
 // The raw vertex farthest from the kept segment at position i, or -1,
@@ -541,6 +543,7 @@ static void CheckContours(const mnavContourSet* set, const mnavRegionMap* region
             const mnavContourVertex* w = &v[(k + 1) % contour->count];
             MNAV_ASSERT(v[k].x >= 0 && v[k].x <= side && v[k].z >= 0 && v[k].z <= side);
             MNAV_ASSERT(v[k].x != w->x || v[k].z != w->z);
+            (void)w;
         }
         MNAV_ASSERT(contour->hole == (SignedArea(v, contour->count) < 0));
         next += contour->count;
