@@ -944,9 +944,10 @@ extern "C"
     /// @param z         The point's Z.
     /// @param heightOut Receives the height.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// coordinate not finite, a polygon id never handed out, or a point outside
-    /// the polygon on the ground; `mnav_errorStale` for a polygon whose tile
-    /// has gone.
+    /// coordinate not finite or a polygon id never handed out;
+    /// `mnav_errorOutside` for a point outside the polygon on the ground,
+    /// heightOut left as it was; `mnav_errorStale` for a polygon whose tile has
+    /// gone.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it.

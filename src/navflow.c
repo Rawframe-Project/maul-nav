@@ -658,7 +658,7 @@ static MNAV_NOINLINE mnavResult NavFlowAtWork(const mnavNavFlow* field, const mn
     }
     if (!InRegion(field, navmesh, (int32_t)polygon.slot - 1))
     {
-        return mnav_errorInvalid;
+        return mnav_errorOutside;
     }
     if (!field->ended)
     {

@@ -103,7 +103,7 @@ static MNAV_NOINLINE mnavResult GetHeightWork(const mnavNavmesh* navmesh, mnavPo
     }
     if (below && above)
     {
-        return mnav_errorInvalid;
+        return mnav_errorOutside;
     }
     *heightOut = mnavSurfaceHeight(navmesh, slot, (int32_t)polygon.polygon, x, z);
     return mnav_success;

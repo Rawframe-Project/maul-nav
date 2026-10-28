@@ -36,6 +36,8 @@ const char* mnavResultName(mnavResult result)
         return "mnav_errorBusy";
     case mnav_errorNotLoaded:
         return "mnav_errorNotLoaded";
+    case mnav_errorOutside:
+        return "mnav_errorOutside";
     default:
         return "unknown result";
     }

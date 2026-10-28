@@ -39,6 +39,7 @@ static void TestResultNames(void)
         {mnav_errorLimit, -9, "mnav_errorLimit"},
         {mnav_errorBusy, -10, "mnav_errorBusy"},
         {mnav_errorNotLoaded, -32, "mnav_errorNotLoaded"},
+        {mnav_errorOutside, -33, "mnav_errorOutside"},
     };
     for (size_t i = 0; i < sizeof(results) / sizeof(results[0]); ++i)
     {
@@ -46,7 +47,7 @@ static void TestResultNames(void)
         CHECK(strcmp(mnavResultName(results[i].result), results[i].name) == 0, "its name");
     }
     CHECK(strcmp(mnavResultName(-5), "unknown result") == 0 &&
-              strcmp(mnavResultName(-33), "unknown result") == 0,
+              strcmp(mnavResultName(-34), "unknown result") == 0,
           "values no error has");
     CHECK(strcmp(mnavResultName(12345), "unknown result") == 0, "unknown name");
 }

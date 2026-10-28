@@ -520,7 +520,7 @@ static MNAV_NOINLINE mnavResult FlowAtWork(const mnavFlowField* field, mnavCell 
     const mnavFlowRegion* r = &field->region;
     if (cell.x < r->x || cell.y < r->y || cell.x >= r->x + r->width || cell.y >= r->y + r->height)
     {
-        return mnav_errorInvalid;
+        return mnav_errorOutside;
     }
     if (field->state != mnav_flowEnded)
     {

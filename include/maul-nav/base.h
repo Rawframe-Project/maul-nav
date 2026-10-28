@@ -135,6 +135,10 @@ extern "C"
         // The place asked about has no tile loaded: not a wall, nothing
         // is known there.
         mnav_errorNotLoaded = -32,
+        // The place asked about is outside what the object covers: a point
+        // off the polygon given, a cell or polygon outside a flow field's
+        // region. A correct program meets it; it counts no misuse.
+        mnav_errorOutside = -33,
     };
 
     // A library version: major, minor and patch.
