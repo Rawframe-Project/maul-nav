@@ -278,6 +278,10 @@ static MNAV_NOINLINE mnavResult MoveAlongSurfaceWork(mnavQuery* query, const mna
                                                      mnavPolygonId startPolygon, mnavPos3 start,
                                                      mnavPos3 end, mnavMove* moveOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (query == nullptr || navmesh == nullptr || moveOut == nullptr || !isfinite(start.x) ||
         !isfinite(start.y) || !isfinite(start.z) || !isfinite(end.x) || !isfinite(end.z))
     {

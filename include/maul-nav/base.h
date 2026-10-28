@@ -127,6 +127,11 @@ extern "C"
         // infinity included: a coordinate past the extent, a count past its
         // most. More room would not help.
         mnav_errorLimit = -9,
+        // The object is in use by host code the library is inside (its
+        // allocator, a link generation's clearance test), and the call came
+        // back in from there; one misuse is counted. The same call succeeds
+        // once that code returns.
+        mnav_errorBusy = -10,
         // The place asked about has no tile loaded: not a wall, nothing
         // is known there.
         mnav_errorNotLoaded = -32,

@@ -37,6 +37,7 @@ static void TestResultNames(void)
         {mnav_errorVersion, -7, "mnav_errorVersion"},
         {mnav_errorFormat, -8, "mnav_errorFormat"},
         {mnav_errorLimit, -9, "mnav_errorLimit"},
+        {mnav_errorBusy, -10, "mnav_errorBusy"},
         {mnav_errorNotLoaded, -32, "mnav_errorNotLoaded"},
     };
     for (size_t i = 0; i < sizeof(results) / sizeof(results[0]); ++i)

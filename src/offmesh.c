@@ -169,6 +169,10 @@ static int32_t NextFree(const mnavNavmesh* navmesh, int32_t s)
 static MNAV_NOINLINE mnavResult StageLinkWork(mnavNavmesh* navmesh, const mnavLinkDef* def,
                                               mnavLinkId* linkOut)
 {
+    if (navmesh != nullptr && mnavHostCalledBack(&navmesh->host))
+    {
+        return mnav_errorBusy;
+    }
     if (navmesh == nullptr || def == nullptr || linkOut == nullptr)
     {
         return mnav_errorInvalid;
@@ -233,6 +237,10 @@ mnavResult mnavStageLink(mnavNavmesh* navmesh, const mnavLinkDef* def, mnavLinkI
 
 static MNAV_NOINLINE mnavResult StageLinkRemovalWork(mnavNavmesh* navmesh, mnavLinkId id)
 {
+    if (navmesh != nullptr && mnavHostCalledBack(&navmesh->host))
+    {
+        return mnav_errorBusy;
+    }
     if (navmesh == nullptr)
     {
         return mnav_errorInvalid;
@@ -276,6 +284,10 @@ mnavResult mnavStageLinkRemoval(mnavNavmesh* navmesh, mnavLinkId id)
 static MNAV_NOINLINE mnavResult StageLinkEnabledWork(mnavNavmesh* navmesh, mnavLinkId id,
                                                      bool enabled)
 {
+    if (navmesh != nullptr && mnavHostCalledBack(&navmesh->host))
+    {
+        return mnav_errorBusy;
+    }
     if (navmesh == nullptr)
     {
         return mnav_errorInvalid;

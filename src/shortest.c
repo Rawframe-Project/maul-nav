@@ -864,6 +864,10 @@ static MNAV_NOINLINE mnavResult FindShortestPathWork(mnavQuery* query, const mna
                                                      mnavPolygonId endPolygon, mnavPos3 end,
                                                      mnavPath* pathOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (query == nullptr || navmesh == nullptr || pathOut == nullptr || !isfinite(start.x) ||
         !isfinite(start.y) || !isfinite(start.z) || !isfinite(end.x) || !isfinite(end.y) ||
         !isfinite(end.z))

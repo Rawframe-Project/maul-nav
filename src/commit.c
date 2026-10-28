@@ -100,6 +100,10 @@ static void CheckNavmesh(const mnavNavmesh* navmesh)
 
 static MNAV_NOINLINE mnavResult CommitWork(mnavNavmesh* navmesh)
 {
+    if (navmesh != nullptr && mnavHostCalledBack(&navmesh->host))
+    {
+        return mnav_errorBusy;
+    }
     if (navmesh == nullptr)
     {
         return mnav_errorInvalid;

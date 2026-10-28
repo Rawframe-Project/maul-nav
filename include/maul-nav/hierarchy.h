@@ -136,7 +136,8 @@ extern "C"
     /// MNAV_MAX_AREA_COST, an infinity included; `mnav_errorCapacity` for more
     /// tile slots, transitions or edges than the limits, or a cluster needing
     /// more nodes than the context's limit. On an error the hierarchy holds no
-    /// graph.
+    /// graph. Also `mnav_errorBusy` when called back in from a clearance test
+    /// whose link generation uses the context, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the hierarchy and the context are used by one
     /// thread at a time, and no commit runs on the navmesh.
@@ -162,7 +163,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// hierarchy built for another navmesh; `mnav_errorState` for a hierarchy
     /// with no graph; `mnav_errorCapacity` as mnavBuildHierarchy. On an error
-    /// the hierarchy holds no graph.
+    /// the hierarchy holds no graph. Also `mnav_errorBusy` when called back in
+    /// from a clearance test whose link generation uses the context, one misuse
+    /// counted.
     /// @par Thread safety
     /// Safe from any thread; the hierarchy and the context are used by one
     /// thread at a time, and no commit runs on the navmesh.
@@ -193,7 +196,9 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// with a NaN coordinate, or a hierarchy built for another navmesh;
     /// `mnav_errorState` for a hierarchy with no graph, or a navmesh committed
-    /// since the build; the errors of mnavFindPath otherwise.
+    /// since the build; the errors of mnavFindPath otherwise. Also
+    /// `mnav_errorBusy` when called back in from a clearance test whose link
+    /// generation uses the context, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context and the hierarchy are used by one
     /// thread at a time.

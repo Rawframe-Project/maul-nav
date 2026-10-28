@@ -25,6 +25,10 @@ mnavTier mnavGetTier(const mnavNavmesh* navmesh)
 static MNAV_NOINLINE mnavResult StageAreaWork(mnavNavmesh* navmesh, mnavPolygonId polygon,
                                               mnavAreaType area)
 {
+    if (navmesh != nullptr && mnavHostCalledBack(&navmesh->host))
+    {
+        return mnav_errorBusy;
+    }
     if (navmesh == nullptr || area >= MNAV_AREA_TYPES)
     {
         return mnav_errorInvalid;

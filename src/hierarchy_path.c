@@ -346,6 +346,10 @@ static MNAV_NOINLINE mnavResult FindHierarchicalPathWork(mnavQuery* query, mnavH
                                                          mnavPolygonId endPolygon, mnavPos3 end,
                                                          mnavPath* pathOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     mnavHierarchy* h = hierarchy;
     if (pathOut == nullptr)
     {

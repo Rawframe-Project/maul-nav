@@ -248,6 +248,10 @@ static MNAV_NOINLINE mnavResult CorridorCornersWork(mnavQuery* query, const mnav
                                                     const mnavCorridor* corridor,
                                                     mnavCorners* cornersOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (query == nullptr || navmesh == nullptr || cornersOut == nullptr || !WellFormed(corridor))
     {
         return mnav_errorInvalid;
@@ -368,6 +372,10 @@ static MNAV_NOINLINE mnavResult CorridorAreasWork(mnavQuery* query, const mnavNa
                                                   mnavCorners* cornersOut, mnavAreaRun* runsOut,
                                                   int32_t capacity, int32_t* countOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (countOut == nullptr || capacity < 0 || (capacity > 0 && runsOut == nullptr))
     {
         return mnav_errorInvalid;
@@ -502,6 +510,10 @@ static MNAV_NOINLINE mnavResult MoveCorridorWork(mnavQuery* query, const mnavNav
                                                  mnavCorridor* corridor, mnavPos3 wanted,
                                                  mnavMove* moveOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (!WellFormed(corridor))
     {
         return mnav_errorInvalid;
@@ -537,6 +549,10 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetWork(mnavQuery* query, const m
                                                        mnavCorridor* corridor, mnavPos3 wanted,
                                                        mnavMove* moveOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (!WellFormed(corridor))
     {
         return mnav_errorInvalid;
@@ -573,6 +589,10 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorWork(mnavQuery* query, const mna
                                                      mnavCorridor* corridor, mnavPos3 toward,
                                                      bool* shortenedOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (!WellFormed(corridor) || shortenedOut == nullptr)
     {
         return mnav_errorInvalid;
@@ -640,6 +660,10 @@ static MNAV_NOINLINE mnavResult ReplanCorridorWork(mnavQuery* query, const mnavN
                                                    mnavCorridor* corridor, mnavVec3 halfExtents,
                                                    mnavPath* pathOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (query == nullptr || navmesh == nullptr || pathOut == nullptr || !WellFormed(corridor))
     {
         return mnav_errorInvalid;

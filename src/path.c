@@ -413,6 +413,10 @@ static MNAV_NOINLINE mnavResult BeginPathWork(mnavQuery* query, const mnavNavmes
                                               mnavPolygonId startPolygon, mnavPos3 start,
                                               mnavPolygonId endPolygon, mnavPos3 end)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (query == nullptr || navmesh == nullptr || !FinitePoint(start) || !FinitePoint(end))
     {
         return mnav_errorInvalid;
@@ -596,6 +600,10 @@ static bool Ended(const mnavQuery* query)
 static MNAV_NOINLINE mnavResult ContinuePathWork(mnavQuery* query, const mnavNavmesh* navmesh,
                                                  int32_t nodes, bool* endedOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (endedOut == nullptr || nodes < 1)
     {
         return mnav_errorInvalid;
@@ -643,6 +651,10 @@ mnavResult mnavContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, int32_
 static MNAV_NOINLINE mnavResult FinishPathWork(mnavQuery* query, const mnavNavmesh* navmesh,
                                                mnavPath* pathOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (pathOut == nullptr)
     {
         return mnav_errorInvalid;
@@ -686,6 +698,10 @@ static MNAV_NOINLINE mnavResult FindPathWork(mnavQuery* query, const mnavNavmesh
                                              mnavPolygonId endPolygon, mnavPos3 end,
                                              mnavPath* pathOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (pathOut == nullptr)
     {
         return mnav_errorInvalid;
@@ -716,6 +732,10 @@ static MNAV_NOINLINE mnavResult CheckReachableWork(mnavQuery* query, const mnavN
                                                    mnavPolygonId endPolygon, mnavPos3 end,
                                                    mnavPathEnd* endOut)
 {
+    if (query != nullptr && mnavHostCalledBack(&query->host))
+    {
+        return mnav_errorBusy;
+    }
     if (endOut == nullptr)
     {
         return mnav_errorInvalid;
