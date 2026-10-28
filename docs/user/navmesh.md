@@ -32,7 +32,7 @@ The def's `tier` declares what may change once tiles are loaded. Tiles and off-m
 | `mnav_tierModifiers` | A polygon's area changed (`mnavStageArea`, `mnav_areaNone` to block it) and links enabled or disabled (`mnavStageLinkEnabled`). |
 | `mnav_tierDynamic` | A loaded tile replaced in one commit, as after a rebuild with obstacles. |
 
-A change the tier does not allow is `mnav_errorTier`. An area change lasts while its tile is loaded and goes when the tile is replaced or removed. To change the area of part of a polygon, mark the shape on the input at bake time with an area volume, so that polygons end where the change does.
+A change the tier does not allow is `mnav_errorUnsupported`. An area change lasts while its tile is loaded and goes when the tile is replaced or removed. To change the area of part of a polygon, mark the shape on the input at bake time with an area volume, so that polygons end where the change does.
 
 `mnavGetArea` reads a polygon's committed area, `mnavGetTier` the navmesh's tier.
 

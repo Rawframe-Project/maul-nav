@@ -71,7 +71,7 @@ static void TestTheDef(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).setting == mnav_settingTier && navmesh == nullptr,
           "not created");
     CHECK(mnavGetTier(nullptr) == mnav_tierStatic, "NULL reads static");
-    CHECK(mnavResultName(mnav_errorTier)[5] == 'e', "named");
+    CHECK(mnavResultName(mnav_errorUnsupported)[5] == 'e', "named");
 }
 
 static void TestStatic(void)
@@ -80,16 +80,17 @@ static void TestStatic(void)
     mnavNearest middle = On(navmesh, 12.5, 7.5);
     mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false, 0.0f};
     mnavLinkId link;
-    CHECK(mnavStageArea(navmesh, middle.polygon, mnav_areaNone) == mnav_errorTier,
+    CHECK(mnavStageArea(navmesh, middle.polygon, mnav_areaNone) == mnav_errorUnsupported,
           "no area changes");
     CHECK(mnavStageLink(navmesh, &jump, &link) == mnav_success &&
-              mnavStageLinkEnabled(navmesh, link, false) == mnav_errorTier,
+              mnavStageLinkEnabled(navmesh, link, false) == mnav_errorUnsupported,
           "links load, but do not toggle");
-    CHECK(mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result == mnav_errorTier,
+    CHECK(mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result ==
+              mnav_errorUnsupported,
           "no tile replaced in place");
     CHECK(mnavStageTileRemoval(navmesh, 0, 0) == mnav_success &&
               mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result ==
-                  mnav_errorTier,
+                  mnav_errorUnsupported,
           "nor by a removal in the same commit");
     mnavTileId tile;
     CHECK(mnavCommit(navmesh) == mnav_success &&
@@ -136,7 +137,8 @@ static void TestAreas(void)
               mnavStageArea(nullptr, middle.polygon, 1) == mnav_errorInvalid &&
               mnavGetArea(navmesh, middle.polygon, nullptr) == mnav_errorInvalid,
           "bad arguments");
-    CHECK(mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result == mnav_errorTier,
+    CHECK(mnavStageTile(navmesh, s_handRowAndGap, sizeof(s_handRowAndGap)).result ==
+              mnav_errorUnsupported,
           "modifiers replace no tile");
     // A change staged on a tile the commit removes is dropped.
     CHECK(mnavStageArea(navmesh, middle.polygon, mnav_areaNone) == mnav_success &&

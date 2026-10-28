@@ -263,7 +263,7 @@ static MNAV_NOINLINE mnavTileResult StageTileWork(mnavNavmesh* navmesh, const ui
     if (result.result == mnav_success && navmesh->def.tier < mnav_tierDynamic &&
         mnavTileAt(navmesh, tile->info.x, tile->info.z, &held) != nullptr)
     {
-        result = (mnavTileResult){mnav_errorTier, mnav_tileHeader, -1};
+        result = (mnavTileResult){mnav_errorUnsupported, mnav_tileHeader, -1};
     }
     if (result.result == mnav_success)
     {

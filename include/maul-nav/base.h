@@ -106,6 +106,10 @@ extern "C"
         // An id names a tile, polygon or link that has been replaced or
         // removed since it was handed out.
         mnav_errorStale = -3,
+        // The navmesh was made without the feature the call needs: its
+        // runtime tier, chosen when it was made, does not allow the change.
+        // No later call adds it.
+        mnav_errorUnsupported = -4,
         // The call is not allowed in the object's current state, which only
         // another call of the program changes: work begun and not ended,
         // a link not yet committed, or an object built on a navmesh or a
@@ -126,9 +130,6 @@ extern "C"
         // The place asked about has no tile loaded: not a wall, nothing
         // is known there.
         mnav_errorNotLoaded = -32,
-        // The navmesh's runtime tier, chosen when it was made, does not
-        // allow the change.
-        mnav_errorTier = -33,
     };
 
     // A library version: major, minor and patch.

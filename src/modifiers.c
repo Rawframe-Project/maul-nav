@@ -32,7 +32,7 @@ static MNAV_NOINLINE mnavResult StageAreaWork(mnavNavmesh* navmesh, mnavPolygonI
     mnavResult result = mnavCheckPolygon(navmesh, polygon);
     if (result == mnav_success && navmesh->def.tier < mnav_tierModifiers)
     {
-        result = mnav_errorTier;
+        result = mnav_errorUnsupported;
     }
     if (result == mnav_success)
     {
