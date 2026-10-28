@@ -105,12 +105,24 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateHierarchy(const mnavHierarchyDef* def,
                                                            mnavHierarchy** hierarchyOut);
 
-    /// Destroys a hierarchy.
+    /// Destroys a hierarchy. Called back in from the hierarchy's allocator, it
+    /// does nothing and counts one misuse.
     ///
     /// @param hierarchy The hierarchy, or NULL.
     /// @par Thread safety
     /// Safe from any thread; the hierarchy is used by one thread at a time.
     MNAV_API void mnavDestroyHierarchy(mnavHierarchy* hierarchy);
+
+    /// Returns how many calls against the hierarchy were refused because they
+    /// came back in from host code it ran (`mnav_errorBusy`), since it was
+    /// made.
+    ///
+    /// @param hierarchy The hierarchy.
+    /// @return The count; 0 for NULL.
+    /// @par Thread safety
+    /// Safe from any thread. It may be read at any time, also while host
+    /// code the object runs calls back in.
+    MNAV_API uint64_t mnavGetHierarchyMisuse(const mnavHierarchy* hierarchy);
 
     /// Builds the hierarchy for a navmesh as committed and a filter. Each
     /// run of tile links along a cluster border, one way, is an entrance
@@ -136,8 +148,9 @@ extern "C"
     /// MNAV_MAX_AREA_COST, an infinity included; `mnav_errorCapacity` for more
     /// tile slots, transitions or edges than the limits, or a cluster needing
     /// more nodes than the context's limit. On an error the hierarchy holds no
-    /// graph. Also `mnav_errorBusy` when called back in from a clearance test
-    /// whose link generation uses the context, one misuse counted.
+    /// graph. Also `mnav_errorBusy` when called back in from the hierarchy's
+    /// allocator, or from a clearance test whose link generation uses the
+    /// context, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the hierarchy and the context are used by one
     /// thread at a time, and no commit runs on the navmesh.
@@ -164,8 +177,8 @@ extern "C"
     /// hierarchy built for another navmesh; `mnav_errorState` for a hierarchy
     /// with no graph; `mnav_errorCapacity` as mnavBuildHierarchy. On an error
     /// the hierarchy holds no graph. Also `mnav_errorBusy` when called back in
-    /// from a clearance test whose link generation uses the context, one misuse
-    /// counted.
+    /// from the hierarchy's allocator, or from a clearance test whose link
+    /// generation uses the context, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the hierarchy and the context are used by one
     /// thread at a time, and no commit runs on the navmesh.

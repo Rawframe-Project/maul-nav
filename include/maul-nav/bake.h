@@ -129,7 +129,9 @@ extern "C"
 
     // A clock the host passes in: now returns ticks in a unit of the
     // host's choosing, never going back, and is called from the thread
-    // that bakes, in the host's own floating-point environment.
+    // that bakes, in the host's own floating-point environment. It may call
+    // nothing of the baker: such a call is refused with mnav_errorBusy, one
+    // misuse counted.
     typedef struct mnavClock
     {
         uint64_t (*now)(void* context);
@@ -611,12 +613,23 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavCreateBaker(const mnavBakeDef* def,
                                                               mnavBaker** bakerOut);
 
-    /// Destroys a baker and the tile it holds.
+    /// Destroys a baker and the tile it holds. Called back in from the baker's
+    /// allocator or clock, it does nothing and counts one misuse.
     ///
     /// @param baker  The baker, or NULL.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     MNAV_API void mnavDestroyBaker(mnavBaker* baker);
+
+    /// Returns how many calls against the baker were refused because they came
+    /// back in from host code it ran (`mnav_errorBusy`), since it was made.
+    ///
+    /// @param baker The baker.
+    /// @return The count; 0 for NULL.
+    /// @par Thread safety
+    /// Safe from any thread. It may be read at any time, also while host
+    /// code the object runs calls back in.
+    MNAV_API uint64_t mnavGetBakerMisuse(const mnavBaker* baker);
 
     /// Bakes tile (tileX, tileZ) of triangle meshes and terrains, shaped
     /// by volumes: checks the input, then rasterizes, filters,
@@ -655,7 +668,8 @@ extern "C"
     /// than MNAV_MAX_PIECE_CORNERS corners, which only rounding can cause (the
     /// report's stage says where); `mnav_errorCapacity` when a named limit or
     /// the memory limit is reached or the allocator fails. On failure the baker
-    /// holds no tile.
+    /// holds no tile. Also `mnav_errorBusy` when called back in from the
+    /// baker's allocator or clock, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     /// Bakers share nothing, so one per thread bakes tiles in parallel.
@@ -723,13 +737,25 @@ extern "C"
                                                              mnavTileIndex** indexOut,
                                                              mnavBakeReport* reportOut);
 
-    /// Destroys a tile index.
+    /// Destroys a tile index. Called back in from the index's allocator, it
+    /// does nothing and counts one misuse.
     ///
     /// @param index  The index, or NULL.
     /// @par Thread safety
     /// Safe from any thread; the index is used by one thread at a time.
     /// No bake may be reading it.
     MNAV_API void mnavDestroyTileIndex(mnavTileIndex* index);
+
+    /// Returns how many calls against the tile index were refused because they
+    /// came back in from host code it ran (`mnav_errorBusy`), since it was
+    /// made.
+    ///
+    /// @param index The index.
+    /// @return The count; 0 for NULL.
+    /// @par Thread safety
+    /// Safe from any thread. It may be read at any time, also while host
+    /// code the object runs calls back in.
+    MNAV_API uint64_t mnavGetTileIndexMisuse(const mnavTileIndex* index);
 
     /// Bakes tile (tileX, tileZ) of 2D outlines: checks the outlines,
     /// fills the cells whose centers a walkable outline holds and no
@@ -749,11 +775,12 @@ extern "C"
     /// @param tileZ     The tile's row.
     /// @param reportOut Receives what the bake did. May be NULL.
     /// @return As mnavBakeTile, for outlines: a NULL input is
-    /// `mnav_errorInvalid`, and so is a tile index made for another grid,
-    /// for meshes, or for another number of outlines or of points in one;
-    /// also `mnav_errorCapacity` for more points in all than the
-    /// inputTriangles limit, or more outlines reaching the tile than the
-    /// tileTriangles limit.
+    /// `mnav_errorInvalid`, and so is a tile index made for another grid, for
+    /// meshes, or for another number of outlines or of points in one; also
+    /// `mnav_errorCapacity` for more points in all than the inputTriangles
+    /// limit, or more outlines reaching the tile than the tileTriangles limit.
+    /// Also `mnav_errorBusy` when called back in from the baker's allocator or
+    /// clock, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     /// Bakers share nothing, so one per thread bakes tiles in parallel.
@@ -842,12 +869,24 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateTileCache(const mnavTileCacheDef* def,
                                                            mnavTileCache** cacheOut);
 
-    /// Destroys a tile cache and everything it holds.
+    /// Destroys a tile cache and everything it holds. Called back in from the
+    /// cache's allocator, it does nothing and counts one misuse.
     ///
     /// @param cache The cache, or NULL.
     /// @par Thread safety
     /// Safe from any thread; the cache is used by one thread at a time.
     MNAV_API void mnavDestroyTileCache(mnavTileCache* cache);
+
+    /// Returns how many calls against the tile cache were refused because they
+    /// came back in from host code it ran (`mnav_errorBusy`), since it was
+    /// made.
+    ///
+    /// @param cache The cache.
+    /// @return The count; 0 for NULL.
+    /// @par Thread safety
+    /// Safe from any thread. It may be read at any time, also while host
+    /// code the object runs calls back in.
+    MNAV_API uint64_t mnavGetTileCacheMisuse(const mnavTileCache* cache);
 
     /// Bakes a tile as mnavBakeTile does and keeps what a rebuild
     /// needs in the cache, replacing what it held for the tile.
@@ -859,8 +898,10 @@ extern "C"
     /// @param tileZ     The tile's row.
     /// @param reportOut Receives the report. May be NULL.
     /// @return As mnavBakeTile; `mnav_errorInvalid` for a NULL cache;
-    /// `mnav_errorCapacity` when the cache holds its most tiles or bytes,
-    /// with no tile baked and the tile's old entry dropped.
+    /// `mnav_errorCapacity` when the cache holds its most tiles or bytes, with
+    /// no tile baked and the tile's old entry dropped. Also `mnav_errorBusy`
+    /// when called back in from the baker's allocator or clock or the cache's
+    /// allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the baker and the cache are used by one thread
     /// at a time.
@@ -883,11 +924,12 @@ extern "C"
     ///                      when obstacleCount is 0.
     /// @param obstacleCount How many, at least 0.
     /// @param reportOut     Receives the report. May be NULL.
-    /// @return `mnav_success`; `mnav_errorNotLoaded` for a tile the cache
-    /// does not hold; `mnav_errorInvalid` for a NULL argument, a negative
-    /// count or a baker of another def; for an obstacle a bake refuses as a
-    /// volume, the status the bake gives, the obstacle named in the report;
-    /// otherwise as mnavBakeTile.
+    /// @return `mnav_success`; `mnav_errorNotLoaded` for a tile the cache does
+    /// not hold; `mnav_errorInvalid` for a NULL argument, a negative count or a
+    /// baker of another def; for an obstacle a bake refuses as a volume, the
+    /// status the bake gives, the obstacle named in the report; otherwise as
+    /// mnavBakeTile. Also `mnav_errorBusy` when called back in from the baker's
+    /// allocator or clock or the cache's allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the baker and the cache are used by one thread
     /// at a time.
@@ -897,7 +939,8 @@ extern "C"
                                                        int32_t obstacleCount,
                                                        mnavBakeReport* reportOut);
 
-    /// Drops what the cache holds for a tile, if anything.
+    /// Drops what the cache holds for a tile, if anything. Called back in from
+    /// the cache's allocator, it does nothing and counts one misuse.
     ///
     /// @param cache The cache, or NULL.
     /// @param tileX The tile's column.

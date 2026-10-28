@@ -8,7 +8,7 @@ base:
 scalar:
 bake_def: fpenv scalar
 input: bake_def fpenv
-tile_index: allocator bake_def fpenv input
+tile_index: allocator bake_def fpenv host_code input
 raster: allocator
 terrain: raster
 volume: allocator compact outline raster
@@ -37,8 +37,8 @@ tile: allocator bytes detail fields invariant polymesh
 flight_def: bake_def fpenv scalar
 flight: allocator bake_def flight_def heightfield invariant raster
 flight_tile: allocator bytes fields flight flight_def invariant
-flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def flight_tile fpenv raster
-flight_volume: allocator flight flight_def flight_tile fpenv
+flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def flight_tile fpenv host_code raster
+flight_volume: allocator flight flight_def flight_tile fpenv host_code
 flight_space: flight flight_volume invariant
 flight_frame: flight_volume
 flight_debug: draw flight_frame flight_space fpenv
@@ -46,8 +46,8 @@ flight_search: flight_frame flight_space flight_volume fpenv invariant query
 flight_probe: flight flight_frame flight_space flight_volume fpenv
 fingerprint: bytes outline raster terrain tile_index
 bake_input: input terrain volume
-baker: allocator bake_def bake_input border_vertices bytes compact contour detail erode field_pack filter fingerprint fpenv heightfield holes input invariant outline polymesh raster region terrain tile tile_cache tile_index volume
-tile_cache: allocator compact field_pack fpenv outline raster
+baker: allocator bake_def bake_input border_vertices bytes compact contour detail erode field_pack filter fingerprint fpenv heightfield holes host_code input invariant outline polymesh raster region terrain tile tile_cache tile_index volume
+tile_cache: allocator compact field_pack fpenv host_code outline raster
 field_pack: allocator compact invariant lz raster
 lz: invariant
 navmesh: allocator bake_def detail fpenv host_code invariant polymesh tile
@@ -67,16 +67,16 @@ grid: fpenv invariant query query_filter
 clip: polymesh
 spatial: clip fpenv invariant navmesh nearest query query_filter
 linkgen: fpenv navmesh path query query_filter
-flow: allocator draw fpenv invariant query_filter
+flow: allocator draw fpenv host_code invariant query_filter
 flow_repair: flow fpenv invariant
-navflow: allocator draw fpenv invariant navmesh offmesh query_filter sort
-hierarchy: allocator fpenv invariant navmesh offmesh path query query_filter sort
+navflow: allocator draw fpenv host_code invariant navmesh offmesh query_filter sort
+hierarchy: allocator fpenv host_code invariant navmesh offmesh path query query_filter sort
 hierarchy_path: fpenv hierarchy navmesh path query
 # Avoidance uses the base alone, never a navmesh module.
 orca:
 obstacle: invariant orca
 crowd: invariant
 orca3:
-avoidance: allocator crowd draw fpenv invariant obstacle orca orca3
+avoidance: allocator crowd draw fpenv host_code invariant obstacle orca orca3
 avoidance3: avoidance crowd draw fpenv invariant obstacle orca3
 steer: fpenv

@@ -32,7 +32,10 @@ void mnavDestroyQuery(mnavQuery* query)
                 alignof(int32_t));
     mnavRelease(memory, query->heap, nodes, sizeof(mnavHeapEntry), alignof(mnavHeapEntry));
     mnavRelease(memory, query->nodes, nodes, sizeof(mnavSearchNode), alignof(mnavSearchNode));
-    // The mark lives in the block being freed.
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&query->host);
     mnavMemory last = *memory;
     last.host = nullptr;
     mnavRelease(&last, query, 1, sizeof(mnavQuery), alignof(mnavQuery));

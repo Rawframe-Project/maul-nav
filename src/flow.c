@@ -67,6 +67,7 @@ static MNAV_NOINLINE mnavResult CreateFlowFieldWork(const mnavFlowFieldDef* def,
     }
     *f = (mnavFlowField){0};
     f->memory = memory;
+    f->memory.host = &f->host;
     f->def = *def;
     size_t cells = (size_t)def->cells;
     result = mnavAllocate(&f->memory, cells, sizeof(double), alignof(double), (void**)&f->costs);
@@ -121,9 +122,14 @@ mnavResult mnavCreateFlowField(const mnavFlowFieldDef* def, mnavFlowField** fiel
     return result;
 }
 
+uint64_t mnavGetFlowFieldMisuse(const mnavFlowField* field)
+{
+    return field != nullptr ? mnavHostMisuse(&field->host) : 0;
+}
+
 void mnavDestroyFlowField(mnavFlowField* field)
 {
-    if (field == nullptr)
+    if (field == nullptr || mnavHostCalledBack(&field->host))
     {
         return;
     }
@@ -136,6 +142,11 @@ void mnavDestroyFlowField(mnavFlowField* field)
     mnavRelease(&memory, field->goals, cells, sizeof(int32_t), alignof(int32_t));
     mnavRelease(&memory, field->touched, cells, sizeof(int32_t), alignof(int32_t));
     mnavRelease(&memory, field->marks, cells, sizeof(uint8_t), alignof(uint8_t));
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&field->host);
+    memory.host = nullptr;
     mnavRelease(&memory, field, 1, sizeof(mnavFlowField), alignof(mnavFlowField));
 }
 
@@ -357,6 +368,10 @@ static MNAV_NOINLINE mnavResult BeginFlowFieldWork(mnavFlowField* field, const m
                                                    const mnavFlowRegion* region,
                                                    const mnavCell* goals, int32_t goalCount)
 {
+    if (field != nullptr && mnavHostCalledBack(&field->host))
+    {
+        return mnav_errorBusy;
+    }
     if (field != nullptr)
     {
         field->state = mnav_flowNone;
@@ -429,6 +444,10 @@ bool mnavFlowSameGrid(const mnavFlowField* f, const mnavGrid* grid)
 static MNAV_NOINLINE mnavResult ContinueFlowFieldWork(mnavFlowField* field, const mnavGrid* grid,
                                                       int32_t cells, bool* endedOut)
 {
+    if (field != nullptr && mnavHostCalledBack(&field->host))
+    {
+        return mnav_errorBusy;
+    }
     if (field == nullptr || grid == nullptr || cells < 1)
     {
         return mnav_errorInvalid;

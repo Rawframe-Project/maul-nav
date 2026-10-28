@@ -9,6 +9,7 @@
 
 #include "allocator.h"
 #include "crowd.h"
+#include "host_code.h"
 #include "obstacle.h"
 #include "orca.h"
 #include "orca3.h"
@@ -26,6 +27,7 @@
 struct mnavAvoidance
 {
     mnavMemory memory;
+    mnavHostCode host;
     mnavAvoidanceDef def;
     // The neighbour grid; its table has room for tableCapacity runs.
     mnavCrowd crowd;

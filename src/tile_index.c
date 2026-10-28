@@ -172,6 +172,11 @@ static void Release(mnavTileIndex* index)
     mnavRelease(&memory, index->first, (size_t)tiles + 1, sizeof(int32_t), alignof(int32_t));
     mnavRelease(&memory, index->counts, (size_t)index->sourceCount, sizeof(int32_t),
                 alignof(int32_t));
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&index->host);
+    memory.host = nullptr;
     mnavRelease(&memory, index, 1, sizeof(mnavTileIndex), alignof(mnavTileIndex));
 }
 
@@ -244,6 +249,7 @@ static mnavResult Make(const mnavBakeDef* def, const mnavBakeCells* cells, Sourc
                              .border = cells->border,
                              .outlines = s.outlines != nullptr,
                              .sourceCount = s.count};
+    index->memory.host = &index->host;
     result = Build(index, s);
     if (result != mnav_success)
     {
@@ -362,10 +368,15 @@ mnavResult mnavCreateTileIndex2D(const mnavBakeDef* def, const mnavOutline* outl
 
 void mnavDestroyTileIndex(mnavTileIndex* index)
 {
-    if (index != nullptr)
+    if (index != nullptr && !mnavHostCalledBack(&index->host))
     {
         Release(index);
     }
+}
+
+uint64_t mnavGetTileIndexMisuse(const mnavTileIndex* index)
+{
+    return index != nullptr ? mnavHostMisuse(&index->host) : 0;
 }
 
 // Whether an index was made for the def's grid, of this kind of input and

@@ -121,7 +121,10 @@ void mnavDestroyNavmesh(mnavNavmesh* navmesh)
                 alignof(mnavPlace));
     mnavRelease(memory, navmesh->slots, (size_t)navmesh->slotCapacity, sizeof(mnavSlot),
                 alignof(mnavSlot));
-    // The mark lives in the block being freed.
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&navmesh->host);
     mnavMemory last = *memory;
     last.host = nullptr;
     mnavRelease(&last, navmesh, 1, sizeof(mnavNavmesh), alignof(mnavNavmesh));

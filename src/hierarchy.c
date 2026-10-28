@@ -141,6 +141,7 @@ static MNAV_NOINLINE mnavResult CreateHierarchyWork(const mnavHierarchyDef* def,
     }
     *h = (mnavHierarchy){0};
     h->memory = memory;
+    h->memory.host = &h->host;
     h->def = *def;
     result = Allocate(h);
     if (result != mnav_success)
@@ -161,9 +162,14 @@ mnavResult mnavCreateHierarchy(const mnavHierarchyDef* def, mnavHierarchy** hier
     return result;
 }
 
+uint64_t mnavGetHierarchyMisuse(const mnavHierarchy* hierarchy)
+{
+    return hierarchy != nullptr ? mnavHostMisuse(&hierarchy->host) : 0;
+}
+
 void mnavDestroyHierarchy(mnavHierarchy* hierarchy)
 {
-    if (hierarchy == nullptr)
+    if (hierarchy == nullptr || mnavHostCalledBack(&hierarchy->host))
     {
         return;
     }
@@ -190,7 +196,12 @@ void mnavDestroyHierarchy(mnavHierarchy* hierarchy)
     Give(h, h->parents, n.transitions + 1, sizeof(int32_t), alignof(int32_t));
     Give(h, h->places, n.transitions + 1, sizeof(int32_t), alignof(int32_t));
     Give(h, h->heap, n.transitions + 1, sizeof(int32_t), alignof(int32_t));
+    // The mark lives in the block being freed: it is set for good, so that
+    // a call back in from this release is refused too, and the release
+    // does not touch it.
+    mnavHostEnter(&h->host);
     mnavMemory memory = h->memory;
+    memory.host = nullptr;
     mnavRelease(&memory, h, 1, sizeof(mnavHierarchy), alignof(mnavHierarchy));
 }
 
@@ -867,7 +878,8 @@ static MNAV_NOINLINE mnavResult BuildHierarchyWork(mnavHierarchy* hierarchy, mna
                                                    const mnavQueryFilter* filter,
                                                    mnavHierarchyReport* reportOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if ((query != nullptr && mnavHostCalledBack(&query->host)) ||
+        (hierarchy != nullptr && mnavHostCalledBack(&hierarchy->host)))
     {
         return mnav_errorBusy;
     }
@@ -900,7 +912,8 @@ static MNAV_NOINLINE mnavResult UpdateHierarchyWork(mnavHierarchy* hierarchy, mn
                                                     const mnavNavmesh* navmesh,
                                                     mnavHierarchyReport* reportOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if ((query != nullptr && mnavHostCalledBack(&query->host)) ||
+        (hierarchy != nullptr && mnavHostCalledBack(&hierarchy->host)))
     {
         return mnav_errorBusy;
     }

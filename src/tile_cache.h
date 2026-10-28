@@ -65,4 +65,8 @@ mnavResult mnavCacheTile(mnavTileCache* cache, mnavMemory* scratch, const mnavCa
 // What the cache holds for a tile, or NULL.
 const mnavCachedTile* mnavFindCachedTile(const mnavTileCache* cache, int32_t tileX, int32_t tileZ);
 
+// Whether a call that uses the cache came back in from its allocator:
+// then one misuse is counted on it and the call refuses.
+bool mnavTileCacheCalledBack(mnavTileCache* cache);
+
 #endif // MAUL_NAV_SRC_TILE_CACHE_H

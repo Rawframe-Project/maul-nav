@@ -122,12 +122,24 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateNavFlow(const mnavNavFlowDef* def,
                                                          mnavNavFlow** fieldOut);
 
-    /// Destroys a navmesh flow field.
+    /// Destroys a navmesh flow field. Called back in from the field's
+    /// allocator, it does nothing and counts one misuse.
     ///
     /// @param field The field, or NULL.
     /// @par Thread safety
     /// Safe from any thread; the field is used by one thread at a time.
     MNAV_API void mnavDestroyNavFlow(mnavNavFlow* field);
+
+    /// Returns how many calls against the navmesh flow field were refused
+    /// because they came back in from host code it ran (`mnav_errorBusy`),
+    /// since it was made.
+    ///
+    /// @param field The field.
+    /// @return The count; 0 for NULL.
+    /// @par Thread safety
+    /// Safe from any thread. It may be read at any time, also while host
+    /// code the object runs calls back in.
+    MNAV_API uint64_t mnavGetNavFlowMisuse(const mnavNavFlow* field);
 
     // A box of tile places, from (x0, z0) to (x1, z1), both included.
     typedef struct mnavNavFlowRegion
@@ -151,8 +163,9 @@ extern "C"
     /// @param region    The tiles searched, or NULL for all.
     /// @param goals     The goals; those outside the region are left out.
     /// @param goalCount How many, at least 0.
-    /// @return As mnavBuildNavFlow; also `mnav_errorInvalid` for a region
-    /// with x0 past x1 or z0 past z1.
+    /// @return As mnavBuildNavFlow; also `mnav_errorInvalid` for a region with
+    /// x0 past x1 or z0 past z1. Also `mnav_errorBusy` when called back in from
+    /// the field's allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh at
     /// once while no commit runs on it; the field is used by one thread at
@@ -171,7 +184,9 @@ extern "C"
     /// @return `mnav_success`, also when the work had already ended;
     /// `mnav_errorInvalid` for a NULL field or navmesh, fewer than 1 polygon,
     /// or a navmesh other than the field's; `mnav_errorState` for nothing
-    /// begun, or a navmesh committed to since the work began: begin again.
+    /// begun, or a navmesh committed to since the work began: begin again. Also
+    /// `mnav_errorBusy` when called back in from the field's allocator, one
+    /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh at
     /// once while no commit runs on it; the field is used by one thread at
@@ -206,7 +221,8 @@ extern "C"
     /// polygon whose tile was replaced or removed; `mnav_errorCapacity` for a
     /// navmesh of more polygons (in the tiles searched), tile slots or off-mesh
     /// links than the field's limits. A build allocates nothing. On an error
-    /// the field holds nothing.
+    /// the field holds nothing. Also `mnav_errorBusy` when called back in from
+    /// the field's allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh at
     /// once while no commit runs on it; the field is used by one thread at

@@ -15,6 +15,15 @@ reads or copies stored integers and bytes:
     mnavGetTileCacheBytes
     mnavGetNavmeshMisuse
     mnavGetQueryMisuse
+    mnavGetBakerMisuse
+    mnavGetTileIndexMisuse
+    mnavGetTileCacheMisuse
+    mnavGetHierarchyMisuse
+    mnavGetFlowFieldMisuse
+    mnavGetNavFlowMisuse
+    mnavGetAvoidanceMisuse
+    mnavGetFlightBakerMisuse
+    mnavGetFlightVolumeMisuse
 
 gives memory back, which the allocator does in the host's environment:
     mnavDestroyAvoidance

@@ -263,6 +263,10 @@ static MNAV_NOINLINE mnavResult Avoid3DWork(mnavAvoidance* avoidance, const mnav
                                             int32_t sphereCount, double step,
                                             mnavPos3* velocitiesOut)
 {
+    if (avoidance != nullptr && mnavHostCalledBack(&avoidance->host))
+    {
+        return mnav_errorBusy;
+    }
     if (avoidance == nullptr || agentCount < 0 || sphereCount < 0 ||
         (agentCount > 0 && (agents == nullptr || velocitiesOut == nullptr)) ||
         (sphereCount > 0 && spheres == nullptr))
@@ -321,6 +325,10 @@ static MNAV_NOINLINE mnavResult DebugAvoidance3DWork(mnavAvoidance* avoidance,
                                                      const mnavSphere* spheres, int32_t sphereCount,
                                                      mnavDebugBuffer* buffer)
 {
+    if (avoidance != nullptr && mnavHostCalledBack(&avoidance->host))
+    {
+        return mnav_errorBusy;
+    }
     if (avoidance == nullptr || agentCount < 0 || sphereCount < 0 ||
         (agentCount > 0 && agents == nullptr) || (sphereCount > 0 && spheres == nullptr) ||
         !mnavGoodBuffer(buffer))
