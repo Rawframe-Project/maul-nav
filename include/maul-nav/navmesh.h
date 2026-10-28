@@ -101,7 +101,7 @@ extern "C"
     /// bytes, or a tile baked with other settings (the header);
     /// `mnav_errorVersion` for another tile format version;
     /// `mnav_errorCapacity` past the memory limit or when the allocator
-    /// fails; `mnav_errorTier` for a tile at a place where one is
+    /// fails; `mnav_errorUnsupported` for a tile at a place where one is
     /// committed, below mnav_tierDynamic.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time.
@@ -162,7 +162,7 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh, an
     /// area out of range or an id never handed out; `mnav_errorStale` for
     /// a polygon whose tile has been replaced or removed;
-    /// `mnav_errorTier` for a static navmesh; `mnav_errorCapacity` when
+    /// `mnav_errorUnsupported` for a static navmesh; `mnav_errorCapacity` when
     /// memory runs out.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
@@ -332,7 +332,7 @@ extern "C"
     /// @param enabled Whether it may be crossed.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL navmesh or an
     /// id never handed out; `mnav_errorStale` for a link removed or staged
-    /// for removal; `mnav_errorTier` for a static navmesh.
+    /// for removal; `mnav_errorUnsupported` for a static navmesh.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a stage call.

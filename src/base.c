@@ -22,6 +22,8 @@ const char* mnavResultName(mnavResult result)
         return "mnav_errorCapacity";
     case mnav_errorStale:
         return "mnav_errorStale";
+    case mnav_errorUnsupported:
+        return "mnav_errorUnsupported";
     case mnav_errorState:
         return "mnav_errorState";
     case mnav_errorVersion:
@@ -32,8 +34,6 @@ const char* mnavResultName(mnavResult result)
         return "mnav_errorLimit";
     case mnav_errorNotLoaded:
         return "mnav_errorNotLoaded";
-    case mnav_errorTier:
-        return "mnav_errorTier";
     default:
         return "unknown result";
     }

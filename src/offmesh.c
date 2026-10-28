@@ -289,7 +289,7 @@ static MNAV_NOINLINE mnavResult StageLinkEnabledWork(mnavNavmesh* navmesh, mnavL
     }
     if (result == mnav_success && navmesh->def.tier < mnav_tierModifiers)
     {
-        result = mnav_errorTier;
+        result = mnav_errorUnsupported;
     }
     for (int32_t c = s; result == mnav_success && c < navmesh->linkSlots; ++c)
     {

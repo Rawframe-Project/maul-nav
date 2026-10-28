@@ -32,19 +32,21 @@ static void TestResultNames(void)
         {mnav_errorInvalid, -1, "mnav_errorInvalid"},
         {mnav_errorCapacity, -2, "mnav_errorCapacity"},
         {mnav_errorStale, -3, "mnav_errorStale"},
+        {mnav_errorUnsupported, -4, "mnav_errorUnsupported"},
         {mnav_errorState, -6, "mnav_errorState"},
         {mnav_errorVersion, -7, "mnav_errorVersion"},
         {mnav_errorFormat, -8, "mnav_errorFormat"},
         {mnav_errorLimit, -9, "mnav_errorLimit"},
         {mnav_errorNotLoaded, -32, "mnav_errorNotLoaded"},
-        {mnav_errorTier, -33, "mnav_errorTier"},
     };
     for (size_t i = 0; i < sizeof(results) / sizeof(results[0]); ++i)
     {
         CHECK(results[i].result == results[i].value, "the family's value");
         CHECK(strcmp(mnavResultName(results[i].result), results[i].name) == 0, "its name");
     }
-    CHECK(strcmp(mnavResultName(-4), "unknown result") == 0, "a value no error has");
+    CHECK(strcmp(mnavResultName(-5), "unknown result") == 0 &&
+              strcmp(mnavResultName(-33), "unknown result") == 0,
+          "values no error has");
     CHECK(strcmp(mnavResultName(12345), "unknown result") == 0, "unknown name");
 }
 
