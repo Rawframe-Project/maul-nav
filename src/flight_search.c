@@ -579,7 +579,7 @@ static MNAV_NOINLINE mnavResult BeginFlightPathWork(mnavQuery* query,
     // Below the floor or above the ceiling, the volume's def's bounds.
     if (at[1] < 0 || at[1] >= frame.layers || to[1] < 0 || to[1] >= frame.layers)
     {
-        return mnav_errorInvalid;
+        return mnav_errorOutside;
     }
     query->search.active = false;
     query->flight = (mnavFlightSliced){.volume = volume,

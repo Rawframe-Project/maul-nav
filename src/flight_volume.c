@@ -383,7 +383,7 @@ static MNAV_NOINLINE mnavResult IsFlightOpenWork(const mnavFlightVolume* volume,
     int64_t y = v[1] - volume->shape.floorVoxel;
     if (y < 0 || y >= (int64_t)volume->shape.cubeCount * side)
     {
-        return mnav_errorInvalid;
+        return mnav_errorOutside;
     }
     int64_t tileX = FloorDiv(v[0], side);
     int64_t tileZ = FloorDiv(v[2], side);

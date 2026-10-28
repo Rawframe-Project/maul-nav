@@ -913,21 +913,23 @@ static void RandomSolid(int32_t v[3])
     } while (Open(v[0], v[1], v[2]));
 }
 
-// Path searches refused: points not finite, below or above the volume,
-// and NULL arguments.
+// Path searches refused: points not finite, points below or above the
+// volume, which are outside it, and NULL arguments.
 static void Refusals(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 open)
 {
     mnavFlightPath path;
     const mnavPos3 bad[3] = {{(double)NAN, 5.0, 5.0}, {5.0, -5.0, 5.0}, {5.0, 40.0, 5.0}};
+    const mnavResult expected[3] = {mnav_errorInvalid, mnav_errorOutside, mnav_errorOutside};
+    const uint64_t before = mnavGetQueryMisuse(query);
     int32_t wrong = 0;
     for (int32_t k = 0; k < 3; ++k)
     {
-        wrong +=
-            mnavFindFlightPath(query, volume, bad[k], open, &path) == mnav_errorInvalid ? 0 : 1;
-        wrong +=
-            mnavFindFlightPath(query, volume, open, bad[k], &path) == mnav_errorInvalid ? 0 : 1;
+        wrong += mnavFindFlightPath(query, volume, bad[k], open, &path) == expected[k] ? 0 : 1;
+        wrong += mnavFindFlightPath(query, volume, open, bad[k], &path) == expected[k] ? 0 : 1;
+        wrong += mnavBeginFlightPath(query, volume, bad[k], open) == expected[k] ? 0 : 1;
     }
     CHECK(wrong == 0, "points not finite, below or above the volume");
+    CHECK(mnavGetQueryMisuse(query) - before == 3, "only the points not finite are misuse");
     CHECK(mnavFindFlightPath(nullptr, volume, open, open, &path) == mnav_errorInvalid &&
               mnavFindFlightPath(query, nullptr, open, open, &path) == mnav_errorInvalid &&
               mnavFindFlightPath(query, volume, open, open, nullptr) == mnav_errorInvalid,

@@ -131,9 +131,9 @@ static void CheckOutside(const mnavFlightVolume* volume)
                              {(double)NAN, 5.0, 1.0},
                              {1.0, 5.0, 1e300},
                              {(double)INFINITY, 5.0, 1.0}};
-    // Below the floor, above the ceiling and NaN are wrong; past
-    // MNAV_MAX_FLIGHT_VOXELS, an infinity included, is a bound.
-    const mnavResult refused[5] = {mnav_errorInvalid, mnav_errorInvalid, mnav_errorInvalid,
+    // Below the floor and above the ceiling are outside the volume, NaN is
+    // wrong; past MNAV_MAX_FLIGHT_VOXELS, an infinity included, is a bound.
+    const mnavResult refused[5] = {mnav_errorOutside, mnav_errorOutside, mnav_errorInvalid,
                                    mnav_errorLimit, mnav_errorLimit};
     for (int32_t k = 0; k < 5; ++k)
     {
