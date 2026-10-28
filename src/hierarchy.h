@@ -60,9 +60,9 @@ struct mnavHierarchy
     // The graph's navmesh and its commits when built; NULL with no graph.
     const mnavNavmesh* navmesh;
     uint64_t commits;
-    // While a build or update runs, the context it searches with and the
-    // navmesh it reads, marked while the hierarchy's allocator runs; NULL
-    // otherwise.
+    // While a build or update runs, the context it searches with, marked
+    // while the hierarchy's allocator runs, and the navmesh it reads,
+    // marked for the whole call; NULL otherwise.
     mnavQuery* building;
     const mnavNavmesh* reading;
     mnavQueryFilter filter;

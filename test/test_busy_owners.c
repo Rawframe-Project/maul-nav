@@ -708,6 +708,29 @@ static Outcome BuildOuter(void* object)
     return out;
 }
 
+// A build searches with its context, but never runs the context's
+// allocator: a context takes its memory when it is made, so the only host
+// code a build runs is the hierarchy's allocator.
+static void TestContextQuiet(void)
+{
+    mnavQuery* query = MakeQuery();
+    mnavHierarchyDef def = mnavDefaultHierarchyDef();
+    def.limits.tiles = 16;
+    def.limits.transitions = 64;
+    def.limits.edges = 256;
+    mnavHierarchy* plain = nullptr;
+    CHECK(mnavCreateHierarchy(&def, &plain) == mnav_success, "a hierarchy");
+    s_allocs = 0;
+    s_frees = 0;
+    CHECK(mnavBuildHierarchy(plain, query, s_heldNavmesh, nullptr, nullptr) == mnav_success &&
+              mnavUpdateHierarchy(plain, query, s_heldNavmesh, nullptr) == mnav_success,
+          "built and updated");
+    CHECK(s_allocs == 0 && s_frees == 0, "the context's allocator never ran");
+    mnavDestroyHierarchy(plain);
+    mnavDestroyQuery(query);
+    CHECK(s_held == 0, "every byte given back");
+}
+
 static void Setup(void)
 {
     s_trench = Trench();
@@ -757,6 +780,7 @@ int main(void)
     TestAcross(BAKER, INDEX, s_heldIndex, IndexedOuter, 0);
     TestAcross(FLIGHT_BAKER, INDEX, s_heldIndex, FlightIndexedOuter, 0);
     TestOuter(HIERARCHY, BuildOuter);
+    TestContextQuiet();
     // The navmesh is read: staging a tile and its removal stay allowed.
     TestAcross(HIERARCHY, QUERY, s_heldQuery, BuildOuter, 0);
     TestAcross(HIERARCHY, NAVMESH, s_heldNavmesh, BuildOuter, 2);

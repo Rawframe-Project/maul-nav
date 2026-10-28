@@ -46,16 +46,13 @@ static mnavResult CheckDef(const mnavHierarchyDef* def)
                : mnav_success;
 }
 
-// Marks the context and the navmesh a build or update uses while the
-// hierarchy's allocator runs: host code may change neither while the build
-// holds pointers into them. The navmesh is marked as a reader, as link
-// generation marks it.
+// Marks the context a build searches with while the hierarchy's allocator
+// runs; only there, since the build's path calls refuse a marked context.
 static void Hold(const mnavHierarchy* h)
 {
     if (h->building != nullptr)
     {
         mnavHostEnter(&h->building->host);
-        mnavHostEnterReader((mnavHostCode*)&h->reading->host);
     }
 }
 
@@ -63,7 +60,6 @@ static void LetGo(const mnavHierarchy* h)
 {
     if (h->building != nullptr)
     {
-        mnavHostLeaveReader((mnavHostCode*)&h->reading->host);
         mnavHostLeave(&h->building->host);
     }
 }
@@ -899,10 +895,20 @@ static mnavResult Finish(mnavHierarchy* h, const mnavNavmesh* navmesh, mnavResul
     return mnav_success;
 }
 
-// Sets the context and the navmesh a build or update uses, to be marked
-// while the hierarchy's allocator runs; NULL for both when it ends.
+// Starts or, with NULLs, ends a build or update: the hierarchy and, as a
+// reader, the navmesh are marked for the whole call; the context by Hold.
 static void Use(mnavHierarchy* h, mnavQuery* query, const mnavNavmesh* navmesh)
 {
+    if (query != nullptr)
+    {
+        mnavHostEnter(&h->host);
+        mnavHostEnterReader((mnavHostCode*)&navmesh->host);
+    }
+    else
+    {
+        mnavHostLeaveReader((mnavHostCode*)&h->reading->host);
+        mnavHostLeave(&h->host);
+    }
     h->building = query;
     h->reading = navmesh;
 }
