@@ -6,9 +6,11 @@
 // twelve fliers cross it at right angles at different heights. Each
 // flier gets a path through the volume and follows it, a point at a
 // time, while avoidance in space keeps the fliers apart and a raycast
-// each step keeps them in open space. Three seconds in, a fifth pillar
-// rises: its tile is baked again and committed, and the fliers whose
-// paths it blocks, by a check of what is left of them, search again.
+// each step keeps them in open space. A flier avoidance pushes off its
+// path until its next point is out of sight, behind a pillar, searches
+// again from where it is. Three seconds in, a fifth pillar rises: its
+// tile is baked again and committed, and the fliers whose paths it
+// blocks, by a check of what is left of them, search again.
 // Prints the paths' lengths, the fliers that replanned and how close any
 // two came; returns 0 when every flier arrives without overlapping
 // another or leaving open space.
@@ -162,15 +164,23 @@ static double Distance(mnavPos3 a, mnavPos3 b)
     return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
+// Whether a flier may go straight from one point to another.
+static bool Clear(const mnavFlightVolume* volume, mnavPos3 from, mnavPos3 to)
+{
+    mnavFlightHit hit;
+    Check(mnavFlightRaycast(volume, from, to, &hit), "raycast");
+    return hit.stop == mnav_flightClear;
+}
+
 // Heads each flier for its route's next point, moving on to the one
-// after once within a meter of it, and slowing into the last.
-static void Prefer(mnavAgent3D* fliers, Route* routes)
+// after once that is in sight, and slowing into the last.
+static void Prefer(const mnavFlightVolume* volume, mnavAgent3D* fliers, Route* routes)
 {
     for (int32_t i = 0; i < FLIERS; ++i)
     {
         Route* r = &routes[i];
         mnavPos3 at = fliers[i].position;
-        while (r->next + 1 < r->count && Distance(at, r->points[r->next]) < 1.0)
+        while (r->next + 1 < r->count && Clear(volume, at, r->points[r->next + 1]))
         {
             r->next += 1;
         }
@@ -183,24 +193,24 @@ static void Prefer(mnavAgent3D* fliers, Route* routes)
     }
 }
 
-// Whether a flier may go straight from one point to another.
-static bool Clear(const mnavFlightVolume* volume, mnavPos3 from, mnavPos3 to)
-{
-    mnavFlightHit hit;
-    Check(mnavFlightRaycast(volume, from, to, &hit), "raycast");
-    return hit.stop == mnav_flightClear;
-}
-
 // Moves a flier by its velocity for a step as far as the volume lets it:
 // avoidance knows the other fliers, not the pillars, and may push a
 // flier toward one. A step whose ray meets a voxel the flier may not
-// enter slides instead: its parts along X, Y and Z are taken one at a
-// time, each only when its own ray is clear.
+// enter takes the flier's own preferred step instead, which heads along a
+// line in sight; when that is blocked too, the step slides: its parts
+// along X, Y and Z are taken one at a time, each only when its own ray is
+// clear.
 static void Move(const mnavFlightVolume* volume, mnavAgent3D* flier, mnavPos3 velocity)
 {
     mnavPos3 from = flier->position;
     mnavPos3 to = {from.x + velocity.x * STEP, from.y + velocity.y * STEP,
                    from.z + velocity.z * STEP};
+    if (!Clear(volume, from, to))
+    {
+        velocity = flier->preferred;
+        to = (mnavPos3){from.x + velocity.x * STEP, from.y + velocity.y * STEP,
+                        from.z + velocity.z * STEP};
+    }
     if (!Clear(volume, from, to))
     {
         to = from;
@@ -214,6 +224,29 @@ static void Move(const mnavFlightVolume* volume, mnavAgent3D* flier, mnavPos3 ve
     flier->velocity =
         (mnavPos3){(to.x - from.x) / STEP, (to.y - from.y) / STEP, (to.z - from.z) / STEP};
     flier->position = to;
+}
+
+// Avoidance knows the other fliers, not the pillars, and may push a flier
+// off its path until the point it heads for lies behind a pillar; aiming
+// at it, the flier would slide along the pillar's face and stop. Such a
+// flier searches again from where it is. Returns how many did.
+static int32_t Rejoin(mnavQuery* query, const mnavFlightVolume* volume, const mnavAgent3D* fliers,
+                      Route* routes)
+{
+    int32_t rejoined = 0;
+    for (int32_t i = 0; i < FLIERS; ++i)
+    {
+        Route* r = &routes[i];
+        if (!Clear(volume, fliers[i].position, r->points[r->next]))
+        {
+            (void)FindRoute(query, volume, fliers[i].position, r->points[r->count - 1], r);
+            // The path starts at the open point nearest the flier, which
+            // it heads for first.
+            r->next = 0;
+            rejoined += 1;
+        }
+    }
+    return rejoined;
 }
 
 // A fifth pillar rises in the tile at (1, 1): that tile alone is baked
@@ -276,6 +309,7 @@ int main(void)
     }
     printf("%d paths found, %.1f m in all\n", FLIERS, length);
     int32_t replanned = 0;
+    int32_t rejoined = 0;
     double closest = (double)INFINITY;
     int32_t arrived = 0;
     int32_t blocked = 0;
@@ -285,7 +319,8 @@ int main(void)
         {
             replanned = Raise(query, volume, fliers, routes);
         }
-        Prefer(fliers, routes);
+        rejoined += Rejoin(query, volume, fliers, routes);
+        Prefer(volume, fliers, routes);
         mnavPos3 velocities[FLIERS];
         Check(mnavAvoid3D(avoidance, fliers, FLIERS, NULL, 0, STEP, velocities), "avoid");
         arrived = 0;
@@ -308,6 +343,7 @@ int main(void)
     }
     printf("a pillar rose at step %d; %d fliers found their way blocked and replanned\n",
            RAISE_STEP, replanned);
+    printf("fliers pushed out of sight of their paths searched again %d times\n", rejoined);
     printf("%d of %d fliers arrived; the closest two came %.3f m apart; %d steps in blocked "
            "space\n",
            arrived, FLIERS, closest, blocked);
