@@ -5,6 +5,35 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.3.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.2.0...v0.3.0) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* velocities and directions are binary32 vectors. `mnavAgent`, `mnavObstacle`, `mnavAgent3D` and `mnavSphere` take their velocities as `mnavVec2` or `mnavVec3`; `mnavAvoid` and `mnavAvoid3D` write `mnavVec2` and `mnavVec3`; `mnavSteering.velocity` and `mnavWall.normal` are `mnavVec3`; `mnavRay`'s `normalX` and `normalZ` become one `mnavVec3 normal`. `mnavVec2` moves from `bake.h` and `mnavPos2` from `avoidance.h` to `base.h`. Avoidance velocities are rounded to binary32, so hosts that compare runs see them change.
+* **avoidance:** an agent whose preferred velocity is faster than its maximum speed, and that no neighbour, obstacle or sphere holds back, now goes along its preferred direction instead of 1% to its right. Runs where agents prefer their maximum speed change.
+* **avoidance:** a velocity scaled back onto the speed circle or sphere can differ in its last unit, so runs whose agents reach their maximum speed can differ from before.
+* mnavDebugNavmesh and mnavGenerateLinks take a const mnavTileRange* (NULL for every tile) instead of four tile coordinates. mnavNavFlowRegion is replaced by mnavTileRange. mnavFlowRegion { x, y, width, height } is replaced by mnavCellRange { x0, y0, x1, y1 }, both corners included, and a region of no cells is now a backward range.
+* **query:** mnavWallSegment is removed, and mnavFindWalls fills mnavWall, which gains the nearest point. mnavFindWallDistance fills an mnavNearestWall { found, limited, wall } instead of an mnavWall. Its normal is now the wall edge's normal toward the walkable side, not the direction from the wall point to the center, which differs at a corner and is (center - point) / distance. With no wall found, the wall is zeroed instead of holding the radius and the center.
+* every call whose first parameter is an owner object zeroes its outputs on any failure, except the size or count a buffer too small needed, the links counted when link generation stops at a bound, and bake reports. Outputs that mnavGetHeight, mnavFlowAt, mnavNavFlowAt and mnavFindFlightPath kept on mnav_errorOutside are now zeroed, as are mnavAvoid's and mnavAvoid3D's velocities when the set's limit holds the agents.
+* **bake:** mnavCopyBakedTile and mnavCopyFlightTile return mnav_errorState, not mnav_errorInvalid, for a baker that holds no tile (before its first bake or after a failed one), and count no misuse for it.
+
+### Fixed
+
+* **avoidance:** keep a scaled-back velocity within the maximum speed ([#177](https://github.com/Rawframe-Project/maul-nav/issues/177)) ([fd2a13c](https://github.com/Rawframe-Project/maul-nav/commit/fd2a13cc8560762702afbc0e1de99a8fe0eac87f))
+* **avoidance:** sidestep only when lines hold an agent back ([#178](https://github.com/Rawframe-Project/maul-nav/issues/178)) ([f06d198](https://github.com/Rawframe-Project/maul-nav/commit/f06d198e9865adcdead7395d61e2ac0575be9ffe))
+* **bake:** drop a triangle with no area when a border vertex goes ([#154](https://github.com/Rawframe-Project/maul-nav/issues/154)) ([a04687f](https://github.com/Rawframe-Project/maul-nav/commit/a04687fdba10549b6330a4a5f3b42f7e4addf506))
+* **bake:** refuse a copy from a baker with no tile as errorState ([#167](https://github.com/Rawframe-Project/maul-nav/issues/167)) ([6e5c22d](https://github.com/Rawframe-Project/maul-nav/commit/6e5c22d5cafd5b61dc413bf3b795fe2905ca0d2e))
+* clear every output an owner call fails to give ([#168](https://github.com/Rawframe-Project/maul-nav/issues/168)) ([074f074](https://github.com/Rawframe-Project/maul-nav/commit/074f074051ee24971a527d1f92084d1d5ef68579))
+* **samples:** keep fliers off the pillars a push leaves them against ([#175](https://github.com/Rawframe-Project/maul-nav/issues/175)) ([b88dcf4](https://github.com/Rawframe-Project/maul-nav/commit/b88dcf40dd94f528eabe819c9ac33afa81c91410)), closes [#171](https://github.com/Rawframe-Project/maul-nav/issues/171)
+
+
+### Changed
+
+* give a box of tiles or of cells one type ([#170](https://github.com/Rawframe-Project/maul-nav/issues/170)) ([1fe4758](https://github.com/Rawframe-Project/maul-nav/commit/1fe4758cba859ecbb600a93c743035273205de71))
+* **query:** describe a wall with one type ([#169](https://github.com/Rawframe-Project/maul-nav/issues/169)) ([d4e1424](https://github.com/Rawframe-Project/maul-nav/commit/d4e1424a54dd0cb3f61966ebbdc0f51604823b86))
+* use float vectors for velocities and directions ([#179](https://github.com/Rawframe-Project/maul-nav/issues/179)) ([19a7776](https://github.com/Rawframe-Project/maul-nav/commit/19a7776be2a7a24447c3377b08d9bc9f29e669c2))
+
 ## [0.2.0](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.2.0) (2026-10-28)
 
 Tile bytes, fingerprints, paths and velocities do not change, and no
