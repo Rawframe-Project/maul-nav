@@ -195,8 +195,11 @@ static mnavPos3 Solve(mnavAvoidance* a, const mnavAgent3D* agents, const mnavSph
     mnavPos3 velocity = {0.0, 0.0, 0.0};
     int32_t failed =
         mnavPlaneProgram3(a->planes, count, self->maxSpeed, self->preferred, false, &velocity);
-    if (failed == count && (velocity.x != self->preferred.x || velocity.y != self->preferred.y ||
-                            velocity.z != self->preferred.z))
+    // The velocity with no planes: the preferred one within the speed
+    // sphere. Only planes hold an agent back; its own speed does not.
+    mnavPos3 free = {0.0, 0.0, 0.0};
+    (void)mnavPlaneProgram3(a->planes, 0, self->maxSpeed, self->preferred, false, &free);
+    if (failed == count && (velocity.x != free.x || velocity.y != free.y || velocity.z != free.z))
     {
         // Held back: aim a little right of the preferred velocity, so that
         // agents meeting in perfect symmetry pass rather than stop.

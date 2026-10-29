@@ -313,7 +313,11 @@ static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, double step, in
     mnavPos2 velocity = {0.0, 0.0};
     int32_t failed =
         mnavLinearProgram2(a->lines, count, self->maxSpeed, self->preferred, false, &velocity);
-    if (failed == count && (velocity.x != self->preferred.x || velocity.y != self->preferred.y))
+    // The velocity with no lines: the preferred one within the speed
+    // circle. Only lines hold an agent back; its own speed does not.
+    mnavPos2 free = {0.0, 0.0};
+    (void)mnavLinearProgram2(a->lines, 0, self->maxSpeed, self->preferred, false, &free);
+    if (failed == count && (velocity.x != free.x || velocity.y != free.y))
     {
         // Held back: aim a little right of the preferred velocity, so that
         // agents meeting in perfect symmetry pass on their right rather

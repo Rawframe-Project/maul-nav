@@ -34,7 +34,7 @@ On the ground, cells are a half to a sixth of the neighbor range, chosen from th
 
 - **Priority.** Of each avoidance between two agents, one takes the other's priority over the sum of both; equal priorities are plain ORCA, half each.
 - **Layers.** Agents, obstacles and spheres carry `layers`, agents `ignores`. An agent avoids another agent or an obstacle unless its `ignores` shares a bit with the other's `layers`. Zero for both avoids everything, so zero-initialized input keeps its meaning, where a mask of what to avoid would avoid nothing. Ignored agents are passed over in the neighbor search, not counted against the limit. An agent that avoids one ignoring it takes the whole avoidance instead of the priority's share, since ORCA's split assumes the other side does its part.
-- **Symmetry.** Two agents meeting exactly head on can stall, each waiting for the other. An agent held back from its preferred velocity aims 1% of its speed to its right; an agent left free keeps its preferred velocity exactly.
+- **Symmetry.** Two agents meeting exactly head on can stall, each waiting for the other. An agent its lines or planes hold back from its preferred velocity aims 1% of its speed to its right; an agent left free keeps its preferred velocity exactly, brought within its maximum speed when it is faster. The speed limit alone holds no agent back: an agent counts as held back when its velocity differs from the one the program gives with no lines or planes.
 
 ## Obstacles
 

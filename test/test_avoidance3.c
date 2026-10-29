@@ -581,6 +581,10 @@ static void TestChecks(void)
     CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
           "a negative speed");
     pair[1] = agents[1];
+    pair[1].maxSpeed = 1.5 * MNAV_MAX_AVOIDANCE_SPEED;
+    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
+          "a maximum speed out of range");
+    pair[1] = agents[1];
     pair[1].priority = 0.0;
     CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
           "no priority");
@@ -621,8 +625,13 @@ static void TestSpeedScaledBack(void)
     CHECK(mnavAvoid3D(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) == mnav_success, "stepped");
     CHECK(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z <= 2.25,
           "no faster than the maximum");
-    CHECK(velocity.x > 1.1 && velocity.y > 0.1 && velocity.z > 0.9,
-          "toward the preferred velocity");
+    // Held back by its speed alone, it does not sidestep: a 1% sidestep
+    // would put the cross product near 0.04.
+    mnavPos3 p = agent.preferred;
+    mnavPos3 cross = {velocity.y * p.z - velocity.z * p.y, velocity.z * p.x - velocity.x * p.z,
+                      velocity.x * p.y - velocity.y * p.x};
+    CHECK(velocity.x > 1.1 && fabs(cross.x) + fabs(cross.y) + fabs(cross.z) < 1e-12,
+          "along the preferred velocity");
     mnavDestroyAvoidance(avoidance);
 }
 
