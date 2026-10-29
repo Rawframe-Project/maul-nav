@@ -584,7 +584,7 @@ static void Doorway(void)
     };
     static mnavAgent agents[AGENTS];
     static mnavPos2 goals[AGENTS];
-    static mnavPos2 velocities[AGENTS];
+    static mnavVec2 velocities[AGENTS];
     const mnavPos2 below[4] = {{-1.0, -60.0}, {1.0, -60.0}, {1.0, -2.0}, {-1.0, -2.0}};
     const mnavPos2 above[4] = {{-1.0, 2.0}, {1.0, 2.0}, {1.0, 60.0}, {-1.0, 60.0}};
     const mnavObstacle wall[2] = {{below, 4, 0.0, {0.0, 0.0}, 1, 0},
@@ -620,14 +620,14 @@ static void Doorway(void)
                 double dy = aim.y - agents[i].position.y;
                 double length = sqrt(dx * dx + dy * dy);
                 double scale = length > 1.0 ? 1.0 / length : 1.0;
-                agents[i].preferred = (mnavPos2){dx * scale, dy * scale};
+                agents[i].preferred = (mnavVec2){(float)(dx * scale), (float)(dy * scale)};
             }
             Check(mnavAvoid(avoidance, agents, AGENTS, wall, 2, 0.1, velocities), "avoid");
             for (int32_t i = 0; i < AGENTS; ++i)
             {
                 agents[i].velocity = velocities[i];
-                agents[i].position.x += velocities[i].x * 0.1;
-                agents[i].position.y += velocities[i].y * 0.1;
+                agents[i].position.x += (double)velocities[i].x * 0.1;
+                agents[i].position.y += (double)velocities[i].y * 0.1;
             }
         }
         double took = Seconds() - start;
@@ -737,13 +737,14 @@ static int32_t CrowdWalls(mnavQuery* query, const mnavNavmesh* navmesh)
         for (int32_t k = 0; k < s_crowdWallCounts[i]; ++k)
         {
             const mnavWall* wall = &s_crowdWalls[i][k];
-            if (wall->normal.x == 0.0 && wall->normal.z == 0.0)
+            if ((double)wall->normal.x == 0.0 && (double)wall->normal.z == 0.0)
             {
                 continue;
             }
-            mnavPos2 ends[2] = {
-                {wall->start.x - wall->normal.x * radius, wall->start.z - wall->normal.z * radius},
-                {wall->end.x - wall->normal.x * radius, wall->end.z - wall->normal.z * radius}};
+            mnavPos2 ends[2] = {{wall->start.x - (double)wall->normal.x * radius,
+                                 wall->start.z - (double)wall->normal.z * radius},
+                                {wall->end.x - (double)wall->normal.x * radius,
+                                 wall->end.z - (double)wall->normal.z * radius}};
             uint32_t cell = (uint32_t)mnavHash64(MNAV_HASH_INIT, ends, (int32_t)sizeof(ends)) &
                             (CROWD_WALL_TABLE - 1);
             while (s_crowdWallTable[cell] >= 0 &&
@@ -770,7 +771,7 @@ static int32_t CrowdWalls(mnavQuery* query, const mnavNavmesh* navmesh)
 static int32_t RunCrowd(mnavQuery* query, const mnavNavmesh* navmesh, mnavAvoidance* avoidance,
                         bool walls, double parts[4])
 {
-    static mnavPos2 velocities[CROWD];
+    static mnavVec2 velocities[CROWD];
     mnavSteerDef steer = mnavDefaultSteerDef();
     steer.maxSpeed = 1.5f;
     int32_t arrived = 0;
@@ -785,7 +786,8 @@ static int32_t RunCrowd(mnavQuery* query, const mnavNavmesh* navmesh, mnavAvoida
             Check(mnavCorridorCorners(query, navmesh, &s_crowd[i], &corners), "crowd corners");
             Check(mnavSteer(&corners, &steer, &steering), "crowd steer");
             arrived += steering.state == mnav_steerArrived ? 1 : 0;
-            s_crowdAgents[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
+            s_crowdAgents[i].preferred =
+                (mnavVec2){(float)(steering.velocity.x), (float)(steering.velocity.z)};
         }
         double t1 = Seconds();
         int32_t wallCount = walls ? CrowdWalls(query, navmesh) : 0;
@@ -797,7 +799,8 @@ static int32_t RunCrowd(mnavQuery* query, const mnavNavmesh* navmesh, mnavAvoida
         for (int32_t i = 0; i < CROWD; ++i)
         {
             mnavPos3 at = s_crowd[i].position;
-            mnavPos3 wanted = {at.x + velocities[i].x * 0.1, at.y, at.z + velocities[i].y * 0.1};
+            mnavPos3 wanted = {at.x + (double)velocities[i].x * 0.1, at.y,
+                               at.z + (double)velocities[i].y * 0.1};
             Check(mnavMoveCorridor(query, navmesh, NULL, &s_crowd[i], wanted, NULL), "crowd move");
             s_crowdAgents[i].position = (mnavPos2){s_crowd[i].position.x, s_crowd[i].position.z};
             s_crowdAgents[i].velocity = velocities[i];
@@ -873,7 +876,7 @@ static void Gap(void)
     };
     static mnavAgent3D fliers[FLIERS];
     static mnavPos3 goals[FLIERS];
-    static mnavPos3 velocities[FLIERS];
+    static mnavVec3 velocities[FLIERS];
     static mnavSphere wall[SIDE * SIDE];
     int32_t spheres = 0;
     for (int32_t a = 0; a < SIDE; ++a)
@@ -924,16 +927,17 @@ static void Gap(void)
                 double dz = aim.z - at.z;
                 double length = sqrt(dx * dx + dy * dy + dz * dz);
                 double scale = length > 1.0 ? 1.0 / length : 1.0;
-                fliers[i].preferred = (mnavPos3){dx * scale, dy * scale, dz * scale};
+                fliers[i].preferred =
+                    (mnavVec3){(float)(dx * scale), (float)(dy * scale), (float)(dz * scale)};
             }
             Check(mnavAvoid3D(avoidance, fliers, FLIERS, wall, spheres, 0.1, velocities),
                   "avoid in space");
             for (int32_t i = 0; i < FLIERS; ++i)
             {
                 fliers[i].velocity = velocities[i];
-                fliers[i].position.x += velocities[i].x * 0.1;
-                fliers[i].position.y += velocities[i].y * 0.1;
-                fliers[i].position.z += velocities[i].z * 0.1;
+                fliers[i].position.x += (double)velocities[i].x * 0.1;
+                fliers[i].position.y += (double)velocities[i].y * 0.1;
+                fliers[i].position.z += (double)velocities[i].z * 0.1;
             }
         }
         double took = Seconds() - start;

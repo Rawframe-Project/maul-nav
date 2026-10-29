@@ -15,7 +15,7 @@
 #include <string.h>
 
 // The hash of the swap's final positions, the same on every platform.
-#define SWAP_HASH 0xd66a719793f96444ull
+#define SWAP_HASH 0xc433d8c69469f2a0ull
 
 enum
 {
@@ -55,6 +55,12 @@ static double Miss(const mnavAgent3D* agent, mnavPos3 goal)
 }
 
 // Points each agent's preferred velocity at its goal, at speed 1 at most.
+// A velocity the set gives, in the doubles the checks below work in.
+static mnavPos3 Wide(mnavVec3 v)
+{
+    return (mnavPos3){(double)v.x, (double)v.y, (double)v.z};
+}
+
 static void Prefer(mnavAgent3D* agents, const mnavPos3* goals, int32_t count)
 {
     for (int32_t i = 0; i < count; ++i)
@@ -62,7 +68,8 @@ static void Prefer(mnavAgent3D* agents, const mnavPos3* goals, int32_t count)
         mnavPos3 d = Sub(goals[i], agents[i].position);
         double length = Length(d);
         double scale = length > 1.0 ? 1.0 / length : 1.0;
-        agents[i].preferred = (mnavPos3){d.x * scale, d.y * scale, d.z * scale};
+        agents[i].preferred =
+            (mnavVec3){(float)(d.x * scale), (float)(d.y * scale), (float)(d.z * scale)};
     }
 }
 
@@ -118,7 +125,7 @@ typedef struct Scene
 // Moves every agent by its new velocity and every sphere by its own.
 static void Run(Scene* s, int32_t steps)
 {
-    mnavPos3 velocities[MOST];
+    mnavVec3 velocities[MOST];
     s->closest = (double)INFINITY;
     s->closestSphere = (double)INFINITY;
     s->over = 0.0;
@@ -131,19 +138,19 @@ static void Run(Scene* s, int32_t steps)
         for (int32_t i = 0; i < s->count; ++i)
         {
             mnavAgent3D* a = &s->agents[i];
-            double over = Length(velocities[i]) - a->maxSpeed;
+            double over = Length(Wide(velocities[i])) - a->maxSpeed;
             s->over = over > s->over ? over : s->over;
             a->velocity = velocities[i];
-            a->position.x += velocities[i].x * 0.1;
-            a->position.y += velocities[i].y * 0.1;
-            a->position.z += velocities[i].z * 0.1;
+            a->position.x += (double)velocities[i].x * 0.1;
+            a->position.y += (double)velocities[i].y * 0.1;
+            a->position.z += (double)velocities[i].z * 0.1;
         }
         for (int32_t k = 0; k < s->sphereCount; ++k)
         {
             mnavSphere* sphere = &s->spheres[k];
-            sphere->center.x += sphere->velocity.x * 0.1;
-            sphere->center.y += sphere->velocity.y * 0.1;
-            sphere->center.z += sphere->velocity.z * 0.1;
+            sphere->center.x += (double)sphere->velocity.x * 0.1;
+            sphere->center.y += (double)sphere->velocity.y * 0.1;
+            sphere->center.z += (double)sphere->velocity.z * 0.1;
         }
         double closest = Closest(s->agents, s->count);
         s->closest = closest < s->closest ? closest : s->closest;
@@ -228,7 +235,7 @@ static void TestSwap(void)
     // by a micrometer changes. So the swap runs from 12 m and from starts
     // moved by 1, 10 and 100 micrometers, and the deepest overlap must
     // stay within 8% of a radius (40 mm): the deepest measured over 31
-    // starts within a millimeter of 12 m (31 mm, from 12.0003 m) and a
+    // starts within a millimeter of 12 m (20 mm, from 11.999995 m) and a
     // margin. The hash pins the run from 12 m.
     static const double starts[7] = {12.0,     12.000001, 11.999999, 12.00001,
                                      11.99999, 12.0001,   11.9999};
@@ -307,15 +314,16 @@ static void TestAnyOrder(void)
         double y = Random(-4.0, 4.0);
         double z = Random(-4.0, 4.0);
         agents[i] = Agent(x, y, z, (uint64_t)(1000 - i));
-        agents[i].velocity = (mnavPos3){Random(-1.0, 1.0), Random(-1.0, 1.0), Random(-1.0, 1.0)};
-        agents[i].preferred = (mnavPos3){-x / 4.0, -y / 4.0, -z / 4.0};
+        agents[i].velocity = (mnavVec3){(float)(Random(-1.0, 1.0)), (float)(Random(-1.0, 1.0)),
+                                        (float)(Random(-1.0, 1.0))};
+        agents[i].preferred = (mnavVec3){(float)(-x / 4.0), (float)(-y / 4.0), (float)(-z / 4.0)};
         agents[i].priority = Random(0.5, 2.0);
         reversed[MOST - 1 - i] = agents[i];
     }
     mnavSphere spheres[2] = {{{0.0, 0.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 7, 0},
                              {{2.0, 1.0, -1.0}, 0.5, {0.5, 0.0, 0.0}, 8, 0}};
-    mnavPos3 forward[MOST];
-    mnavPos3 backward[MOST];
+    mnavVec3 forward[MOST];
+    mnavVec3 backward[MOST];
     CHECK(mnavAvoid3D(avoidance, agents, MOST, spheres, 2, 0.1, forward) == mnav_success,
           "forward");
     mnavSphere swapped[2] = {spheres[1], spheres[0]};
@@ -324,7 +332,7 @@ static void TestAnyOrder(void)
     bool same = true;
     for (int32_t i = 0; i < MOST; ++i)
     {
-        same = same && memcmp(&forward[i], &backward[MOST - 1 - i], sizeof(mnavPos3)) == 0;
+        same = same && memcmp(&forward[i], &backward[MOST - 1 - i], sizeof(mnavVec3)) == 0;
     }
     CHECK(same, "the same velocities in any order");
     mnavDestroyAvoidance(avoidance);
@@ -338,7 +346,7 @@ static void TestPriority(void)
     mnavAgent3D agents[2] = {Agent(-5.0, 0.0, 0.0, 1), Agent(5.0, 0.0, 0.0, 2)};
     agents[0].priority = 1000.0;
     const mnavPos3 goals[2] = {{5.0, 0.0, 0.0}, {-5.0, 0.0, 0.0}};
-    mnavPos3 velocities[2];
+    mnavVec3 velocities[2];
     double strayFirst = 0.0;
     double straySecond = 0.0;
     for (int32_t step = 0; step < 200; ++step)
@@ -349,9 +357,9 @@ static void TestPriority(void)
         for (int32_t i = 0; i < 2; ++i)
         {
             agents[i].velocity = velocities[i];
-            agents[i].position.x += velocities[i].x * 0.1;
-            agents[i].position.y += velocities[i].y * 0.1;
-            agents[i].position.z += velocities[i].z * 0.1;
+            agents[i].position.x += (double)velocities[i].x * 0.1;
+            agents[i].position.y += (double)velocities[i].y * 0.1;
+            agents[i].position.z += (double)velocities[i].z * 0.1;
         }
         double first = hypot(agents[0].position.y, agents[0].position.z);
         double second = hypot(agents[1].position.y, agents[1].position.z);
@@ -367,10 +375,10 @@ static void TestOneSpot(void)
     // On the same spot with the same velocity: they part.
     mnavAvoidance* avoidance = Make(16, 10, 2.0);
     mnavAgent3D agents[2] = {Agent(1.0, 2.0, 3.0, 1), Agent(1.0, 2.0, 3.0, 2)};
-    mnavPos3 velocities[2];
+    mnavVec3 velocities[2];
     CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_success,
           "stepped");
-    CHECK(velocities[0].x < 0.0 && velocities[1].x > 0.0, "opposite ways");
+    CHECK((double)velocities[0].x < 0.0 && (double)velocities[1].x > 0.0, "opposite ways");
     mnavDestroyAvoidance(avoidance);
 }
 
@@ -416,28 +424,30 @@ static void TestLayers(void)
     // it as for a flier that shares the avoidance.
     agents[0] = Agent(-1.5, 0.0, 0.0, 1);
     agents[1] = Agent(1.5, 0.3, 0.1, 2);
-    agents[0].velocity = agents[0].preferred = (mnavPos3){1.5, 0.0, 0.0};
-    agents[1].velocity = agents[1].preferred = (mnavPos3){-1.5, 0.0, 0.0};
+    agents[0].velocity = agents[0].preferred = (mnavVec3){1.5f, 0.0f, 0.0f};
+    agents[1].velocity = agents[1].preferred = (mnavVec3){-1.5f, 0.0f, 0.0f};
     agents[0].maxSpeed = 3.0;
     agents[1].maxSpeed = 3.0;
-    mnavPos3 shared[2];
-    mnavPos3 alone[2];
+    mnavVec3 shared[2];
+    mnavVec3 alone[2];
     CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, shared) == mnav_success, "stepped");
     agents[0].layers = 1;
     agents[1].ignores = 1;
     CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, alone) == mnav_success, "stepped");
-    mnavPos3 n = Sub(alone[0], shared[0]);
-    mnavPos3 off = Sub(shared[0], (mnavPos3){1.5, 0.0, 0.0});
+    mnavPos3 n = Sub(Wide(alone[0]), Wide(shared[0]));
+    mnavPos3 off = Sub(Wide(shared[0]), (mnavPos3){1.5, 0.0, 0.0});
     double across = off.x * n.x + off.y * n.y + off.z * n.z;
     double between = n.x * n.x + n.y * n.y + n.z * n.z;
-    CHECK(between > 1e-4 && fabs(across - between) < 1e-9 * between && alone[1].x == -1.5 &&
-              alone[1].y == 0.0 && alone[1].z == 0.0,
+    // Within binary32's rounding of the velocities.
+    CHECK(between > 1e-4 && fabs(across - between) < 1e-6 * between && alone[1].x == -1.5f &&
+              alone[1].y == 0.0f && alone[1].z == 0.0f,
           "the whole avoidance, twice the half");
     // Each ignoring the other, they fly through each other.
     agents[0].ignores = 2;
     agents[1].layers = 2;
     CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, alone) == mnav_success &&
-              alone[0].x == 1.5 && alone[0].y == 0.0 && alone[1].x == -1.5 && alone[1].y == 0.0,
+              (double)alone[0].x == 1.5 && (double)alone[0].y == 0.0 &&
+              (double)alone[1].x == -1.5 && (double)alone[1].y == 0.0,
           "ghosts pass through each other");
     mnavDestroyAvoidance(avoidance);
 }
@@ -451,10 +461,10 @@ static void TestSphereKept(void)
     mnavAgent3D agents[2] = {Agent(0.0, 0.0, 0.0, 1), Agent(-0.6, 0.0, 0.0, 2)};
     agents[1].priority = 1e6;
     mnavSphere sphere = {{1.0, 0.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 9, 0};
-    mnavPos3 velocities[2];
+    mnavVec3 velocities[2];
     CHECK(mnavAvoid3D(avoidance, agents, 2, &sphere, 1, 0.1, velocities) == mnav_success,
           "stepped");
-    CHECK(velocities[0].x <= -1.5 + 1e-9, "out of the sphere at full speed");
+    CHECK((double)velocities[0].x <= -1.5 + 1e-9, "out of the sphere at full speed");
     mnavDestroyAvoidance(avoidance);
 }
 
@@ -466,14 +476,14 @@ static void TestFastSphere(void)
     mnavAgent3D agents[1] = {Agent(0.0, 0.0, 0.0, 1)};
     const mnavPos3 goals[1] = {{0.0, 0.0, 0.0}};
     mnavSphere spheres[1] = {{{6.0, 0.3, 0.0}, 1.0, {-3.0, 0.0, 0.0}, 9, 0}};
-    mnavPos3 velocities[1];
+    mnavVec3 velocities[1];
     CHECK(mnavAvoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
           "stepped");
-    CHECK(Length(velocities[0]) > 0.1, "it moves off at once");
+    CHECK(Length(Wide(velocities[0])) > 0.1, "it moves off at once");
     // Kept to the new velocity, it stays clear of the sphere for the whole
     // horizon: the avoidance is all its own, not half.
     mnavPos3 rel = Sub(spheres[0].center, agents[0].position);
-    mnavPos3 closing = Sub(velocities[0], spheres[0].velocity);
+    mnavPos3 closing = Sub(Wide(velocities[0]), Wide(spheres[0].velocity));
     double along = (rel.x * closing.x + rel.y * closing.y + rel.z * closing.z) /
                    (closing.x * closing.x + closing.y * closing.y + closing.z * closing.z);
     along = along < 0.0 ? 0.0 : (along > 2.0 ? 2.0 : along);
@@ -496,10 +506,10 @@ static void TestFastSphereFarOff(void)
     mnavAgent3D agents[1] = {Agent(0.0, 0.0, 0.0, 1)};
     const mnavPos3 goals[1] = {{0.0, 0.0, 0.0}};
     mnavSphere spheres[1] = {{{14.0, 0.3, 0.0}, 1.0, {-8.0, 0.0, 0.0}, 9, 0}};
-    mnavPos3 velocities[1];
+    mnavVec3 velocities[1];
     CHECK(mnavAvoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
           "stepped");
-    CHECK(Length(velocities[0]) > 0.1, "it moves off at once");
+    CHECK(Length(Wide(velocities[0])) > 0.1, "it moves off at once");
     Scene s = {avoidance, agents, goals, 1, spheres, 1, 0.0, 0.0, 0.0};
     Run(&s, 40);
     CHECK(s.closestSphere > -1e-6, "it is never touched");
@@ -516,17 +526,17 @@ static void TestSphereTie(void)
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
     mnavAgent3D agent = Agent(0.0, 0.0, 0.0, 1);
-    agent.preferred = (mnavPos3){1.0, 0.0, 0.0};
+    agent.preferred = (mnavVec3){1.0f, 0.0f, 0.0f};
     mnavSphere spheres[2] = {{{0.0, 3.0, 0.0}, 1.0, {0.0, -2.0, 0.0}, 5, 0},
                              {{0.0, -3.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 6, 0}};
     mnavSphere swapped[2] = {spheres[1], spheres[0]};
-    mnavPos3 first;
-    mnavPos3 second;
+    mnavVec3 first;
+    mnavVec3 second;
     CHECK(mnavAvoid3D(avoidance, &agent, 1, spheres, 2, 0.1, &first) == mnav_success &&
               mnavAvoid3D(avoidance, &agent, 1, swapped, 2, 0.1, &second) == mnav_success,
           "stepped");
-    CHECK(memcmp(&first, &agent.preferred, sizeof(mnavPos3)) != 0 &&
-              memcmp(&first, &second, sizeof(mnavPos3)) == 0,
+    CHECK(memcmp(&first, &agent.preferred, sizeof(mnavVec3)) != 0 &&
+              memcmp(&first, &second, sizeof(mnavVec3)) == 0,
           "the lower id kept in either order");
     mnavDestroyAvoidance(avoidance);
 }
@@ -537,7 +547,7 @@ static void TestChecks(void)
     mnavAgent3D agents[3] = {Agent(0.0, 0.0, 0.0, 1), Agent(3.0, 0.0, 0.0, 2),
                              Agent(6.0, 0.0, 0.0, 3)};
     mnavSphere sphere = {{0.0, 5.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 9, 0};
-    mnavPos3 out[3];
+    mnavVec3 out[3];
     CHECK(mnavAvoid3D(nullptr, agents, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid, "no set");
     CHECK(mnavAvoid3D(avoidance, nullptr, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
           "no agents");
@@ -620,17 +630,18 @@ static void TestSpeedScaledBack(void)
 {
     mnavAvoidance* avoidance = Make(1, 1, 2.0);
     mnavAgent3D agent = Agent(0.0, 0.0, 0.0, 1);
-    agent.preferred = (mnavPos3){0x1.d50b790a82134p+0, 0x1.15aa2f1c7bda8p-2, 0x1.8ba9bab5226e6p+0};
-    mnavPos3 velocity;
+    agent.preferred = (mnavVec3){0x1.7d0e8p-3f, -0x1.464268p+0f, 0x1.e6476cp+0f};
+    mnavVec3 velocity;
     CHECK(mnavAvoid3D(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) == mnav_success, "stepped");
-    CHECK(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z <= 2.25,
-          "no faster than the maximum");
+    mnavPos3 v = {(double)velocity.x, (double)velocity.y, (double)velocity.z};
+    double speedSq = v.x * v.x + v.y * v.y + v.z * v.z;
+    CHECK(speedSq <= 2.25, "no faster than the maximum");
     // Held back by its speed alone, it does not sidestep: a 1% sidestep
-    // would put the cross product near 0.04.
-    mnavPos3 p = agent.preferred;
-    mnavPos3 cross = {velocity.y * p.z - velocity.z * p.y, velocity.z * p.x - velocity.x * p.z,
-                      velocity.x * p.y - velocity.y * p.x};
-    CHECK(velocity.x > 1.1 && fabs(cross.x) + fabs(cross.y) + fabs(cross.z) < 1e-12,
+    // would put the cross product near 0.04, rounding to binary32 below
+    // 1e-6.
+    mnavPos3 p = {(double)agent.preferred.x, (double)agent.preferred.y, (double)agent.preferred.z};
+    mnavPos3 cross = {v.y * p.z - v.z * p.y, v.z * p.x - v.x * p.z, v.x * p.y - v.y * p.x};
+    CHECK(speedSq > 2.24 && fabs(cross.x) + fabs(cross.y) + fabs(cross.z) < 1e-6,
           "along the preferred velocity");
     mnavDestroyAvoidance(avoidance);
 }
@@ -638,20 +649,20 @@ static void TestSpeedScaledBack(void)
 // A maximum speed whose square is subnormal, about 3.4 units of the least
 // subnormal: the squares round absolutely, so a velocity clamped to the
 // sphere may square to a unit or so past the speed's square, and is kept.
+// The preferred velocity lies far outside the sphere, so the program
+// clamps onto it in binary64, which the library's assertions check in
+// builds that keep them; the velocity given back is that rounded to
+// binary32, which is zero.
 static void TestSubnormalSpeed(void)
 {
     mnavAvoidance* avoidance = Make(4, 4, 2.0);
     mnavAgent3D agent = Agent(0.0, 0.0, 0.0, 1);
     agent.maxSpeed = sqrt(3.4) * 0x1p-537;
-    agent.preferred =
-        (mnavPos3){sqrt(0.65) * 0x1p-537, sqrt(0.65) * 0x1p-537, sqrt(2.1) * 0x1p-537};
-    mnavPos3 velocity;
+    agent.preferred = (mnavVec3){0.80622577f, 0.80622577f, 1.4491377f};
+    mnavVec3 velocity;
     CHECK(mnavAvoid3D(avoidance, &agent, 1, nullptr, 0, 0.05, &velocity) == mnav_success,
           "stepped");
-    CHECK(isfinite(velocity.x) && isfinite(velocity.y) && isfinite(velocity.z) &&
-              velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z <=
-                  agent.maxSpeed * agent.maxSpeed + 0x1p-1072,
-          "on the sphere, but for subnormal rounding");
+    CHECK(velocity.x == 0.0f && velocity.y == 0.0f && velocity.z == 0.0f, "zero in binary32");
     mnavDestroyAvoidance(avoidance);
 }
 

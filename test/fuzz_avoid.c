@@ -92,6 +92,29 @@ static mnavPos2 Pos(Reader* r)
     return (mnavPos2){Value(r), Value(r)};
 }
 
+// A float, for a velocity: one time in eight its raw bits, otherwise a
+// step of a quarter meter per second from -16 to 16.
+static float Speed(Reader* r)
+{
+    if (Byte(r) % 8 != 0)
+    {
+        return ((float)Byte(r) - 128.0f) * 0.125f;
+    }
+    uint32_t bits = 0;
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        bits |= (uint32_t)Byte(r) << (8 * k);
+    }
+    float f;
+    memcpy(&f, &bits, sizeof(f));
+    return f;
+}
+
+static mnavVec2 Vec(Reader* r)
+{
+    return (mnavVec2){Speed(r), Speed(r)};
+}
+
 static bool Typed(mnavResult result)
 {
     return result == mnav_success || result == mnav_errorInvalid || result == mnav_errorLimit ||
@@ -100,14 +123,14 @@ static bool Typed(mnavResult result)
 
 static mnavAgent s_agents[MOST_AGENTS];
 static mnavAgent s_reversed[MOST_AGENTS];
-static mnavPos2 s_first[MOST_AGENTS];
-static mnavPos2 s_second[MOST_AGENTS];
+static mnavVec2 s_first[MOST_AGENTS];
+static mnavVec2 s_second[MOST_AGENTS];
 static mnavPos2 s_points[MOST_OBSTACLES][MOST_POINTS];
 static mnavObstacle s_obstacles[MOST_OBSTACLES];
 static mnavAgent3D s_fliers[MOST_AGENTS];
 static mnavAgent3D s_fliersReversed[MOST_AGENTS];
-static mnavPos3 s_first3[MOST_AGENTS];
-static mnavPos3 s_second3[MOST_AGENTS];
+static mnavVec3 s_first3[MOST_AGENTS];
+static mnavVec3 s_second3[MOST_AGENTS];
 static mnavSphere s_spheres[MOST_OBSTACLES];
 static mnavSphere s_spheresReversed[MOST_OBSTACLES];
 static mnavDebugVertex s_vertices[1 << 14];
@@ -120,7 +143,7 @@ static int32_t ReadAgents(Reader* r, bool* distinct)
     for (int32_t i = 0; i < count; ++i)
     {
         uint64_t id = Byte(r) % 4 == 0 ? (uint64_t)(Byte(r) % 4) : 100u + (uint64_t)i;
-        s_agents[i] = (mnavAgent){Pos(r),  Pos(r), Pos(r),    Size(r),  Size(r),
+        s_agents[i] = (mnavAgent){Pos(r),  Vec(r), Vec(r),    Size(r),  Size(r),
                                   Size(r), id,     Layers(r), Layers(r)};
         for (int32_t j = 0; j < i; ++j)
         {
@@ -142,7 +165,7 @@ static int32_t ReadObstacles(Reader* r)
         }
         double radius = points == 1 ? Size(r) : (Byte(r) % 8 == 0 ? Size(r) : 0.0);
         s_obstacles[o] =
-            (mnavObstacle){s_points[o], points, radius, Pos(r), (uint64_t)o + 1, Layers(r)};
+            (mnavObstacle){s_points[o], points, radius, Vec(r), (uint64_t)o + 1, Layers(r)};
     }
     return count;
 }
@@ -158,6 +181,11 @@ static mnavPos3 Pos3(Reader* r)
     return (mnavPos3){Value(r), Value(r), Value(r)};
 }
 
+static mnavVec3 Vec3(Reader* r)
+{
+    return (mnavVec3){Speed(r), Speed(r), Speed(r)};
+}
+
 static int32_t ReadFliers(Reader* r, bool* distinct)
 {
     int32_t count = Byte(r) % (MOST_AGENTS + 1);
@@ -165,7 +193,7 @@ static int32_t ReadFliers(Reader* r, bool* distinct)
     for (int32_t i = 0; i < count; ++i)
     {
         uint64_t id = Byte(r) % 4 == 0 ? (uint64_t)(Byte(r) % 4) : 100u + (uint64_t)i;
-        s_fliers[i] = (mnavAgent3D){Pos3(r), Pos3(r), Pos3(r),   Size(r),  Size(r),
+        s_fliers[i] = (mnavAgent3D){Pos3(r), Vec3(r), Vec3(r),   Size(r),  Size(r),
                                     Size(r), id,      Layers(r), Layers(r)};
         for (int32_t j = 0; j < i; ++j)
         {
@@ -180,7 +208,7 @@ static int32_t ReadSpheres(Reader* r)
     int32_t count = Byte(r) % (MOST_OBSTACLES + 1);
     for (int32_t o = 0; o < count; ++o)
     {
-        s_spheres[o] = (mnavSphere){Pos3(r), Size(r), Pos3(r), (uint64_t)o + 1, Layers(r)};
+        s_spheres[o] = (mnavSphere){Pos3(r), Size(r), Vec3(r), (uint64_t)o + 1, Layers(r)};
     }
     return count;
 }
@@ -210,14 +238,14 @@ static void Space(Reader* r, mnavAvoidance* avoidance)
     }
     for (int32_t i = 0; i < agents; ++i)
     {
-        mnavPos3 v = s_first3[i];
+        mnavPos3 v = {(double)s_first3[i].x, (double)s_first3[i].y, (double)s_first3[i].z};
         Expect(isfinite(v.x) && isfinite(v.y) && isfinite(v.z));
         double speed = sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
         Expect(speed <= s_fliers[i].maxSpeed * (1.0 + 1e-9) + 1e-12);
     }
     Expect(mnavAvoid3D(avoidance, s_fliers, agents, s_spheres, spheres, step, s_second3) ==
                mnav_success &&
-           memcmp(s_first3, s_second3, (size_t)agents * sizeof(mnavPos3)) == 0);
+           memcmp(s_first3, s_second3, (size_t)agents * sizeof(mnavVec3)) == 0);
     if (!distinct)
     {
         return;
@@ -234,7 +262,7 @@ static void Space(Reader* r, mnavAvoidance* avoidance)
                        s_second3) == mnav_success);
     for (int32_t i = 0; i < agents; ++i)
     {
-        Expect(memcmp(&s_first3[i], &s_second3[agents - 1 - i], sizeof(mnavPos3)) == 0);
+        Expect(memcmp(&s_first3[i], &s_second3[agents - 1 - i], sizeof(mnavVec3)) == 0);
     }
 }
 
@@ -260,14 +288,14 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     {
         for (int32_t i = 0; i < agents; ++i)
         {
-            double speed = hypot(s_first[i].x, s_first[i].y);
+            double speed = hypot((double)s_first[i].x, (double)s_first[i].y);
             Expect(isfinite(s_first[i].x) && isfinite(s_first[i].y));
             Expect(speed <= s_agents[i].maxSpeed * (1.0 + 1e-9) + 1e-12);
         }
         // Again, the same; reversed, the same per agent when ids differ.
         Expect(mnavAvoid(avoidance, s_agents, agents, s_obstacles, obstacles, step, s_second) ==
                    mnav_success &&
-               memcmp(s_first, s_second, (size_t)agents * sizeof(mnavPos2)) == 0);
+               memcmp(s_first, s_second, (size_t)agents * sizeof(mnavVec2)) == 0);
         if (distinct)
         {
             for (int32_t i = 0; i < agents; ++i)
@@ -278,7 +306,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
                              s_second) == mnav_success);
             for (int32_t i = 0; i < agents; ++i)
             {
-                Expect(memcmp(&s_first[i], &s_second[agents - 1 - i], sizeof(mnavPos2)) == 0);
+                Expect(memcmp(&s_first[i], &s_second[agents - 1 - i], sizeof(mnavVec2)) == 0);
             }
         }
     }

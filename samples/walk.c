@@ -119,8 +119,8 @@ int main(void)
             break;
         }
         mnavPos3 at = corridor.position;
-        mnavPos3 wanted = {at.x + steering.velocity.x * 0.1, at.y,
-                           at.z + steering.velocity.z * 0.1};
+        mnavPos3 wanted = {at.x + (double)steering.velocity.x * 0.1, at.y,
+                           at.z + (double)steering.velocity.z * 0.1};
         Check(mnavMoveCorridor(query, navmesh, NULL, &corridor, wanted, NULL), "move");
     }
     double dx = corridor.position.x - end.point.x;

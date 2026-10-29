@@ -170,7 +170,8 @@ static int32_t Steer(mnavQuery* query, const mnavNavmesh* navmesh)
         Check(mnavSteer(&corners, &def, &steering), "steer");
         s_walkers[i].arrived = steering.state == mnav_steerArrived;
         arrived += s_walkers[i].arrived ? 1 : 0;
-        s_agents[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
+        s_agents[i].preferred =
+            (mnavVec2){(float)(steering.velocity.x), (float)(steering.velocity.z)};
     }
     return arrived;
 }
@@ -216,14 +217,14 @@ static int32_t GatherWalls(mnavObstacle* obstacles, mnavPos2 (*ends)[2])
         for (int32_t k = 0; k < s_walkers[i].wallCount; ++k)
         {
             const mnavWall* wall = &s_walkers[i].walls[k];
-            if (wall->normal.x == 0.0 && wall->normal.z == 0.0)
+            if ((double)wall->normal.x == 0.0 && (double)wall->normal.z == 0.0)
             {
                 continue;
             }
-            mnavPos2 a = {wall->start.x - wall->normal.x * RADIUS,
-                          wall->start.z - wall->normal.z * RADIUS};
-            mnavPos2 b = {wall->end.x - wall->normal.x * RADIUS,
-                          wall->end.z - wall->normal.z * RADIUS};
+            mnavPos2 a = {wall->start.x - (double)wall->normal.x * RADIUS,
+                          wall->start.z - (double)wall->normal.z * RADIUS};
+            mnavPos2 b = {wall->end.x - (double)wall->normal.x * RADIUS,
+                          wall->end.z - (double)wall->normal.z * RADIUS};
             bool seen = false;
             for (int32_t o = 0; o < count && !seen; ++o)
             {
@@ -246,21 +247,22 @@ static int32_t GatherWalls(mnavObstacle* obstacles, mnavPos2 (*ends)[2])
 // Moves each agent at its avoided velocity, its change limited by the
 // acceleration, along the surface; returns how far the moves fell short
 // of where the agents meant to go, pressed against walls.
-static double Move(mnavQuery* query, const mnavNavmesh* navmesh, const mnavPos2* velocities)
+static double Move(mnavQuery* query, const mnavNavmesh* navmesh, const mnavVec2* velocities)
 {
     double pressed = 0.0;
     for (int32_t i = 0; i < AGENTS; ++i)
     {
         mnavAgent* a = &s_agents[i];
-        double dx = velocities[i].x - a->velocity.x;
-        double dz = velocities[i].y - a->velocity.y;
+        double dx = (double)velocities[i].x - (double)a->velocity.x;
+        double dz = (double)velocities[i].y - (double)a->velocity.y;
         double change = sqrt(dx * dx + dz * dz);
         double most = ACCELERATION * STEP;
         double t = change > most ? most / change : 1.0;
-        a->velocity = (mnavPos2){a->velocity.x + dx * t, a->velocity.y + dz * t};
+        a->velocity = (mnavVec2){(float)((double)a->velocity.x + dx * t),
+                                 (float)((double)a->velocity.y + dz * t)};
         mnavCorridor* c = &s_walkers[i].corridor;
-        mnavPos3 wanted = {c->position.x + a->velocity.x * STEP, c->position.y,
-                           c->position.z + a->velocity.y * STEP};
+        mnavPos3 wanted = {c->position.x + (double)a->velocity.x * STEP, c->position.y,
+                           c->position.z + (double)a->velocity.y * STEP};
         Check(mnavMoveCorridor(query, navmesh, NULL, c, wanted, NULL), "move");
         pressed += hypot(wanted.x - c->position.x, wanted.z - c->position.z);
         a->position = (mnavPos2){c->position.x, c->position.z};
@@ -312,7 +314,7 @@ int main(void)
         FindWalls(query, navmesh);
         int32_t wallCount = GatherWalls(walls, ends);
         mostWalls = wallCount > mostWalls ? wallCount : mostWalls;
-        static mnavPos2 velocities[AGENTS];
+        static mnavVec2 velocities[AGENTS];
         Check(mnavAvoid(avoidance, s_agents, AGENTS, walls, wallCount, STEP, velocities), "avoid");
         pressed += Move(query, navmesh, velocities);
         double gap = Closest();

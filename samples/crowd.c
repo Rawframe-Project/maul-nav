@@ -55,10 +55,11 @@ int main(void)
             double dz = goals[i].y - agents[i].position.y;
             double d = sqrt(dx * dx + dz * dz);
             double speed = d < SPEED * STEP ? d / STEP : SPEED;
-            agents[i].preferred =
-                d > 0.0 ? (mnavPos2){dx / d * speed, dz / d * speed} : (mnavPos2){0.0, 0.0};
+            agents[i].preferred = d > 0.0
+                                      ? (mnavVec2){(float)(dx / d * speed), (float)(dz / d * speed)}
+                                      : (mnavVec2){0.0f, 0.0f};
         }
-        mnavPos2 velocities[AGENTS];
+        mnavVec2 velocities[AGENTS];
         if (mnavAvoid(avoidance, agents, AGENTS, &pillar, 1, STEP, velocities) != mnav_success)
         {
             return 1;
@@ -67,8 +68,8 @@ int main(void)
         for (int32_t i = 0; i < AGENTS; ++i)
         {
             agents[i].velocity = velocities[i];
-            agents[i].position.x += velocities[i].x * STEP;
-            agents[i].position.y += velocities[i].y * STEP;
+            agents[i].position.x += (double)velocities[i].x * STEP;
+            agents[i].position.y += (double)velocities[i].y * STEP;
             double dx = goals[i].x - agents[i].position.x;
             double dz = goals[i].y - agents[i].position.y;
             arrived += dx * dx + dz * dz < 0.05 * 0.05 ? 1 : 0;

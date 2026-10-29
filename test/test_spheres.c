@@ -60,7 +60,8 @@ static int32_t Every(const mnavAgent3D* agent, double horizon, mnavObstacleNear*
     for (int32_t s = 0; s < SPHERES; ++s)
     {
         const mnavSphere* sphere = &s_spheres[s];
-        mnavPos3 v = sphere->velocity;
+        mnavPos3 v = {(double)sphere->velocity.x, (double)sphere->velocity.y,
+                      (double)sphere->velocity.z};
         double speed = sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
         double range = horizon * (agent->maxSpeed + speed) + agent->radius;
         double dx = sphere->center.x - agent->position.x;
@@ -104,7 +105,7 @@ static void Scatter(double extent, bool vertical)
         double vy = (Random() - 0.5) * fast;
         s_spheres[s] = (mnavSphere){{x, y, z},
                                     0.25 + (double)(int32_t)(Random() * 4.0) * 0.5,
-                                    {vx, vy, 0.0},
+                                    {(float)vx, (float)vy, 0.0f},
                                     (uint64_t)(Random() * 400.0),
                                     0};
     }

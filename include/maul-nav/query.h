@@ -708,7 +708,7 @@ extern "C"
     {
         // On the ground (y is 0), in meters per second: the agent's
         // preferred velocity for avoidance, x and z.
-        mnavPos3 velocity;
+        mnavVec3 velocity;
         mnavSteerState state;
         // At a link: its index among the corners' links; otherwise -1.
         int32_t link;
@@ -983,7 +983,7 @@ extern "C"
         // The unit direction on the ground from it toward its polygon, the
         // walkable side; zero for an edge of no length on the ground. The
         // way from the wall to the center is (center - point) / distance.
-        mnavPos3 normal;
+        mnavVec3 normal;
         // The distance on the ground from the center to its nearest point.
         double distance;
     } mnavWall;
@@ -1181,8 +1181,7 @@ extern "C"
         double t;
         // At a wall, the wall's normal on the ground, pointing back to
         // where the ray came from; 0 otherwise.
-        double normalX;
-        double normalZ;
+        mnavVec3 normal;
         // The polygons crossed, from the start polygon to the one where the
         // ray ended, in the context's memory until its next query.
         const mnavPolygonId* polygons;

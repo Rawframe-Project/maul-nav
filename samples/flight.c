@@ -189,7 +189,8 @@ static void Prefer(const mnavFlightVolume* volume, mnavAgent3D* fliers, Route* r
         double speed = d < SPEED * STEP ? d / STEP : SPEED;
         double scale = d > 0.0 ? speed / d : 0.0;
         fliers[i].preferred =
-            (mnavPos3){(aim.x - at.x) * scale, (aim.y - at.y) * scale, (aim.z - at.z) * scale};
+            (mnavVec3){(float)((aim.x - at.x) * scale), (float)((aim.y - at.y) * scale),
+                       (float)((aim.z - at.z) * scale)};
     }
 }
 
@@ -200,14 +201,16 @@ static void Prefer(const mnavFlightVolume* volume, mnavAgent3D* fliers, Route* r
 // line in sight; when that is blocked too, the step slides: its parts
 // along X, Y and Z are taken one at a time, each only when its own ray is
 // clear.
-static void Move(const mnavFlightVolume* volume, mnavAgent3D* flier, mnavPos3 velocity)
+static void Move(const mnavFlightVolume* volume, mnavAgent3D* flier, mnavVec3 given)
 {
+    mnavPos3 velocity = {(double)given.x, (double)given.y, (double)given.z};
     mnavPos3 from = flier->position;
     mnavPos3 to = {from.x + velocity.x * STEP, from.y + velocity.y * STEP,
                    from.z + velocity.z * STEP};
     if (!Clear(volume, from, to))
     {
-        velocity = flier->preferred;
+        velocity = (mnavPos3){(double)flier->preferred.x, (double)flier->preferred.y,
+                              (double)flier->preferred.z};
         to = (mnavPos3){from.x + velocity.x * STEP, from.y + velocity.y * STEP,
                         from.z + velocity.z * STEP};
     }
@@ -221,8 +224,8 @@ static void Move(const mnavFlightVolume* volume, mnavAgent3D* flier, mnavPos3 ve
         mnavPos3 z = {to.x, to.y, from.z + velocity.z * STEP};
         to = Clear(volume, to, z) ? z : to;
     }
-    flier->velocity =
-        (mnavPos3){(to.x - from.x) / STEP, (to.y - from.y) / STEP, (to.z - from.z) / STEP};
+    flier->velocity = (mnavVec3){(float)((to.x - from.x) / STEP), (float)((to.y - from.y) / STEP),
+                                 (float)((to.z - from.z) / STEP)};
     flier->position = to;
 }
 
@@ -321,7 +324,7 @@ int main(void)
         }
         rejoined += Rejoin(query, volume, fliers, routes);
         Prefer(volume, fliers, routes);
-        mnavPos3 velocities[FLIERS];
+        mnavVec3 velocities[FLIERS];
         Check(mnavAvoid3D(avoidance, fliers, FLIERS, NULL, 0, STEP, velocities), "avoid");
         arrived = 0;
         for (int32_t i = 0; i < FLIERS; ++i)

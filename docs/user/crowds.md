@@ -35,7 +35,7 @@ for (int32_t i = 0; i < count; ++i)
     if (mnavCorridorCorners(query, navmesh, &corridors[i], &corners) == mnav_success &&
         mnavSteer(&corners, &steer, &steering) == mnav_success)
     {
-        agents[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
+        agents[i].preferred = (mnavVec2){steering.velocity.x, steering.velocity.z};
     }
 }
 mnavResult avoided = mnavAvoid(avoidance, agents, count, obstacles, obstacleCount, dt, velocities);
@@ -43,7 +43,8 @@ for (int32_t i = 0; i < count && avoided == mnav_success; ++i)
 {
     // Limit the change from agents[i].velocity by the agent's acceleration.
     mnavPos3 at = corridors[i].position;
-    mnavPos3 wanted = {at.x + velocities[i].x * dt, at.y, at.z + velocities[i].y * dt};
+    mnavPos3 wanted = {at.x + (double)velocities[i].x * dt, at.y,
+                       at.z + (double)velocities[i].y * dt};
     if (mnavMoveCorridor(query, navmesh, NULL, &corridors[i], wanted, NULL) == mnav_success)
     {
         agents[i].position = (mnavPos2){corridors[i].position.x, corridors[i].position.z};

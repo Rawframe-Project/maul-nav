@@ -92,7 +92,7 @@ static void TestWalls(mnavQuery* query, const mnavNavmesh* navmesh)
                   mnav_success &&
               on.found && on.wall.distance == 0.0 && on.wall.point.x == wide.wall.point.x &&
               on.wall.point.z == wide.wall.point.z &&
-              fabs(hypot(on.wall.normal.x, on.wall.normal.z) - 1.0) < 1e-9,
+              fabs(hypot((double)on.wall.normal.x, (double)on.wall.normal.z) - 1.0) < 1e-6,
           "a center on the wall");
 }
 

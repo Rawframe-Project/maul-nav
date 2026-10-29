@@ -276,8 +276,8 @@ static int32_t Walk(World* w, mnavQuery* query)
             continue;
         }
         mnavPos3 at = agent->corridor.position;
-        mnavPos3 wanted = {at.x + steering.velocity.x * STEP, at.y,
-                           at.z + steering.velocity.z * STEP};
+        mnavPos3 wanted = {at.x + (double)steering.velocity.x * STEP, at.y,
+                           at.z + (double)steering.velocity.z * STEP};
         Check(mnavMoveCorridor(query, w->navmesh, NULL, &agent->corridor, wanted, NULL), "move");
         inside += InCrate(agent->corridor.position) ? 1 : 0;
     }

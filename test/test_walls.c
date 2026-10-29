@@ -130,7 +130,8 @@ static void TestPartlyLinkedSide(void)
           "two walls within 2.5 m");
     CHECK(walls[0].distance == 2.0 && walls[0].start.z == 10.0 && walls[0].end.z == 10.0 &&
               walls[1].distance == 2.0 && walls[1].start.x == 32.0 && walls[1].end.x == 32.0 &&
-              walls[1].start.z == 10.0 && walls[1].end.z == 5.0 && walls[1].normal.x == -1.0,
+              walls[1].start.z == 10.0 && walls[1].end.z == 5.0 &&
+              (double)walls[1].normal.x == -1.0,
           "the north side, then the seam's open part");
     mnavNearestWall wall;
     CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, (mnavPos3){31.0, 0.0, 8.0}, 2.5,

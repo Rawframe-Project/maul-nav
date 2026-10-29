@@ -166,7 +166,16 @@ extern "C"
         void* context;
     } mnavAllocator;
 
-    // A vector or a position within a frame, in meters, binary32.
+    // A vector, binary32: a velocity, a direction, or a position within a
+    // frame the library names, in meters. mnavVec2 is one on a plane: a 2D
+    // outline's (x, y) is the navmesh point (x, 0, y), and avoidance's lies
+    // on the plane its agents move on.
+    typedef struct mnavVec2
+    {
+        float x;
+        float y;
+    } mnavVec2;
+
     typedef struct mnavVec3
     {
         float x;
@@ -174,8 +183,15 @@ extern "C"
         float z;
     } mnavVec3;
 
-    // A world position in meters, in doubles, so that precision does not
-    // depend on the distance from the world origin.
+    // A world position in meters, binary64, so that precision does not
+    // depend on the distance from the world origin. mnavPos2 is one on a
+    // plane, as avoidance takes positions.
+    typedef struct mnavPos2
+    {
+        double x;
+        double y;
+    } mnavPos2;
+
     typedef struct mnavPos3
     {
         double x;

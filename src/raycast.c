@@ -131,8 +131,7 @@ static void Wall(mnavRay* ray, mnavPos3 a, mnavPos3 b)
     double ez = b.z - a.z;
     double length = sqrt(ex * ex + ez * ez);
     ray->end = mnav_rayWall;
-    ray->normalX = ez / length;
-    ray->normalZ = -ex / length;
+    ray->normal = (mnavVec3){(float)(ez / length), 0.0f, (float)(-ex / length)};
 }
 
 // A ray's arguments: a call back in from host code, then the arguments
@@ -172,7 +171,7 @@ mnavResult mnavRaycastWork(mnavQuery* query, const mnavNavmesh* navmesh,
               usable,
               (int32_t)startPolygon.slot - 1,
               (int32_t)startPolygon.polygon};
-    *rayOut = (mnavRay){mnav_rayReached, 1.0, 0.0, 0.0, query->corridor, 0};
+    *rayOut = (mnavRay){mnav_rayReached, 1.0, {0.0f, 0.0f, 0.0f}, query->corridor, 0};
     double t = 0.0;
     int32_t count = 0;
     Record(query, &w, &count);

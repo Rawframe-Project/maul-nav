@@ -35,21 +35,15 @@ extern "C"
 #define MNAV_MAX_AVOIDANCE_RADIUS     1.0e6
 #define MNAV_MIN_AVOIDANCE_TIME       1.0e-6
 
-    // A point or a velocity on the ground plane, binary64.
-    typedef struct mnavPos2
-    {
-        double x;
-        double y;
-    } mnavPos2;
-
     // An agent as the host sees it this step, its values in the ranges
     // above.
     typedef struct mnavAgent
     {
         mnavPos2 position;
-        mnavPos2 velocity;
+        // In meters per second.
+        mnavVec2 velocity;
         // Where the agent would go, in meters per second.
-        mnavPos2 preferred;
+        mnavVec2 preferred;
         // More than 0, up to MNAV_MAX_AVOIDANCE_RADIUS.
         double radius;
         // 0 to MNAV_MAX_AVOIDANCE_SPEED.
@@ -81,8 +75,9 @@ extern "C"
         // A circle's radius, more than 0 and up to
         // MNAV_MAX_AVOIDANCE_RADIUS; 0 for two or more points.
         double radius;
-        // Each component within MNAV_MAX_AVOIDANCE_SPEED.
-        mnavPos2 velocity;
+        // In meters per second, each component within
+        // MNAV_MAX_AVOIDANCE_SPEED.
+        mnavVec2 velocity;
         // The host's id for the obstacle, which orders obstacles at equal
         // distances; ids should differ, or the input's order counts.
         uint64_t id;
@@ -94,9 +89,10 @@ extern "C"
     typedef struct mnavAgent3D
     {
         mnavPos3 position;
-        mnavPos3 velocity;
+        // In meters per second.
+        mnavVec3 velocity;
         // Where the agent would go, in meters per second.
-        mnavPos3 preferred;
+        mnavVec3 preferred;
         // More than 0, up to MNAV_MAX_AVOIDANCE_RADIUS.
         double radius;
         // 0 to MNAV_MAX_AVOIDANCE_SPEED.
@@ -118,8 +114,9 @@ extern "C"
         mnavPos3 center;
         // More than 0, up to MNAV_MAX_AVOIDANCE_RADIUS.
         double radius;
-        // Each component within MNAV_MAX_AVOIDANCE_SPEED.
-        mnavPos3 velocity;
+        // In meters per second, each component within
+        // MNAV_MAX_AVOIDANCE_SPEED.
+        mnavVec3 velocity;
         // The host's id for the sphere, which orders spheres at equal
         // distances; ids should differ, or the input's order counts.
         uint64_t id;
@@ -257,10 +254,12 @@ extern "C"
     ///                      at least MNAV_MIN_AVOIDANCE_TIME: agents
     ///                      already overlapping part
     ///                      within it.
-    /// @param velocitiesOut Receives agentCount velocities, in the agents' order.
-    ///                      On any failure, the first agentCount are zeroed when
-    ///                      the set's agent limit holds them; otherwise nothing is
-    ///                      written.
+    /// @param velocitiesOut Receives agentCount velocities, in the agents' order,
+    ///                      found in binary64 and rounded to binary32: to
+    ///                      nearest, or toward zero where that would pass the
+    ///                      maximum speed. On any failure, the first
+    ///                      agentCount are zeroed when the set's agent limit
+    ///                      holds them; otherwise nothing is written.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents or obstacles, a negative count, a step that is NaN or plus
     /// infinity, an agent or obstacle with a NaN value, an agent with a radius
@@ -278,7 +277,7 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents,
                                                  int32_t agentCount, const mnavObstacle* obstacles,
                                                  int32_t obstacleCount, double step,
-                                                 mnavPos2* velocitiesOut);
+                                                 mnavVec2* velocitiesOut);
 
     /// Finds each flier's new velocity, as mnavAvoid does on the ground:
     /// the one nearest its preferred velocity, no faster than its maximum
@@ -301,10 +300,12 @@ extern "C"
     /// @param step          The step the velocities are for, in seconds,
     ///                      at least MNAV_MIN_AVOIDANCE_TIME: agents
     ///                      already overlapping part within it.
-    /// @param velocitiesOut Receives agentCount velocities, in the agents' order.
-    ///                      On any failure, the first agentCount are zeroed when
-    ///                      the set's agent limit holds them; otherwise nothing is
-    ///                      written.
+    /// @param velocitiesOut Receives agentCount velocities, in the agents' order,
+    ///                      found in binary64 and rounded to binary32: to
+    ///                      nearest, or toward zero where that would pass the
+    ///                      maximum speed. On any failure, the first
+    ///                      agentCount are zeroed when the set's agent limit
+    ///                      holds them; otherwise nothing is written.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents or spheres, a negative count, a step that is NaN or plus
     /// infinity, an agent or sphere with a NaN value or a radius not more than
@@ -320,7 +321,7 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavAvoid3D(mnavAvoidance* avoidance,
                                                    const mnavAgent3D* agents, int32_t agentCount,
                                                    const mnavSphere* spheres, int32_t sphereCount,
-                                                   double step, mnavPos3* velocitiesOut);
+                                                   double step, mnavVec3* velocitiesOut);
 
     /// Appends each agent's outline, a 16-gon (mnav_debugAgent), and a line
     /// to each neighbour mnavAvoid would give it (mnav_debugNeighbor), at a

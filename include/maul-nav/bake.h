@@ -304,14 +304,6 @@ extern "C"
         const mnavAreaType* areas;
     } mnavTerrain;
 
-    // A point of a 2D outline, in meters relative to the bake's origin:
-    // (x, y) is the navmesh point (x, 0, y).
-    typedef struct mnavVec2
-    {
-        float x;
-        float y;
-    } mnavVec2;
-
     // A closed ring of points in a 2D bake's input. The cells whose
     // centers it holds, by the even-odd rule, take its area; one of area
     // mnav_areaNone cuts them out of every other outline.

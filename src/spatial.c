@@ -338,8 +338,8 @@ static mnavWall MakeWall(mnavPos3 a, mnavPos3 b, mnavPos3 nearest, double distan
     double ez = b.z - a.z;
     double length = sqrt(ex * ex + ez * ez);
     // A polygon lies to the negative side of its edges, which is this way.
-    mnavPos3 normal =
-        length > 0.0 ? (mnavPos3){ez / length, 0.0, -ex / length} : (mnavPos3){0.0, 0.0, 0.0};
+    mnavVec3 normal = length > 0.0 ? (mnavVec3){(float)(ez / length), 0.0f, (float)(-ex / length)}
+                                   : (mnavVec3){0.0f, 0.0f, 0.0f};
     return (mnavWall){a, b, nearest, normal, distance};
 }
 

@@ -34,7 +34,7 @@
 #define TERRAIN_HASH 0x27e9d11ce83c708bull
 
 // The hash of the group's final places.
-#define GROUP_HASH 0xac467226f310e52full
+#define GROUP_HASH 0xc0da4df76e807955ull
 
 // The hash of the doorway crowd's final places.
 #define DOORWAY_HASH 0x236419da9ed2faafull
@@ -472,13 +472,13 @@ static bool InWall(mnavPos2 p)
 
 // The velocity an agent prefers: toward the center of the next cell the
 // field gives its cell, at its speed; slowing into the goal's center.
-static mnavPos2 Preferred(const mnavFlowField* field, const mnavAgent* a)
+static mnavVec2 Preferred(const mnavFlowField* field, const mnavAgent* a)
 {
     mnavCell cell = {(int32_t)floor(a->position.x), (int32_t)floor(a->position.y)};
     mnavFlow flow = {0};
     if (mnavFlowAt(field, cell, &flow) != mnav_success || !isfinite(flow.cost))
     {
-        return (mnavPos2){0, 0};
+        return (mnavVec2){0.0f, 0.0f};
     }
     mnavPos2 to = {flow.next.x + 0.5, flow.next.y + 0.5};
     if (flow.cost == 0.0)
@@ -489,7 +489,8 @@ static mnavPos2 Preferred(const mnavFlowField* field, const mnavAgent* a)
     double dy = to.y - a->position.y;
     double length = sqrt(dx * dx + dy * dy);
     double speed = length < a->maxSpeed ? length : a->maxSpeed;
-    return length > 1e-9 ? (mnavPos2){dx / length * speed, dy / length * speed} : (mnavPos2){0, 0};
+    return length > 1e-9 ? (mnavVec2){(float)(dx / length * speed), (float)(dy / length * speed)}
+                         : (mnavVec2){0.0f, 0.0f};
 }
 
 static void TestGroup(void)
@@ -534,7 +535,7 @@ static void TestGroup(void)
                                 0,
                                 0};
     }
-    static mnavPos2 velocities[GROUP];
+    static mnavVec2 velocities[GROUP];
     double closest = 1e9;
     int32_t walled = 0;
     const double step = 0.1;
@@ -549,8 +550,8 @@ static void TestGroup(void)
         for (int32_t i = 0; i < GROUP; ++i)
         {
             agents[i].velocity = velocities[i];
-            agents[i].position.x += velocities[i].x * step;
-            agents[i].position.y += velocities[i].y * step;
+            agents[i].position.x += (double)velocities[i].x * step;
+            agents[i].position.y += (double)velocities[i].y * step;
             walled += InWall(agents[i].position) ? 1 : 0;
         }
         for (int32_t i = 0; i < GROUP; ++i)
@@ -642,14 +643,14 @@ static int32_t GatherWalls(mnavQuery* query, const mnavNavmesh* navmesh)
         for (int32_t k = 0; k < s_walkers[i].wallCount; ++k)
         {
             const mnavWall* wall = &s_walkers[i].walls[k];
-            if (wall->normal.x == 0.0 && wall->normal.z == 0.0)
+            if ((double)wall->normal.x == 0.0 && (double)wall->normal.z == 0.0)
             {
                 continue;
             }
-            mnavPos2 ends[2] = {{wall->start.x - wall->normal.x * CROWD_RADIUS,
-                                 wall->start.z - wall->normal.z * CROWD_RADIUS},
-                                {wall->end.x - wall->normal.x * CROWD_RADIUS,
-                                 wall->end.z - wall->normal.z * CROWD_RADIUS}};
+            mnavPos2 ends[2] = {{wall->start.x - (double)wall->normal.x * CROWD_RADIUS,
+                                 wall->start.z - (double)wall->normal.z * CROWD_RADIUS},
+                                {wall->end.x - (double)wall->normal.x * CROWD_RADIUS,
+                                 wall->end.z - (double)wall->normal.z * CROWD_RADIUS}};
             uint32_t cell = (uint32_t)mnavHash64(MNAV_HASH_INIT, ends, (int32_t)sizeof(ends)) &
                             (WALL_TABLE - 1);
             while (s_wallTable[cell] >= 0 &&
@@ -731,7 +732,7 @@ static void TestDoorway(mnavQuery* query)
     CHECK(mnavCreateAvoidance(&avoidDef, &avoidance) == mnav_success, "avoidance");
     mnavSteerDef steer = mnavDefaultSteerDef();
     steer.maxSpeed = 1.5f;
-    static mnavPos2 velocities[CROWD];
+    static mnavVec2 velocities[CROWD];
     int32_t arrived = 0;
     int32_t step = 0;
     int32_t mostWalls = 0;
@@ -749,7 +750,8 @@ static void TestDoorway(mnavQuery* query)
                       mnavSteer(&corners, &steer, &steering) == mnav_success,
                   "steered");
             arrived += steering.state == mnav_steerArrived ? 1 : 0;
-            s_crowd[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
+            s_crowd[i].preferred =
+                (mnavVec2){(float)(steering.velocity.x), (float)(steering.velocity.z)};
         }
         int32_t walls = GatherWalls(query, navmesh);
         mostWalls = walls > mostWalls ? walls : mostWalls;
@@ -759,8 +761,8 @@ static void TestDoorway(mnavQuery* query)
         for (int32_t i = 0; i < CROWD; ++i)
         {
             mnavCorridor* c = &s_walkers[i].corridor;
-            mnavPos3 wanted = {c->position.x + velocities[i].x * 0.1, c->position.y,
-                               c->position.z + velocities[i].y * 0.1};
+            mnavPos3 wanted = {c->position.x + (double)velocities[i].x * 0.1, c->position.y,
+                               c->position.z + (double)velocities[i].y * 0.1};
             CHECK(mnavMoveCorridor(query, navmesh, nullptr, c, wanted, nullptr) == mnav_success,
                   "moved");
             pressed += hypot(wanted.x - c->position.x, wanted.z - c->position.z);
