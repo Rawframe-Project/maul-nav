@@ -39,7 +39,10 @@
 // The hash of the doorway crowd's final places.
 #define DOORWAY_HASH 0x6e8f71f35ad31bfaull
 
-// The hash of the final places of the doorway crowd's first ten rows.
+// The hash of the final places of the doorway crowd's first ten rows. A
+// change that moves it moves DOORWAY_HASH too, which only the nightly
+// checks: run the doorway test (test_scenarios --doorway, or ctest
+// --preset nightly) and update both hashes in the same pull request.
 #define DOORWAY_ROWS_HASH 0x9c116ef698d4bb68ull
 
 enum
@@ -810,7 +813,11 @@ static void TestDoorway(mnavQuery* query, int32_t crowd, uint64_t pinned)
     CHECK(arrived == crowd, "every agent through");
     CHECK(pressed < 1.0, "hardly pressed against the walls");
     CHECK(closest > -0.2, "no two overlapping by 20 cm");
-    CHECK(hash == pinned, "the pinned hash");
+    CHECK(hash == pinned, crowd == CROWD
+                              ? "the pinned hash"
+                              : "the pinned hash; DOORWAY_HASH has moved too: run the doorway test "
+                                "(test_scenarios --doorway, or ctest --preset nightly) and update "
+                                "both hashes in the same pull request");
     mnavDestroyAvoidance(avoidance);
     mnavDestroyNavmesh(navmesh);
 }
