@@ -706,9 +706,25 @@ static void TestSpeedKept(void)
     CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.05, velocities) == mnav_success, "stepped");
     for (int32_t i = 0; i < 3; ++i)
     {
-        double speed = sqrt(velocities[i].x * velocities[i].x + velocities[i].y * velocities[i].y);
-        CHECK(speed <= agents[i].maxSpeed * (1.0 + 0x1p-52), "no faster than the maximum");
+        CHECK(velocities[i].x * velocities[i].x + velocities[i].y * velocities[i].y <=
+                  agents[i].maxSpeed * agents[i].maxSpeed,
+              "no faster than the maximum");
     }
+    mnavDestroyAvoidance(avoidance);
+}
+
+// A lone agent that would go faster than it may: the velocity scaled
+// back onto the speed circle came out a unit past it, its squared speed
+// 0x1.2000000000001p+1 against 2.25.
+static void TestSpeedScaledBack(void)
+{
+    mnavAvoidance* avoidance = Make(1, 1, 2.0);
+    mnavAgent agent = Agent(0.0, 0.0, 1);
+    agent.preferred = (mnavPos2){0x1.f535bda15cca2p+0, -0x1.95d3b9c15802ap+0};
+    mnavPos2 velocity;
+    CHECK(mnavAvoid(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) == mnav_success, "stepped");
+    CHECK(velocity.x * velocity.x + velocity.y * velocity.y <= 2.25, "no faster than the maximum");
+    CHECK(velocity.x > 1.1 && velocity.y < -0.9, "toward the preferred velocity");
     mnavDestroyAvoidance(avoidance);
 }
 
@@ -844,6 +860,7 @@ int main(void)
     TestMixedScene();
     TestObstacleChecks();
     TestSpeedKept();
+    TestSpeedScaledBack();
     TestSubnormalSpeed();
     TestUnderEveryHost();
     TestOnACorner();

@@ -22,7 +22,7 @@ The host owns time: it passes every agent and the step's length each call and ap
 
 For each agent, `mnavAvoid` builds an ORCA line per neighbor and per nearby obstacle edge and solves the 2D linear program for the velocity nearest the preferred one within the speed circle; when the lines leave nothing, the 3D program finds the velocity that breaks them least, keeping obstacle lines hard. All of it is binary64, and lines count as parallel within 1e-9.
 
-A velocity the programs leave past the maximum speed, which rounding does when lines meet at a narrow angle, is scaled back onto the speed circle, so no agent is ever given more than its maximum speed.
+A velocity the programs leave past the maximum speed, which rounding does when lines meet at a narrow angle, is scaled back onto the speed circle. The scaling rounds too, so a velocity it leaves a unit outside steps each component one unit toward zero until its squared speed is no more than the squared maximum: no agent is ever given more than its maximum speed. Only where the squares are subnormal, and round by a unit of the least subnormal, can the squared speed pass the squared maximum, by that unit.
 
 ## Neighbors and order
 

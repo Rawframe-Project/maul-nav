@@ -21,6 +21,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 // How far right of its preferred velocity a held-back agent aims, as a
 // fraction of its speed.
@@ -48,6 +49,22 @@ struct mnavAvoidance
 // The corners of a 16-gon on the unit circle, written out so that every
 // platform has the same: the outline debug drawing gives an agent.
 extern const double mnavOutline[16][2];
+
+// A value one unit nearer zero; a zero stays.
+static inline double mnavTowardZero(double v)
+{
+    uint64_t bits;
+    memcpy(&bits, &v, sizeof bits);
+    bits -= (bits << 1) != 0;
+    memcpy(&v, &bits, sizeof v);
+    return v;
+}
+
+// How many times a velocity scaled back onto the speed circle or sphere
+// steps toward zero at most. One step takes off about 2^-52 of its
+// squared speed, which the scaling's rounding passes by at most a few
+// units where the squares are normal.
+#define MNAV_SPEED_STEPS 4
 
 static inline bool mnavAvoidPositive(double v)
 {
