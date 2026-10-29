@@ -22,6 +22,7 @@
 #include "input.h"
 #include "invariant.h"
 #include "outline.h"
+#include "outputs.h"
 #include "polymesh.h"
 #include "raster.h"
 #include "region.h"
@@ -872,6 +873,8 @@ static mnavResult CopyBakedTileWork(const mnavBaker* baker, uint8_t* bufferOut, 
 mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* bufferOut, size_t capacity,
                              size_t* sizeOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(baker),
-                                CopyBakedTileWork(baker, bufferOut, capacity, sizeOut));
+    mnavClearOutput(sizeOut, sizeof(*sizeOut));
+    mnavResult result = mnavHostCountInvalid(
+        MNAV_HOST(baker), CopyBakedTileWork(baker, bufferOut, capacity, sizeOut));
+    return mnavClearUnlessCapacity(result, sizeOut, sizeof(*sizeOut));
 }

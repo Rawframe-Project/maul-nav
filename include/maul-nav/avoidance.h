@@ -256,8 +256,10 @@ extern "C"
     ///                      at least MNAV_MIN_AVOIDANCE_TIME: agents
     ///                      already overlapping part
     ///                      within it.
-    /// @param velocitiesOut Receives agentCount velocities, in the agents'
-    ///                      order.
+    /// @param velocitiesOut Receives agentCount velocities, in the agents' order.
+    ///                      On any failure, the first agentCount are zeroed when
+    ///                      the set's agent limit holds them; otherwise nothing is
+    ///                      written.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents or obstacles, a negative count, a step that is NaN or plus
     /// infinity, an agent or obstacle with a NaN value, an agent with a radius
@@ -297,8 +299,10 @@ extern "C"
     /// @param step          The step the velocities are for, in seconds,
     ///                      at least MNAV_MIN_AVOIDANCE_TIME: agents
     ///                      already overlapping part within it.
-    /// @param velocitiesOut Receives agentCount velocities, in the agents'
-    ///                      order.
+    /// @param velocitiesOut Receives agentCount velocities, in the agents' order.
+    ///                      On any failure, the first agentCount are zeroed when
+    ///                      the set's agent limit holds them; otherwise nothing is
+    ///                      written.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents or spheres, a negative count, a step that is NaN or plus
     /// infinity, an agent or sphere with a NaN value or a radius not more than

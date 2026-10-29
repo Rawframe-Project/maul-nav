@@ -9,6 +9,7 @@
 
 #include "fpenv.h"
 #include "invariant.h"
+#include "outputs.h"
 #include "query.h"
 #include "query_filter.h"
 
@@ -536,8 +537,10 @@ static MNAV_NOINLINE mnavResult FindGridPathCounted(mnavQuery* query, const mnav
                                                     const mnavQueryFilter* filter, mnavCell start,
                                                     mnavCell end, mnavGridPath* pathOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(query),
-                                FindGridPathWork(query, grid, filter, start, end, pathOut));
+    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavResult result = mnavHostCountInvalid(
+        MNAV_HOST(query), FindGridPathWork(query, grid, filter, start, end, pathOut));
+    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
 mnavResult mnavFindGridPath(mnavQuery* query, const mnavGrid* grid, const mnavQueryFilter* filter,

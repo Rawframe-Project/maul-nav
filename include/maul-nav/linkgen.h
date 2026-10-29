@@ -131,8 +131,10 @@ extern "C"
     /// @param tileZ1    The last tile row, at least tileZ0.
     /// @param linksOut  Receives the links, up to capacity.
     /// @param capacity  The buffer's size in links, at least 0.
-    /// @param countOut  Receives the number of links generated, also beyond
-    ///                  the capacity.
+    /// @param countOut  Receives the number of links generated, also beyond the
+    ///                  capacity. Zeroed on any failure but those that count the
+    ///                  links found: mnav_errorCapacity, and mnav_errorLimit when
+    ///                  generation stops at a bound.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a def
     /// not from mnavDefaultLinkGenDef, a def value NaN or below 0, a spacing of
     /// 0 or below the navmesh's cell size, a detour other than 0 below 1 or

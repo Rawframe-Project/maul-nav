@@ -12,6 +12,7 @@
 #include "fpenv.h"
 #include "navmesh.h"
 #include "nearest.h"
+#include "outputs.h"
 #include "query.h"
 #include "query_filter.h"
 
@@ -408,9 +409,15 @@ static MNAV_NOINLINE mnavResult GenerateLinksCounted(mnavQuery* query, const mna
                                                      mnavLinkDef* linksOut, int32_t capacity,
                                                      int32_t* countOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                                GenerateLinksWork(query, navmesh, filter, def, tileX0, tileZ0,
-                                                  tileX1, tileZ1, linksOut, capacity, countOut));
+    mnavClearOutput(countOut, sizeof(*countOut));
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                             GenerateLinksWork(query, navmesh, filter, def, tileX0, tileZ0, tileX1,
+                                               tileZ1, linksOut, capacity, countOut));
+    // Generation that stopped at a bound counts the links found, as a
+    // buffer too small does.
+    return result == mnav_errorLimit ? result
+                                     : mnavClearUnlessCapacity(result, countOut, sizeof(*countOut));
 }
 
 mnavResult mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,

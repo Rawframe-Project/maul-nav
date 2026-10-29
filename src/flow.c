@@ -14,6 +14,7 @@
 #include "flow.h"
 #include "fpenv.h"
 #include "invariant.h"
+#include "outputs.h"
 #include "query_filter.h"
 
 #include "maul-nav/bake.h"
@@ -491,8 +492,10 @@ static MNAV_NOINLINE mnavResult ContinueFlowFieldWork(mnavFlowField* field, cons
 static MNAV_NOINLINE mnavResult ContinueFlowFieldCounted(mnavFlowField* field, const mnavGrid* grid,
                                                          int32_t cells, bool* endedOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(field),
-                                ContinueFlowFieldWork(field, grid, cells, endedOut));
+    mnavClearOutput(endedOut, sizeof(*endedOut));
+    mnavResult result =
+        mnavHostCountInvalid(MNAV_HOST(field), ContinueFlowFieldWork(field, grid, cells, endedOut));
+    return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
 }
 
 mnavResult mnavContinueFlowField(mnavFlowField* field, const mnavGrid* grid, int32_t cells,
@@ -559,7 +562,9 @@ static MNAV_NOINLINE mnavResult FlowAtWork(const mnavFlowField* field, mnavCell 
 static MNAV_NOINLINE mnavResult FlowAtCounted(const mnavFlowField* field, mnavCell cell,
                                               mnavFlow* flowOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(field), FlowAtWork(field, cell, flowOut));
+    mnavClearOutput(flowOut, sizeof(*flowOut));
+    mnavResult result = mnavHostCountInvalid(MNAV_HOST(field), FlowAtWork(field, cell, flowOut));
+    return mnavClearOnFailure(result, flowOut, sizeof(*flowOut));
 }
 
 mnavResult mnavFlowAt(const mnavFlowField* field, mnavCell cell, mnavFlow* flowOut)

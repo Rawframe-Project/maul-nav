@@ -17,6 +17,7 @@
 #include "invariant.h"
 #include "navmesh.h"
 #include "offmesh.h"
+#include "outputs.h"
 #include "query_filter.h"
 #include "sort.h"
 
@@ -624,8 +625,11 @@ static MNAV_NOINLINE mnavResult ContinueNavFlowCounted(mnavNavFlow* field,
                                                        const mnavNavmesh* navmesh, int32_t polygons,
                                                        bool* endedOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
-                                ContinueNavFlowWork(field, navmesh, polygons, endedOut));
+    mnavClearOutput(endedOut, sizeof(*endedOut));
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
+                             ContinueNavFlowWork(field, navmesh, polygons, endedOut));
+    return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
 }
 
 mnavResult mnavContinueNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh, int32_t polygons,
@@ -711,8 +715,10 @@ static MNAV_NOINLINE mnavResult NavFlowAtCounted(const mnavNavFlow* field,
                                                  const mnavNavmesh* navmesh, mnavPolygonId polygon,
                                                  mnavPolygonFlow* flowOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
-                                NavFlowAtWork(field, navmesh, polygon, flowOut));
+    mnavClearOutput(flowOut, sizeof(*flowOut));
+    mnavResult result = mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
+                                             NavFlowAtWork(field, navmesh, polygon, flowOut));
+    return mnavClearOnFailure(result, flowOut, sizeof(*flowOut));
 }
 
 mnavResult mnavNavFlowAt(const mnavNavFlow* field, const mnavNavmesh* navmesh,

@@ -181,7 +181,8 @@ extern "C"
     /// @param field    The field.
     /// @param navmesh  The navmesh the work began on.
     /// @param polygons The most polygons to settle, at least 1.
-    /// @param endedOut Receives whether the work has ended. May be NULL.
+    /// @param endedOut Receives whether the work has ended. May be NULL. Zeroed on
+    ///                 any failure.
     /// @return `mnav_success`, also when the work had already ended;
     /// `mnav_errorInvalid` for a NULL field or navmesh, fewer than 1 polygon,
     /// or a navmesh other than the field's; `mnav_errorState` for nothing
@@ -239,13 +240,13 @@ extern "C"
     /// @param field   The field.
     /// @param navmesh The navmesh the field was built on.
     /// @param polygon The polygon.
-    /// @param flowOut Receives its way.
+    /// @param flowOut Receives its way. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// navmesh other than the field's or a polygon id never handed out;
-    /// `mnav_errorOutside` for a polygon outside the region, flowOut left as it
-    /// was; `mnav_errorState` for nothing begun, a navmesh committed to since
-    /// the work began, or work not yet ended; `mnav_errorStale` for a polygon
-    /// whose tile was replaced or removed.
+    /// `mnav_errorOutside` for a polygon outside the region; `mnav_errorState`
+    /// for nothing begun, a navmesh committed to since the work began, or work
+    /// not yet ended; `mnav_errorStale` for a polygon whose tile was replaced
+    /// or removed.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read a field at once
     /// while no build runs on it.

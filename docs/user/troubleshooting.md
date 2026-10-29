@@ -18,6 +18,8 @@
 
 `mnavResultName` gives any result's name for a log.
 
+On any failure, a call on an object (a navmesh, a query context, a field, a flight volume) zeroes its outputs, so a path, a point or a flag never keeps a value from an earlier call. Where a buffer was too small, the count or size it needed is kept, with the buffer's first items written. A bake's report is written on failure too and names what failed. A call on no object, such as checking a def, leaves its outputs as they were.
+
 ## Common surprises
 
 - **No polygon found.** `mnavFindNearest` returns slot 0 when no polygon's nearest point lies in its box. Widen the box upward and downward first: a point on a character's head or at its feet can lie outside a box sized for the ground.

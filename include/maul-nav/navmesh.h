@@ -199,7 +199,7 @@ extern "C"
     ///
     /// @param navmesh The navmesh.
     /// @param polygon The polygon.
-    /// @param areaOut Receives its area.
+    /// @param areaOut Receives its area. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or
     /// an id never handed out; `mnav_errorStale` for a polygon whose tile
     /// has been replaced or removed.
@@ -215,7 +215,8 @@ extern "C"
     /// @param navmesh  The navmesh.
     /// @param tileX    The tile's column.
     /// @param tileZ    The tile's row.
-    /// @param tileOut  Receives the tile's id, or a zeroed id.
+    /// @param tileOut  Receives the tile's id, or a zeroed id. Zeroed on any
+    ///                 failure.
     /// @return `mnav_success`; `mnav_errorNotLoaded` when no tile is
     /// committed there; `mnav_errorInvalid` for a NULL argument.
     /// @par Thread safety
@@ -316,7 +317,8 @@ extern "C"
     ///
     /// @param navmesh  The navmesh.
     /// @param def      The link.
-    /// @param linkOut  Receives its id, usable once it is committed.
+    /// @param linkOut  Receives its id, usable once it is committed. Zeroed on any
+    ///                 failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// with a NaN coordinate, or an edge link whose ends lie at one place on
     /// the ground or so near that the square of their distance rounds to 0, a
@@ -376,7 +378,7 @@ extern "C"
     ///
     /// @param navmesh  The navmesh.
     /// @param link     The link.
-    /// @param stateOut Receives its state.
+    /// @param stateOut Receives its state. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or an
     /// id never handed out; `mnav_errorState` for a link staged and not yet
     /// committed; `mnav_errorStale` for a link removed.

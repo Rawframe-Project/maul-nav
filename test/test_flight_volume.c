@@ -565,9 +565,9 @@ static void TestDefIsChecked(void)
 static void CopyRefusals(mnavFlightBaker* baker, const mnavBakeInput* input)
 {
     size_t size = 7;
-    CHECK(mnavCopyFlightTile(baker, nullptr, 0, &size) == mnav_errorState && size == 7 &&
+    CHECK(mnavCopyFlightTile(baker, nullptr, 0, &size) == mnav_errorState && size == 0 &&
               mnavGetFlightBakerMisuse(baker) == 0,
-          "no tile yet: a state, not misuse");
+          "no tile yet: a state, not misuse, the size zeroed");
     CHECK(mnavBakeFlightTile(baker, input, 0, 0, nullptr) == mnav_success, "baked");
     CHECK(mnavCopyFlightTile(baker, nullptr, 0, &size) == mnav_errorCapacity && size == s_sizes[0],
           "the size asked for");

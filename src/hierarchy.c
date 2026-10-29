@@ -14,6 +14,7 @@
 #include "invariant.h"
 #include "navmesh.h"
 #include "offmesh.h"
+#include "outputs.h"
 #include "query.h"
 #include "query_filter.h"
 #include "sort.h"
@@ -909,9 +910,11 @@ static MNAV_NOINLINE mnavResult BuildHierarchyCounted(mnavHierarchy* hierarchy, 
                                                       const mnavQueryFilter* filter,
                                                       mnavHierarchyReport* reportOut)
 {
-    return mnavHostCountInvalid(
+    mnavClearOutput(reportOut, sizeof(*reportOut));
+    mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(hierarchy), mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh))),
         BuildHierarchyWork(hierarchy, query, navmesh, filter, reportOut));
+    return mnavClearOnFailure(result, reportOut, sizeof(*reportOut));
 }
 
 mnavResult mnavBuildHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
@@ -964,9 +967,11 @@ static MNAV_NOINLINE mnavResult UpdateHierarchyCounted(mnavHierarchy* hierarchy,
                                                        const mnavNavmesh* navmesh,
                                                        mnavHierarchyReport* reportOut)
 {
-    return mnavHostCountInvalid(
+    mnavClearOutput(reportOut, sizeof(*reportOut));
+    mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(hierarchy), mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh))),
         UpdateHierarchyWork(hierarchy, query, navmesh, reportOut));
+    return mnavClearOnFailure(result, reportOut, sizeof(*reportOut));
 }
 
 mnavResult mnavUpdateHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,

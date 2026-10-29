@@ -296,9 +296,11 @@ static MNAV_NOINLINE mnavResult Avoid3DCounted(mnavAvoidance* avoidance, const m
                                                int32_t sphereCount, double step,
                                                mnavPos3* velocitiesOut)
 {
-    return mnavHostCountInvalid(
+
+    mnavResult result = mnavHostCountInvalid(
         MNAV_HOST(avoidance),
         Avoid3DWork(avoidance, agents, agentCount, spheres, sphereCount, step, velocitiesOut));
+    return mnavAvoidClear(result, avoidance, agentCount, velocitiesOut, sizeof(*velocitiesOut));
 }
 
 mnavResult mnavAvoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,

@@ -10,6 +10,7 @@
 #include "flight_volume.h"
 #include "fpenv.h"
 #include "invariant.h"
+#include "outputs.h"
 #include "query.h"
 
 #include "maul-nav/base.h"
@@ -672,8 +673,11 @@ static MNAV_NOINLINE mnavResult ContinueFlightPathCounted(mnavQuery* query,
                                                           const mnavFlightVolume* volume,
                                                           int32_t nodes, bool* endedOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
-                                ContinueFlightPathWork(query, volume, nodes, endedOut));
+    mnavClearOutput(endedOut, sizeof(*endedOut));
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
+                             ContinueFlightPathWork(query, volume, nodes, endedOut));
+    return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
 }
 
 mnavResult mnavContinueFlightPath(mnavQuery* query, const mnavFlightVolume* volume, int32_t nodes,
@@ -729,8 +733,10 @@ static MNAV_NOINLINE mnavResult FinishFlightPathCounted(mnavQuery* query,
                                                         const mnavFlightVolume* volume,
                                                         mnavFlightPath* pathOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
-                                FinishFlightPathWork(query, volume, pathOut));
+    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavResult result = mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
+                                             FinishFlightPathWork(query, volume, pathOut));
+    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
 mnavResult mnavFinishFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
@@ -768,8 +774,11 @@ static MNAV_NOINLINE mnavResult FindFlightPathCounted(mnavQuery* query,
                                                       mnavPos3 start, mnavPos3 end,
                                                       mnavFlightPath* pathOut)
 {
-    return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
-                                FindFlightPathWork(query, volume, start, end, pathOut));
+    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
+                             FindFlightPathWork(query, volume, start, end, pathOut));
+    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
 mnavResult mnavFindFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 start,

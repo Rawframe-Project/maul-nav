@@ -395,9 +395,11 @@ static MNAV_NOINLINE mnavResult AvoidCounted(mnavAvoidance* avoidance, const mna
                                              int32_t obstacleCount, double step,
                                              mnavPos2* velocitiesOut)
 {
-    return mnavHostCountInvalid(
+
+    mnavResult result = mnavHostCountInvalid(
         MNAV_HOST(avoidance),
         AvoidWork(avoidance, agents, agentCount, obstacles, obstacleCount, step, velocitiesOut));
+    return mnavAvoidClear(result, avoidance, agentCount, velocitiesOut, sizeof(*velocitiesOut));
 }
 
 mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount,

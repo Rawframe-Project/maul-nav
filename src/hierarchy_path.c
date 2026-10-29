@@ -9,6 +9,7 @@
 #include "fpenv.h"
 #include "hierarchy.h"
 #include "navmesh.h"
+#include "outputs.h"
 #include "query.h"
 
 #include "maul-nav/base.h"
@@ -448,10 +449,12 @@ FindHierarchicalPathCounted(mnavQuery* query, mnavHierarchy* hierarchy, const mn
                             mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
                             mnavPos3 end, mnavPath* pathOut)
 {
-    return mnavHostCountInvalid(
+    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), mnavHostFirst(MNAV_HOST(hierarchy), MNAV_HOST(navmesh))),
         FindHierarchicalPathWork(query, hierarchy, navmesh, startPolygon, start, endPolygon, end,
                                  pathOut));
+    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
 mnavResult mnavFindHierarchicalPath(mnavQuery* query, mnavHierarchy* hierarchy,

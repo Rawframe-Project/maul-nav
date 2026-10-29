@@ -484,8 +484,8 @@ extern "C"
     /// Checks a bake def and converts its meters to cells.
     ///
     /// @param def       The def to check.
-    /// @param cellsOut  Receives the settings in cells when the def is
-    ///                  valid. May be NULL.
+    /// @param cellsOut  Receives the settings in cells when the def is valid. May
+    ///                  be NULL. Left as it was on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` with the setting for a NULL
     /// def, a def without its cookie, an allocator with one function, a NaN, a
     /// value (an infinity included) outside the range its field gives with no
@@ -654,7 +654,8 @@ extern "C"
     ///                  def's frame.
     /// @param tileX     The tile's column in the grid from the origin.
     /// @param tileZ     The tile's row.
-    /// @param reportOut Receives what the bake did. May be NULL.
+    /// @param reportOut Receives what the bake did. May be NULL. Written on failure
+    ///                  too, naming it.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or input, a
     /// negative count, NULL meshes, terrains or volumes with a positive count,
     /// or a mesh its check refuses (the report names it); a terrain with fewer
@@ -779,7 +780,8 @@ extern "C"
     /// @param input     The outlines and the index, in the def's frame.
     /// @param tileX     The tile's column in the grid from the origin.
     /// @param tileZ     The tile's row.
-    /// @param reportOut Receives what the bake did. May be NULL.
+    /// @param reportOut Receives what the bake did. May be NULL. Written on failure
+    ///                  too, naming it.
     /// @return As mnavBakeTile, for outlines: a NULL input is
     /// `mnav_errorInvalid`, and so is a tile index made for another grid, for
     /// meshes, or for another number of outlines or of points in one; also
@@ -800,7 +802,8 @@ extern "C"
     /// @param bufferOut Receives the bytes: at least capacity bytes; may be
     ///                  NULL when capacity is 0.
     /// @param capacity  The buffer's size in bytes.
-    /// @param sizeOut   Receives the tile's size in bytes. May be NULL.
+    /// @param sizeOut   Receives the tile's size in bytes. May be NULL. Zeroed on
+    ///                  any failure but mnav_errorCapacity, which gives the size.
     /// @return `mnav_success`; `mnav_errorCapacity` when the buffer is
     /// smaller than the tile, with the size still written;
     /// `mnav_errorInvalid` for a NULL baker or a NULL buffer with a
@@ -905,7 +908,8 @@ extern "C"
     /// @param input     The input, as mnavBakeTile takes it.
     /// @param tileX     The tile's column.
     /// @param tileZ     The tile's row.
-    /// @param reportOut Receives the report. May be NULL.
+    /// @param reportOut Receives the report. May be NULL. Written on failure too,
+    ///                  naming it.
     /// @return As mnavBakeTile; `mnav_errorInvalid` for a NULL cache;
     /// `mnav_errorCapacity` when the cache holds its most tiles or bytes, with
     /// no tile baked and the tile's old entry dropped. Also `mnav_errorBusy`
@@ -932,7 +936,8 @@ extern "C"
     /// @param obstacles     The obstacles, as bake volumes. May be NULL
     ///                      when obstacleCount is 0.
     /// @param obstacleCount How many, at least 0.
-    /// @param reportOut     Receives the report. May be NULL.
+    /// @param reportOut     Receives the report. May be NULL. Written on failure
+    ///                      too, naming it.
     /// @return `mnav_success`; `mnav_errorNotLoaded` for a tile the cache does
     /// not hold; `mnav_errorInvalid` for a NULL argument, a negative count or a
     /// baker of another def; for an obstacle a bake refuses as a volume, the

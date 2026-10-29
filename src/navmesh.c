@@ -10,6 +10,7 @@
 #include "detail.h"
 #include "fpenv.h"
 #include "invariant.h"
+#include "outputs.h"
 #include "polymesh.h"
 #include "tile.h"
 
@@ -197,7 +198,10 @@ static mnavResult GetTileWork(const mnavNavmesh* navmesh, int32_t tileX, int32_t
 mnavResult mnavGetTile(const mnavNavmesh* navmesh, int32_t tileX, int32_t tileZ,
                        mnavTileId* tileOut)
 {
-    return mnavHostCountInvalid(MNAV_HOST(navmesh), GetTileWork(navmesh, tileX, tileZ, tileOut));
+    mnavClearOutput(tileOut, sizeof(*tileOut));
+    mnavResult result =
+        mnavHostCountInvalid(MNAV_HOST(navmesh), GetTileWork(navmesh, tileX, tileZ, tileOut));
+    return mnavClearOnFailure(result, tileOut, sizeof(*tileOut));
 }
 
 static uint32_t FloatBits(float f)
