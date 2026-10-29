@@ -667,7 +667,7 @@ static const double CROWD_WALL_RANGE = 2.0;
 static mnavPolygonId s_crowdBuffers[CROWD][CROWD_CORRIDOR];
 static mnavCorridor s_crowd[CROWD];
 static mnavAgent s_crowdAgents[CROWD];
-static mnavWallSegment s_crowdWalls[CROWD][CROWD_WALLS];
+static mnavWall s_crowdWalls[CROWD][CROWD_WALLS];
 static int32_t s_crowdWallCounts[CROWD];
 static mnavPos3 s_crowdWallsAt[CROWD];
 static mnavObstacle s_crowdObstacles[CROWD * CROWD_WALLS];
@@ -736,7 +736,7 @@ static int32_t CrowdWalls(mnavQuery* query, const mnavNavmesh* navmesh)
         double radius = s_crowdAgents[i].radius;
         for (int32_t k = 0; k < s_crowdWallCounts[i]; ++k)
         {
-            const mnavWallSegment* wall = &s_crowdWalls[i][k];
+            const mnavWall* wall = &s_crowdWalls[i][k];
             if (wall->normal.x == 0.0 && wall->normal.z == 0.0)
             {
                 continue;
