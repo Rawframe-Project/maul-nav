@@ -5,34 +5,217 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
-## [0.3.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.2.0...v0.3.0) (2026-10-29)
+## [0.3.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.2.0...v0.3.0) (2026-10-30)
 
+The whole API takes the Maul family's naming rule, so most functions
+have new names and 25 take their arguments in a new order (the table
+under Changed). Avoidance velocities change: they are binary32 now, a
+velocity held to the maximum speed no longer passes it, and an agent
+that only its own speed holds back no longer steps aside. Tile bytes,
+fingerprints and paths do not change, and no tile format rises: tiles
+baked by 0.2.0 load as they are.
 
-### ⚠ BREAKING CHANGES
+### Added
 
-* velocities and directions are binary32 vectors. `mnavAgent`, `mnavObstacle`, `mnavAgent3D` and `mnavSphere` take their velocities as `mnavVec2` or `mnavVec3`; `mnavAvoid` and `mnavAvoid3D` write `mnavVec2` and `mnavVec3`; `mnavSteering.velocity` and `mnavWall.normal` are `mnavVec3`; `mnavRay`'s `normalX` and `normalZ` become one `mnavVec3 normal`. `mnavVec2` moves from `bake.h` and `mnavPos2` from `avoidance.h` to `base.h`. Avoidance velocities are rounded to binary32, so hosts that compare runs see them change.
-* **avoidance:** an agent whose preferred velocity is faster than its maximum speed, and that no neighbour, obstacle or sphere holds back, now goes along its preferred direction instead of 1% to its right. Runs where agents prefer their maximum speed change.
-* **avoidance:** a velocity scaled back onto the speed circle or sphere can differ in its last unit, so runs whose agents reach their maximum speed can differ from before.
-* mnavDebugNavmesh and mnavGenerateLinks take a const mnavTileRange* (NULL for every tile) instead of four tile coordinates. mnavNavFlowRegion is replaced by mnavTileRange. mnavFlowRegion { x, y, width, height } is replaced by mnavCellRange { x0, y0, x1, y1 }, both corners included, and a region of no cells is now a backward range.
-* **query:** mnavWallSegment is removed, and mnavFindWalls fills mnavWall, which gains the nearest point. mnavFindWallDistance fills an mnavNearestWall { found, limited, wall } instead of an mnavWall. Its normal is now the wall edge's normal toward the walkable side, not the direction from the wall point to the center, which differs at a corner and is (center - point) / distance. With no wall found, the wall is zeroed instead of holding the radius and the center.
-* every call whose first parameter is an owner object zeroes its outputs on any failure, except the size or count a buffer too small needed, the links counted when link generation stops at a bound, and bake reports. Outputs that mnavGetHeight, mnavFlowAt, mnavNavFlowAt and mnavFindFlightPath kept on mnav_errorOutside are now zeroed, as are mnavAvoid's and mnavAvoid3D's velocities when the set's limit holds the agents.
-* **bake:** mnavCopyBakedTile and mnavCopyFlightTile return mnav_errorState, not mnav_errorInvalid, for a baker that holds no tile (before its first bake or after a failed one), and count no misuse for it.
-
-### Fixed
-
-* **avoidance:** keep a scaled-back velocity within the maximum speed ([#177](https://github.com/Rawframe-Project/maul-nav/issues/177)) ([fd2a13c](https://github.com/Rawframe-Project/maul-nav/commit/fd2a13cc8560762702afbc0e1de99a8fe0eac87f))
-* **avoidance:** sidestep only when lines hold an agent back ([#178](https://github.com/Rawframe-Project/maul-nav/issues/178)) ([f06d198](https://github.com/Rawframe-Project/maul-nav/commit/f06d198e9865adcdead7395d61e2ac0575be9ffe))
-* **bake:** drop a triangle with no area when a border vertex goes ([#154](https://github.com/Rawframe-Project/maul-nav/issues/154)) ([a04687f](https://github.com/Rawframe-Project/maul-nav/commit/a04687fdba10549b6330a4a5f3b42f7e4addf506))
-* **bake:** refuse a copy from a baker with no tile as errorState ([#167](https://github.com/Rawframe-Project/maul-nav/issues/167)) ([6e5c22d](https://github.com/Rawframe-Project/maul-nav/commit/6e5c22d5cafd5b61dc413bf3b795fe2905ca0d2e))
-* clear every output an owner call fails to give ([#168](https://github.com/Rawframe-Project/maul-nav/issues/168)) ([074f074](https://github.com/Rawframe-Project/maul-nav/commit/074f074051ee24971a527d1f92084d1d5ef68579))
-* **samples:** keep fliers off the pillars a push leaves them against ([#175](https://github.com/Rawframe-Project/maul-nav/issues/175)) ([b88dcf4](https://github.com/Rawframe-Project/maul-nav/commit/b88dcf40dd94f528eabe819c9ac33afa81c91410)), closes [#171](https://github.com/Rawframe-Project/maul-nav/issues/171)
-
+- `mnavLink_IsEnabled(navmesh, link, enabledOut)` reads whether a link
+  is switched on, as committed: right after `mnavLink_StageEnable` it
+  still gives the old state, and the new one after
+  `mnavNavmesh_Commit`. A link staged and not yet committed is
+  `mnav_errorState`, as with `mnavLink_GetState`.
+  ([#181](https://github.com/Rawframe-Project/maul-nav/pull/181))
 
 ### Changed
 
-* give a box of tiles or of cells one type ([#170](https://github.com/Rawframe-Project/maul-nav/issues/170)) ([1fe4758](https://github.com/Rawframe-Project/maul-nav/commit/1fe4758cba859ecbb600a93c743035273205de71))
-* **query:** describe a wall with one type ([#169](https://github.com/Rawframe-Project/maul-nav/issues/169)) ([d4e1424](https://github.com/Rawframe-Project/maul-nav/commit/d4e1424a54dd0cb3f61966ebbdc0f51604823b86))
-* use float vectors for velocities and directions ([#179](https://github.com/Rawframe-Project/maul-nav/issues/179)) ([19a7776](https://github.com/Rawframe-Project/maul-nav/commit/19a7776be2a7a24447c3377b08d9bc9f29e669c2))
+- **Breaking:** functions are named by the family's naming rule.
+  ([#181](https://github.com/Rawframe-Project/maul-nav/pull/181))
+  - A call on one object is `mnavObject_Verb`: the object is the kind
+    of the first id the call acts on (`mnavPolygon_GetArea`,
+    `mnavLink_StageEnable`), or else the object it takes first
+    (`mnavNavmesh_Commit`, `mnavQuery_FindPath`). Each object's misuse
+    count is `mnav<Object>_GetMisuse`.
+  - Creation, destruction, defaults, def validation, calls on a value
+    such as a corridor (`mnavResetCorridor`, `mnavSetCorridor`,
+    `mnavSteer`), `mnavGetVersion` and `mnavHash64` keep their names.
+    `mnavResultName` is `mnavGetResultName`.
+  - Every call that takes a query filter takes it after its inputs,
+    just before its outputs, and the corridor calls take the corridor
+    right after the query or navmesh. The table gives the new
+    parameter list of each call that moves.
+  - `mnavClearanceFn` is `mnavClearanceFunction`, a function type, and
+    `mnavLinkGenDef.clear` is `mnavClearanceFunction* clearance`.
+  - `mnavSteerDef.anticipateTurns` is `enableTurnAnticipation`, and
+    `mnavFlightDef.groundBelow` is `enableGroundFill`.
+
+| Old | New | Parameters |
+|---|---|---|
+| `mnavResultName` | `mnavGetResultName` |  |
+| `mnavGetAvoidanceMisuse` | `mnavAvoidance_GetMisuse` |  |
+| `mnavAvoid` | `mnavAvoidance_Avoid` |  |
+| `mnavAvoid3D` | `mnavAvoidance_Avoid3D` |  |
+| `mnavDebugAvoidance` | `mnavAvoidance_Debug` |  |
+| `mnavDebugAvoidance3D` | `mnavAvoidance_Debug3D` |  |
+| `mnavGetBakerMisuse` | `mnavBaker_GetMisuse` |  |
+| `mnavBakeTile` | `mnavBaker_BakeTile` |  |
+| `mnavBakeTile2D` | `mnavBaker_BakeTile2D` |  |
+| `mnavCopyBakedTile` | `mnavBaker_CopyTile` |  |
+| `mnavBakeTileCached` | `mnavBaker_BakeTileCached` |  |
+| `mnavRebuildTile` | `mnavBaker_RebuildTile` |  |
+| `mnavGetTileIndexMisuse` | `mnavTileIndex_GetMisuse` |  |
+| `mnavGetTileCacheMisuse` | `mnavTileCache_GetMisuse` |  |
+| `mnavDropCachedTile` | `mnavTileCache_DropTile` |  |
+| `mnavGetTileCacheBytes` | `mnavTileCache_GetBytes` |  |
+| `mnavDebugNavmesh` | `mnavNavmesh_Debug` |  |
+| `mnavDebugLinks` | `mnavNavmesh_DebugLinks` |  |
+| `mnavDebugCorridor` | `mnavNavmesh_DebugCorridor` |  |
+| `mnavGetFlightBakerMisuse` | `mnavFlightBaker_GetMisuse` |  |
+| `mnavBakeFlightTile` | `mnavFlightBaker_BakeTile` |  |
+| `mnavCopyFlightTile` | `mnavFlightBaker_CopyTile` |  |
+| `mnavGetFlightVolumeMisuse` | `mnavFlightVolume_GetMisuse` |  |
+| `mnavStageFlightTile` | `mnavFlightVolume_StageTile` |  |
+| `mnavStageFlightTileRemoval` | `mnavFlightVolume_StageTileRemoval` |  |
+| `mnavCommitFlight` | `mnavFlightVolume_Commit` |  |
+| `mnavGetFlightTile` | `mnavFlightVolume_GetTile` |  |
+| `mnavIsFlightOpen` | `mnavFlightVolume_IsOpen` |  |
+| `mnavFlightRaycast` | `mnavFlightVolume_Raycast` |  |
+| `mnavCheckFlightPath` | `mnavFlightVolume_CheckPath` |  |
+| `mnavFindNearestFlightPoint` | `mnavFlightVolume_FindNearestPoint` |  |
+| `mnavDebugFlight` | `mnavFlightVolume_Debug` |  |
+| `mnavFindFlightPath` | `mnavQuery_FindFlightPath` |  |
+| `mnavBeginFlightPath` | `mnavQuery_BeginFlightPath` |  |
+| `mnavContinueFlightPath` | `mnavQuery_ContinueFlightPath` |  |
+| `mnavFinishFlightPath` | `mnavQuery_FinishFlightPath` |  |
+| `mnavGetFlowFieldMisuse` | `mnavFlowField_GetMisuse` |  |
+| `mnavBeginFlowField` | `mnavFlowField_Begin` | `(field, grid, region, goals, goalCount, filter)` |
+| `mnavContinueFlowField` | `mnavFlowField_Continue` |  |
+| `mnavUpdateFlowField` | `mnavFlowField_Update` |  |
+| `mnavBuildFlowField` | `mnavFlowField_Build` | `(field, grid, goals, goalCount, filter)` |
+| `mnavFlowAt` | `mnavFlowField_GetFlow` |  |
+| `mnavDebugFlowField` | `mnavFlowField_Debug` |  |
+| `mnavGetHierarchyMisuse` | `mnavHierarchy_GetMisuse` |  |
+| `mnavBuildHierarchy` | `mnavHierarchy_Build` |  |
+| `mnavUpdateHierarchy` | `mnavHierarchy_Update` |  |
+| `mnavFindHierarchicalPath` | `mnavQuery_FindHierarchicalPath` |  |
+| `mnavGenerateLinks` | `mnavQuery_GenerateLinks` | `(query, navmesh, def, tiles, filter, linksOut, capacity, countOut)` |
+| `mnavClearanceFn` | `mnavClearanceFunction` | a function type (see above) |
+| `mnavGetNavFlowMisuse` | `mnavNavFlow_GetMisuse` |  |
+| `mnavBeginNavFlow` | `mnavNavFlow_Begin` | `(field, navmesh, region, goals, goalCount, filter)` |
+| `mnavContinueNavFlow` | `mnavNavFlow_Continue` |  |
+| `mnavBuildNavFlow` | `mnavNavFlow_Build` | `(field, navmesh, goals, goalCount, filter)` |
+| `mnavNavFlowAt` | `mnavNavFlow_GetFlow` |  |
+| `mnavDebugNavFlow` | `mnavNavFlow_Debug` |  |
+| `mnavGetNavmeshMisuse` | `mnavNavmesh_GetMisuse` |  |
+| `mnavStageTile` | `mnavNavmesh_StageTile` |  |
+| `mnavStageTileRemoval` | `mnavNavmesh_StageTileRemoval` |  |
+| `mnavCommit` | `mnavNavmesh_Commit` |  |
+| `mnavGetTier` | `mnavNavmesh_GetTier` |  |
+| `mnavGetTile` | `mnavNavmesh_GetTile` |  |
+| `mnavStageArea` | `mnavPolygon_StageArea` |  |
+| `mnavGetArea` | `mnavPolygon_GetArea` |  |
+| `mnavStageLinkEnabled` | `mnavLink_StageEnable` |  |
+| `mnavGetLink` | `mnavLink_GetState` |  |
+| `mnavGetQueryMisuse` | `mnavQuery_GetMisuse` |  |
+| `mnavFindPolygons` | `mnavNavmesh_FindPolygons` | `(navmesh, center, halfExtents, filter, polygonsOut, capacity, foundOut)` |
+| `mnavFindNearest` | `mnavNavmesh_FindNearest` | `(navmesh, point, halfExtents, filter, nearestOut)` |
+| `mnavFindRandomPoint` | `mnavNavmesh_FindRandomPoint` | `(navmesh, seed, filter, pointOut)` |
+| `mnavCheckCorridor` | `mnavNavmesh_CheckCorridor` | `(navmesh, corridor, filter, validOut)` |
+| `mnavGetHeight` | `mnavPolygon_GetHeight` |  |
+| `mnavFindPath` | `mnavQuery_FindPath` | `(query, navmesh, startPolygon, start, endPolygon, end, filter, pathOut)` |
+| `mnavFindShortestPath` | `mnavQuery_FindShortestPath` | `(query, navmesh, startPolygon, start, endPolygon, end, filter, pathOut)` |
+| `mnavBeginPath` | `mnavQuery_BeginPath` | `(query, navmesh, startPolygon, start, endPolygon, end, filter)` |
+| `mnavContinuePath` | `mnavQuery_ContinuePath` |  |
+| `mnavFinishPath` | `mnavQuery_FinishPath` |  |
+| `mnavMoveAlongSurface` | `mnavQuery_MoveAlongSurface` | `(query, navmesh, startPolygon, start, end, filter, moveOut)` |
+| `mnavCorridorCorners` | `mnavQuery_FindCorridorCorners` | `(query, corridor, navmesh, cornersOut)` |
+| `mnavCorridorAreas` | `mnavQuery_FindCorridorAreas` | `(query, corridor, navmesh, cornersOut, runsOut, capacity, countOut)` |
+| `mnavMoveCorridor` | `mnavQuery_MoveCorridor` | `(query, corridor, navmesh, wanted, filter, moveOut)` |
+| `mnavMoveCorridorTarget` | `mnavQuery_MoveCorridorTarget` | `(query, corridor, navmesh, wanted, filter, moveOut)` |
+| `mnavShortcutCorridor` | `mnavQuery_ShortcutCorridor` | `(query, corridor, navmesh, toward, filter, shortenedOut)` |
+| `mnavReplanCorridor` | `mnavQuery_ReplanCorridor` | `(query, corridor, navmesh, halfExtents, filter, pathOut)` |
+| `mnavFindGridPath` | `mnavQuery_FindGridPath` | `(query, grid, start, end, filter, pathOut)` |
+| `mnavFindWallDistance` | `mnavQuery_FindWallDistance` | `(query, navmesh, polygon, center, radius, filter, nearestOut)` |
+| `mnavFindWalls` | `mnavQuery_FindWalls` | `(query, navmesh, polygon, center, radius, filter, wallsOut, capacity, foundOut)` |
+| `mnavFindRandomPointAround` | `mnavQuery_FindRandomPointAround` | `(query, navmesh, polygon, center, radius, seed, filter, pointOut)` |
+| `mnavCheckReachable` | `mnavQuery_CheckReachable` | `(query, navmesh, startPolygon, start, endPolygon, end, filter, endOut)` |
+| `mnavRaycast` | `mnavQuery_Raycast` | `(query, navmesh, startPolygon, start, end, filter, rayOut)` |
+
+- **Breaking:** velocities and directions are binary32 vectors, and
+  positions stay binary64.
+  ([#179](https://github.com/Rawframe-Project/maul-nav/pull/179))
+  - `mnavAgent` and `mnavObstacle` take `velocity` and `preferred` as
+    `mnavVec2`, and `mnavAvoidance_Avoid` writes `mnavVec2`;
+    `mnavAgent3D` and `mnavSphere` take `mnavVec3`, and
+    `mnavAvoidance_Avoid3D` writes `mnavVec3`.
+  - `mnavSteering.velocity` and `mnavWall.normal` are `mnavVec3`, and
+    `mnavRay`'s `normalX` and `normalZ` are one `mnavVec3 normal`.
+  - `mnavVec2`, `mnavVec3`, `mnavPos2` and `mnavPos3` are all in
+    `base.h`.
+- **Breaking:** avoidance velocities change, so runs that feed them
+  back differ from 0.2.0's.
+  - Avoidance still computes in binary64 and rounds each velocity it
+    gives back to binary32 once, never past the agent's maximum speed.
+    `mnavSteer` rounds its velocity to binary32 too.
+    ([#179](https://github.com/Rawframe-Project/maul-nav/pull/179))
+  - A velocity scaled back to the maximum speed could pass it by a
+    unit in the last place; it now stays within it, as documented.
+    ([#177](https://github.com/Rawframe-Project/maul-nav/pull/177))
+  - An agent whose preferred velocity is faster than its maximum speed,
+    and that no neighbour, obstacle or sphere holds back, goes along its
+    preferred direction. It used to aim 1% of its speed to the right of
+    it, about 0.57 degrees.
+    ([#178](https://github.com/Rawframe-Project/maul-nav/pull/178))
+- **Breaking:** a call whose first parameter is an object zeroes its
+  outputs on any failure. It keeps only what the failure defines: the
+  size or count a buffer too small needed, the links counted when link
+  generation stops at a bound, and bake reports. The outputs that
+  `mnavPolygon_GetHeight`, `mnavFlowField_GetFlow`,
+  `mnavNavFlow_GetFlow` and `mnavQuery_FindFlightPath` left as they
+  were on `mnav_errorOutside` are now zeroed, and so are
+  `mnavAvoidance_Avoid`'s and `mnavAvoidance_Avoid3D`'s velocities when
+  the set's limit holds the agents.
+  ([#168](https://github.com/Rawframe-Project/maul-nav/pull/168))
+- **Breaking:** one type describes a wall.
+  ([#169](https://github.com/Rawframe-Project/maul-nav/pull/169))
+  - `mnavWallSegment` is removed. `mnavQuery_FindWalls` fills
+    `mnavWall { start, end, point, normal, distance }`, which gains the
+    point nearest the center.
+  - `mnavQuery_FindWallDistance` fills an
+    `mnavNearestWall { found, limited, wall }`, whose wall is, field
+    for field, the first one `mnavQuery_FindWalls` lists. Its normal is
+    the wall edge's normal toward the walkable side; it used to be the
+    direction from the wall's point to the center, which differs at a
+    corner and is `(center - point) / distance`. With no wall found,
+    the wall is zeroed instead of holding the radius and the center.
+- **Breaking:** one type gives a box of tiles, and one a box of cells.
+  ([#170](https://github.com/Rawframe-Project/maul-nav/pull/170))
+  - `mnavNavmesh_Debug` and `mnavQuery_GenerateLinks` take a
+    `const mnavTileRange*` (NULL for every tile) instead of four tile
+    coordinates, and `mnavTileRange { x0, z0, x1, z1 }` replaces
+    `mnavNavFlowRegion`.
+  - `mnavCellRange { x0, y0, x1, y1 }` replaces
+    `mnavFlowRegion { x, y, width, height }`. Both corners of either
+    range are included, so a region of no cells is a backward range.
+- **Breaking:** `mnavBaker_CopyTile` and `mnavFlightBaker_CopyTile`
+  refuse a baker that holds no tile (before its first bake, or after a
+  failed one) with `mnav_errorState`, not `mnav_errorInvalid`, and
+  count no misuse for it.
+  ([#167](https://github.com/Rawframe-Project/maul-nav/pull/167))
+- The user guide (`docs/user/`) uses the new names, types and argument
+  orders, and the troubleshooting page says what a failed call leaves
+  in its outputs.
+
+### Fixed
+
+- Removing a tile-border vertex could leave a triangle with no area
+  where two vertices share a ground place at different heights. A
+  Debug build then trapped, and a Release build could divide by zero
+  in the detail stage. No known bake input reaches it, and an input
+  that does not keeps its tile bytes.
+  ([#154](https://github.com/Rawframe-Project/maul-nav/pull/154))
+- The flight sample (`samples/flight.c`) no longer leaves fliers
+  pressed against a pillar when their speed changes slightly: a flier
+  moves on to the next route point only once it can see it, and
+  searches its route again when it loses sight of it.
+  ([#175](https://github.com/Rawframe-Project/maul-nav/pull/175))
 
 ## [0.2.0](https://github.com/Rawframe-Project/maul-nav/releases/tag/v0.2.0) (2026-10-28)
 
