@@ -601,7 +601,7 @@ typedef struct Walker
 {
     mnavPolygonId buffer[CROWD_CORRIDOR];
     mnavCorridor corridor;
-    mnavWallSegment walls[CROWD_WALLS];
+    mnavWall walls[CROWD_WALLS];
     int32_t wallCount;
     mnavPos3 wallsAt;
 } Walker;
@@ -641,7 +641,7 @@ static int32_t GatherWalls(mnavQuery* query, const mnavNavmesh* navmesh)
     {
         for (int32_t k = 0; k < s_walkers[i].wallCount; ++k)
         {
-            const mnavWallSegment* wall = &s_walkers[i].walls[k];
+            const mnavWall* wall = &s_walkers[i].walls[k];
             if (wall->normal.x == 0.0 && wall->normal.z == 0.0)
             {
                 continue;

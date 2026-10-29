@@ -58,7 +58,7 @@ Portal midpoints make A* cheap and the straight path often longer than it need b
 
 ## Walls and random points
 
-`mnavFindWallDistance` and `mnavFindWalls` (`spatial.c`) search from the center's polygon through the edges within a radius, as Detour's findDistanceToWall does. An edge with nothing included across it is a wall, an unloaded tile side included, and so are the parts of a tile side no polygon beyond covers. Off-mesh links are left aside. `mnavFindWalls` keeps the nearest walls when its buffer is short, as Detour's crowd keeps a local boundary.
+`mnavFindWallDistance` and `mnavFindWalls` (`spatial.c`) search from the center's polygon through the edges within a radius, as Detour's findDistanceToWall does. An edge with nothing included across it is a wall, an unloaded tile side included, and so are the parts of a tile side no polygon beyond covers. Off-mesh links are left aside. `mnavFindWalls` keeps the nearest walls when its buffer is short, as Detour's crowd keeps a local boundary. Both give a wall as one `mnavWall`: its ends, its point nearest the center, the edge's normal toward the walkable side and the distance, so the nearest wall `mnavFindWallDistance` gives is, field for field, the first `mnavFindWalls` lists.
 
 `mnavFindRandomPoint` picks uniformly over the ground area of every included polygon from a 64-bit seed through SplitMix64, where Detour picks a tile first and so favors sparse tiles. `mnavFindRandomPointAround` samples the polygons the wall search reaches by the area each shares with the circle, an inscribed 32-gon written out as constants, so the point lies in the circle, where Detour's may lie a polygon away.
 

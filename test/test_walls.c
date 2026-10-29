@@ -46,7 +46,7 @@ static void TestTiesAndTheRadius(void)
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&def, &query) == mnav_success, "query");
     const double corners[4][2] = {{0, 0}, {0, 10}, {10, 10}, {10, 0}};
-    mnavWallSegment walls[4];
+    mnavWall walls[4];
     mnavWallsFound found;
     CHECK(mnavFindWalls(query, navmesh, nullptr, polygon, (mnavPos3){5.0, 0.0, 5.0}, 5.0, walls, 4,
                         &found) == mnav_success &&
@@ -82,8 +82,8 @@ static void TestShortBuffer(void)
     mnavQueryDef def = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&def, &query) == mnav_success, "query");
-    mnavWallSegment walls[3];
-    walls[2] = (mnavWallSegment){.distance = -1.0};
+    mnavWall walls[3];
+    walls[2] = (mnavWall){.distance = -1.0};
     mnavWallsFound found;
     CHECK(mnavFindWalls(query, navmesh, nullptr, polygon, (mnavPos3){1.0, 0.0, 2.0}, 10.0, walls, 2,
                         &found) == mnav_errorCapacity &&
@@ -122,7 +122,7 @@ static void TestPartlyLinkedSide(void)
     // From (30, 8): the north side and the seam's open part, 2 m each, in
     // the order of the square's sides; the seam's part runs from z = 10
     // to 5 m, as the side runs.
-    mnavWallSegment walls[4];
+    mnavWall walls[4];
     mnavWallsFound found;
     CHECK(mnavFindWalls(query, navmesh, nullptr, n.polygon, (mnavPos3){30.0, 0.0, 8.0}, 2.5, walls,
                         4, &found) == mnav_success &&
@@ -132,10 +132,10 @@ static void TestPartlyLinkedSide(void)
               walls[1].distance == 2.0 && walls[1].start.x == 32.0 && walls[1].end.x == 32.0 &&
               walls[1].start.z == 10.0 && walls[1].end.z == 5.0 && walls[1].normal.x == -1.0,
           "the north side, then the seam's open part");
-    mnavWall wall;
+    mnavNearestWall wall;
     CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, (mnavPos3){31.0, 0.0, 8.0}, 2.5,
                                &wall) == mnav_success &&
-              wall.found && wall.distance == 1.0 && wall.point.x == 32.0,
+              wall.found && wall.wall.distance == 1.0 && wall.wall.point.x == 32.0,
           "the seam's open part is the nearest wall");
     // From (30, 2), beside the linked part: only the south side, 2 m away;
     // the open part lies over 3.6 m off.

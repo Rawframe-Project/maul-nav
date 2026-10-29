@@ -69,27 +69,30 @@ static void TestWalls(mnavQuery* query, const mnavNavmesh* navmesh)
     // From the world's middle, between boxes: the nearest wall lies a few
     // meters off, and a circle a little short of it finds none.
     mnavNearest c = On(navmesh, 27.0, 27.0);
-    mnavWall wide;
+    mnavNearestWall wide;
     CHECK(mnavFindWallDistance(query, navmesh, nullptr, c.polygon, c.point, 25.0, &wide) ==
                   mnav_success &&
-              wide.found && !wide.limited && wide.distance > 0.5 && wide.distance < 25.0,
+              wide.found && !wide.limited && wide.wall.distance > 0.5 && wide.wall.distance < 25.0,
           "a wall within 25 m");
-    mnavWall shorter;
-    CHECK(mnavFindWallDistance(query, navmesh, nullptr, c.polygon, c.point, wide.distance - 0.01,
-                               &shorter) == mnav_success &&
+    mnavNearestWall shorter;
+    CHECK(mnavFindWallDistance(query, navmesh, nullptr, c.polygon, c.point,
+                               wide.wall.distance - 0.01, &shorter) == mnav_success &&
               !shorter.found,
           "none just short of it");
-    mnavWall just;
-    CHECK(mnavFindWallDistance(query, navmesh, nullptr, c.polygon, c.point, wide.distance + 0.01,
-                               &just) == mnav_success &&
-              just.found && just.distance == wide.distance,
+    mnavNearestWall just;
+    CHECK(mnavFindWallDistance(query, navmesh, nullptr, c.polygon, c.point,
+                               wide.wall.distance + 0.01, &just) == mnav_success &&
+              just.found && just.wall.distance == wide.wall.distance,
           "the same wall just past it");
-    // From the wall's own point: distance 0, no direction.
-    mnavNearest at = On(navmesh, wide.point.x, wide.point.z);
-    mnavWall on;
-    CHECK(mnavFindWallDistance(query, navmesh, nullptr, at.polygon, wide.point, 5.0, &on) ==
+    // From the wall's own point: distance 0, the point itself, and the
+    // wall's own normal.
+    mnavNearest at = On(navmesh, wide.wall.point.x, wide.wall.point.z);
+    mnavNearestWall on;
+    CHECK(mnavFindWallDistance(query, navmesh, nullptr, at.polygon, wide.wall.point, 5.0, &on) ==
                   mnav_success &&
-              on.found && on.distance == 0.0 && on.normal.x == 0.0 && on.normal.z == 0.0,
+              on.found && on.wall.distance == 0.0 && on.wall.point.x == wide.wall.point.x &&
+              on.wall.point.z == wide.wall.point.z &&
+              fabs(hypot(on.wall.normal.x, on.wall.normal.z) - 1.0) < 1e-9,
           "a center on the wall");
 }
 
@@ -137,7 +140,7 @@ static void TestChecks(mnavQuery* query, const mnavNavmesh* navmesh)
     stale.generation += 1;
     mnavQueryFilter bad = mnavDefaultQueryFilter();
     bad.cookie = 0;
-    mnavWall wall;
+    mnavNearestWall wall;
     mnavRandomPoint p;
     double height = 0.0;
     CHECK(mnavFindWallDistance(query, navmesh, nullptr, never, c.point, 5.0, &wall) ==

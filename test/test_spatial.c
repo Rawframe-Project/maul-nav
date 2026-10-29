@@ -167,28 +167,29 @@ static void TestWalls(mnavNavmesh* navmesh)
     // West of the block from x = 30, which the navmesh keeps a radius from.
     mnavQuery* query = Query(4096);
     mnavNearest n = On(navmesh, 27.0, 11.0);
-    mnavWall wall;
+    mnavNearestWall wall;
     CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 6.0, &wall) ==
                   mnav_success &&
               wall.found && !wall.limited,
           "found");
-    printf("wall %.3f m at (%.3f %.3f), normal (%.3f %.3f)\n", wall.distance, wall.point.x,
-           wall.point.z, wall.normal.x, wall.normal.z);
-    CHECK(wall.distance > 2.0 && wall.distance < 2.8 && wall.normal.x < -0.99 &&
-              fabs(wall.point.z - n.point.z) < 1e-6,
+    printf("wall %.3f m at (%.3f %.3f), normal (%.3f %.3f)\n", wall.wall.distance,
+           wall.wall.point.x, wall.wall.point.z, wall.wall.normal.x, wall.wall.normal.z);
+    CHECK(wall.wall.distance > 2.0 && wall.wall.distance < 2.8 && wall.wall.normal.x < -0.99 &&
+              fabs(wall.wall.point.z - n.point.z) < 1e-6,
           "the block's face, straight east");
-    CHECK(fabs(wall.distance - hypot(wall.point.x - n.point.x, wall.point.z - n.point.z)) < 1e-9,
+    CHECK(fabs(wall.wall.distance -
+               hypot(wall.wall.point.x - n.point.x, wall.wall.point.z - n.point.z)) < 1e-9,
           "the distance to the point");
     CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 1.0, &wall) ==
                   mnav_success &&
-              !wall.found && wall.distance == 1.0,
+              !wall.found && memcmp(&wall.wall, &(mnavWall){0}, sizeof(mnavWall)) == 0,
           "none within 1 m");
     // Walls behind the filter's refusals: none of the floor's area allowed.
     mnavQueryFilter none = mnavDefaultQueryFilter();
     none.areas = 0;
     CHECK(mnavFindWallDistance(query, navmesh, &none, n.polygon, n.point, 6.0, &wall) ==
                   mnav_success &&
-              wall.found && wall.distance < 2.0,
+              wall.found && wall.wall.distance < 2.0,
           "the polygon's own edges as walls");
     // A small radius needs few nodes.
     mnavQuery* few = Query(16);
@@ -215,8 +216,8 @@ static void TestWalls(mnavNavmesh* navmesh)
     without.areas &= ~((uint64_t)1 << 3);
     CHECK(mnavFindWallDistance(query, navmesh, &without, near.polygon, near.point, 6.0, &wall) ==
                   mnav_success &&
-              wall.found && fabs(wall.point.x - 32.0) < 1e-6 &&
-              fabs(wall.distance - (32.0 - near.point.x)) < 1e-6,
+              wall.found && fabs(wall.wall.point.x - 32.0) < 1e-6 &&
+              fabs(wall.wall.distance - (32.0 - near.point.x)) < 1e-6,
           "the tile side as a wall");
     for (int32_t i = 0; i < found.count; ++i)
     {
@@ -253,8 +254,8 @@ static void TestWallAtTheRadius(mnavNavmesh* navmesh)
             double x = 2.0 + 5.0 * i;
             double z = 2.0 + 5.0 * k;
             mnavNearest n = {0};
-            mnavWall far;
-            mnavWall exact;
+            mnavNearestWall far;
+            mnavNearestWall exact;
             if (mnavFindNearest(navmesh, nullptr, (mnavPos3){x, x * (double)SLOPE, z},
                                 (mnavVec3){0.5f, 2.0f, 0.5f}, &n) != mnav_success ||
                 n.polygon.slot == 0 ||
@@ -266,10 +267,10 @@ static void TestWallAtTheRadius(mnavNavmesh* navmesh)
             }
             tried += 1;
             same = same &&
-                   mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, far.distance,
-                                        &exact) == mnav_success &&
-                   exact.found && exact.distance == far.distance && exact.point.x == far.point.x &&
-                   exact.point.z == far.point.z;
+                   mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point,
+                                        far.wall.distance, &exact) == mnav_success &&
+                   exact.found && exact.wall.distance == far.wall.distance &&
+                   exact.wall.point.x == far.wall.point.x && exact.wall.point.z == far.wall.point.z;
         }
     }
     printf("walls at the radius: %d centers\n", tried);
@@ -281,7 +282,7 @@ static void TestWallAtTheRadius(mnavNavmesh* navmesh)
 // from the center, not nearer than the one before it, its normal a unit
 // across it with the navmesh on that side.
 static bool SoundWall(const mnavNavmesh* navmesh, mnavPos3 center, double radius,
-                      const mnavWallSegment* wall, const mnavWallSegment* before)
+                      const mnavWall* wall, const mnavWall* before)
 {
     double ex = wall->end.x - wall->start.x;
     double ez = wall->end.z - wall->start.z;
@@ -296,6 +297,8 @@ static bool SoundWall(const mnavNavmesh* navmesh, mnavPos3 center, double radius
                        (wall->start.z + wall->end.z) * 0.5 + wall->normal.z * 0.01};
     mnavNearest n;
     return wall->distance <= radius && fabs(wall->distance - distance) < 1e-9 &&
+           fabs(wall->point.x - (wall->start.x + t * ex)) < 1e-9 &&
+           fabs(wall->point.z - (wall->start.z + t * ez)) < 1e-9 &&
            (before == nullptr || before->distance <= wall->distance) &&
            fabs(hypot(wall->normal.x, wall->normal.z) - 1.0) < 1e-9 && wall->normal.y == 0.0 &&
            fabs(wall->normal.x * ex + wall->normal.z * ez) < 1e-9 * length &&
@@ -310,8 +313,8 @@ static void TestWallList(const mnavNavmesh* navmesh)
     // first, the first the wall distance's; a buffer of three holds the
     // first three and counts all, and no buffer counts.
     mnavQuery* query = Query(4096);
-    static mnavWallSegment walls[256];
-    mnavWallSegment few[3];
+    static mnavWall walls[256];
+    mnavWall few[3];
     int32_t tried = 0;
     int32_t listed = 0;
     int32_t cut = 0;
@@ -329,7 +332,7 @@ static void TestWallList(const mnavNavmesh* navmesh)
             {
                 continue;
             }
-            mnavWall wall;
+            mnavNearestWall wall;
             mnavWallsFound found;
             CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 8.0, &wall) ==
                           mnav_success &&
@@ -340,7 +343,7 @@ static void TestWallList(const mnavNavmesh* navmesh)
             tried += 1;
             listed += found.count;
             sound = sound && (found.count > 0) == wall.found &&
-                    (found.count == 0 || walls[0].distance == wall.distance);
+                    (found.count == 0 || memcmp(&walls[0], &wall.wall, sizeof(mnavWall)) == 0);
             for (int32_t w = 0; w < found.count; ++w)
             {
                 sound = sound && SoundWall(navmesh, n.point, 8.0, &walls[w],
@@ -352,7 +355,7 @@ static void TestWallList(const mnavNavmesh* navmesh)
             int32_t held = found.count < 3 ? found.count : 3;
             sound = sound && result == (found.count > 3 ? mnav_errorCapacity : mnav_success) &&
                     some.count == found.count &&
-                    memcmp(few, walls, (size_t)held * sizeof(mnavWallSegment)) == 0;
+                    memcmp(few, walls, (size_t)held * sizeof(mnavWall)) == 0;
             cut += found.count > 3 ? 1 : 0;
             result =
                 mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 8.0, nullptr, 0, &some);

@@ -962,22 +962,34 @@ extern "C"
                                                      mnavPolygonId polygon, double x, double z,
                                                      double* heightOut);
 
-    // The nearest wall a search within a radius found.
+    // A wall within a radius: an edge no polygon the filter includes lies
+    // across.
     typedef struct mnavWall
     {
-        // Whether a wall lies within the radius; when not, the distance is
-        // the radius and the point the center.
+        // Its ends, in the order of its polygon's corners.
+        mnavPos3 start;
+        mnavPos3 end;
+        // Its point nearest the center.
+        mnavPos3 point;
+        // The unit direction on the ground from it toward its polygon, the
+        // walkable side; zero for an edge of no length on the ground. The
+        // way from the wall to the center is (center - point) / distance.
+        mnavPos3 normal;
+        // The distance on the ground from the center to its nearest point.
+        double distance;
+    } mnavWall;
+
+    // The nearest wall a search within a radius found.
+    typedef struct mnavNearestWall
+    {
+        // Whether a wall lies within the radius.
         bool found;
         // Whether the context's node limit cut the search short, so that a
         // nearer wall may lie unseen.
         bool limited;
-        // The distance on the ground from the center to the wall point.
-        double distance;
-        // The wall's nearest point, and the unit direction on the ground
-        // from it to the center.
-        mnavPos3 point;
-        mnavPos3 normal;
-    } mnavWall;
+        // The wall; zeroed when none was found.
+        mnavWall wall;
+    } mnavNearestWall;
 
     /// Finds the nearest wall to a point within a radius on the ground,
     /// searching from its polygon across the edges that come within the
@@ -988,13 +1000,14 @@ extern "C"
     /// walls at the same distance it gives one, the same on every
     /// platform, but which one is not promised.
     ///
-    /// @param query   The context; its last search ends.
-    /// @param navmesh The navmesh.
-    /// @param filter  The areas usable, or NULL.
-    /// @param polygon The polygon the center lies in.
-    /// @param center  The point.
-    /// @param radius  How far to look, in meters, at least 0 and finite.
-    /// @param wallOut Receives the wall. Zeroed on any failure.
+    /// @param query      The context; its last search ends.
+    /// @param navmesh    The navmesh.
+    /// @param filter     The areas usable, or NULL.
+    /// @param polygon    The polygon the center lies in.
+    /// @param center     The point.
+    /// @param radius     How far to look, in meters, at least 0 and finite.
+    /// @param nearestOut Receives whether a wall was found, and the wall. Zeroed
+    ///                   on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// or radius not finite, a negative radius, a polygon id never handed out,
     /// or a filter not built from mnavDefaultQueryFilter or with a NaN cost;
@@ -1005,25 +1018,9 @@ extern "C"
     /// a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindWallDistance(mnavQuery* query,
-                                                            const mnavNavmesh* navmesh,
-                                                            const mnavQueryFilter* filter,
-                                                            mnavPolygonId polygon, mnavPos3 center,
-                                                            double radius, mnavWall* wallOut);
-
-    // A wall within a radius: an edge no polygon the filter includes lies
-    // across.
-    typedef struct mnavWallSegment
-    {
-        // Its ends, in the order of its polygon's corners.
-        mnavPos3 start;
-        mnavPos3 end;
-        // The unit direction on the ground from it toward its polygon, the
-        // walkable side; zero for an edge of no length on the ground.
-        mnavPos3 normal;
-        // The distance on the ground from the center to its nearest point.
-        double distance;
-    } mnavWallSegment;
+    MNAV_NODISCARD MNAV_API mnavResult mnavFindWallDistance(
+        mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+        mnavPolygonId polygon, mnavPos3 center, double radius, mnavNearestWall* nearestOut);
 
     // What a search for the walls within a radius found.
     typedef struct mnavWallsFound
@@ -1069,7 +1066,7 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavFindWalls(mnavQuery* query, const mnavNavmesh* navmesh,
                                                      const mnavQueryFilter* filter,
                                                      mnavPolygonId polygon, mnavPos3 center,
-                                                     double radius, mnavWallSegment* wallsOut,
+                                                     double radius, mnavWall* wallsOut,
                                                      int32_t capacity, mnavWallsFound* foundOut);
 
     // A random point and the polygon it lies on; slot 0 when there was no

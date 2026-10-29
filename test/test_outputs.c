@@ -63,7 +63,7 @@ typedef struct Outputs
     mnavRay ray;
     mnavNearest nearest;
     mnavFound found;
-    mnavWall wall;
+    mnavNearestWall wall;
     mnavWallsFound walls;
     mnavRandomPoint point;
     mnavGridPath gridPath;
@@ -139,7 +139,7 @@ static void TestNoOwner(void)
     mnavCorridor corridor = {0};
     CHECK(mnavResetCorridor(&corridor, polygons, ROOM, polygon, at) == mnav_success, "a corridor");
     mnavPolygonId found[ROOM];
-    mnavWallSegment walls[ROOM];
+    mnavWall walls[ROOM];
     mnavAreaRun runs[ROOM];
     mnavLinkDef links[ROOM];
     mnavLinkDef linkDef = {at, at, 0.5f, 1.0f, mnav_linkJump, false, 0.0f};

@@ -186,10 +186,10 @@ static uint64_t Points(Reader* reader, uint32_t* state, uint64_t hash)
     hash = MixResult(
         hash, mnavMoveAlongSurface(query, s_navmesh, nullptr, a.polygon, a.point, b.point, &move));
     hash = Mix(hash, &move.point, sizeof(move.point));
-    mnavWall wall = {0};
+    mnavNearestWall wall = {0};
     hash = MixResult(
         hash, mnavFindWallDistance(query, s_navmesh, nullptr, a.polygon, a.point, 4.0, &wall));
-    hash = MixDouble(hash, wall.distance);
+    hash = MixDouble(hash, wall.wall.distance);
     mnavRandomPoint random = {0};
     hash = MixResult(hash, mnavFindRandomPoint(s_navmesh, nullptr, *state, &random));
     hash = Mix(hash, &random.point, sizeof(random.point));

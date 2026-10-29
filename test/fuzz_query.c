@@ -214,13 +214,13 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
     }
     else if (op == 2 && Byte(r) % 2 == 0)
     {
-        mnavWall wall;
+        mnavNearestWall wall;
         result = mnavFindWallDistance(s_query, s_navmesh, filter, id, a, Length(r), &wall);
-        Expect(result != mnav_success || !wall.found || isfinite(wall.distance));
+        Expect(result != mnav_success || !wall.found || isfinite(wall.wall.distance));
     }
     else if (op == 2)
     {
-        mnavWallSegment walls[16];
+        mnavWall walls[16];
         int32_t capacity = Byte(r) % 17;
         mnavWallsFound found;
         result =
