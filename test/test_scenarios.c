@@ -34,7 +34,7 @@
 #define TERRAIN_HASH 0x27e9d11ce83c708bull
 
 // The hash of the group's final places.
-#define GROUP_HASH 0xb16f4123b3485eedull
+#define GROUP_HASH 0xac467226f310e52full
 
 // The hash of the doorway crowd's final places.
 #define DOORWAY_HASH 0x236419da9ed2faafull

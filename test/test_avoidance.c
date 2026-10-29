@@ -724,7 +724,10 @@ static void TestSpeedScaledBack(void)
     mnavPos2 velocity;
     CHECK(mnavAvoid(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) == mnav_success, "stepped");
     CHECK(velocity.x * velocity.x + velocity.y * velocity.y <= 2.25, "no faster than the maximum");
-    CHECK(velocity.x > 1.1 && velocity.y < -0.9, "toward the preferred velocity");
+    // Held back by its speed alone, it does not sidestep: a 1% sidestep
+    // would put the cross product near 0.04.
+    double cross = velocity.x * agent.preferred.y - velocity.y * agent.preferred.x;
+    CHECK(velocity.x > 1.1 && fabs(cross) < 1e-12, "along the preferred velocity");
     mnavDestroyAvoidance(avoidance);
 }
 

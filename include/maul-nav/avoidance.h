@@ -242,10 +242,11 @@ extern "C"
     /// when none does, the one that keeps clear of the obstacles and breaks
     /// the agents' constraints least. An agent sees an obstacle edge only
     /// from outside it.
-    /// An agent held back from its preferred velocity aims 1% of its speed
-    /// to the right of it, so that agents meeting in perfect symmetry pass
-    /// rather than stop face to face. The same agents give the same
-    /// velocities in any order, on every platform.
+    /// An agent its neighbours or obstacles hold back from its preferred
+    /// velocity aims 1% of its speed to the right of it; one held back
+    /// only by its maximum speed does not. So agents meeting in perfect
+    /// symmetry pass rather than stop face to face. The same agents give
+    /// the same velocities in any order, on every platform.
     ///
     /// @param avoidance     The set.
     /// @param agents        The agents.
@@ -285,9 +286,10 @@ extern "C"
     /// colliding with its neighbours within the time horizon if they do
     /// their share (ORCA in space); when none does, the one that keeps
     /// clear of the spheres and breaks the agents' constraints least.
-    /// An agent held back from its preferred velocity aims 1% of its speed
-    /// to the right of it, +Y being up; rising vertically it turns toward
-    /// +X, falling toward -X.
+    /// An agent its neighbours or spheres hold back from its preferred
+    /// velocity aims 1% of its speed to the right of it, +Y being up;
+    /// rising vertically it turns toward +X, falling toward -X. One held
+    /// back only by its maximum speed does not.
     /// The same agents give the same velocities in any order, on every
     /// platform.
     ///
