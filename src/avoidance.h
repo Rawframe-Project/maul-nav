@@ -10,6 +10,7 @@
 #include "allocator.h"
 #include "crowd.h"
 #include "host_code.h"
+#include "invariant.h"
 #include "obstacle.h"
 #include "orca.h"
 #include "orca3.h"
@@ -93,6 +94,28 @@ static inline bool mnavWithinSpeed3(mnavPos3 v, double maxSpeed)
     return mnavDot3(s, s) <= (maxSpeed * k) * (maxSpeed * k);
 }
 
+// Whether a velocity just scaled back onto the speed circle is within a
+// few units of it, which a few steps close: 2^-40 of the squared maximum,
+// and two units of the least subnormal on the speed, scaled, where the
+// components round absolutely. A velocity further out would take up to
+// 2^52 steps.
+static inline bool mnavNearSpeed2(mnavPos2 v, double maxSpeed)
+{
+    double k = mnavSpeedScale(maxSpeed);
+    mnavPos2 s = mnavScale2(v, k);
+    double bound = (maxSpeed + 0x1p-1073) * k;
+    return mnavDot2(s, s) <= bound * bound * (1.0 + 0x1p-40);
+}
+
+// The same for the speed sphere.
+static inline bool mnavNearSpeed3(mnavPos3 v, double maxSpeed)
+{
+    double k = mnavSpeedScale(maxSpeed);
+    mnavPos3 s = mnavScale3(v, k);
+    double bound = (maxSpeed + 0x1p-1073) * k;
+    return mnavDot3(s, s) <= bound * bound * (1.0 + 0x1p-40);
+}
+
 // A velocity kept within the speed circle. One past it is scaled back
 // onto it, and since that rounds, each component then steps one unit
 // toward zero until it is within. A step takes at least a unit of the
@@ -108,6 +131,7 @@ static inline mnavPos2 mnavKeepSpeed2(mnavPos2 v, double maxSpeed)
         return v;
     }
     v = mnavScale2(v, maxSpeed * k / sqrt(speedSq));
+    MNAV_ASSERT(mnavNearSpeed2(v, maxSpeed));
     while (!mnavWithinSpeed2(v, maxSpeed))
     {
         v = (mnavPos2){mnavTowardZero(v.x), mnavTowardZero(v.y)};
@@ -127,6 +151,7 @@ static inline mnavPos3 mnavKeepSpeed3(mnavPos3 v, double maxSpeed)
         return v;
     }
     v = mnavScale3(v, maxSpeed * k / sqrt(speedSq));
+    MNAV_ASSERT(mnavNearSpeed3(v, maxSpeed));
     while (!mnavWithinSpeed3(v, maxSpeed))
     {
         v = (mnavPos3){mnavTowardZero(v.x), mnavTowardZero(v.y), mnavTowardZero(v.z)};
