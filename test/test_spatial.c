@@ -173,9 +173,10 @@ static void TestWalls(mnavNavmesh* navmesh)
               wall.found && !wall.limited,
           "found");
     printf("wall %.3f m at (%.3f %.3f), normal (%.3f %.3f)\n", wall.wall.distance,
-           wall.wall.point.x, wall.wall.point.z, wall.wall.normal.x, wall.wall.normal.z);
-    CHECK(wall.wall.distance > 2.0 && wall.wall.distance < 2.8 && wall.wall.normal.x < -0.99 &&
-              fabs(wall.wall.point.z - n.point.z) < 1e-6,
+           wall.wall.point.x, wall.wall.point.z, (double)wall.wall.normal.x,
+           (double)wall.wall.normal.z);
+    CHECK(wall.wall.distance > 2.0 && wall.wall.distance < 2.8 &&
+              (double)wall.wall.normal.x < -0.99 && fabs(wall.wall.point.z - n.point.z) < 1e-6,
           "the block's face, straight east");
     CHECK(fabs(wall.wall.distance -
                hypot(wall.wall.point.x - n.point.x, wall.wall.point.z - n.point.z)) < 1e-9,
@@ -292,16 +293,18 @@ static bool SoundWall(const mnavNavmesh* navmesh, mnavPos3 center, double radius
     t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
     double distance =
         hypot(center.x - (wall->start.x + t * ex), center.z - (wall->start.z + t * ez));
-    mnavPos3 inside = {(wall->start.x + wall->end.x) * 0.5 + wall->normal.x * 0.01,
+    mnavPos3 inside = {(wall->start.x + wall->end.x) * 0.5 + (double)wall->normal.x * 0.01,
                        (wall->start.y + wall->end.y) * 0.5,
-                       (wall->start.z + wall->end.z) * 0.5 + wall->normal.z * 0.01};
+                       (wall->start.z + wall->end.z) * 0.5 + (double)wall->normal.z * 0.01};
     mnavNearest n;
     return wall->distance <= radius && fabs(wall->distance - distance) < 1e-9 &&
            fabs(wall->point.x - (wall->start.x + t * ex)) < 1e-9 &&
            fabs(wall->point.z - (wall->start.z + t * ez)) < 1e-9 &&
            (before == nullptr || before->distance <= wall->distance) &&
-           fabs(hypot(wall->normal.x, wall->normal.z) - 1.0) < 1e-9 && wall->normal.y == 0.0 &&
-           fabs(wall->normal.x * ex + wall->normal.z * ez) < 1e-9 * length &&
+           // The normal is binary32: unit and square to the edge to its rounding.
+           fabs(hypot((double)wall->normal.x, (double)wall->normal.z) - 1.0) < 1e-6 &&
+           wall->normal.y == 0.0f &&
+           fabs((double)wall->normal.x * ex + (double)wall->normal.z * ez) < 1e-6 * length &&
            mnavFindNearest(navmesh, nullptr, inside, (mnavVec3){0.05f, 1.0f, 0.05f}, &n) ==
                mnav_success &&
            n.polygon.slot != 0 && hypot(n.point.x - inside.x, n.point.z - inside.z) < 1e-6;

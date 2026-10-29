@@ -68,17 +68,17 @@ static void TestReachAndWalls(void)
     mnavQuery* query = MakeQuery(64);
     mnavRay ray = Cast(query, navmesh, 1.0, 2.5, 19.0, 2.5);
     CHECK(ray.end == mnav_rayReached && ray.t == 1.0 && ray.polygonCount == 4 &&
-              ray.normalX == 0.0 && ray.normalZ == 0.0,
+              ray.normal.x == 0.0f && ray.normal.z == 0.0f,
           "down the row");
     ray = Cast(query, navmesh, 1.0, 2.5, 25.0, 2.5);
     CHECK(ray.end == mnav_rayWall && ray.t == 19.0 / 24.0 && ray.polygonCount == 4 &&
-              ray.normalX == -1.0 && ray.normalZ == 0.0,
+              ray.normal.x == -1.0f && ray.normal.z == 0.0f,
           "the row's far end, its normal back along the row");
     ray = Cast(query, navmesh, 1.0, 2.5, 1.0, 2.5);
     CHECK(ray.end == mnav_rayReached && ray.t == 1.0 && ray.polygonCount == 1, "no length");
     ray = Cast(query, navmesh, 3.0, 1.0, 3.0, 7.0);
     CHECK(ray.end == mnav_rayWall && ray.t == 4.0 / 6.0 && ray.polygonCount == 1 &&
-              ray.normalX == 0.0 && ray.normalZ == -1.0,
+              ray.normal.x == 0.0f && ray.normal.z == -1.0f,
           "the row's side");
     // The row's other side lies on the tile's -Z side.
     ray = Cast(query, navmesh, 3.0, 1.0, 3.0, -3.0);
@@ -99,8 +99,8 @@ static void TestCorners(void)
     mnavQuery* query = MakeQuery(64);
     // Toward (6, 9) the ray meets the first square's top at z = 5.
     mnavRay ray = Cast(query, navmesh, 1.0, 1.0, 6.0, 9.0);
-    CHECK(ray.end == mnav_rayWall && ray.t == 0.5 && ray.polygonCount == 1 && ray.normalX == 0.0 &&
-              ray.normalZ == -1.0,
+    CHECK(ray.end == mnav_rayWall && ray.t == 0.5 && ray.polygonCount == 1 &&
+              ray.normal.x == 0.0f && ray.normal.z == -1.0f,
           "the wall above the start");
     // Exactly through the L's inner corner, (5, 5): it goes on.
     ray = Cast(query, navmesh, 1.0, 1.0, 9.0, 9.0);
@@ -122,12 +122,12 @@ static void TestTileSides(void)
     CHECK(ray.end == mnav_rayReached && ray.polygonCount == 2, "across the link");
     // Crossing x = 32 at z = 11, past the link: a wall.
     ray = Cast(query, navmesh, 26.0, 5.0, 36.0, 15.0);
-    CHECK(ray.end == mnav_rayWall && ray.t == 0.6 && ray.polygonCount == 1 && ray.normalX == -1.0,
+    CHECK(ray.end == mnav_rayWall && ray.t == 0.6 && ray.polygonCount == 1 && ray.normal.x == -1.0f,
           "past the link's end");
     // Crossing exactly at the link's end, z = 10: through, then the right
     // square's top.
     ray = Cast(query, navmesh, 26.0, 4.0, 38.0, 16.0);
-    CHECK(ray.end == mnav_rayWall && ray.t == 0.5 && ray.polygonCount == 2 && ray.normalZ == -1.0,
+    CHECK(ray.end == mnav_rayWall && ray.t == 0.5 && ray.polygonCount == 2 && ray.normal.z == -1.0f,
           "the link's end counts");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -135,7 +135,7 @@ static void TestTileSides(void)
     query = MakeQuery(64);
     ray = Cast(query, navmesh, 26.0, 1.0, 36.0, 7.0);
     CHECK(ray.end == mnav_rayNotLoaded && ray.t == 0.6 && ray.polygonCount == 1 &&
-              ray.normalX == 0.0,
+              ray.normal.x == 0.0f,
           "nothing loaded beyond");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);

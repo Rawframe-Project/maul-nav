@@ -162,7 +162,7 @@ static void GuideAvoidance(void)
     int32_t agentCount = 2;
     const mnavObstacle* obstacles = nullptr;
     int32_t obstacleCount = 0;
-    mnavPos2 velocities[2];
+    mnavVec2 velocities[2];
     // clang-format off
     mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
     mnavAvoidance* avoidance = NULL;
@@ -197,7 +197,7 @@ static void GuideCrowd(void)
     static mnavPolygonId buffers[COUNT][64];
     mnavCorridor corridors[COUNT];
     mnavAgent agents[COUNT];
-    mnavPos2 velocities[COUNT];
+    mnavVec2 velocities[COUNT];
     const mnavObstacle* obstacles = nullptr;
     int32_t obstacleCount = 0;
     double dt = 0.1;
@@ -236,7 +236,7 @@ static void GuideCrowd(void)
             if (mnavCorridorCorners(query, navmesh, &corridors[i], &corners) == mnav_success &&
                 mnavSteer(&corners, &steer, &steering) == mnav_success)
             {
-                agents[i].preferred = (mnavPos2){steering.velocity.x, steering.velocity.z};
+                agents[i].preferred = (mnavVec2){steering.velocity.x, steering.velocity.z};
             }
         }
         mnavResult avoided = mnavAvoid(avoidance, agents, count, obstacles, obstacleCount, dt, velocities);
@@ -244,7 +244,8 @@ static void GuideCrowd(void)
         {
             // Limit the change from agents[i].velocity by the agent's acceleration.
             mnavPos3 at = corridors[i].position;
-            mnavPos3 wanted = {at.x + velocities[i].x * dt, at.y, at.z + velocities[i].y * dt};
+            mnavPos3 wanted = {at.x + (double)velocities[i].x * dt, at.y,
+                               at.z + (double)velocities[i].y * dt};
             if (mnavMoveCorridor(query, navmesh, NULL, &corridors[i], wanted, NULL) == mnav_success)
             {
                 agents[i].position = (mnavPos2){corridors[i].position.x, corridors[i].position.z};

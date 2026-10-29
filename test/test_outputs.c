@@ -357,7 +357,7 @@ static void TestAvoidanceOutputs(void)
         {{0.0, 0.0}, {0.0, 0.0}, {1.0, 0.0}, 0.5, 2.0, 1.0, 1, 0, 0},
         {{5.0, 0.0}, {0.0, 0.0}, {-1.0, 0.0}, 0.0, 2.0, 1.0, 2, 0, 0},
     };
-    mnavPos2 velocities[2];
+    mnavVec2 velocities[2];
     Fill(velocities, sizeof(velocities));
     CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid &&
               Zeroed(velocities, sizeof(velocities)),
@@ -366,14 +366,14 @@ static void TestAvoidanceOutputs(void)
         {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, 0.5, 2.0, 1.0, 1, 0, 0},
         {{5.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {-1.0, 0.0, 0.0}, 0.5, 2.0, 0.0, 2, 0, 0},
     };
-    mnavPos3 velocities3[2];
+    mnavVec3 velocities3[2];
     Fill(velocities3, sizeof(velocities3));
     CHECK(mnavAvoid3D(avoidance, fliers, 2, nullptr, 0, 0.1, velocities3) == mnav_errorInvalid &&
               Zeroed(velocities3, sizeof(velocities3)),
           "a flier of no priority: every velocity cleared");
     Fill(velocities, sizeof(velocities));
     CHECK(mnavAvoid(nullptr, agents, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid &&
-              velocities[0].x != 0.0,
+              (double)velocities[0].x != 0.0,
           "no set: nothing written");
     mnavDestroyAvoidance(avoidance);
 }

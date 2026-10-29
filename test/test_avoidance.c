@@ -16,10 +16,10 @@
 #include <string.h>
 
 // The hash of the circle's final positions, the same on every platform.
-#define CIRCLE_HASH 0x533db80b7f73782cull
+#define CIRCLE_HASH 0x092e2f6f5b5edafbull
 
 // The hash of the mixed scene's velocities.
-#define SCENE_HASH 0xcb53ba76cc38d780ull
+#define SCENE_HASH 0x175bc043ba25ae3full
 
 enum
 {
@@ -46,7 +46,7 @@ static void Prefer(mnavAgent* agents, const mnavPos2* goals, int32_t count)
         double dy = goals[i].y - agents[i].position.y;
         double length = sqrt(dx * dx + dy * dy);
         double scale = length > 1.0 ? 1.0 / length : 1.0;
-        agents[i].preferred = (mnavPos2){dx * scale, dy * scale};
+        agents[i].preferred = (mnavVec2){(float)(dx * scale), (float)(dy * scale)};
     }
 }
 
@@ -55,7 +55,7 @@ static void Prefer(mnavAgent* agents, const mnavPos2* goals, int32_t count)
 static double Run(mnavAvoidance* avoidance, mnavAgent* agents, const mnavPos2* goals, int32_t count,
                   int32_t steps)
 {
-    mnavPos2 velocities[CIRCLE];
+    mnavVec2 velocities[CIRCLE];
     double closest = (double)INFINITY;
     for (int32_t s = 0; s < steps; ++s)
     {
@@ -65,8 +65,8 @@ static double Run(mnavAvoidance* avoidance, mnavAgent* agents, const mnavPos2* g
         for (int32_t i = 0; i < count; ++i)
         {
             agents[i].velocity = velocities[i];
-            agents[i].position.x += velocities[i].x * 0.1;
-            agents[i].position.y += velocities[i].y * 0.1;
+            agents[i].position.x += (double)velocities[i].x * 0.1;
+            agents[i].position.y += (double)velocities[i].y * 0.1;
         }
         for (int32_t i = 0; i < count; ++i)
         {
@@ -153,23 +153,23 @@ static void TestAnyOrder(void)
                            Agent(0.0, 1.5, 1), Agent(0.0, -1.5, 4), Agent(3.0, 3.0, 2)};
     for (int32_t i = 0; i < 6; ++i)
     {
-        agents[i].preferred = (mnavPos2){1.0 - 0.3 * i, 0.2 * i - 0.5};
-        agents[i].velocity = (mnavPos2){0.1 * i, -0.1 * i};
+        agents[i].preferred = (mnavVec2){(float)(1.0 - 0.3 * i), (float)(0.2 * i - 0.5)};
+        agents[i].velocity = (mnavVec2){(float)(0.1 * i), (float)(-0.1 * i)};
     }
     mnavAgent reversed[6];
     for (int32_t i = 0; i < 6; ++i)
     {
         reversed[i] = agents[5 - i];
     }
-    mnavPos2 forward[6];
-    mnavPos2 backward[6];
+    mnavVec2 forward[6];
+    mnavVec2 backward[6];
     CHECK(mnavAvoid(avoidance, agents, 6, nullptr, 0, 0.1, forward) == mnav_success &&
               mnavAvoid(avoidance, reversed, 6, nullptr, 0, 0.1, backward) == mnav_success,
           "both orders");
     bool same = true;
     for (int32_t i = 0; i < 6; ++i)
     {
-        same = same && memcmp(&forward[i], &backward[5 - i], sizeof(mnavPos2)) == 0;
+        same = same && memcmp(&forward[i], &backward[5 - i], sizeof(mnavVec2)) == 0;
     }
     CHECK(same, "the same velocities");
     mnavDestroyAvoidance(avoidance);
@@ -183,7 +183,7 @@ static void TestPriority(void)
     agents[0].priority = 1000.0;
     const mnavPos2 goals[2] = {{5.0, 0.1}, {-5.0, -0.1}};
     double straying[2] = {0.0, 0.0};
-    mnavPos2 velocities[2];
+    mnavVec2 velocities[2];
     for (int32_t s = 0; s < 120; ++s)
     {
         Prefer(agents, goals, 2);
@@ -192,8 +192,8 @@ static void TestPriority(void)
         for (int32_t i = 0; i < 2; ++i)
         {
             agents[i].velocity = velocities[i];
-            agents[i].position.x += velocities[i].x * 0.1;
-            agents[i].position.y += velocities[i].y * 0.1;
+            agents[i].position.x += (double)velocities[i].x * 0.1;
+            agents[i].position.y += (double)velocities[i].y * 0.1;
             double off = fabs(agents[i].position.y - goals[i].y);
             straying[i] = off > straying[i] ? off : straying[i];
         }
@@ -223,23 +223,24 @@ static void TestLayers(void)
     // ghost as for an agent that shares it. The step between the two
     // results lies along the line's normal, as long as the shared one's.
     mnavAgent pair[2] = {Agent(-1.5, 0.0, 1), Agent(1.5, 0.3, 2)};
-    pair[0].velocity = pair[0].preferred = (mnavPos2){1.5, 0.0};
-    pair[1].velocity = pair[1].preferred = (mnavPos2){-1.5, 0.0};
+    pair[0].velocity = pair[0].preferred = (mnavVec2){1.5f, 0.0f};
+    pair[1].velocity = pair[1].preferred = (mnavVec2){-1.5f, 0.0f};
     // Room enough that the speed limit cuts neither.
     pair[0].maxSpeed = 3.0;
     pair[1].maxSpeed = 3.0;
-    mnavPos2 shared[2];
-    mnavPos2 alone[2];
+    mnavVec2 shared[2];
+    mnavVec2 alone[2];
     CHECK(mnavAvoid(avoidance, pair, 2, nullptr, 0, 0.1, shared) == mnav_success, "stepped");
     pair[1].ignores = 1;
     pair[0].layers = 1;
     CHECK(mnavAvoid(avoidance, pair, 2, nullptr, 0, 0.1, alone) == mnav_success, "stepped");
-    double nx = alone[0].x - shared[0].x;
-    double ny = alone[0].y - shared[0].y;
-    double across = (shared[0].x - 1.5) * nx + shared[0].y * ny;
+    double nx = (double)alone[0].x - (double)shared[0].x;
+    double ny = (double)alone[0].y - (double)shared[0].y;
+    double across = ((double)shared[0].x - 1.5) * nx + (double)shared[0].y * ny;
     double between = nx * nx + ny * ny;
-    CHECK(between > 1e-4 && fabs(across - between) < 1e-9 * between && alone[1].x == -1.5 &&
-              alone[1].y == 0.0,
+    // Within binary32's rounding of the velocities.
+    CHECK(between > 1e-4 && fabs(across - between) < 1e-6 * between && alone[1].x == -1.5f &&
+              alone[1].y == 0.0f,
           "the whole avoidance, twice the half");
     // Each ignoring the other, they walk through each other.
     agents[0] = Agent(-5.0, 0.0, 1);
@@ -273,9 +274,10 @@ static void TestOneSpot(void)
     // Two agents on one spot with one velocity part, the lower id one way.
     mnavAvoidance* avoidance = Make(16, 10, 2.0);
     mnavAgent agents[2] = {Agent(0.0, 0.0, 1), Agent(0.0, 0.0, 2)};
-    mnavPos2 velocities[2];
+    mnavVec2 velocities[2];
     CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_success &&
-              isfinite(velocities[0].x) && velocities[0].x < 0.0 && velocities[1].x > 0.0,
+              isfinite(velocities[0].x) && (double)velocities[0].x < 0.0 &&
+              (double)velocities[1].x > 0.0,
           "parted");
     mnavDestroyAvoidance(avoidance);
 }
@@ -304,7 +306,7 @@ static void TestChecks(void)
           "bad defs");
     avoidance = Make(2, 4, 2.0);
     mnavAgent agents[3] = {Agent(0.0, 0.0, 1), Agent(3.0, 0.0, 2), Agent(6.0, 0.0, 3)};
-    mnavPos2 velocities[3];
+    mnavVec2 velocities[3];
     CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.1, velocities) == mnav_errorCapacity,
           "more agents than the limit");
     CHECK(mnavAvoid(avoidance, agents, 0, nullptr, 0, 0.1, nullptr) == mnav_success, "none at all");
@@ -333,8 +335,8 @@ static void TestChecks(void)
         broken[1].position.x = k == 0 || k == 4 ? bad[k] : broken[1].position.x;
         broken[1].radius = k == 1 || k == 5 ? bad[k] : broken[1].radius;
         broken[1].maxSpeed = k == 2 || k == 6 ? bad[k] : broken[1].maxSpeed;
-        broken[1].velocity.y = k == 7 ? bad[k] : broken[1].velocity.y;
-        broken[1].preferred.x = k == 8 ? bad[k] : broken[1].preferred.x;
+        broken[1].velocity.y = k == 7 ? (float)bad[k] : broken[1].velocity.y;
+        broken[1].preferred.x = k == 8 ? (float)bad[k] : broken[1].preferred.x;
         broken[1].priority = k == 3 ? bad[k] : broken[1].priority;
         // Not finite, a radius of 0, a negative speed or a priority of 0
         // is wrong; past an MNAV_MAX_AVOIDANCE_ value is a bound.
@@ -354,13 +356,13 @@ static double RunPast(mnavAvoidance* avoidance, mnavAgent* agent, mnavPos2 goal,
     double closest = (double)INFINITY;
     for (int32_t s = 0; s < steps; ++s)
     {
-        mnavPos2 velocity;
+        mnavVec2 velocity;
         Prefer(agent, &goal, 1);
         CHECK(mnavAvoid(avoidance, agent, 1, obstacles, count, 0.1, &velocity) == mnav_success,
               "stepped");
         agent->velocity = velocity;
-        agent->position.x += velocity.x * 0.1;
-        agent->position.y += velocity.y * 0.1;
+        agent->position.x += (double)velocity.x * 0.1;
+        agent->position.y += (double)velocity.y * 0.1;
         for (int32_t o = 0; o < count; ++o)
         {
             mnavObstacle* ob = &obstacles[o];
@@ -371,13 +373,13 @@ static double RunPast(mnavAvoidance* avoidance, mnavAgent* agent, mnavPos2 goal,
                 double ex = b.x - a.x;
                 double ey = b.y - a.y;
                 double length = ex * ex + ey * ey;
-                double r =
-                    length > 0.0
-                        ? ((agent->position.x - a.x) * ex + (agent->position.y - a.y) * ey) / length
-                        : 0.0;
+                double r = length > 0.0 ? ((agent->position.x - (double)a.x) * ex +
+                                           (agent->position.y - (double)a.y) * ey) /
+                                              length
+                                        : 0.0;
                 r = r < 0.0 ? 0.0 : (r > 1.0 ? 1.0 : r);
-                double dx = agent->position.x - (a.x + r * ex);
-                double dy = agent->position.y - (a.y + r * ey);
+                double dx = agent->position.x - ((double)a.x + r * ex);
+                double dy = agent->position.y - ((double)a.y + r * ey);
                 double gap = sqrt(dx * dx + dy * dy) - agent->radius - ob->radius;
                 closest = gap < closest ? gap : closest;
             }
@@ -409,10 +411,10 @@ static void TestWallsAndBlocks(void)
     CHECK(closest > -1e-9 && Miss(&agent, (mnavPos2){6.0, 1.8}) < 0.05, "round the corner");
     // From inside the block it sees no edge and walks out.
     agent = Agent(0.0, 0.0, 1);
-    mnavPos2 velocity;
-    agent.preferred = (mnavPos2){1.0, 0.0};
+    mnavVec2 velocity;
+    agent.preferred = (mnavVec2){1.0f, 0.0f};
     CHECK(mnavAvoid(avoidance, &agent, 1, obstacles, 1, 0.1, &velocity) == mnav_success &&
-              velocity.x == 1.0 && velocity.y == 0.0,
+              (double)velocity.x == 1.0 && (double)velocity.y == 0.0,
           "edges are seen from outside only");
     mnavDestroyAvoidance(avoidance);
 }
@@ -448,13 +450,13 @@ static void TestMovingObstacles(void)
     double closest = (double)INFINITY;
     for (int32_t s = 0; s < 200; ++s)
     {
-        mnavPos2 velocity;
+        mnavVec2 velocity;
         Prefer(&agent, &goal, 1);
         CHECK(mnavAvoid(avoidance, &agent, 1, obstacles, 2, 0.1, &velocity) == mnav_success,
               "stepped");
         agent.velocity = velocity;
-        agent.position.x += velocity.x * 0.1;
-        agent.position.y += velocity.y * 0.1;
+        agent.position.x += (double)velocity.x * 0.1;
+        agent.position.y += (double)velocity.y * 0.1;
         center.y += 0.1;
         door[0].y += 0.05;
         door[1].y += 0.05;
@@ -488,10 +490,10 @@ static void TestObstaclesInAnyOrder(void)
                                {&top, 1, 0.5, {0.0, 0.0}, 9, 0}};
     mnavObstacle backward[3] = {forward[2], forward[1], forward[0]};
     mnavAgent agent = Agent(0.0, 0.0, 1);
-    agent.preferred = (mnavPos2){0.3, 1.2};
-    agent.velocity = (mnavPos2){-0.4, 0.9};
-    mnavPos2 a;
-    mnavPos2 b;
+    agent.preferred = (mnavVec2){0.3f, 1.2f};
+    agent.velocity = (mnavVec2){-0.4f, 0.9f};
+    mnavVec2 a;
+    mnavVec2 b;
     CHECK(mnavAvoid(avoidance, &agent, 1, forward, 3, 0.1, &a) == mnav_success &&
               mnavAvoid(avoidance, &agent, 1, backward, 3, 0.1, &b) == mnav_success &&
               memcmp(&a, &b, sizeof(a)) == 0,
@@ -531,8 +533,8 @@ static void TestMixedScene(void)
                                  {slope, 2, 0.0, {0, 0}, 3, 0},
                                  {bar, 2, 0.0, {0, 0}, 4, 0},
                                  {&still, 1, 1.0, {0, 0}, 5, 0},
-                                 {&rolling, 1, 0.8, {0.8, 0.1}, 6, 0},
-                                 {gate, 2, 0.0, {0.4, -0.6}, 7, 0}};
+                                 {&rolling, 1, 0.8, {0.8f, 0.1f}, 6, 0},
+                                 {gate, 2, 0.0, {0.4f, -0.6f}, 7, 0}};
     mnavAgent agents[AGENTS];
     mnavPos2 goals[AGENTS];
     uint32_t state = 12345;
@@ -549,7 +551,7 @@ static void TestMixedScene(void)
         goals[i] = (mnavPos2){p[2], p[3]};
     }
     uint64_t hash = MNAV_HASH_INIT;
-    mnavPos2 velocities[AGENTS];
+    mnavVec2 velocities[AGENTS];
     for (int32_t s = 0; s < 200; ++s)
     {
         Prefer(agents, goals, AGENTS);
@@ -559,8 +561,8 @@ static void TestMixedScene(void)
         for (int32_t i = 0; i < AGENTS; ++i)
         {
             agents[i].velocity = velocities[i];
-            agents[i].position.x += velocities[i].x * 0.1;
-            agents[i].position.y += velocities[i].y * 0.1;
+            agents[i].position.x += (double)velocities[i].x * 0.1;
+            agents[i].position.y += (double)velocities[i].y * 0.1;
         }
         rolling.x += 0.08;
         rolling.y += 0.01;
@@ -582,7 +584,7 @@ static void TestObstacleChecks(void)
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
     mnavAgent agent = Agent(-5.0, 0.0, 1);
-    mnavPos2 velocity;
+    mnavVec2 velocity;
     const mnavPos2 clockwise[3] = {{0.0, 0.0}, {0.0, 1.0}, {1.0, 0.0}};
     const mnavPos2 repeated[3] = {{0.0, 0.0}, {0.0, 0.0}, {1.0, 0.0}};
     const mnavPos2 square[4] = {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}};
@@ -631,7 +633,8 @@ static void TestObstacleChecks(void)
 // An agent a hair from an obstacle's corner, from the avoidance fuzz
 // target: the corner gave no direction to keep out by, and the agent's
 // velocity came out NaN. It keeps out of the edge, as one touching its
-// middle does.
+// middle does. The velocities are the fuzz input's rounded to binary32,
+// which takes the subnormal ones to zero; the corner is in the positions.
 static void TestOnACorner(void)
 {
     mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
@@ -642,8 +645,8 @@ static void TestOnACorner(void)
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
     const mnavAgent agents[3] = {{{0x1.2p+0, -0x1.4p-1},
-                                  {-0x1.4949494940ap-694, 0x1.4p+1},
-                                  {0x1.ep+0, -0x1.d4p+3},
+                                  {-0.0f, 0x1.4p+1f},
+                                  {0x1.ep+0f, -0x1.d4p+3f},
                                   0x1.4p+1,
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
@@ -651,8 +654,8 @@ static void TestOnACorner(void)
                                   0,
                                   0},
                                  {{0x0.0000000e2p-1022, 0.0},
-                                  {0.0, 0x0.00000000001p-1022},
-                                  {-0x1.4949494949494p-694, 0x1.fcp+3},
+                                  {0.0f, 0.0f},
+                                  {-0.0f, 0x1.fcp+3f},
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
@@ -660,8 +663,8 @@ static void TestOnACorner(void)
                                   0,
                                   0},
                                  {{0x1.c8p+3, -0x1p+4},
-                                  {-0x1.494949494940ap-694, 0x1.4p+1},
-                                  {0x1.4p+1, -0x1p+4},
+                                  {-0.0f, 0x1.4p+1f},
+                                  {0x1.4p+1f, -0x1p+4f},
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
                                   0x1.ccccccccccccdp-1,
@@ -671,7 +674,7 @@ static void TestOnACorner(void)
     const mnavPos2 corners[3] = {
         {-0x1p+4, 0x0.000000000e2p-1022}, {0.0, 0x0.001p-1022}, {-0x1.49494p-694, 0x1.4p+1}};
     const mnavObstacle block = {corners, 3, 0.0, {0x1.fcp+3, -0x1.fcp+3}, 1, 0};
-    mnavPos2 velocities[3];
+    mnavVec2 velocities[3];
     CHECK(mnavAvoid(avoidance, agents, 3, &block, 1, 0x1.ccccccccccccdp-2, velocities) ==
               mnav_success,
           "stepped");
@@ -679,7 +682,9 @@ static void TestOnACorner(void)
     {
         // Squared, as the library keeps it: hypot rounds differently by
         // platform.
-        double speedSq = velocities[i].x * velocities[i].x + velocities[i].y * velocities[i].y;
+        double vx = (double)velocities[i].x;
+        double vy = (double)velocities[i].y;
+        double speedSq = vx * vx + vy * vy;
         CHECK(isfinite(velocities[i].x) && isfinite(velocities[i].y) &&
                   speedSq <= agents[i].maxSpeed * agents[i].maxSpeed,
               "finite and within the speed");
@@ -702,56 +707,61 @@ static void TestSpeedKept(void)
         {{12.5, 12.5}, {14.75, 14.75}, {14.75, 14.75}, 12.5, 12.5, 12.5, 0, 0, 0},
         {{12.5, 14.75}, {14.75, 14.75}, {14.75, 14.75}, 12.5, 12.5, 12.5, 0, 0, 0},
         {{12.5, 14.5}, {14.5, 14.5}, {12.5, 12.5}, 14.625, 0.6, 1.8000000000000003, 0, 0, 0}};
-    mnavPos2 velocities[3];
+    mnavVec2 velocities[3];
     CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.05, velocities) == mnav_success, "stepped");
     for (int32_t i = 0; i < 3; ++i)
     {
-        CHECK(velocities[i].x * velocities[i].x + velocities[i].y * velocities[i].y <=
-                  agents[i].maxSpeed * agents[i].maxSpeed,
+        double x = (double)velocities[i].x;
+        double y = (double)velocities[i].y;
+        CHECK(x * x + y * y <= agents[i].maxSpeed * agents[i].maxSpeed,
               "no faster than the maximum");
     }
     mnavDestroyAvoidance(avoidance);
 }
 
-// A lone agent that would go faster than it may: the velocity scaled
-// back onto the speed circle came out a unit past it, its squared speed
-// 0x1.2000000000001p+1 against 2.25.
+// A lone agent that would go faster than it may: the program scaled its
+// preferred velocity back onto the speed circle a unit past it, its
+// squared speed 0x1.2000000000001p+1 against 2.25.
 static void TestSpeedScaledBack(void)
 {
     mnavAvoidance* avoidance = Make(1, 1, 2.0);
     mnavAgent agent = Agent(0.0, 0.0, 1);
-    agent.preferred = (mnavPos2){0x1.f535bda15cca2p+0, -0x1.95d3b9c15802ap+0};
-    mnavPos2 velocity;
+    agent.preferred = (mnavVec2){0x1.f977bcp+0f, -0x1.10eb7p-2f};
+    mnavVec2 velocity;
     CHECK(mnavAvoid(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) == mnav_success, "stepped");
-    CHECK(velocity.x * velocity.x + velocity.y * velocity.y <= 2.25, "no faster than the maximum");
+    double x = (double)velocity.x;
+    double y = (double)velocity.y;
+    CHECK(x * x + y * y <= 2.25, "no faster than the maximum");
     // Held back by its speed alone, it does not sidestep: a 1% sidestep
-    // would put the cross product near 0.04.
-    double cross = velocity.x * agent.preferred.y - velocity.y * agent.preferred.x;
-    CHECK(velocity.x > 1.1 && fabs(cross) < 1e-12, "along the preferred velocity");
+    // would put the cross product near 0.04, rounding to binary32 below
+    // 1e-6.
+    double cross = x * (double)agent.preferred.y - y * (double)agent.preferred.x;
+    CHECK(x * x + y * y > 2.24 && fabs(cross) < 1e-6, "along the preferred velocity");
     mnavDestroyAvoidance(avoidance);
 }
 
 // A maximum speed whose square is subnormal, about 1.4 units of the least
 // subnormal, which rounds to 1: a velocity on the circle squares to 2,
-// since the squares round absolutely, and is kept all the same.
+// since the squares round absolutely, and is kept all the same. The
+// preferred velocity lies far outside the circle, so the program clamps
+// onto it in binary64, which the library's assertions check in builds that
+// keep them; the velocity given back is that rounded to binary32, which is
+// zero.
 static void TestSubnormalSpeed(void)
 {
     mnavAvoidance* avoidance = Make(4, 4, 2.0);
     mnavAgent agent = Agent(0.0, 0.0, 1);
     agent.maxSpeed = 2.6533818898224513e-162;
-    agent.preferred = (mnavPos2){1.8899272380723789e-162, 1.8624205991209053e-162};
-    mnavPos2 velocity;
+    agent.preferred = (mnavVec2){1.8899272f, 1.8624206f};
+    mnavVec2 velocity;
     CHECK(mnavAvoid(avoidance, &agent, 1, nullptr, 0, 0.05, &velocity) == mnav_success, "stepped");
-    CHECK(isfinite(velocity.x) && isfinite(velocity.y) &&
-              velocity.x * velocity.x + velocity.y * velocity.y <=
-                  agent.maxSpeed * agent.maxSpeed + 0x1p-1072,
-          "on the circle, but for subnormal rounding");
+    CHECK(velocity.x == 0.0f && velocity.y == 0.0f, "zero in binary32");
     mnavDestroyAvoidance(avoidance);
 }
 
 // Two agents whose squared distance is subnormal: flushing it to zero
 // would put them on one spot, and A would turn straight back.
-static mnavPos2 s_closeVelocities[2];
+static mnavVec2 s_closeVelocities[2];
 
 static uint64_t CloseHash(void)
 {
@@ -767,8 +777,9 @@ static uint64_t CloseHash(void)
 static void TestUnderEveryHost(void)
 {
     uint64_t hash = CloseHash();
-    CHECK(s_closeVelocities[0].x == -0x1.6c4b5ce91523p+0 &&
-              s_closeVelocities[0].y == -0x1.e5b9d136c6d95p-2,
+    // The binary64 velocity -0x1.6c4b5ce91523p+0, -0x1.e5b9d136c6d95p-2,
+    // rounded to nearest, which keeps it within the maximum speed.
+    CHECK(s_closeVelocities[0].x == -0x1.6c4b5cp+0f && s_closeVelocities[0].y == -0x1.e5b9d2p-2f,
           "a subnormal distance kept");
     CHECK(EveryFloatHost(CloseHash, hash), "the same velocities under every host setting");
 }
@@ -787,10 +798,10 @@ static void TestNeighbourThreeCellsOut(void)
     mnavAgent agents[2] = {
         {{0x1.3d896d6036906p+7, 0.0}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 1, 0, 0},
         {{0x1.479e0b42c2747p+7, 0.0}, {-3.0, 0.0}, {-3.0, 0.0}, 0.5, 4.0, 1.0, 2, 0, 0}};
-    mnavPos2 velocities[2];
+    mnavVec2 velocities[2];
     CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_success &&
-              (velocities[0].x != 3.0 || velocities[0].y != 0.0) &&
-              (velocities[1].x != -3.0 || velocities[1].y != 0.0),
+              ((double)velocities[0].x != 3.0 || (double)velocities[0].y != 0.0) &&
+              ((double)velocities[1].x != -3.0 || (double)velocities[1].y != 0.0),
           "a neighbour three cells out is seen");
     mnavDestroyAvoidance(avoidance);
 }
@@ -804,8 +815,8 @@ static void TestFarNeighbourPastANearOne(void)
     mnavAgent agents[3] = {{{4.9, 0.1}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 1, 0, 0},
                            {{4.9, 1.6}, {3.0, 0.0}, {3.0, 0.0}, 0.5, 4.0, 1.0, 2, 0, 0},
                            {{10.5, 0.1}, {-3.0, 0.0}, {-3.0, 0.0}, 0.5, 4.0, 1.0, 3, 0, 0}};
-    mnavPos2 with[3];
-    mnavPos2 without[2];
+    mnavVec2 with[3];
+    mnavVec2 without[2];
     CHECK(mnavAvoid(avoidance, agents, 3, nullptr, 0, 0.1, with) == mnav_success &&
               mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.1, without) == mnav_success &&
               (with[0].x != without[0].x || with[0].y != without[0].y),
@@ -826,9 +837,9 @@ static void TestOverlappedObstacleFirst(void)
     const mnavPos2 a = {0.3, 0.0};
     const mnavPos2 b = {0.0, 2.0};
     const mnavObstacle both[2] = {{&a, 1, 1.0, {0.0, 0.0}, 1, 0}, {&b, 1, 1.4, {0.0, 0.0}, 2, 0}};
-    mnavPos2 withBoth;
-    mnavPos2 withA;
-    mnavPos2 withB;
+    mnavVec2 withBoth;
+    mnavVec2 withA;
+    mnavVec2 withB;
     CHECK(mnavAvoid(avoidance, &agent, 1, both, 2, 0.1, &withBoth) == mnav_success &&
               mnavAvoid(avoidance, &agent, 1, both, 1, 0.1, &withA) == mnav_success &&
               mnavAvoid(avoidance, &agent, 1, both + 1, 1, 0.1, &withB) == mnav_success,
@@ -836,13 +847,13 @@ static void TestOverlappedObstacleFirst(void)
     CHECK((withA.x != withB.x || withA.y != withB.y) && withBoth.x == withA.x &&
               withBoth.y == withA.y,
           "an obstacle overlapped is kept before one apart");
-    CHECK(withA.x < 0.0, "out of a circle it stands in, not on into it");
+    CHECK((double)withA.x < 0.0, "out of a circle it stands in, not on into it");
     // A circle coming on at 4 m/s, faster than the agent can leave: away
     // at its full speed, the most the agent can do.
     const mnavObstacle fast = {&a, 1, 1.0, {-4.0, 0.0}, 3, 0};
-    mnavPos2 fleeing;
+    mnavVec2 fleeing;
     CHECK(mnavAvoid(avoidance, &agent, 1, &fast, 1, 0.1, &fleeing) == mnav_success &&
-              fleeing.x == -1.5 && fleeing.y == 0.0,
+              (double)fleeing.x == -1.5 && (double)fleeing.y == 0.0,
           "away from an oncoming circle at full speed");
     mnavDestroyAvoidance(avoidance);
 }

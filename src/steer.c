@@ -103,7 +103,7 @@ static MNAV_NOINLINE mnavResult SteerWork(const mnavCorners* corners, const mnav
             return mnav_errorInvalid;
         }
     }
-    *steeringOut = (mnavSteering){{0.0, 0.0, 0.0}, mnav_steerArrived, -1};
+    *steeringOut = (mnavSteering){{0.0f, 0.0f, 0.0f}, mnav_steerArrived, -1};
     double left = Left(corners);
     if (left <= (double)def->arriveDistance)
     {
@@ -113,7 +113,7 @@ static MNAV_NOINLINE mnavResult SteerWork(const mnavCorners* corners, const mnav
     bool takeoff = corners->linkCount > 0 && corners->links[0].point == 1;
     if (takeoff && Ground(corners->points[0], corners->points[1]) <= (double)def->arriveDistance)
     {
-        *steeringOut = (mnavSteering){{0.0, 0.0, 0.0}, mnav_steerAtLink, 0};
+        *steeringOut = (mnavSteering){{0.0f, 0.0f, 0.0f}, mnav_steerAtLink, 0};
         return mnav_success;
     }
     // The first corner away from the agent on the ground: one straight
@@ -130,8 +130,8 @@ static MNAV_NOINLINE mnavResult SteerWork(const mnavCorners* corners, const mnav
     {
         speed *= left / (double)def->slowDistance;
     }
-    *steeringOut =
-        (mnavSteering){{direction.x * speed, 0.0, direction.z * speed}, mnav_steerMoving, -1};
+    *steeringOut = (mnavSteering){
+        {(float)(direction.x * speed), 0.0f, (float)(direction.z * speed)}, mnav_steerMoving, -1};
     return mnav_success;
 }
 

@@ -213,9 +213,48 @@ static inline mnavResult mnavAvoidRadius(double v)
     return v > 0.0 ? mnavAvoidBound(v, MNAV_MAX_AVOIDANCE_RADIUS) : mnav_errorInvalid;
 }
 
-// Fills the set's obstacle grid with spheres, by their bounds on the
-// ground (X and Z), its fastest speed their fastest in space; count is
-// within the set's obstacle points.
+// The binary32 next to f toward zero: one less in the magnitude's bits,
+// the sign kept. f is finite and not zero.
+static inline float mnavStepTowardZero(float f)
+{
+    uint32_t bits = 0;
+    memcpy(&bits, &f, sizeof(bits));
+    bits -= 1u;
+    memcpy(&f, &bits, sizeof(f));
+    return f;
+}
+
+// A velocity the set gives back, rounded once to binary32, to nearest. v
+// is within the maximum speed; when that rounding would put it past, each
+// component it grew steps back toward zero, to at most its own magnitude in
+// v, so the speed check that held for v holds for the result too.
+static inline mnavVec2 mnavNarrow2(mnavPos2 v, double maxSpeed)
+{
+    mnavVec2 f = {(float)v.x, (float)v.y};
+    mnavPos2 wide = mnavWide2(f);
+    if (!mnavWithinSpeed2(wide, maxSpeed))
+    {
+        f.x = fabs(wide.x) > fabs(v.x) ? mnavStepTowardZero(f.x) : f.x;
+        f.y = fabs(wide.y) > fabs(v.y) ? mnavStepTowardZero(f.y) : f.y;
+    }
+    MNAV_ASSERT(mnavWithinSpeed2(mnavWide2(f), maxSpeed));
+    return f;
+}
+
+static inline mnavVec3 mnavNarrow3(mnavPos3 v, double maxSpeed)
+{
+    mnavVec3 f = {(float)v.x, (float)v.y, (float)v.z};
+    mnavPos3 wide = mnavWide3(f);
+    if (!mnavWithinSpeed3(wide, maxSpeed))
+    {
+        f.x = fabs(wide.x) > fabs(v.x) ? mnavStepTowardZero(f.x) : f.x;
+        f.y = fabs(wide.y) > fabs(v.y) ? mnavStepTowardZero(f.y) : f.y;
+        f.z = fabs(wide.z) > fabs(v.z) ? mnavStepTowardZero(f.z) : f.z;
+    }
+    MNAV_ASSERT(mnavWithinSpeed3(mnavWide3(f), maxSpeed));
+    return f;
+}
+
 // Clears the velocities of a call that failed, when the set's agent limit
 // holds them; a count past it, or no set, writes nothing, since the count
 // is all that bounds the caller's array.
@@ -230,6 +269,9 @@ static inline mnavResult mnavAvoidClear(mnavResult result, const mnavAvoidance* 
     return result;
 }
 
+// Fills the set's obstacle grid with spheres, by their bounds on the
+// ground (X and Z), its fastest speed their fastest in space; count is
+// within the set's obstacle points.
 void mnavBuildSphereGrid(mnavAvoidance* avoidance, const mnavSphere* spheres, int32_t count);
 
 // The spheres an agent may meet within the obstacle horizon, the nearest

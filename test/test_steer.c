@@ -24,9 +24,10 @@ static mnavCorners Corners(const mnavPos3* points, int32_t count)
     return (mnavCorners){points, count, nullptr, 0};
 }
 
+// Within binary32's rounding of a velocity of a few meters a second.
 static bool Near(double a, double b)
 {
-    return fabs(a - b) < 1e-12;
+    return fabs(a - b) < 1e-6;
 }
 
 static mnavSteering Steer(const mnavCorners* corners, const mnavSteerDef* def)
@@ -42,8 +43,8 @@ static void TestMoving(void)
     const mnavPos3 straight[2] = {At(0, 0), At(10, 0)};
     mnavCorners c = Corners(straight, 2);
     mnavSteering s = Steer(&c, &def);
-    CHECK(s.state == mnav_steerMoving && s.link == -1 && Near(s.velocity.x, 3.5) &&
-              s.velocity.y == 0.0 && s.velocity.z == 0.0,
+    CHECK(s.state == mnav_steerMoving && s.link == -1 && Near((double)s.velocity.x, 3.5) &&
+              (double)s.velocity.y == 0.0 && (double)s.velocity.z == 0.0,
           "straight at the next corner at full speed");
     // A turn ahead: toward (4, 0) less the direction to (4, 4) times 2.
     const mnavPos3 turn[3] = {At(0, 0), At(4, 0), At(4, 4)};
@@ -52,16 +53,19 @@ static void TestMoving(void)
     double x = 4.0 - sqrt(0.5) * 2.0;
     double z = -sqrt(0.5) * 2.0;
     double length = hypot(x, z);
-    CHECK(Near(s.velocity.x, 3.5 * x / length) && Near(s.velocity.z, 3.5 * z / length),
+    CHECK(Near((double)s.velocity.x, 3.5 * x / length) &&
+              Near((double)s.velocity.z, 3.5 * z / length),
           "swinging wide of the turn, away from it");
     def.anticipateTurns = false;
     s = Steer(&c, &def);
-    CHECK(Near(s.velocity.x, 3.5) && s.velocity.z == 0.0, "without anticipation, straight");
+    CHECK(Near((double)s.velocity.x, 3.5) && (double)s.velocity.z == 0.0,
+          "without anticipation, straight");
     // A corner straight above the agent, at a step, is passed.
     const mnavPos3 step[3] = {At(0, 0), {0.0, 0.3, 0.0}, At(0, 5)};
     c = Corners(step, 3);
     s = Steer(&c, &def);
-    CHECK(s.state == mnav_steerMoving && s.velocity.x == 0.0 && Near(s.velocity.z, 3.5),
+    CHECK(s.state == mnav_steerMoving && (double)s.velocity.x == 0.0 &&
+              Near((double)s.velocity.z, 3.5),
           "past a corner above the agent");
 }
 
@@ -72,12 +76,12 @@ static void TestArriving(void)
     const mnavPos3 bend[3] = {At(0, 0), At(0.3, 0), At(0.3, 0.4)};
     mnavCorners c = Corners(bend, 3);
     mnavSteering s = Steer(&c, &def);
-    double speed = hypot(s.velocity.x, s.velocity.z);
+    double speed = hypot((double)s.velocity.x, (double)s.velocity.z);
     CHECK(s.state == mnav_steerMoving && Near(speed, 3.5 * 0.7), "slowing by the distance left");
     const mnavPos3 near[2] = {At(0, 0), At(0.1, 0)};
     c = Corners(near, 2);
     s = Steer(&c, &def);
-    CHECK(s.state == mnav_steerArrived && s.velocity.x == 0.0 && s.link == -1,
+    CHECK(s.state == mnav_steerArrived && (double)s.velocity.x == 0.0 && s.link == -1,
           "within the arrival distance: arrived");
     c = Corners(near, 1);
     s = Steer(&c, &def);
@@ -92,7 +96,7 @@ static void TestArriving(void)
     const mnavPos3 short2[2] = {At(0, 0), At(0.2, 0)};
     c = Corners(short2, 2);
     s = Steer(&c, &def);
-    CHECK(Near(s.velocity.x, 3.5), "no slowing: full speed to the end");
+    CHECK(Near((double)s.velocity.x, 3.5), "no slowing: full speed to the end");
 }
 
 static void TestLinks(void)
@@ -102,12 +106,13 @@ static void TestLinks(void)
     const mnavPathLink links[1] = {{{1, 1}, mnav_linkJump, 1}};
     mnavCorners c = {jump, 4, links, 1};
     mnavSteering s = Steer(&c, &def);
-    CHECK(s.state == mnav_steerMoving && Near(s.velocity.x, 3.5) && s.velocity.z == 0.0,
+    CHECK(s.state == mnav_steerMoving && Near((double)s.velocity.x, 3.5) &&
+              (double)s.velocity.z == 0.0,
           "straight at a takeoff, never swinging wide of it");
     const mnavPos3 there[4] = {At(2.95, 0), At(3, 0), At(5, 2), At(8, 2)};
     c.points = there;
     s = Steer(&c, &def);
-    CHECK(s.state == mnav_steerAtLink && s.link == 0 && s.velocity.x == 0.0,
+    CHECK(s.state == mnav_steerAtLink && s.link == 0 && (double)s.velocity.x == 0.0,
           "within the arrival distance of the takeoff: at the link");
     // A link further on: steering as usual.
     const mnavPathLink later[1] = {{{1, 1}, mnav_linkJump, 2}};

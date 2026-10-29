@@ -49,13 +49,13 @@ static double LeftOf(mnavPos2 a, mnavPos2 b, mnavPos2 c)
 // its MNAV_MAX_AVOIDANCE_ bound, an infinity included.
 static mnavResult CheckObstacle(const mnavObstacle* o)
 {
-    if (o->points == nullptr || o->pointCount < 1 || HasNaN(o->velocity) || isnan(o->radius) ||
-        (o->pointCount == 1) != (o->radius > 0.0) || o->radius < 0.0)
+    if (o->points == nullptr || o->pointCount < 1 || HasNaN(mnavWide2(o->velocity)) ||
+        isnan(o->radius) || (o->pointCount == 1) != (o->radius > 0.0) || o->radius < 0.0)
     {
         return mnav_errorInvalid;
     }
-    bool within =
-        Within(o->velocity, MNAV_MAX_AVOIDANCE_SPEED) && o->radius <= MNAV_MAX_AVOIDANCE_RADIUS;
+    bool within = Within(mnavWide2(o->velocity), MNAV_MAX_AVOIDANCE_SPEED) &&
+                  o->radius <= MNAV_MAX_AVOIDANCE_RADIUS;
     for (int32_t i = 0; i < o->pointCount; ++i)
     {
         mnavPos2 a = o->points[i];
@@ -104,8 +104,8 @@ mnavResult mnavBuildObstacles(const mnavObstacle* obstacles, int32_t count,
                 c > 1 ? mnavNormalize2(mnavSub2(next, here)) : (mnavPos2){0.0, 0.0};
             bool convex = c < 3 || LeftOf(previous, here, next) >= 0.0;
             vertices[n + i] = (mnavObstacleVertex){
-                here, direction,       o->velocity,         o->radius, o->id,
-                i,    n + (i + 1) % c, n + (i + c - 1) % c, convex,    o->layers};
+                here, direction,       mnavWide2(o->velocity), o->radius, o->id,
+                i,    n + (i + 1) % c, n + (i + c - 1) % c,    convex,    o->layers};
         }
         n += c;
     }
@@ -626,8 +626,8 @@ static mnavLine CircleLine(const mnavAgent* agent, const mnavObstacleVertex* o, 
     double distanceSq = mnavDot2(rel, rel);
     if (distanceSq > combined * combined)
     {
-        return mnavPairLine(agent->position, agent->velocity, o->point, o->velocity, combined, 1.0,
-                            horizon, step, agent->id < o->id);
+        return mnavPairLine(agent->position, mnavWide2(agent->velocity), o->point, o->velocity,
+                            combined, 1.0, horizon, step, agent->id < o->id);
     }
     // On the center itself no way is out; a fixed one keeps it
     // deterministic.
@@ -650,8 +650,8 @@ int32_t mnavObstacleLines(const mnavAgent* agent, const mnavObstacleVertex* vert
             lines[count++] = CircleLine(agent, o, horizon, step);
             continue;
         }
-        View w = {vertices, agent->position, mnavSub2(agent->velocity, o->velocity), agent->radius,
-                  1.0 / horizon};
+        View w = {vertices, agent->position, mnavSub2(mnavWide2(agent->velocity), o->velocity),
+                  agent->radius, 1.0 / horizon};
         if (Covered(&w, near[k].vertex, o->next, lines, count))
         {
             continue;

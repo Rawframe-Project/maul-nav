@@ -144,7 +144,7 @@ static void TestExcludedAreasElsewhere(void)
     mnavRay ray = {0};
     CHECK(mnavRaycast(query, navmesh, &filter, a.polygon, a.point, (mnavPos3){17.5, 0.0, 7.5},
                       &ray) == mnav_success &&
-              ray.end == mnav_rayWall && ray.t == 0.25 && ray.normalX == -1.0 &&
+              ray.end == mnav_rayWall && ray.t == 0.25 && ray.normal.x == -1.0f &&
               ray.polygonCount == 1,
           "the bridge's edge a wall");
     CHECK(mnavRaycast(query, navmesh, nullptr, a.polygon, a.point, (mnavPos3){17.5, 0.0, 7.5},

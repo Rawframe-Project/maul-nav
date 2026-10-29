@@ -20,7 +20,7 @@
 #include <stdint.h>
 
 // The hash of every line the grid of agents gets.
-#define LINES_HASH 0x24500654f967d856ull
+#define LINES_HASH 0xabad7e0d0d0528e6ull
 
 static const mnavPos2 s_l[6] = {{-8, -8}, {-2, -8}, {-2, -6}, {-6, -6}, {-6, -2}, {-8, -2}};
 static const mnavPos2 s_u[8] = {{2, 2}, {9, 2}, {9, 8}, {7, 8}, {7, 4}, {4, 4}, {4, 8}, {2, 8}};
@@ -49,14 +49,14 @@ static uint64_t LinesWith(const mnavObstacleVertex* vertices, int32_t count, dou
     uint64_t hash = MNAV_HASH_INIT;
     *total = 0;
     *touching = 0;
-    const mnavPos2 velocities[4] = {{1.0, 0.0}, {0.0, 1.2}, {-0.8, -0.8}, {0.0, 0.0}};
+    const mnavVec2 velocities[4] = {{1.0f, 0.0f}, {0.0f, 1.2f}, {-0.8f, -0.8f}, {0.0f, 0.0f}};
     for (int32_t gx = 0; gx < 48; ++gx)
     {
         for (int32_t gy = 0; gy < 48; ++gy)
         {
             mnavAgent agent = {{-10.0 + gx * 0.4375, -10.0 + gy * 0.4375},
                                velocities[(gx + gy) % 4],
-                               {0.0, 0.0},
+                               {0.0f, 0.0f},
                                0.5,
                                1.5,
                                1.0,
@@ -81,7 +81,7 @@ static void TestLinesAroundShapes(void)
 {
     const mnavObstacle obstacles[3] = {{s_l, 6, 0.0, {0, 0}, 1, 0},
                                        {s_u, 8, 0.0, {0, 0}, 2, 0},
-                                       {s_bar, 2, 0.0, {0.3, -0.2}, 3, 0}};
+                                       {s_bar, 2, 0.0, {0.3f, -0.2f}, 3, 0}};
     static mnavObstacleVertex vertices[16];
     int32_t count = 0;
     CHECK(mnavBuildObstacles(obstacles, 3, vertices, 16, &count) == mnav_success && count == 16,

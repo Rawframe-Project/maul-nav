@@ -204,7 +204,7 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
     {
         mnavRay ray;
         result = mnavRaycast(s_query, s_navmesh, filter, id, a, b, &ray);
-        Expect(result != mnav_success || (ray.polygonCount >= 0 && isfinite(ray.normalX)));
+        Expect(result != mnav_success || (ray.polygonCount >= 0 && isfinite(ray.normal.x)));
     }
     else if (op == 1)
     {
@@ -353,9 +353,13 @@ static mnavResult Steer(Reader* r, const mnavCorridor* corridor)
     {
         return result;
     }
-    double speed = hypot(steering.velocity.x, steering.velocity.z);
-    Expect(Finite(steering.velocity) && steering.velocity.y == 0.0 &&
-           speed <= (double)def.maxSpeed * (1.0 + 1e-9) + 1e-12);
+    // The velocity is rounded to binary32, to nearest: its speed may pass
+    // the def's by that rounding.
+    mnavPos3 velocity = {(double)steering.velocity.x, (double)steering.velocity.y,
+                         (double)steering.velocity.z};
+    double speed = hypot(velocity.x, velocity.z);
+    Expect(Finite(velocity) && velocity.y == 0.0 &&
+           speed <= (double)def.maxSpeed * (1.0 + 0x1p-22) + 0x1p-148);
     Expect(steering.state == mnav_steerMoving || speed == 0.0);
     Expect((steering.state == mnav_steerAtLink) == (steering.link >= 0) &&
            steering.link < (corners.linkCount > 0 ? corners.linkCount : 1));
