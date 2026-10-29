@@ -162,6 +162,17 @@ static void TestHeights(const mnavNavmesh* navmesh)
           "bad arguments");
 }
 
+// Whether two walls are the same, field by field: a wall's binary32
+// normal leaves padding before its distance, which memcmp would compare.
+static bool SameWall(const mnavWall* a, const mnavWall* b)
+{
+    return memcmp(&a->start, &b->start, sizeof(a->start)) == 0 &&
+           memcmp(&a->end, &b->end, sizeof(a->end)) == 0 &&
+           memcmp(&a->point, &b->point, sizeof(a->point)) == 0 &&
+           memcmp(&a->normal, &b->normal, sizeof(a->normal)) == 0 &&
+           memcmp(&a->distance, &b->distance, sizeof(a->distance)) == 0;
+}
+
 static void TestWalls(mnavNavmesh* navmesh)
 {
     // West of the block from x = 30, which the navmesh keeps a radius from.
@@ -183,7 +194,7 @@ static void TestWalls(mnavNavmesh* navmesh)
           "the distance to the point");
     CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 1.0, &wall) ==
                   mnav_success &&
-              !wall.found && memcmp(&wall.wall, &(mnavWall){0}, sizeof(mnavWall)) == 0,
+              !wall.found && SameWall(&wall.wall, &(mnavWall){0}),
           "none within 1 m");
     // Walls behind the filter's refusals: none of the floor's area allowed.
     mnavQueryFilter none = mnavDefaultQueryFilter();
@@ -346,7 +357,7 @@ static void TestWallList(const mnavNavmesh* navmesh)
             tried += 1;
             listed += found.count;
             sound = sound && (found.count > 0) == wall.found &&
-                    (found.count == 0 || memcmp(&walls[0], &wall.wall, sizeof(mnavWall)) == 0);
+                    (found.count == 0 || SameWall(&walls[0], &wall.wall));
             for (int32_t w = 0; w < found.count; ++w)
             {
                 sound = sound && SoundWall(navmesh, n.point, 8.0, &walls[w],
@@ -357,8 +368,11 @@ static void TestWallList(const mnavNavmesh* navmesh)
                 mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 8.0, few, 3, &some);
             int32_t held = found.count < 3 ? found.count : 3;
             sound = sound && result == (found.count > 3 ? mnav_errorCapacity : mnav_success) &&
-                    some.count == found.count &&
-                    memcmp(few, walls, (size_t)held * sizeof(mnavWall)) == 0;
+                    some.count == found.count;
+            for (int32_t w = 0; w < held; ++w)
+            {
+                sound = sound && SameWall(&few[w], &walls[w]);
+            }
             cut += found.count > 3 ? 1 : 0;
             result =
                 mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 8.0, nullptr, 0, &some);
