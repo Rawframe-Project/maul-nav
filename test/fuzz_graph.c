@@ -353,7 +353,7 @@ static void Fields(Reader* r, const mnavNavmesh* navmesh, const mnavQueryFilter*
     FieldDrawing drawing = {whole, navmesh};
     Draw(DrawField, &drawing, Byte(r), Byte(r), Byte(r));
     // A region from the bytes, perhaps backward or outside the world.
-    mnavNavFlowRegion region = {Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1};
+    mnavTileRange region = {Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1};
     begun = mnavBeginNavFlow(stepped, navmesh, filter, &region, goals, goalCount);
     Expect(Typed(begun));
     ended = begun != mnav_success;
@@ -416,8 +416,9 @@ static void Generate(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
     mnavResult results[2];
     for (int32_t k = 0; k < 2; ++k)
     {
-        results[k] = mnavGenerateLinks(query, navmesh, filter, &def, x0, z0, x1, z1, s_links[k],
-                                       capacity, &counts[k]);
+        results[k] =
+            mnavGenerateLinks(query, navmesh, filter, &def, &(mnavTileRange){x0, z0, x1, z1},
+                              s_links[k], capacity, &counts[k]);
         Expect(Typed(results[k]));
     }
     Expect(results[0] == results[1]);

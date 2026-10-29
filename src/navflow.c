@@ -69,7 +69,7 @@ struct mnavNavFlow
     int32_t polygonCount;
     mnavQueryFilter filter;
     // The tiles searched, and whether the work has ended.
-    mnavNavFlowRegion region;
+    mnavTileRange region;
     bool ended;
 };
 
@@ -329,7 +329,7 @@ static void Polygon(const mnavNavFlow* f, int32_t number, int32_t* slot, int32_t
 static bool InRegion(const mnavNavFlow* f, const mnavNavmesh* navmesh, int32_t slot)
 {
     const mnavSlot* s = &navmesh->slots[slot];
-    const mnavNavFlowRegion* r = &f->region;
+    const mnavTileRange* r = &f->region;
     return s->tile != nullptr && s->x >= r->x0 && s->x <= r->x1 && s->z >= r->z0 && s->z <= r->z1;
 }
 
@@ -510,7 +510,7 @@ static mnavResult Seed(mnavNavFlow* f, const mnavNavFlowGoal* goals, int32_t goa
 
 static MNAV_NOINLINE mnavResult BeginNavFlowWork(mnavNavFlow* field, const mnavNavmesh* navmesh,
                                                  const mnavQueryFilter* filter,
-                                                 const mnavNavFlowRegion* region,
+                                                 const mnavTileRange* region,
                                                  const mnavNavFlowGoal* goals, int32_t goalCount)
 {
     if (field != nullptr && mnavHostCalledBack(&field->host))
@@ -528,9 +528,8 @@ static MNAV_NOINLINE mnavResult BeginNavFlowWork(mnavNavFlow* field, const mnavN
     {
         return mnav_errorInvalid;
     }
-    field->region = region != nullptr
-                        ? *region
-                        : (mnavNavFlowRegion){INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX};
+    field->region =
+        region != nullptr ? *region : (mnavTileRange){INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX};
     mnavResult result = mnavCheckFilter(filter, &usable);
     result = result == mnav_success ? Index(field, navmesh) : result;
     if (result != mnav_success)
@@ -554,7 +553,7 @@ static MNAV_NOINLINE mnavResult BeginNavFlowWork(mnavNavFlow* field, const mnavN
 
 static MNAV_NOINLINE mnavResult BeginNavFlowCounted(mnavNavFlow* field, const mnavNavmesh* navmesh,
                                                     const mnavQueryFilter* filter,
-                                                    const mnavNavFlowRegion* region,
+                                                    const mnavTileRange* region,
                                                     const mnavNavFlowGoal* goals, int32_t goalCount)
 {
     return mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
@@ -562,7 +561,7 @@ static MNAV_NOINLINE mnavResult BeginNavFlowCounted(mnavNavFlow* field, const mn
 }
 
 mnavResult mnavBeginNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
-                            const mnavQueryFilter* filter, const mnavNavFlowRegion* region,
+                            const mnavQueryFilter* filter, const mnavTileRange* region,
                             const mnavNavFlowGoal* goals, int32_t goalCount)
 {
     uint64_t env = mnavFloatEnvEnter();

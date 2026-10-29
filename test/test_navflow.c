@@ -378,7 +378,7 @@ static void TestStepsAndRegions(mnavNavFlow* field)
     CHECK(mnavStageLink(navmesh, &out, &outLink) == mnav_success &&
               mnavCommit(navmesh) == mnav_success,
           "a link out of the region");
-    const mnavNavFlowRegion region = {1, 2, 4, 5};
+    const mnavTileRange region = {1, 2, 4, 5};
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tileCells = 32;
     mnavNavmesh* part = nullptr;
@@ -413,7 +413,7 @@ static void TestStepsAndRegions(mnavNavFlow* field)
     mnavPolygonFlow f;
     CHECK(mnavNavFlowAt(regional, navmesh, goals[1].polygon, &f) == mnav_errorOutside,
           "a polygon outside the region");
-    const mnavNavFlowRegion backward = {4, 2, 1, 5};
+    const mnavTileRange backward = {4, 2, 1, 5};
     CHECK(mnavBeginNavFlow(regional, navmesh, nullptr, &backward, goals, 2) == mnav_errorInvalid,
           "a region backward");
     // A commit while working: the work is stale.
@@ -515,7 +515,7 @@ static void TestDebug(mnavNavFlow* field, const mnavNavmesh* other)
           "stale after a commit");
     mnavDestroyNavmesh(navmesh);
     // A field over a region draws its polygons alone.
-    const mnavNavFlowRegion part = {1, 1, 3, 3};
+    const mnavTileRange part = {1, 1, 3, 3};
     b.lineCount = 0;
     b.vertexCount = 0;
     navmesh = LoadSmall();

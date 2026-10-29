@@ -426,7 +426,7 @@ static void Grid(Reader* r, const mnavQueryFilter* filter)
     def.cells = 64;
     mnavFlowField* field = nullptr;
     Expect(mnavCreateFlowField(&def, &field) == mnav_success);
-    mnavFlowRegion region = {Byte(r) % 6, Byte(r) % 6, Byte(r) % 10, Byte(r) % 10};
+    mnavCellRange region = {Byte(r) % 6, Byte(r) % 6, Byte(r) % 10, Byte(r) % 10};
     mnavCell goals[2] = {a, b};
     result =
         mnavBeginFlowField(field, &grid, filter, Byte(r) % 2 == 0 ? &region : nullptr, goals, 2);

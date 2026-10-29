@@ -142,15 +142,6 @@ extern "C"
     /// code the object runs calls back in.
     MNAV_API uint64_t mnavGetNavFlowMisuse(const mnavNavFlow* field);
 
-    // A box of tile places, from (x0, z0) to (x1, z1), both included.
-    typedef struct mnavNavFlowRegion
-    {
-        int32_t x0;
-        int32_t z0;
-        int32_t x1;
-        int32_t z1;
-    } mnavNavFlowRegion;
-
     /// Begins building the field over the tiles of a region, as
     /// mnavBuildNavFlow builds it over all; polygons outside the region
     /// are as left out, and only those inside count toward the field's
@@ -171,9 +162,9 @@ extern "C"
     /// Safe from any thread. Any number of threads may read the navmesh at
     /// once while no commit runs on it; the field is used by one thread at
     /// a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavBeginNavFlow(
-        mnavNavFlow* field, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-        const mnavNavFlowRegion* region, const mnavNavFlowGoal* goals, int32_t goalCount);
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavBeginNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                     const mnavTileRange* region, const mnavNavFlowGoal* goals, int32_t goalCount);
 
     /// Continues the work begun on a field: settles up to a number of
     /// polygons, fewer when the work ends first.

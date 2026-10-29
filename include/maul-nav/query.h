@@ -898,6 +898,15 @@ extern "C"
         int32_t y;
     } mnavCell;
 
+    // A box of a grid's cells, from (x0, y0) to (x1, y1), both included.
+    typedef struct mnavCellRange
+    {
+        int32_t x0;
+        int32_t y0;
+        int32_t x1;
+        int32_t y1;
+    } mnavCellRange;
+
     // A grid path: how its search ended, its cost and length, and the
     // cells it turns at, the start first and the last cell reached last,
     // in a query context's memory until its next query.

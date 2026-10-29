@@ -39,7 +39,7 @@ static void Raise(mnavFlowField* f, int32_t cell)
 // The cell of the region at grid place (x, y), or -1 outside it.
 static int32_t CellAt(const mnavFlowField* f, int32_t x, int32_t y)
 {
-    const mnavFlowRegion* r = &f->region;
+    const mnavFlowWindow* r = &f->region;
     if (x < r->x || y < r->y || x >= r->x + r->width || y >= r->y + r->height)
     {
         return -1;

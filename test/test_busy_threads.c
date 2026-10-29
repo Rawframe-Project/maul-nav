@@ -96,8 +96,8 @@ static int32_t Generate(mnavQuery* query, mnavLinkDef* links)
     def.clear = Clearance;
     int32_t count = 0;
     s_tests = 0;
-    CHECK(mnavGenerateLinks(query, s_navmesh, nullptr, &def, 0, 0, 1, 0, links, LINKS, &count) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, s_navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, links,
+                            LINKS, &count) == mnav_success &&
               count > 0,
           "links with a clearance test");
     return count;

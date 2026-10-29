@@ -69,7 +69,7 @@ static int32_t Count(const mnavDebugBuffer* b, mnavDebugKind kind, int32_t value
 static void TestNavmesh(const mnavNavmesh* navmesh)
 {
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 1, 1, &b) == mnav_success, "drawn");
+    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &b) == mnav_success, "drawn");
     printf("navmesh: %d vertices, %d triangle and %d line indices\n", b.vertexCount,
            b.triangleCount, b.lineCount);
     CHECK(b.triangleCount > 0 && b.triangleCount % 3 == 0 && b.lineCount % 2 == 0 &&
@@ -95,42 +95,44 @@ static void TestNavmesh(const mnavNavmesh* navmesh)
     CHECK(hash == NAVMESH_HASH, "the pinned hash");
     // An empty buffer counts what the whole needs.
     mnavDebugBuffer none = {{0.0, 0.0, 0.0}, nullptr, 0, 0, nullptr, 0, 0, nullptr, 0, 0};
-    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 1, 1, &none) == mnav_errorCapacity &&
+    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &none) == mnav_errorCapacity &&
               none.vertexCount == b.vertexCount && none.triangleCount == b.triangleCount &&
               none.lineCount == b.lineCount,
           "counted without room");
     // Relative to another origin, every position moves by it.
     mnavDebugBuffer moved = Buffer((mnavPos3){100.0, 2.0, -50.0});
     mnavDebugVertex first = b.vertices[0];
-    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 1, 1, &moved) == mnav_success &&
+    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &moved) == mnav_success &&
               fabsf(moved.vertices[0].x - (first.x - 100.0f)) < 1e-3f &&
               fabsf(moved.vertices[0].y - (first.y - 2.0f)) < 1e-3f &&
               fabsf(moved.vertices[0].z - (first.z + 50.0f)) < 1e-3f,
           "relative to the origin");
     // One tile only, at either end of the range.
     mnavDebugBuffer one = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugNavmesh(navmesh, 1, 1, 1, 1, &one) == mnav_success &&
+    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){1, 1, 1, 1}, &one) == mnav_success &&
               Count(&one, mnav_debugTileBounds, -1) == 8 && one.vertexCount < b.vertexCount,
           "one tile");
     one = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 0, 0, &one) == mnav_success &&
+    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 0, 0}, &one) == mnav_success &&
               Count(&one, mnav_debugTileBounds, -1) == 8,
           "the first tile");
     // Room for every index but not every vertex: still too small.
     mnavDebugBuffer tight = Buffer((mnavPos3){0.0, 0.0, 0.0});
     tight.vertexCapacity = b.vertexCount - 1;
-    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 1, 1, &tight) == mnav_errorCapacity &&
+    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &tight) == mnav_errorCapacity &&
               tight.vertexCount == b.vertexCount,
           "one vertex short");
     mnavDebugBuffer bad = Buffer((mnavPos3){0.0, 0.0, 0.0});
     bad.lineCount = -1;
-    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 1, 1, &bad) == mnav_errorInvalid, "a bad count");
+    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &bad) == mnav_errorInvalid,
+          "a bad count");
     bad = Buffer((mnavPos3){(double)NAN, 0.0, 0.0});
-    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 1, 1, &bad) == mnav_errorInvalid, "a bad origin");
+    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &bad) == mnav_errorInvalid,
+          "a bad origin");
     bad = Buffer((mnavPos3){0.0, 0.0, 0.0});
     bad.vertices = nullptr;
-    CHECK(mnavDebugNavmesh(navmesh, 0, 0, 1, 1, &bad) == mnav_errorInvalid &&
-              mnavDebugNavmesh(navmesh, 1, 0, 0, 1, &one) == mnav_errorInvalid,
+    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &bad) == mnav_errorInvalid &&
+              mnavDebugNavmesh(navmesh, &(mnavTileRange){1, 0, 0, 1}, &one) == mnav_errorInvalid,
           "no vertex array; a range backward");
 }
 

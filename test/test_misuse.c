@@ -232,8 +232,8 @@ static void TestGoodInput(void)
     mnavLinkGenDef def = mnavDefaultLinkGenDef();
     def.jumpMax = 3.0f;
     int32_t count = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success &&
               count > 0,
           "links");
     mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();

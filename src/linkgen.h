@@ -13,15 +13,6 @@
 
 #include <stdint.h>
 
-// A range of tile places, both ends included.
-typedef struct mnavTileRange
-{
-    int32_t x0;
-    int32_t z0;
-    int32_t x1;
-    int32_t z1;
-} mnavTileRange;
-
 // Where generation stops with mnav_errorLimit: past links found, or at a
 // landing box meeting more than landings polygons, at most
 // MNAV_MAX_LINK_LANDINGS. mnavGenerateLinks gives MNAV_MAX_LINKS and

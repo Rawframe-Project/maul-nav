@@ -110,18 +110,20 @@ static void Bounds(mnavDebugBuffer* buffer, const mnavNavmesh* navmesh, int32_t 
     }
 }
 
-static MNAV_NOINLINE mnavResult DebugNavmeshWork(const mnavNavmesh* navmesh, int32_t tileX0,
-                                                 int32_t tileZ0, int32_t tileX1, int32_t tileZ1,
+static MNAV_NOINLINE mnavResult DebugNavmeshWork(const mnavNavmesh* navmesh,
+                                                 const mnavTileRange* tiles,
                                                  mnavDebugBuffer* buffer)
 {
-    if (navmesh == nullptr || !mnavGoodBuffer(buffer) || tileX1 < tileX0 || tileZ1 < tileZ0)
+    mnavTileRange r =
+        tiles != nullptr ? *tiles : (mnavTileRange){INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX};
+    if (navmesh == nullptr || !mnavGoodBuffer(buffer) || r.x1 < r.x0 || r.z1 < r.z0)
     {
         return mnav_errorInvalid;
     }
     for (int32_t i = 0; i < navmesh->placeCount; ++i)
     {
         const mnavPlace* place = &navmesh->places[i];
-        if (place->x < tileX0 || place->x > tileX1 || place->z < tileZ0 || place->z > tileZ1)
+        if (place->x < r.x0 || place->x > r.x1 || place->z < r.z0 || place->z > r.z1)
         {
             continue;
         }
@@ -136,19 +138,18 @@ static MNAV_NOINLINE mnavResult DebugNavmeshWork(const mnavNavmesh* navmesh, int
     return mnavDrawResult(buffer);
 }
 
-static MNAV_NOINLINE mnavResult DebugNavmeshCounted(const mnavNavmesh* navmesh, int32_t tileX0,
-                                                    int32_t tileZ0, int32_t tileX1, int32_t tileZ1,
+static MNAV_NOINLINE mnavResult DebugNavmeshCounted(const mnavNavmesh* navmesh,
+                                                    const mnavTileRange* tiles,
                                                     mnavDebugBuffer* buffer)
 {
-    return mnavHostCountInvalid(MNAV_HOST(navmesh),
-                                DebugNavmeshWork(navmesh, tileX0, tileZ0, tileX1, tileZ1, buffer));
+    return mnavHostCountInvalid(MNAV_HOST(navmesh), DebugNavmeshWork(navmesh, tiles, buffer));
 }
 
-mnavResult mnavDebugNavmesh(const mnavNavmesh* navmesh, int32_t tileX0, int32_t tileZ0,
-                            int32_t tileX1, int32_t tileZ1, mnavDebugBuffer* buffer)
+mnavResult mnavDebugNavmesh(const mnavNavmesh* navmesh, const mnavTileRange* tiles,
+                            mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = DebugNavmeshCounted(navmesh, tileX0, tileZ0, tileX1, tileZ1, buffer);
+    mnavResult result = DebugNavmeshCounted(navmesh, tiles, buffer);
     mnavFloatEnvLeave(env);
     return result;
 }

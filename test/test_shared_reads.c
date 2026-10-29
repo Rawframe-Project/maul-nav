@@ -314,8 +314,9 @@ static uint64_t Wide(Reader* reader, int32_t round, uint32_t* state, uint64_t ha
     hash = Mix(hash, &cell.next, sizeof(cell.next));
     mnavLinkGenDef def = mnavDefaultLinkGenDef();
     int32_t generated = 0;
-    hash = MixResult(hash, mnavGenerateLinks(query, s_navmesh, nullptr, &def, round % 2, 0,
-                                             round % 2, 1, reader->links, GENERATED, &generated));
+    hash = MixResult(hash, mnavGenerateLinks(query, s_navmesh, nullptr, &def,
+                                             &(mnavTileRange){round % 2, 0, round % 2, 1},
+                                             reader->links, GENERATED, &generated));
     hash = MixInt(hash, generated);
     for (int32_t i = 0; i < generated && i < GENERATED; ++i)
     {
@@ -328,7 +329,8 @@ static uint64_t Wide(Reader* reader, int32_t round, uint32_t* state, uint64_t ha
                                          b.polygon, b.point, &path),
                 &path);
     mnavDebugBuffer buffer = Buffer(reader);
-    hash = Drawn(reader, mnavDebugNavmesh(s_navmesh, round % 2, 0, 1, 1, &buffer), &buffer, hash);
+    hash = Drawn(reader, mnavDebugNavmesh(s_navmesh, &(mnavTileRange){round % 2, 0, 1, 1}, &buffer),
+                 &buffer, hash);
     buffer = Buffer(reader);
     hash = Drawn(reader, mnavDebugLinks(s_navmesh, &buffer), &buffer, hash);
     buffer = Buffer(reader);

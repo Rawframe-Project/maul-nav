@@ -74,8 +74,8 @@ static void TestKinds(const mnavNavmesh* navmesh)
     mnavQuery* query = Query();
     mnavLinkGenDef def = Def();
     int32_t count = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_success,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success,
           "generated");
     int32_t drops = 0;
     int32_t across = 0;
@@ -125,8 +125,8 @@ static void TestKinds(const mnavNavmesh* navmesh)
     // Without the walking rule, links past the pillar appear.
     def.detour = 0.0f;
     int32_t loose = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &loose) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &loose) == mnav_success &&
               loose > count,
           "the walking rule drops links");
     mnavDestroyQuery(query);
@@ -139,8 +139,8 @@ static void TestClimbAndAreas(mnavNavmesh* navmesh)
     mnavLinkGenDef def = Def();
     def.climbMax = 2.0f;
     int32_t count = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_success,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success,
           "generated");
     int32_t both = 0;
     for (int32_t i = 0; i < count; ++i)
@@ -152,8 +152,8 @@ static void TestClimbAndAreas(mnavNavmesh* navmesh)
     // platform's edges; they land on the slab, the highest.
     def = Def();
     def.dropMax = 8.0f;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_success,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success,
           "generated");
     int32_t onSlab = 0;
     int32_t deep = 0;
@@ -184,8 +184,8 @@ static void TestClimbAndAreas(mnavNavmesh* navmesh)
     without.areas &= ~((uint64_t)1 << 3);
     def = Def();
     int32_t drops = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, &without, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_success,
+    CHECK(mnavGenerateLinks(query, navmesh, &without, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success,
           "generated");
     for (int32_t i = 0; i < count; ++i)
     {
@@ -205,71 +205,71 @@ static void TestChecksAndBuffer(const mnavNavmesh* navmesh)
     mnavQuery* query = Query();
     mnavLinkGenDef def = Def();
     int32_t all = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &all) ==
-              mnav_success,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &all) == mnav_success,
           "generated");
     int32_t count = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, 3, &count) ==
-                  mnav_errorCapacity &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links, 3,
+                            &count) == mnav_errorCapacity &&
               count >= all,
           "a short buffer, counted");
     // Tile 1 holds the pillar and none of the edges that make links.
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 1, 0, 1, 0, s_links, LINKS, &count) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){1, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success &&
               count == 0,
           "only the tiles asked for");
     int32_t asked = 0;
     def.clear = Refuse;
     def.context = &asked;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success &&
               count == 0 && asked > 0,
           "the host refuses every way");
     def = Def();
     def.dropMax = 0.0f;
     def.jumpMax = 0.0f;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success &&
               count == 0,
           "both kinds off");
     def = Def();
     def.spacing = 0.0f;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_errorInvalid,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_errorInvalid,
           "no spacing");
     float cell = mnavDefaultBakeDef().cellSize;
     def.spacing = nextafterf(cell, 0.0f);
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_errorInvalid,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_errorInvalid,
           "a spacing just below a cell");
     def.spacing = cell;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_success,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success,
           "a spacing of one cell");
     def = Def();
     def.dropMax = MNAV_MAX_LINK_REACH * 2.0f;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_errorLimit,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_errorLimit,
           "a drop past the reach");
     def.dropMax = INFINITY;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_errorLimit,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_errorLimit,
           "an infinite drop");
     def = Def();
     def.detour = 0.5f;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_errorInvalid,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_errorInvalid,
           "a detour under 1");
     def = Def();
     def.cookie = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_errorInvalid,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_errorInvalid,
           "not a def");
     def = Def();
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 1, 0, 0, 0, s_links, LINKS, &count) ==
-                  mnav_errorInvalid &&
-              mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, nullptr, 4, &count) ==
-                  mnav_errorInvalid,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){1, 0, 0, 0}, s_links,
+                            LINKS, &count) == mnav_errorInvalid &&
+              mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0},
+                                nullptr, 4, &count) == mnav_errorInvalid,
           "bad arguments");
     mnavDestroyQuery(query);
 }
@@ -280,8 +280,8 @@ static void TestPathThroughLinks(mnavNavmesh* navmesh)
     mnavQuery* query = Query();
     mnavLinkGenDef def = Def();
     int32_t count = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-              mnav_success,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success,
           "generated");
     for (int32_t i = 0; i < count; ++i)
     {

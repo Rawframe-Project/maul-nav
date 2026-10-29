@@ -74,9 +74,18 @@ static mnavCell Cell(Reader* r, int32_t width, int32_t height)
     return (mnavCell){x, y};
 }
 
+// A region by its corner and size, as the checks below read it.
+typedef struct Window
+{
+    int32_t x;
+    int32_t y;
+    int32_t width;
+    int32_t height;
+} Window;
+
 // Begins and continues a field in steps of a budget read from the bytes.
 static mnavResult BuildInSteps(mnavFlowField* field, const mnavGrid* grid,
-                               const mnavQueryFilter* filter, const mnavFlowRegion* region,
+                               const mnavQueryFilter* filter, const mnavCellRange* region,
                                const mnavCell* goals, int32_t goalCount, int32_t budget)
 {
     mnavResult result = mnavBeginFlowField(field, grid, filter, region, goals, goalCount);
@@ -91,7 +100,7 @@ static mnavResult BuildInSteps(mnavFlowField* field, const mnavGrid* grid,
 // Builds a field at once: mnavBuildFlowField for the whole grid, else
 // the work begun and continued with no limit.
 static mnavResult BuildAtOnce(mnavFlowField* field, const mnavGrid* grid,
-                              const mnavQueryFilter* filter, const mnavFlowRegion* region,
+                              const mnavQueryFilter* filter, const mnavCellRange* region,
                               const mnavCell* goals, int32_t goalCount)
 {
     return region == nullptr
@@ -105,7 +114,7 @@ static bool SameBits(double a, double b)
 }
 
 // Whether two fields agree on every cell of the region, cost and next.
-static bool SameFields(const mnavFlowField* a, const mnavFlowField* b, mnavFlowRegion r)
+static bool SameFields(const mnavFlowField* a, const mnavFlowField* b, Window r)
 {
     for (int32_t y = r.y; y < r.y + r.height; ++y)
     {
@@ -127,7 +136,7 @@ static bool SameFields(const mnavFlowField* a, const mnavFlowField* b, mnavFlowR
 // Each cell's cost is its next cell's plus the step between them, summed
 // as the search sums it; a cell with no way, or a goal, points at itself.
 static void CheckWays(const mnavFlowField* field, const mnavGrid* grid,
-                      const mnavQueryFilter* filter, mnavFlowRegion r)
+                      const mnavQueryFilter* filter, Window r)
 {
     for (int32_t y = r.y; y < r.y + r.height; ++y)
     {
@@ -183,15 +192,18 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         filter.costs[3] = -1.0f;
     }
     // The whole grid, or a window of it, now and then not within it.
-    mnavFlowRegion region = {0, 0, width, height};
-    const mnavFlowRegion* window = nullptr;
+    Window region = {0, 0, width, height};
+    mnavCellRange cells = {0, 0, width - 1, height - 1};
+    const mnavCellRange* window = nullptr;
     if (Byte(&r) % 2 == 1)
     {
         region.x = Byte(&r) % (uint32_t)width;
         region.y = Byte(&r) % (uint32_t)height;
         region.width = 1 + Byte(&r) % (uint32_t)(width - region.x + 1);
         region.height = 1 + Byte(&r) % (uint32_t)(height - region.y + 1);
-        window = &region;
+        cells = (mnavCellRange){region.x, region.y, region.x + region.width - 1,
+                                region.y + region.height - 1};
+        window = &cells;
     }
     int32_t goalCount = Byte(&r) % (MOST_GOALS + 1);
     mnavCell goals[MOST_GOALS];

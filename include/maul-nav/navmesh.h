@@ -39,6 +39,15 @@ extern "C"
         uint32_t polygon;
     } mnavPolygonId;
 
+    // A box of tile places, from (x0, z0) to (x1, z1), both included.
+    typedef struct mnavTileRange
+    {
+        int32_t x0;
+        int32_t z0;
+        int32_t x1;
+        int32_t z1;
+    } mnavTileRange;
+
     // The part of tile bytes a load refused.
     typedef uint8_t mnavTileSection;
 

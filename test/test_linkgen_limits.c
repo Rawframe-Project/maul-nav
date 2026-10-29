@@ -54,8 +54,8 @@ static void TestLimits(void)
     def.jumpMax = 3.0f;
     const mnavTileRange range = {0, 0, 1, 0};
     int32_t all = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &all) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &all) == mnav_success &&
               all > 2,
           "more than two links in all");
     int32_t count = 0;

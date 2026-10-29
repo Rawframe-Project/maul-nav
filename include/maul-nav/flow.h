@@ -106,16 +106,6 @@ extern "C"
     /// code the object runs calls back in.
     MNAV_API uint64_t mnavGetFlowFieldMisuse(const mnavFlowField* field);
 
-    // A window of a grid's cells: columns x to x + width - 1 and rows y to
-    // y + height - 1.
-    typedef struct mnavFlowRegion
-    {
-        int32_t x;
-        int32_t y;
-        int32_t width;
-        int32_t height;
-    } mnavFlowRegion;
-
     /// Begins building the field for a region of a grid and a set of goal
     /// cells: one search from all the goals, with the steps of
     /// mnavFindGridPath, to the 8 neighbours, never across a blocked
@@ -130,12 +120,13 @@ extern "C"
     /// @param field     The field; its last field is dropped.
     /// @param grid      The grid; its areas are read until the work ends.
     /// @param filter    The areas usable and their costs, or NULL; copied.
-    /// @param region    The region, or NULL for the whole grid.
+    /// @param region    The cells searched, both corners included, or NULL for
+    ///                  the whole grid.
     /// @param goals     The goal cells, in grid places.
     /// @param goalCount How many, at least 0.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// negative count, a grid with no areas, a side below 1 or a cell size not
-    /// more than 0 or not finite, a region empty or not within the grid, a goal
+    /// more than 0 or not finite, a region backward or not within the grid, a goal
     /// outside the grid, or a filter not built from mnavDefaultQueryFilter or
     /// with a NaN cost; `mnav_errorLimit` for a side past MNAV_MAX_GRID_SIDE or
     /// a filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST, an infinity
@@ -148,7 +139,7 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavBeginFlowField(mnavFlowField* field,
                                                           const mnavGrid* grid,
                                                           const mnavQueryFilter* filter,
-                                                          const mnavFlowRegion* region,
+                                                          const mnavCellRange* region,
                                                           const mnavCell* goals, int32_t goalCount);
 
     /// Continues the work begun on a field: settles up to a number of

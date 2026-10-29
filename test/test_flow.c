@@ -296,8 +296,23 @@ static void TestChecks(void)
     mnavDestroyFlowField(nullptr);
 }
 
+// A region by its corner and size, as the checks below read it, and the
+// cells it covers.
+typedef struct Window
+{
+    int32_t x;
+    int32_t y;
+    int32_t width;
+    int32_t height;
+} Window;
+
+static mnavCellRange Cells(Window w)
+{
+    return (mnavCellRange){w.x, w.y, w.x + w.width - 1, w.y + w.height - 1};
+}
+
 // The hash of every cell's way in a region.
-static uint64_t RegionHash(const mnavFlowField* field, mnavFlowRegion r)
+static uint64_t RegionHash(const mnavFlowField* field, Window r)
 {
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t y = r.y; y < r.y + r.height; ++y)
@@ -320,7 +335,7 @@ static void TestRegion(void)
     RandomAreas(41u);
     mnavGrid grid = Grid();
     mnavQueryFilter filter = Costs();
-    const mnavFlowRegion r = {9, 5, 30, 22};
+    const Window r = {9, 5, 30, 22};
     for (int32_t y = 0; y < r.height; ++y)
     {
         memcpy(&s_window[y * r.width], &s_areas[(r.y + y) * WIDTH + r.x], (size_t)r.width);
@@ -338,7 +353,8 @@ static void TestRegion(void)
     CHECK(mnavBuildFlowField(field, &grid, &filter, goals, 3) == mnav_errorCapacity,
           "the whole grid is past the limit");
     bool ended = false;
-    CHECK(mnavBeginFlowField(field, &grid, &filter, &r, goals, 3) == mnav_success &&
+    const mnavCellRange cells = Cells(r);
+    CHECK(mnavBeginFlowField(field, &grid, &filter, &cells, goals, 3) == mnav_success &&
               mnavContinueFlowField(field, &grid, INT32_MAX, &ended) == mnav_success && ended &&
               mnavBuildFlowField(alone, &window, &filter, local, 2) == mnav_success,
           "a region within the limit");
@@ -370,20 +386,20 @@ static void TestRegion(void)
     }
     CHECK(least >= (float)r.x * grid.cellSize && least < (float)(r.x + 1) * grid.cellSize,
           "arrows at their grid places");
-    mnavFlowRegion bad = {40, 0, 9, 1};
+    mnavCellRange bad = {40, 0, 48, 0};
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid &&
               mnavFlowAt(field, goals[0], &flow) == mnav_errorState,
           "a region past the grid's side; the field holds nothing after");
-    bad = (mnavFlowRegion){0, 30, 5, 7};
+    bad = (mnavCellRange){0, 30, 4, 36};
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid,
           "a region past the grid's foot");
-    bad = (mnavFlowRegion){0, 0, 0, 5};
+    bad = (mnavCellRange){1, 0, 0, 4};
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid,
-          "an empty region");
-    bad = (mnavFlowRegion){-1, 0, 5, 5};
+          "a region backward");
+    bad = (mnavCellRange){-1, 0, 3, 4};
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorInvalid,
           "a region before the grid");
-    bad = (mnavFlowRegion){0, 0, 31, 22};
+    bad = (mnavCellRange){0, 0, 30, 21};
     CHECK(mnavBeginFlowField(field, &grid, &filter, &bad, goals, 3) == mnav_errorCapacity,
           "a region past the limit");
     mnavDestroyFlowField(field);
@@ -398,7 +414,7 @@ static void TestSteps(void)
     mnavQueryFilter filter = Costs();
     const mnavCell goals[3] = {{0, 0}, {47, 35}, {20, 18}};
     mnavFlowField* field = Make(WIDTH * HEIGHT);
-    const mnavFlowRegion whole = {0, 0, WIDTH, HEIGHT};
+    const Window whole = {0, 0, WIDTH, HEIGHT};
     const int32_t budgets[3] = {1, 7, 500};
     for (int32_t b = 0; b < 3; ++b)
     {
@@ -470,7 +486,7 @@ static uint32_t Next(uint32_t bound)
 }
 
 // How many cells of a region two fields give different ways.
-static int32_t Differ(const mnavFlowField* a, const mnavFlowField* b, mnavFlowRegion r)
+static int32_t Differ(const mnavFlowField* a, const mnavFlowField* b, Window r)
 {
     int32_t differ = 0;
     for (int32_t y = r.y; y < r.y + r.height; ++y)
@@ -487,13 +503,15 @@ static int32_t Differ(const mnavFlowField* a, const mnavFlowField* b, mnavFlowRe
 
 // Random goal moves and area changes, each repaired in random budgets,
 // against a field built afresh after each.
-static void RepairHistory(const mnavFlowRegion* region, uint32_t seed)
+static void RepairHistory(const mnavCellRange* region, uint32_t seed)
 {
     RandomAreas(seed);
     s_seed = seed;
     mnavGrid grid = Grid();
     mnavQueryFilter filter = Costs();
-    mnavFlowRegion r = region != nullptr ? *region : (mnavFlowRegion){0, 0, WIDTH, HEIGHT};
+    Window r = region != nullptr ? (Window){region->x0, region->y0, region->x1 - region->x0 + 1,
+                                            region->y1 - region->y0 + 1}
+                                 : (Window){0, 0, WIDTH, HEIGHT};
     mnavFlowField* repaired = Make(WIDTH * HEIGHT);
     mnavFlowField* built = Make(WIDTH * HEIGHT);
     mnavCell goals[6] = {{3, 3}, {40, 30}, {20, 10}, {0, 0}, {47, 0}, {10, 30}};
@@ -611,7 +629,7 @@ static void TestRepairAfterABegin(void)
               mnavContinueFlowField(repaired, &grid, INT32_MAX, &ended) == mnav_success && ended,
           "the cell repaired again");
     CHECK(mnavBuildFlowField(built, &grid, &filter, &goal, 1) == mnav_success, "built afresh");
-    CHECK(Differ(repaired, built, (mnavFlowRegion){0, 0, WIDTH, HEIGHT}) == 0,
+    CHECK(Differ(repaired, built, (Window){0, 0, WIDTH, HEIGHT}) == 0,
           "the repair gives the field a build gives");
     mnavDestroyFlowField(repaired);
     mnavDestroyFlowField(built);
@@ -621,7 +639,7 @@ static void TestRepairs(void)
 {
     RepairHistory(nullptr, 3u);
     RepairHistory(nullptr, 99u);
-    const mnavFlowRegion r = {5, 4, 33, 25};
+    const mnavCellRange r = {5, 4, 37, 28};
     RepairHistory(&r, 12u);
 }
 
