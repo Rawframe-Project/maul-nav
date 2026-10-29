@@ -209,22 +209,9 @@ static mnavPos3 Solve(mnavAvoidance* a, const mnavAgent3D* agents, const mnavSph
                           &velocity);
     }
     // The maximum speed is kept exactly, as on the ground.
-    double maxSq = self->maxSpeed * self->maxSpeed;
-    double speedSq = mnavDot3(velocity, velocity);
-    if (speedSq > maxSq)
-    {
-        velocity = mnavScale3(velocity, self->maxSpeed / sqrt(speedSq));
-        for (int32_t shrink = 0; shrink < MNAV_SPEED_STEPS && mnavDot3(velocity, velocity) > maxSq;
-             ++shrink)
-        {
-            velocity = (mnavPos3){mnavTowardZero(velocity.x), mnavTowardZero(velocity.y),
-                                  mnavTowardZero(velocity.z)};
-        }
-    }
-    // Within the speed sphere, but for a few units of the least subnormal
-    // where the squares are subnormal and round absolutely.
+    velocity = mnavKeepSpeed3(velocity, self->maxSpeed);
     MNAV_ASSERT(isfinite(velocity.x) && isfinite(velocity.y) && isfinite(velocity.z) &&
-                mnavDot3(velocity, velocity) <= maxSq + 0x1p-1072);
+                mnavWithinSpeed3(velocity, self->maxSpeed));
     return velocity;
 }
 

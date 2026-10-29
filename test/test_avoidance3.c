@@ -578,9 +578,6 @@ static void TestChecks(void)
     mnavDestroyAvoidance(avoidance);
 }
 
-// A maximum speed whose square is subnormal, about 3.4 units of the least
-// subnormal: the squares round absolutely, so a velocity clamped to the
-// sphere may square to a unit or so past the speed's square, and is kept.
 // A lone flier that would go faster than it may: the velocity scaled
 // back onto the speed sphere came out a unit past it, its squared speed
 // 0x1.2000000000001p+1 against 2.25.
@@ -598,6 +595,9 @@ static void TestSpeedScaledBack(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+// A maximum speed whose square is subnormal, about 3.4 units of the least
+// subnormal: the squares round absolutely, so a velocity clamped to the
+// sphere may square to a unit or so past the speed's square, and is kept.
 static void TestSubnormalSpeed(void)
 {
     mnavAvoidance* avoidance = Make(4, 4, 2.0);
