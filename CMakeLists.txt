@@ -252,7 +252,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(scenarios)
     maul_add_dense(scenarios)
     # The 1,000-agent doorway crowd, a large scene: nightly, never in the
-    # pull request check.
+    # pull request check, where the scenarios suite runs its first ten rows.
     add_test(NAME doorway COMMAND test_scenarios --doorway)
     set_tests_properties(doorway PROPERTIES LABELS "scenarios;nightly")
     maul_add_test(terrain)
