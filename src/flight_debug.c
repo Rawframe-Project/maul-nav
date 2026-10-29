@@ -112,8 +112,8 @@ static MNAV_NOINLINE mnavResult DebugFlightCounted(const mnavFlightVolume* volum
     return mnavHostCountInvalid(MNAV_HOST(volume), DebugFlightWork(volume, low, high, buffer));
 }
 
-mnavResult mnavDebugFlight(const mnavFlightVolume* volume, mnavPos3 low, mnavPos3 high,
-                           mnavDebugBuffer* buffer)
+mnavResult mnavFlightVolume_Debug(const mnavFlightVolume* volume, mnavPos3 low, mnavPos3 high,
+                                  mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = DebugFlightCounted(volume, low, high, buffer);

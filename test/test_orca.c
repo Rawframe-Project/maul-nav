@@ -4,7 +4,7 @@
 // ORCA's linear programs on lines laid out by hand, parallel
 // ones included.
 //
-// White-box: through mnavAvoid the lines come from agents' positions and
+// White-box: through mnavAvoidance_Avoid the lines come from agents' positions and
 // velocities, which cannot lay out a given line; the parallel cases, such
 // as the bisector of two lines facing the same way, live through the
 // public avoidance suites when broken.

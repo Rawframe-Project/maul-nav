@@ -91,14 +91,14 @@ static const Map* BakeMesh(mnavBaker* baker, const mnavTriangleMesh* mesh,
 {
     const mnavBakeInput input = {mesh, 1, nullptr, 0, volumes, count, nullptr};
     size_t size = 0;
-    CHECK(mnavBakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+    CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, s_tile, size).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
     for (int32_t level = 0; level < 2; ++level)
     {
@@ -109,12 +109,12 @@ static const Map* BakeMesh(mnavBaker* baker, const mnavTriangleMesh* mesh,
                 mnavPos3 center = {0.125 + 0.25 * x, level == 0 ? 0.0 : 3.0, 0.125 + 0.25 * z};
                 mnavNearest n;
                 mnavAreaType area = NO_POLYGON;
-                CHECK(mnavFindNearest(navmesh, nullptr, center, (mnavVec3){0.01f, 1.0f, 0.01f},
-                                      &n) == mnav_success,
+                CHECK(mnavNavmesh_FindNearest(navmesh, center, (mnavVec3){0.01f, 1.0f, 0.01f},
+                                              nullptr, &n) == mnav_success,
                       "nearest");
                 if (n.polygon.slot != 0 && n.over)
                 {
-                    CHECK(mnavGetArea(navmesh, n.polygon, &area) == mnav_success, "area");
+                    CHECK(mnavPolygon_GetArea(navmesh, n.polygon, &area) == mnav_success, "area");
                 }
                 s_map.at[level][z][x] = area;
             }
@@ -286,7 +286,7 @@ static mnavBakeReport Refused(mnavBaker* baker, mnavBakeVolume volume, mnavResul
     const mnavBakeVolume volumes[2] = {volume, volume};
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, volumes, 2, nullptr};
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &input, 0, 0, &report) == result, "refused");
+    CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, &report) == result, "refused");
     return report;
 }
 
@@ -333,16 +333,17 @@ static void TestChecks(mnavBaker* baker)
     v = good;
     v.pointCount = 2;
     const mnavBakeInput withTerrain = {&s_mesh, 1, &terrain, 1, &v, 1, nullptr};
-    CHECK(mnavBakeTile(baker, &withTerrain, 0, 0, &r) == mnav_errorInvalid && r.mesh == 2,
+    CHECK(mnavBaker_BakeTile(baker, &withTerrain, 0, 0, &r) == mnav_errorInvalid && r.mesh == 2,
           "a volume named after the meshes and terrains");
     // An exclude or include volume's area is unused.
     v = good;
     v.kind = mnav_volumeExclude;
     v.area = mnav_areaNone;
     const mnavBakeInput fine = {&s_mesh, 1, nullptr, 0, &v, 1, nullptr};
-    CHECK(mnavBakeTile(baker, &fine, 0, 0, nullptr) == mnav_success, "an exclude volume");
+    CHECK(mnavBaker_BakeTile(baker, &fine, 0, 0, nullptr) == mnav_success, "an exclude volume");
     const mnavBakeInput missing = {&s_mesh, 1, nullptr, 0, nullptr, 1, nullptr};
-    CHECK(mnavBakeTile(baker, &missing, 0, 0, nullptr) == mnav_errorInvalid, "volumes missing");
+    CHECK(mnavBaker_BakeTile(baker, &missing, 0, 0, nullptr) == mnav_errorInvalid,
+          "volumes missing");
 }
 
 static uint64_t BakeHash(mnavBaker* baker, const mnavBakeVolume* volumes, int32_t count,
@@ -350,8 +351,8 @@ static uint64_t BakeHash(mnavBaker* baker, const mnavBakeVolume* volumes, int32_
 {
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, volumes, count, nullptr};
     size_t size = 0;
-    CHECK(mnavBakeTile(baker, &input, 0, 0, report) == mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+    CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, report) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     return mnavHash64(MNAV_HASH_INIT, s_tile, (int32_t)size);
 }
@@ -399,7 +400,8 @@ static void TestBake(mnavBaker* baker)
     mnavBaker* small = nullptr;
     CHECK(mnavCreateBaker(&def, &small).result == mnav_success, "baker");
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, all, 3, nullptr};
-    CHECK(mnavBakeTile(small, &input, 0, 0, &report) == mnav_errorCapacity && report.mesh == -1,
+    CHECK(mnavBaker_BakeTile(small, &input, 0, 0, &report) == mnav_errorCapacity &&
+              report.mesh == -1,
           "points over the input limit");
     mnavVec2 many[16];
     for (int32_t k = 0; k < 16; ++k)
@@ -408,12 +410,13 @@ static void TestBake(mnavBaker* baker)
     }
     const mnavBakeVolume big = {many, 16, -1, 1, mnav_volumeExclude, 0};
     const mnavBakeInput alone = {nullptr, 0, nullptr, 0, &big, 1, nullptr};
-    CHECK(mnavBakeTile(small, &alone, 0, 0, &report) == mnav_errorCapacity && report.mesh == 0,
+    CHECK(mnavBaker_BakeTile(small, &alone, 0, 0, &report) == mnav_errorCapacity &&
+              report.mesh == 0,
           "one volume over the input limit, named");
     mnavDestroyBaker(small);
     def.limits.inputTriangles += 1;
     CHECK(mnavCreateBaker(&def, &small).result == mnav_success &&
-              mnavBakeTile(small, &input, 0, 0, &report) == mnav_success,
+              mnavBaker_BakeTile(small, &input, 0, 0, &report) == mnav_success,
           "points at the input limit");
     mnavDestroyBaker(small);
 }

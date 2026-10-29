@@ -29,11 +29,11 @@ static mnavNavmesh* Make(void)
 
 static mnavResult StageAt(mnavNavmesh* navmesh, int32_t t)
 {
-    return mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result;
+    return mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result;
 }
 
 // How many of a run of polygons, from the first, are current and each
-// joined to the one before (mnavCheckCorridor).
+// joined to the one before (mnavNavmesh_CheckCorridor).
 static int32_t Valid(const mnavNavmesh* navmesh, const mnavPolygonId* polygons, int32_t count)
 {
     mnavPolygonId buffer[2];
@@ -47,7 +47,8 @@ static int32_t Valid(const mnavNavmesh* navmesh, const mnavPolygonId* polygons, 
         buffer[i] = polygons[i];
     }
     corridor.count = count;
-    CHECK(mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success, "checked");
+    CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success,
+          "checked");
     return valid;
 }
 
@@ -60,13 +61,14 @@ static void TestStagedTilesAppearAtCommit(void)
 {
     mnavNavmesh* navmesh = Make();
     mnavTileId id = {9, 9};
-    CHECK(mnavGetTile(navmesh, 0, 0, &id) == mnav_errorNotLoaded && id.slot == 0, "empty");
+    CHECK(mnavNavmesh_GetTile(navmesh, 0, 0, &id) == mnav_errorNotLoaded && id.slot == 0, "empty");
     CHECK(StageAt(navmesh, 0) == mnav_success, "staged");
-    CHECK(mnavGetTile(navmesh, 0, 0, &id) == mnav_errorNotLoaded, "not before the commit");
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
-    CHECK(mnavGetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 1 && id.generation == 1,
+    CHECK(mnavNavmesh_GetTile(navmesh, 0, 0, &id) == mnav_errorNotLoaded, "not before the commit");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_GetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 1 &&
+              id.generation == 1,
           "slot 1, generation 1");
-    CHECK(mnavCommit(navmesh) == mnav_success, "nothing staged");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "nothing staged");
     mnavDestroyNavmesh(navmesh);
 }
 
@@ -74,21 +76,25 @@ static void TestReplacingAndRemovingMakeIdsStale(void)
 {
     mnavNavmesh* navmesh = Make();
     CHECK(StageAt(navmesh, 0) == mnav_success && StageAt(navmesh, 1) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "two tiles");
     mnavPolygonId old = {1, 1, 0};
     CHECK(Current(navmesh, old), "a current id");
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "replaced");
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
+          "replaced");
     CHECK(!Current(navmesh, old), "the old id is stale");
     mnavTileId id;
-    CHECK(mnavGetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 1 && id.generation == 2,
+    CHECK(mnavNavmesh_GetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 1 &&
+              id.generation == 2,
           "the same slot, the next generation");
-    CHECK(mnavStageTileRemoval(navmesh, 1, 0) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 0) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "removed");
-    CHECK(mnavGetTile(navmesh, 1, 0, &id) == mnav_errorNotLoaded, "gone");
-    CHECK(StageAt(navmesh, 3) == mnav_success && mnavCommit(navmesh) == mnav_success, "another");
-    CHECK(mnavGetTile(navmesh, 1, 1, &id) == mnav_success && id.slot == 2 && id.generation == 3,
+    CHECK(mnavNavmesh_GetTile(navmesh, 1, 0, &id) == mnav_errorNotLoaded, "gone");
+    CHECK(StageAt(navmesh, 3) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
+          "another");
+    CHECK(mnavNavmesh_GetTile(navmesh, 1, 1, &id) == mnav_success && id.slot == 2 &&
+              id.generation == 3,
           "the freed slot, reused with its next generation");
     // The removed tile's links went with it: none leads from (0, 0) into
     // the tile now in its slot, and (1, 0) and (0, 1) are not loaded.
@@ -98,18 +104,18 @@ static void TestReplacingAndRemovingMakeIdsStale(void)
     mnavNearest b;
     mnavPath path;
     const mnavVec3 box = {2.0f, 2.0f, 2.0f};
-    CHECK(
-        mnavCreateQuery(&queryDef, &query) == mnav_success &&
-            mnavFindNearest(navmesh, nullptr, (mnavPos3){2.0, 0.0, 2.0}, box, &a) == mnav_success &&
-            mnavFindNearest(navmesh, nullptr, (mnavPos3){62.0, 0.0, 62.0}, box, &b) ==
-                mnav_success &&
-            mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-                mnav_success &&
-            path.end == mnav_pathNotLoaded,
-        "no way into the slot's new tile");
+    CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){2.0, 0.0, 2.0}, box, nullptr, &a) ==
+                  mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){62.0, 0.0, 62.0}, box, nullptr, &b) ==
+                  mnav_success &&
+              mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &path) == mnav_success &&
+              path.end == mnav_pathNotLoaded,
+          "no way into the slot's new tile");
     mnavDestroyQuery(query);
-    CHECK(mnavStageTileRemoval(navmesh, 7, 7) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 7, 7) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "removing nothing");
     mnavDestroyNavmesh(navmesh);
 }
@@ -121,16 +127,17 @@ static void TestFailedCommitChangesNothing(void)
     def.allocator = CountingAllocator();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "one tile");
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
+          "one tile");
     size_t before = s_held;
     CHECK(StageAt(navmesh, 1) == mnav_success, "staged");
     size_t staged = s_held;
-    CHECK(mnavCommit(navmesh) == mnav_errorCapacity, "past the links limit");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_errorCapacity, "past the links limit");
     mnavTileId id;
-    CHECK(mnavGetTile(navmesh, 1, 0, &id) == mnav_errorNotLoaded, "nothing applied");
+    CHECK(mnavNavmesh_GetTile(navmesh, 1, 0, &id) == mnav_errorNotLoaded, "nothing applied");
     CHECK(s_held == staged, "the change stays staged, nothing taken or given back");
-    CHECK(mnavStageTileRemoval(navmesh, 1, 0) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 0) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "unstaged by a removal");
     // The commit's new slot and place arrays have room for one more entry;
     // the tile itself, close to a kilobyte, is gone.
@@ -140,7 +147,7 @@ static void TestFailedCommitChangesNothing(void)
     def.limits.tiles = 1;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     CHECK(StageAt(navmesh, 0) == mnav_success && StageAt(navmesh, 1) == mnav_success &&
-              mnavCommit(navmesh) == mnav_errorCapacity,
+              mnavNavmesh_Commit(navmesh) == mnav_errorCapacity,
           "past the tiles limit");
     mnavDestroyNavmesh(navmesh);
 }
@@ -153,16 +160,16 @@ static void TestTilesMustMatchTheDef(void)
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     size_t held = s_held;
-    mnavTileResult result = mnavStageTile(navmesh, s_tiles[0], s_sizes[0]);
+    mnavTileResult result = mnavNavmesh_StageTile(navmesh, s_tiles[0], s_sizes[0]);
     CHECK(result.result == mnav_errorFormat && result.section == mnav_tileHeader,
           "baked for another agent");
-    result = mnavStageTile(navmesh, s_tiles[0], s_sizes[0] - 1);
+    result = mnavNavmesh_StageTile(navmesh, s_tiles[0], s_sizes[0] - 1);
     CHECK(result.result == mnav_errorFormat, "damaged bytes");
     CHECK(s_held == held, "nothing staged");
     mnavDestroyNavmesh(navmesh);
-    CHECK(mnavStageTile(nullptr, s_tiles[0], s_sizes[0]).result == mnav_errorInvalid &&
-              mnavCommit(nullptr) == mnav_errorInvalid &&
-              mnavStageTileRemoval(nullptr, 0, 0) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_StageTile(nullptr, s_tiles[0], s_sizes[0]).result == mnav_errorInvalid &&
+              mnavNavmesh_Commit(nullptr) == mnav_errorInvalid &&
+              mnavNavmesh_StageTileRemoval(nullptr, 0, 0) == mnav_errorInvalid,
           "no navmesh");
     mnavDestroyNavmesh(nullptr);
 }
@@ -178,11 +185,11 @@ static void TestDestroyGivesEverythingBack(void)
     {
         CHECK(StageAt(navmesh, t) == mnav_success, "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavTileId tile;
     CHECK(StageAt(navmesh, 2) == mnav_success &&
-              mnavGetTile(navmesh, 0, 0, &tile) == mnav_success &&
-              mnavStageArea(navmesh, (mnavPolygonId){tile.slot, tile.generation, 0}, 3) ==
+              mnavNavmesh_GetTile(navmesh, 0, 0, &tile) == mnav_success &&
+              mnavPolygon_StageArea(navmesh, (mnavPolygonId){tile.slot, tile.generation, 0}, 3) ==
                   mnav_success,
           "staged, not committed");
     CHECK(s_held > 0, "held");
@@ -197,11 +204,11 @@ static bool Joined(const uint8_t* west, size_t westSize, const uint8_t* east, si
     mnavNavmesh* navmesh = Make();
     mnavTileId a;
     mnavTileId b;
-    CHECK(mnavStageTile(navmesh, west, westSize).result == mnav_success &&
-              mnavStageTile(navmesh, east, eastSize).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavGetTile(navmesh, 0, 0, &a) == mnav_success &&
-              mnavGetTile(navmesh, 1, 0, &b) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, west, westSize).result == mnav_success &&
+              mnavNavmesh_StageTile(navmesh, east, eastSize).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavNavmesh_GetTile(navmesh, 0, 0, &a) == mnav_success &&
+              mnavNavmesh_GetTile(navmesh, 1, 0, &b) == mnav_success,
           "hand tiles committed");
     const mnavPolygonId there[2] = {{a.slot, a.generation, 0}, {b.slot, b.generation, 0}};
     const mnavPolygonId back[2] = {there[1], there[0]};

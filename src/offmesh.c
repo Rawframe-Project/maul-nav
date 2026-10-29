@@ -337,7 +337,7 @@ static MNAV_NOINLINE mnavResult StageLinkEnabledCounted(mnavNavmesh* navmesh, mn
     return mnavHostCountInvalid(MNAV_HOST(navmesh), StageLinkEnabledWork(navmesh, id, enabled));
 }
 
-mnavResult mnavStageLinkEnabled(mnavNavmesh* navmesh, mnavLinkId id, bool enabled)
+mnavResult mnavLink_StageEnable(mnavNavmesh* navmesh, mnavLinkId id, bool enabled)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = StageLinkEnabledCounted(navmesh, id, enabled);
@@ -391,10 +391,45 @@ static MNAV_NOINLINE mnavResult GetLinkCounted(const mnavNavmesh* navmesh, mnavL
     return mnavClearOnFailure(result, stateOut, sizeof(*stateOut));
 }
 
-mnavResult mnavGetLink(const mnavNavmesh* navmesh, mnavLinkId id, mnavLinkState* stateOut)
+mnavResult mnavLink_GetState(const mnavNavmesh* navmesh, mnavLinkId id, mnavLinkState* stateOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = GetLinkCounted(navmesh, id, stateOut);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult IsLinkEnabledWork(const mnavNavmesh* navmesh, mnavLinkId id,
+                                                  bool* enabledOut)
+{
+    if (navmesh == nullptr || enabledOut == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    int32_t s = -1;
+    mnavResult result = Find(navmesh, id, &s);
+    if (result == mnav_success && navmesh->links[s].phase == MNAV_LINK_ADDING)
+    {
+        result = mnav_errorState;
+    }
+    // The committed state; the link's own flag holds a staged toggle.
+    *enabledOut = result == mnav_success && navmesh->links[s].state.enabled;
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult IsLinkEnabledCounted(const mnavNavmesh* navmesh, mnavLinkId id,
+                                                     bool* enabledOut)
+{
+    mnavClearOutput(enabledOut, sizeof(*enabledOut));
+    mnavResult result =
+        mnavHostCountInvalid(MNAV_HOST(navmesh), IsLinkEnabledWork(navmesh, id, enabledOut));
+    return mnavClearOnFailure(result, enabledOut, sizeof(*enabledOut));
+}
+
+mnavResult mnavLink_IsEnabled(const mnavNavmesh* navmesh, mnavLinkId id, bool* enabledOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = IsLinkEnabledCounted(navmesh, id, enabledOut);
     mnavFloatEnvLeave(env);
     return result;
 }

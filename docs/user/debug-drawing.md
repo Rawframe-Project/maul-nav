@@ -8,13 +8,13 @@ The library never draws. It fills an `mnavDebugBuffer` the host owns with vertic
 
 | Function | Draws |
 |---|---|
-| `mnavDebugNavmesh` | Polygons by area, inner edges, walls, tile sides and tile bounds, over an `mnavTileRange` of tile places, or every tile for NULL. |
-| `mnavDebugLinks` | Every off-mesh link as an arc, at its snapped ends when attached. |
-| `mnavDebugPath`, `mnavDebugCorridor` | A path's straight line; a corridor's polygons. |
-| `mnavDebugFlowField`, `mnavDebugNavFlow` | An arrow for each cell or polygon with a way on. |
-| `mnavDebugAvoidance` | Each agent's outline and a line to each neighbor `mnavAvoid` would give it. |
-| `mnavDebugAvoidance3D` | Each flier as three rings, its neighbors, and the spheres it avoids. |
-| `mnavDebugFlight` | A flight volume's open blocks inside a box, as wire boxes. Solid space shows as gaps. |
+| `mnavNavmesh_Debug` | Polygons by area, inner edges, walls, tile sides and tile bounds, over an `mnavTileRange` of tile places, or every tile for NULL. |
+| `mnavNavmesh_DebugLinks` | Every off-mesh link as an arc, at its snapped ends when attached. |
+| `mnavDebugPath`, `mnavNavmesh_DebugCorridor` | A path's straight line; a corridor's polygons. |
+| `mnavFlowField_Debug`, `mnavNavFlow_Debug` | An arrow for each cell or polygon with a way on. |
+| `mnavAvoidance_Debug` | Each agent's outline and a line to each neighbor `mnavAvoidance_Avoid` would give it. |
+| `mnavAvoidance_Debug3D` | Each flier as three rings, its neighbors, and the spheres it avoids. |
+| `mnavFlightVolume_Debug` | A flight volume's open blocks inside a box, as wire boxes. Solid space shows as gaps. |
 | `mnavDebugFlightPath` | A flight path's steps. |
 
-The avoidance drawings check their input as `mnavAvoid` and `mnavAvoid3D` do, so drawing what a step would refuse is refused too. A bake's own debug output is its [report](baking.md#the-report).
+The avoidance drawings check their input as `mnavAvoidance_Avoid` and `mnavAvoidance_Avoid3D` do, so drawing what a step would refuse is refused too. A bake's own debug output is its [report](baking.md#the-report).

@@ -24,9 +24,10 @@ static mnavNavmesh* LoadWorld(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -52,18 +53,18 @@ static uint64_t HashPath(const mnavPath* path)
 static uint64_t Sliced(mnavQuery* query, const mnavNavmesh* navmesh, mnavNearest a, mnavNearest b,
                        int32_t budget, int32_t* slices)
 {
-    CHECK(mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point) ==
+    CHECK(mnavQuery_BeginPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr) ==
               mnav_success,
           "begun");
     bool ended = false;
     *slices = 0;
     while (!ended)
     {
-        CHECK(mnavContinuePath(query, navmesh, budget, &ended) == mnav_success, "continued");
+        CHECK(mnavQuery_ContinuePath(query, navmesh, budget, &ended) == mnav_success, "continued");
         *slices += 1;
     }
     mnavPath path;
-    CHECK(mnavFinishPath(query, navmesh, &path) == mnav_success, "finished");
+    CHECK(mnavQuery_FinishPath(query, navmesh, &path) == mnav_success, "finished");
     return HashPath(&path);
 }
 
@@ -86,9 +87,9 @@ static void TestSlicesChangeNothing(void)
         mnavNearest a;
         mnavNearest b;
         mnavVec3 box = {3.0f, 2.0f, 3.0f};
-        CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){p[0], 0.0, p[1]}, box, &a) ==
+        CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){p[0], 0.0, p[1]}, box, nullptr, &a) ==
                       mnav_success &&
-                  mnavFindNearest(navmesh, nullptr, (mnavPos3){p[2], 0.0, p[3]}, box, &b) ==
+                  mnavNavmesh_FindNearest(navmesh, (mnavPos3){p[2], 0.0, p[3]}, box, nullptr, &b) ==
                       mnav_success,
               "nearest");
         if (a.polygon.slot == 0 || b.polygon.slot == 0)
@@ -97,8 +98,8 @@ static void TestSlicesChangeNothing(void)
         }
         searches += 1;
         mnavPath whole;
-        CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &whole) == mnav_success,
+        CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &whole) == mnav_success,
               "whole");
         uint64_t expected = HashPath(&whole);
         const int32_t budgets[3] = {1, 3, 50};
@@ -111,8 +112,8 @@ static void TestSlicesChangeNothing(void)
         }
         CHECK(same, "the same result in slices of 1, 3 and 50 nodes");
         // Out of nodes, too, sliced or not.
-        CHECK(mnavFindPath(small, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &whole) == mnav_success,
+        CHECK(mnavQuery_FindPath(small, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &whole) == mnav_success,
               "small whole");
         expected = HashPath(&whole);
         int32_t slices = 0;
@@ -133,33 +134,35 @@ static void TestCommitsMakeSearchesStale(void)
     mnavNearest a;
     mnavNearest b;
     mnavVec3 box = {2.0f, 2.0f, 2.0f};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){2.0, 0.0, 2.0}, box, &a) == mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){62.0, 0.0, 62.0}, box, &b) ==
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){2.0, 0.0, 2.0}, box, nullptr, &a) ==
+                  mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){62.0, 0.0, 62.0}, box, nullptr, &b) ==
                   mnav_success,
           "ends");
     bool ended = false;
     mnavPath path;
-    CHECK(mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point) ==
+    CHECK(mnavQuery_BeginPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr) ==
                   mnav_success &&
-              mnavContinuePath(query, navmesh, 3, &ended) == mnav_success && !ended,
+              mnavQuery_ContinuePath(query, navmesh, 3, &ended) == mnav_success && !ended,
           "under way");
-    CHECK(mnavContinuePath(query, other, 3, &ended) == mnav_errorInvalid &&
-              mnavFinishPath(query, other, &path) == mnav_errorInvalid,
+    CHECK(mnavQuery_ContinuePath(query, other, 3, &ended) == mnav_errorInvalid &&
+              mnavQuery_FinishPath(query, other, &path) == mnav_errorInvalid,
           "not on another navmesh");
     // Staging changes nothing; committing does.
-    CHECK(mnavStageTile(navmesh, s_tiles[3], s_sizes[3]).result == mnav_success &&
-              mnavContinuePath(query, navmesh, 3, &ended) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[3], s_sizes[3]).result == mnav_success &&
+              mnavQuery_ContinuePath(query, navmesh, 3, &ended) == mnav_success,
           "staging alone");
-    CHECK(mnavCommit(navmesh) == mnav_success &&
-              mnavContinuePath(query, navmesh, 3, &ended) == mnav_errorState &&
-              mnavFinishPath(query, navmesh, &path) == mnav_errorState,
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavQuery_ContinuePath(query, navmesh, 3, &ended) == mnav_errorState &&
+              mnavQuery_FinishPath(query, navmesh, &path) == mnav_errorState,
           "out of date after a commit");
     // A commit with nothing staged changes nothing.
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){62.0, 0.0, 62.0}, box, &b) == mnav_success &&
-              mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point) ==
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){62.0, 0.0, 62.0}, box, nullptr, &b) ==
                   mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavContinuePath(query, navmesh, 3, &ended) == mnav_success,
+              mnavQuery_BeginPath(query, navmesh, a.polygon, a.point, b.polygon, b.point,
+                                  nullptr) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavQuery_ContinuePath(query, navmesh, 3, &ended) == mnav_success,
           "an empty commit");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(other);
@@ -173,27 +176,28 @@ static void TestFinishingEarly(void)
     mnavNearest a;
     mnavNearest b;
     mnavVec3 box = {2.0f, 2.0f, 2.0f};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){2.0, 0.0, 2.0}, box, &a) == mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){62.0, 0.0, 62.0}, box, &b) ==
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){2.0, 0.0, 2.0}, box, nullptr, &a) ==
+                  mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){62.0, 0.0, 62.0}, box, nullptr, &b) ==
                   mnav_success,
           "ends");
     bool ended = true;
     mnavPath path;
-    CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorState &&
-              mnavFinishPath(query, navmesh, &path) == mnav_errorState,
+    CHECK(mnavQuery_ContinuePath(query, navmesh, 1, &ended) == mnav_errorState &&
+              mnavQuery_FinishPath(query, navmesh, &path) == mnav_errorState,
           "nothing begun");
-    CHECK(mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point) ==
+    CHECK(mnavQuery_BeginPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr) ==
                   mnav_success &&
-              mnavContinuePath(query, navmesh, 0, &ended) == mnav_errorInvalid &&
-              mnavContinuePath(query, navmesh, 1, nullptr) == mnav_errorInvalid &&
-              mnavContinuePath(query, navmesh, 4, &ended) == mnav_success && !ended,
+              mnavQuery_ContinuePath(query, navmesh, 0, &ended) == mnav_errorInvalid &&
+              mnavQuery_ContinuePath(query, navmesh, 1, nullptr) == mnav_errorInvalid &&
+              mnavQuery_ContinuePath(query, navmesh, 4, &ended) == mnav_success && !ended,
           "four nodes closed");
-    CHECK(mnavFinishPath(query, navmesh, &path) == mnav_success &&
+    CHECK(mnavQuery_FinishPath(query, navmesh, &path) == mnav_success &&
               path.end == mnav_pathUnfinished && path.polygonCount >= 1 &&
               path.polygons[0].polygon == a.polygon.polygon && path.pointCount >= 2,
           "unfinished, toward the end");
-    CHECK(mnavFinishPath(query, navmesh, &path) == mnav_errorState &&
-              mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorState,
+    CHECK(mnavQuery_FinishPath(query, navmesh, &path) == mnav_errorState &&
+              mnavQuery_ContinuePath(query, navmesh, 1, &ended) == mnav_errorState,
           "finished once");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -206,27 +210,29 @@ static void TestTheFilterIsTheSearchsOwn(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_handBridge, sizeof(s_handBridge)).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, s_handBridge, sizeof(s_handBridge)).result ==
+                  mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
     mnavQuery* query = MakeQuery(256);
     mnavNearest a;
     mnavNearest b;
     mnavVec3 box = {0.1f, 1.0f, 0.1f};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){7.5, 0.0, 7.5}, box, &a) == mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){17.5, 0.0, 7.5}, box, &b) ==
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){7.5, 0.0, 7.5}, box, nullptr, &a) ==
+                  mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){17.5, 0.0, 7.5}, box, nullptr, &b) ==
                   mnav_success,
           "ends");
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     filter.areas &= ~((uint64_t)1 << 2);
-    CHECK(mnavBeginPath(query, navmesh, &filter, a.polygon, a.point, b.polygon, b.point) ==
+    CHECK(mnavQuery_BeginPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, &filter) ==
               mnav_success,
           "begun without the bridge");
     filter = mnavDefaultQueryFilter();
     bool ended = false;
     mnavPath path;
-    CHECK(mnavContinuePath(query, navmesh, 1000, &ended) == mnav_success && ended &&
-              mnavFinishPath(query, navmesh, &path) == mnav_success && path.polygonCount == 5,
+    CHECK(mnavQuery_ContinuePath(query, navmesh, 1000, &ended) == mnav_success && ended &&
+              mnavQuery_FinishPath(query, navmesh, &path) == mnav_success && path.polygonCount == 5,
           "still round the bridge");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);

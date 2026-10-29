@@ -14,13 +14,13 @@ Local avoidance steers agents round each other and round obstacles while they fo
 
 ## Apart from the navmesh
 
-`avoidance.h` and its modules (`src/avoidance.c`, `avoidance3.c`, `orca.c`, `orca3.c`, `obstacle.c`, `crowd.c`) use only the base and the debug buffer; the module graph gives them no edge to a navmesh module, so a host can steer units with no navmesh at all. Walls reach avoidance as segment obstacles the host passes, from `mnavFindWalls`. It is a component of the one library rather than a library of its own, since the family's install files export one.
+`avoidance.h` and its modules (`src/avoidance.c`, `avoidance3.c`, `orca.c`, `orca3.c`, `obstacle.c`, `crowd.c`) use only the base and the debug buffer; the module graph gives them no edge to a navmesh module, so a host can steer units with no navmesh at all. Walls reach avoidance as segment obstacles the host passes, from `mnavQuery_FindWalls`. It is a component of the one library rather than a library of its own, since the family's install files export one.
 
 The host owns time: it passes every agent and the step's length each call and applies the velocities. The set keeps the memory for its limits and one hint for the neighbor grid (below), which changes the work, never a velocity.
 
 ## The programs
 
-For each agent, `mnavAvoid` builds an ORCA line per neighbor and per nearby obstacle edge and solves the 2D linear program for the velocity nearest the preferred one within the speed circle; when the lines leave nothing, the 3D program finds the velocity that breaks them least, keeping obstacle lines hard. All of it is binary64, and lines count as parallel within 1e-9.
+For each agent, `mnavAvoidance_Avoid` builds an ORCA line per neighbor and per nearby obstacle edge and solves the 2D linear program for the velocity nearest the preferred one within the speed circle; when the lines leave nothing, the 3D program finds the velocity that breaks them least, keeping obstacle lines hard. All of it is binary64, and lines count as parallel within 1e-9.
 
 A velocity the programs leave past the maximum speed, which rounding does when lines meet at a narrow angle, is scaled back onto the speed circle. The scaling rounds too, so a velocity it leaves a unit outside steps each component one unit toward zero until its squared speed is no more than the squared maximum: no agent is ever given more than its maximum speed. A step takes at least a unit of the scaling's rounding off, so a few steps are enough; three were the most over 2.2e7 random velocities and maxima. Below 2^-500 m/s the squares would round absolutely, so there the velocity and the maximum are scaled by 2^600 before they are squared; that scaling is exact. A host that squares such a small velocity unscaled can find it past the squared maximum by that rounding. The velocity is then rounded to binary32, the type the host gets, to nearest; when that puts it past the maximum speed by the same check, each component the rounding grew steps one binary32 unit toward zero, which leaves no component larger than it was in binary64, so the check still holds.
 
@@ -50,7 +50,7 @@ A unit vector of a vector so short that its squared length is subnormal is taken
 
 ## In space
 
-`mnavAvoid3D` steers fliers sharing a flight volume, on the same set.
+`mnavAvoidance_Avoid3D` steers fliers sharing a flight volume, on the same set.
 
 - Each neighbor gives a half-space of velocities bounded by a plane, built as RVO2-3D builds it (a cut-off sphere, the cone, or parting within the step), in binary64. Exactly head on, where every side of the cone is as near, the plane's normal is square to the line between them, across world up or else world +X, so that each of the pair takes the other's opposite.
 - The new velocity is RVO2-3D's 3D linear program within the speed sphere, with its 4D fallback breaking the planes least. A plane touching the speed sphere leaves a disc of no size; the projection onto its rim falls back on the disc's center, since rounding can leave no offset from the center to scale, and projecting by it would give NaN.

@@ -124,7 +124,7 @@ static MNAV_NOINLINE mnavResult SteerWork(const mnavCorners* corners, const mnav
         n += 1;
     }
     // Toward a takeoff, straight: the link starts there.
-    mnavPos3 direction = Direction(corners, n, def->anticipateTurns && !takeoff);
+    mnavPos3 direction = Direction(corners, n, def->enableTurnAnticipation && !takeoff);
     double speed = (double)def->maxSpeed;
     if (left < (double)def->slowDistance)
     {

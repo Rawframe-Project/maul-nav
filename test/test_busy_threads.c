@@ -49,9 +49,9 @@ static void* Changer(void* unused)
     {
         sched_yield();
     }
-    s_staged = mnavStageTile(s_navmesh, s_trench0, sizeof(s_trench0)).result;
-    s_removed = mnavStageTileRemoval(s_navmesh, 1, 0);
-    s_committed = mnavCommit(s_navmesh);
+    s_staged = mnavNavmesh_StageTile(s_navmesh, s_trench0, sizeof(s_trench0)).result;
+    s_removed = mnavNavmesh_StageTileRemoval(s_navmesh, 1, 0);
+    s_committed = mnavNavmesh_Commit(s_navmesh);
     atomic_store(&s_done, true);
     return nullptr;
 }
@@ -82,9 +82,9 @@ static mnavNavmesh* Load(void)
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
-              mnavStageTile(navmesh, s_trench1, sizeof(s_trench1)).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
+              mnavNavmesh_StageTile(navmesh, s_trench1, sizeof(s_trench1)).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "the trench");
     return navmesh;
 }
@@ -93,11 +93,11 @@ static int32_t Generate(mnavQuery* query, mnavLinkDef* links)
 {
     mnavLinkGenDef def = mnavDefaultLinkGenDef();
     def.jumpMax = 3.0f;
-    def.clear = Clearance;
+    def.clearance = Clearance;
     int32_t count = 0;
     s_tests = 0;
-    CHECK(mnavGenerateLinks(query, s_navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, links,
-                            LINKS, &count) == mnav_success &&
+    CHECK(mnavQuery_GenerateLinks(query, s_navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
+                                  links, LINKS, &count) == mnav_success &&
               count > 0,
           "links with a clearance test");
     return count;
@@ -122,15 +122,15 @@ static void TestStagingBeside(void)
     CHECK(count == expected && memcmp(s_links, s_again, (size_t)count * sizeof(s_links[0])) == 0,
           "the same links");
     CHECK(s_staged == mnav_success && s_removed == mnav_success, "staging allowed beside");
-    CHECK(s_committed == mnav_errorBusy && mnavGetNavmeshMisuse(s_navmesh) == 1,
+    CHECK(s_committed == mnav_errorBusy && mnavNavmesh_GetMisuse(s_navmesh) == 1,
           "a commit refused, one misuse");
-    CHECK(mnavGetQueryMisuse(query) == 0, "no misuse on the context");
+    CHECK(mnavQuery_GetMisuse(query) == 0, "no misuse on the context");
     // What the second thread staged waits for the next commit.
     mnavTileId tile;
-    CHECK(mnavCommit(s_navmesh) == mnav_success &&
-              mnavGetTile(s_navmesh, 0, 0, &tile) == mnav_success &&
-              mnavGetTile(s_navmesh, 1, 0, &tile) == mnav_errorNotLoaded &&
-              mnavGetNavmeshMisuse(s_navmesh) == 1,
+    CHECK(mnavNavmesh_Commit(s_navmesh) == mnav_success &&
+              mnavNavmesh_GetTile(s_navmesh, 0, 0, &tile) == mnav_success &&
+              mnavNavmesh_GetTile(s_navmesh, 1, 0, &tile) == mnav_errorNotLoaded &&
+              mnavNavmesh_GetMisuse(s_navmesh) == 1,
           "committed after");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(s_navmesh);

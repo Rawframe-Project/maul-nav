@@ -81,14 +81,16 @@ static mnavNavmesh* Load(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavBakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr},
-                           t & 1, t >> 1, nullptr) == mnav_success &&
-                  mnavCopyBakedTile(baker, s_slopeTiles[t], CAPACITY, &s_slopeSizes[t]) ==
+        CHECK(mnavBaker_BakeTile(baker,
+                                 &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr},
+                                 t & 1, t >> 1, nullptr) == mnav_success &&
+                  mnavBaker_CopyTile(baker, s_slopeTiles[t], CAPACITY, &s_slopeSizes[t]) ==
                       mnav_success &&
-                  mnavStageTile(navmesh, s_slopeTiles[t], s_slopeSizes[t]).result == mnav_success,
+                  mnavNavmesh_StageTile(navmesh, s_slopeTiles[t], s_slopeSizes[t]).result ==
+                      mnav_success,
               "baked and staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavDestroyBaker(baker);
     return navmesh;
 }
@@ -102,17 +104,18 @@ static mnavNavmesh* LoadWorld(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
 static mnavNearest On(const mnavNavmesh* navmesh, double x, double z)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, x * (double)SLOPE, z},
-                          (mnavVec3){0.5f, 1.0f, 0.5f}, &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, x * (double)SLOPE, z},
+                                  (mnavVec3){0.5f, 1.0f, 0.5f}, nullptr, &n) == mnav_success &&
               n.polygon.slot != 0,
           "nearest");
     return n;
@@ -137,15 +140,16 @@ static void TestHeights(const mnavNavmesh* navmesh)
         double x = 2.0 + (double)(i % 10) * 6.1;
         double z = 2.0 + (double)(i / 10) * 3.3;
         mnavNearest n;
-        CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, x * (double)SLOPE, z},
-                              (mnavVec3){0.5f, 1.0f, 0.5f}, &n) == mnav_success,
+        CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, x * (double)SLOPE, z},
+                                      (mnavVec3){0.5f, 1.0f, 0.5f}, nullptr, &n) == mnav_success,
               "nearest");
         if (n.polygon.slot == 0)
         {
             continue;
         }
         double height = 0.0;
-        CHECK(mnavGetHeight(navmesh, n.polygon, n.point.x, n.point.z, &height) == mnav_success &&
+        CHECK(mnavPolygon_GetHeight(navmesh, n.polygon, n.point.x, n.point.z, &height) ==
+                      mnav_success &&
                   height == n.point.y,
               "the nearest point's height");
         off += fabs(height - n.point.x * (double)SLOPE) < 0.3 ? 0 : 1;
@@ -153,12 +157,13 @@ static void TestHeights(const mnavNavmesh* navmesh)
     CHECK(off == 0, "on the slope");
     mnavNearest n = On(navmesh, 5.0, 5.0);
     double height = -1.0;
-    CHECK(mnavGetHeight(navmesh, n.polygon, 500.0, 5.0, &height) == mnav_errorOutside &&
+    CHECK(mnavPolygon_GetHeight(navmesh, n.polygon, 500.0, 5.0, &height) == mnav_errorOutside &&
               height == 0.0,
           "outside the polygon, the height zeroed");
-    CHECK(mnavGetHeight(navmesh, n.polygon, (double)NAN, 5.0, &height) == mnav_errorInvalid &&
-              mnavGetHeight(nullptr, n.polygon, 5.0, 5.0, &height) == mnav_errorInvalid &&
-              mnavGetHeight(navmesh, n.polygon, 5.0, 5.0, nullptr) == mnav_errorInvalid,
+    CHECK(mnavPolygon_GetHeight(navmesh, n.polygon, (double)NAN, 5.0, &height) ==
+                  mnav_errorInvalid &&
+              mnavPolygon_GetHeight(nullptr, n.polygon, 5.0, 5.0, &height) == mnav_errorInvalid &&
+              mnavPolygon_GetHeight(navmesh, n.polygon, 5.0, 5.0, nullptr) == mnav_errorInvalid,
           "bad arguments");
 }
 
@@ -179,7 +184,7 @@ static void TestWalls(mnavNavmesh* navmesh)
     mnavQuery* query = Query(4096);
     mnavNearest n = On(navmesh, 27.0, 11.0);
     mnavNearestWall wall;
-    CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 6.0, &wall) ==
+    CHECK(mnavQuery_FindWallDistance(query, navmesh, n.polygon, n.point, 6.0, nullptr, &wall) ==
                   mnav_success &&
               wall.found && !wall.limited,
           "found");
@@ -192,20 +197,20 @@ static void TestWalls(mnavNavmesh* navmesh)
     CHECK(fabs(wall.wall.distance -
                hypot(wall.wall.point.x - n.point.x, wall.wall.point.z - n.point.z)) < 1e-9,
           "the distance to the point");
-    CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 1.0, &wall) ==
+    CHECK(mnavQuery_FindWallDistance(query, navmesh, n.polygon, n.point, 1.0, nullptr, &wall) ==
                   mnav_success &&
               !wall.found && SameWall(&wall.wall, &(mnavWall){0}),
           "none within 1 m");
     // Walls behind the filter's refusals: none of the floor's area allowed.
     mnavQueryFilter none = mnavDefaultQueryFilter();
     none.areas = 0;
-    CHECK(mnavFindWallDistance(query, navmesh, &none, n.polygon, n.point, 6.0, &wall) ==
+    CHECK(mnavQuery_FindWallDistance(query, navmesh, n.polygon, n.point, 6.0, &none, &wall) ==
                   mnav_success &&
               wall.found && wall.wall.distance < 2.0,
           "the polygon's own edges as walls");
     // A small radius needs few nodes.
     mnavQuery* few = Query(16);
-    CHECK(mnavFindWallDistance(few, navmesh, nullptr, n.polygon, n.point, 3.0, &wall) ==
+    CHECK(mnavQuery_FindWallDistance(few, navmesh, n.polygon, n.point, 3.0, nullptr, &wall) ==
                   mnav_success &&
               !wall.limited,
           "a small radius, a small search");
@@ -215,36 +220,38 @@ static void TestWalls(mnavNavmesh* navmesh)
     mnavNearest near = On(navmesh, 30.0, 25.0);
     mnavPolygonId across[16];
     mnavFound found;
-    CHECK(mnavFindPolygons(navmesh, nullptr, (mnavPos3){32.5, 1.6, 25.0},
-                           (mnavVec3){0.4f, 1.0f, 6.0f}, across, 16, &found) == mnav_success &&
+    CHECK(mnavNavmesh_FindPolygons(navmesh, (mnavPos3){32.5, 1.6, 25.0},
+                                   (mnavVec3){0.4f, 1.0f, 6.0f}, nullptr, across, 16,
+                                   &found) == mnav_success &&
               found.count > 0 && found.count <= 16,
           "the polygons beyond the side");
     for (int32_t i = 0; i < found.count; ++i)
     {
-        CHECK(mnavStageArea(navmesh, across[i], 3) == mnav_success, "painted");
+        CHECK(mnavPolygon_StageArea(navmesh, across[i], 3) == mnav_success, "painted");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavQueryFilter without = mnavDefaultQueryFilter();
     without.areas &= ~((uint64_t)1 << 3);
-    CHECK(mnavFindWallDistance(query, navmesh, &without, near.polygon, near.point, 6.0, &wall) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindWallDistance(query, navmesh, near.polygon, near.point, 6.0, &without,
+                                     &wall) == mnav_success &&
               wall.found && fabs(wall.wall.point.x - 32.0) < 1e-6 &&
               fabs(wall.wall.distance - (32.0 - near.point.x)) < 1e-6,
           "the tile side as a wall");
     for (int32_t i = 0; i < found.count; ++i)
     {
-        CHECK(mnavStageArea(navmesh, across[i], mnav_areaWalkable) == mnav_success, "painted back");
+        CHECK(mnavPolygon_StageArea(navmesh, across[i], mnav_areaWalkable) == mnav_success,
+              "painted back");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavQuery* tiny = Query(2);
-    CHECK(mnavFindWallDistance(tiny, navmesh, nullptr, n.polygon, n.point, 60.0, &wall) ==
+    CHECK(mnavQuery_FindWallDistance(tiny, navmesh, n.polygon, n.point, 60.0, nullptr, &wall) ==
                   mnav_success &&
               wall.limited,
           "cut short by the node limit");
-    CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, -1.0, &wall) ==
+    CHECK(mnavQuery_FindWallDistance(query, navmesh, n.polygon, n.point, -1.0, nullptr, &wall) ==
                   mnav_errorInvalid &&
-              mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, (double)INFINITY,
-                                   &wall) == mnav_errorInvalid,
+              mnavQuery_FindWallDistance(query, navmesh, n.polygon, n.point, (double)INFINITY,
+                                         nullptr, &wall) == mnav_errorInvalid,
           "bad radii");
     mnavDestroyQuery(tiny);
     mnavDestroyQuery(query);
@@ -268,19 +275,20 @@ static void TestWallAtTheRadius(mnavNavmesh* navmesh)
             mnavNearest n = {0};
             mnavNearestWall far;
             mnavNearestWall exact;
-            if (mnavFindNearest(navmesh, nullptr, (mnavPos3){x, x * (double)SLOPE, z},
-                                (mnavVec3){0.5f, 2.0f, 0.5f}, &n) != mnav_success ||
+            if (mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, x * (double)SLOPE, z},
+                                        (mnavVec3){0.5f, 2.0f, 0.5f}, nullptr,
+                                        &n) != mnav_success ||
                 n.polygon.slot == 0 ||
-                mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 20.0, &far) !=
-                    mnav_success ||
+                mnavQuery_FindWallDistance(query, navmesh, n.polygon, n.point, 20.0, nullptr,
+                                           &far) != mnav_success ||
                 !far.found)
             {
                 continue;
             }
             tried += 1;
             same = same &&
-                   mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point,
-                                        far.wall.distance, &exact) == mnav_success &&
+                   mnavQuery_FindWallDistance(query, navmesh, n.polygon, n.point, far.wall.distance,
+                                              nullptr, &exact) == mnav_success &&
                    exact.found && exact.wall.distance == far.wall.distance &&
                    exact.wall.point.x == far.wall.point.x && exact.wall.point.z == far.wall.point.z;
         }
@@ -316,7 +324,7 @@ static bool SoundWall(const mnavNavmesh* navmesh, mnavPos3 center, double radius
            fabs(hypot((double)wall->normal.x, (double)wall->normal.z) - 1.0) < 1e-6 &&
            wall->normal.y == 0.0f &&
            fabs((double)wall->normal.x * ex + (double)wall->normal.z * ez) < 1e-6 * length &&
-           mnavFindNearest(navmesh, nullptr, inside, (mnavVec3){0.05f, 1.0f, 0.05f}, &n) ==
+           mnavNavmesh_FindNearest(navmesh, inside, (mnavVec3){0.05f, 1.0f, 0.05f}, nullptr, &n) ==
                mnav_success &&
            n.polygon.slot != 0 && hypot(n.point.x - inside.x, n.point.z - inside.z) < 1e-6;
 }
@@ -340,18 +348,19 @@ static void TestWallList(const mnavNavmesh* navmesh)
             double x = 2.0 + 5.0 * i;
             double z = 2.0 + 5.0 * k;
             mnavNearest n = {0};
-            if (mnavFindNearest(navmesh, nullptr, (mnavPos3){x, x * (double)SLOPE, z},
-                                (mnavVec3){0.5f, 2.0f, 0.5f}, &n) != mnav_success ||
+            if (mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, x * (double)SLOPE, z},
+                                        (mnavVec3){0.5f, 2.0f, 0.5f}, nullptr,
+                                        &n) != mnav_success ||
                 n.polygon.slot == 0)
             {
                 continue;
             }
             mnavNearestWall wall;
             mnavWallsFound found;
-            CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, n.point, 8.0, &wall) ==
-                          mnav_success &&
-                      mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 8.0, walls, 256,
-                                    &found) == mnav_success &&
+            CHECK(mnavQuery_FindWallDistance(query, navmesh, n.polygon, n.point, 8.0, nullptr,
+                                             &wall) == mnav_success &&
+                      mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 8.0, nullptr, walls,
+                                          256, &found) == mnav_success &&
                       !found.limited,
                   "listed");
             tried += 1;
@@ -364,8 +373,8 @@ static void TestWallList(const mnavNavmesh* navmesh)
                                            w > 0 ? &walls[w - 1] : nullptr);
             }
             mnavWallsFound some;
-            mnavResult result =
-                mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 8.0, few, 3, &some);
+            mnavResult result = mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 8.0,
+                                                    nullptr, few, 3, &some);
             int32_t held = found.count < 3 ? found.count : 3;
             sound = sound && result == (found.count > 3 ? mnav_errorCapacity : mnav_success) &&
                     some.count == found.count;
@@ -374,8 +383,8 @@ static void TestWallList(const mnavNavmesh* navmesh)
                 sound = sound && SameWall(&few[w], &walls[w]);
             }
             cut += found.count > 3 ? 1 : 0;
-            result =
-                mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 8.0, nullptr, 0, &some);
+            result = mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 8.0, nullptr, nullptr,
+                                         0, &some);
             sound = sound && result == (found.count > 0 ? mnav_errorCapacity : mnav_success) &&
                     some.count == found.count;
         }
@@ -388,26 +397,26 @@ static void TestWallList(const mnavNavmesh* navmesh)
     mnavQueryFilter none = mnavDefaultQueryFilter();
     none.areas = 0;
     mnavWallsFound found;
-    CHECK(mnavFindWalls(query, navmesh, &none, n.polygon, n.point, 60.0, walls, 256, &found) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 60.0, &none, walls, 256,
+                              &found) == mnav_success &&
               found.count >= 3 && found.count <= 6,
           "the polygon's own edges");
     mnavQuery* tiny = Query(2);
-    CHECK(mnavFindWalls(tiny, navmesh, nullptr, n.polygon, n.point, 60.0, walls, 256, &found) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindWalls(tiny, navmesh, n.polygon, n.point, 60.0, nullptr, walls, 256,
+                              &found) == mnav_success &&
               found.limited,
           "cut short by the node limit");
     mnavDestroyQuery(tiny);
-    CHECK(mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 6.0, walls, -1, &found) ==
-                  mnav_errorInvalid &&
-              mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 6.0, nullptr, 2, &found) ==
-                  mnav_errorInvalid &&
-              mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, 6.0, walls, 256,
-                            nullptr) == mnav_errorInvalid &&
-              mnavFindWalls(query, navmesh, nullptr, n.polygon, n.point, (double)NAN, walls, 256,
-                            &found) == mnav_errorInvalid &&
-              mnavFindWalls(nullptr, navmesh, nullptr, n.polygon, n.point, 6.0, walls, 256,
-                            &found) == mnav_errorInvalid,
+    CHECK(mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 6.0, nullptr, walls, -1,
+                              &found) == mnav_errorInvalid &&
+              mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 6.0, nullptr, nullptr, 2,
+                                  &found) == mnav_errorInvalid &&
+              mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 6.0, nullptr, walls, 256,
+                                  nullptr) == mnav_errorInvalid &&
+              mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, (double)NAN, nullptr, walls,
+                                  256, &found) == mnav_errorInvalid &&
+              mnavQuery_FindWalls(nullptr, navmesh, n.polygon, n.point, 6.0, nullptr, walls, 256,
+                                  &found) == mnav_errorInvalid,
           "bad arguments");
     mnavDestroyQuery(query);
 }
@@ -422,11 +431,12 @@ static void TestRandomPoints(const mnavNavmesh* navmesh)
     for (uint64_t seed = 0; seed < 2000; ++seed)
     {
         mnavRandomPoint p;
-        CHECK(mnavFindRandomPoint(navmesh, nullptr, seed, &p) == mnav_success &&
+        CHECK(mnavNavmesh_FindRandomPoint(navmesh, seed, nullptr, &p) == mnav_success &&
                   p.polygon.slot != 0,
               "picked");
         double height = 0.0;
-        off += mnavGetHeight(navmesh, p.polygon, p.point.x, p.point.z, &height) == mnav_success &&
+        off += mnavPolygon_GetHeight(navmesh, p.polygon, p.point.x, p.point.z, &height) ==
+                           mnav_success &&
                        height == p.point.y
                    ? 0
                    : 1;
@@ -442,16 +452,17 @@ static void TestRandomPoints(const mnavNavmesh* navmesh)
     CHECK(hash == POINTS_HASH, "the pinned hash");
     mnavRandomPoint a;
     mnavRandomPoint b;
-    CHECK(mnavFindRandomPoint(navmesh, nullptr, 77u, &a) == mnav_success &&
-              mnavFindRandomPoint(navmesh, nullptr, 77u, &b) == mnav_success &&
+    CHECK(mnavNavmesh_FindRandomPoint(navmesh, 77u, nullptr, &a) == mnav_success &&
+              mnavNavmesh_FindRandomPoint(navmesh, 77u, nullptr, &b) == mnav_success &&
               memcmp(&a, &b, sizeof(a)) == 0,
           "the same seed, the same point");
     mnavQueryFilter none = mnavDefaultQueryFilter();
     none.areas = 0;
-    CHECK(mnavFindRandomPoint(navmesh, &none, 1u, &a) == mnav_success && a.polygon.slot == 0,
+    CHECK(mnavNavmesh_FindRandomPoint(navmesh, 1u, &none, &a) == mnav_success &&
+              a.polygon.slot == 0,
           "nothing to pick");
-    CHECK(mnavFindRandomPoint(nullptr, nullptr, 1u, &a) == mnav_errorInvalid &&
-              mnavFindRandomPoint(navmesh, nullptr, 1u, nullptr) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_FindRandomPoint(nullptr, 1u, nullptr, &a) == mnav_errorInvalid &&
+              mnavNavmesh_FindRandomPoint(navmesh, 1u, nullptr, nullptr) == mnav_errorInvalid,
           "bad arguments");
 }
 
@@ -462,17 +473,17 @@ static void TestAroundAndReachable(const mnavNavmesh* navmesh)
     mnavNearest inside = On(navmesh, 50.0, 50.0);
     mnavNearest far = On(navmesh, 60.0, 5.0);
     mnavPathEnd end = mnav_pathFound;
-    CHECK(mnavCheckReachable(query, navmesh, nullptr, center.polygon, center.point, far.polygon,
-                             far.point, &end) == mnav_success &&
+    CHECK(mnavQuery_CheckReachable(query, navmesh, center.polygon, center.point, far.polygon,
+                                   far.point, nullptr, &end) == mnav_success &&
               end == mnav_pathFound,
           "across the floor");
-    CHECK(mnavCheckReachable(query, navmesh, nullptr, center.polygon, center.point, inside.polygon,
-                             inside.point, &end) == mnav_success &&
+    CHECK(mnavQuery_CheckReachable(query, navmesh, center.polygon, center.point, inside.polygon,
+                                   inside.point, nullptr, &end) == mnav_success &&
               end == mnav_pathNotLoaded,
           "not into the ring, though unloaded sides keep it from saying so");
     mnavQuery* tiny = Query(4);
-    CHECK(mnavCheckReachable(tiny, navmesh, nullptr, center.polygon, center.point, far.polygon,
-                             far.point, &end) == mnav_success &&
+    CHECK(mnavQuery_CheckReachable(tiny, navmesh, center.polygon, center.point, far.polygon,
+                                   far.point, nullptr, &end) == mnav_success &&
               end == mnav_pathOutOfNodes,
           "cannot tell with four nodes");
     // From inside the ring, the points stay inside.
@@ -480,8 +491,8 @@ static void TestAroundAndReachable(const mnavNavmesh* navmesh)
     for (uint64_t seed = 0; seed < 50; ++seed)
     {
         mnavRandomPoint p;
-        CHECK(mnavFindRandomPointAround(query, navmesh, nullptr, inside.polygon, inside.point, 30.0,
-                                        seed, &p) == mnav_success,
+        CHECK(mnavQuery_FindRandomPointAround(query, navmesh, inside.polygon, inside.point, 30.0,
+                                              seed, nullptr, &p) == mnav_success,
               "picked");
         escaped +=
             p.point.x > 44.0 && p.point.x < 56.0 && p.point.z > 44.0 && p.point.z < 56.0 ? 0 : 1;
@@ -498,8 +509,8 @@ static void TestAround(const mnavNavmesh* navmesh)
     mnavQuery* query = Query(4096);
     mnavQuery* other = Query(4096);
     mnavNearest center;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){10.0, 0.0, 10.0},
-                          (mnavVec3){0.5f, 1.0f, 0.5f}, &center) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){10.0, 0.0, 10.0},
+                                  (mnavVec3){0.5f, 1.0f, 0.5f}, nullptr, &center) == mnav_success &&
               center.polygon.slot != 0,
           "nearest");
     mnavPathEnd end = mnav_pathFound;
@@ -510,12 +521,12 @@ static void TestAround(const mnavNavmesh* navmesh)
     for (uint64_t seed = 0; seed < 200; ++seed)
     {
         mnavRandomPoint p;
-        CHECK(mnavFindRandomPointAround(query, navmesh, nullptr, center.polygon, center.point, 8.0,
-                                        seed, &p) == mnav_success &&
+        CHECK(mnavQuery_FindRandomPointAround(query, navmesh, center.polygon, center.point, 8.0,
+                                              seed, nullptr, &p) == mnav_success &&
                   p.polygon.slot != 0,
               "picked");
-        CHECK(mnavCheckReachable(other, navmesh, nullptr, center.polygon, center.point, p.polygon,
-                                 p.point, &end) == mnav_success,
+        CHECK(mnavQuery_CheckReachable(other, navmesh, center.polygon, center.point, p.polygon,
+                                       p.point, nullptr, &end) == mnav_success,
               "checked");
         unreachable += end == mnav_pathFound ? 0 : 1;
         double d = hypot(p.point.x - center.point.x, p.point.z - center.point.z);

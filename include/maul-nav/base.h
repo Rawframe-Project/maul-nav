@@ -229,7 +229,7 @@ extern "C"
     /// @return A static, NUL-terminated string such as "mnav_errorCapacity".
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_API const char* mnavResultName(mnavResult result);
+    MNAV_API const char* mnavGetResultName(mnavResult result);
 
 #ifdef __cplusplus
 }

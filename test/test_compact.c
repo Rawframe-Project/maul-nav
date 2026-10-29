@@ -25,7 +25,7 @@ static mnavNearest Over(int32_t x, int32_t z, int32_t level)
 {
     mnavPos3 center = {(AT + x + 0.5) * 0.25, level * 0.125, (AT + z + 0.5) * 0.25};
     mnavNearest n;
-    CHECK(mnavFindNearest(s_navmesh, nullptr, center, (mnavVec3){0.01f, 1.0f, 0.01f}, &n) ==
+    CHECK(mnavNavmesh_FindNearest(s_navmesh, center, (mnavVec3){0.01f, 1.0f, 0.01f}, nullptr, &n) ==
                   mnav_success &&
               n.polygon.slot != 0 && n.over,
           "a polygon over the cell");
@@ -39,8 +39,8 @@ static bool Reaches(int32_t x0, int32_t z0, int32_t level0, int32_t x1, int32_t 
     mnavNearest a = Over(x0, z0, level0);
     mnavNearest b = Over(x1, z1, level1);
     mnavPath path;
-    CHECK(mnavFindPath(s_query, s_navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                       &path) == mnav_success,
+    CHECK(mnavQuery_FindPath(s_query, s_navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success,
           "searched");
     return path.end == mnav_pathFound;
 }
@@ -164,16 +164,16 @@ static void TestOpenSpansToTheFrameEdge(void)
     mnavBakeReport report;
     size_t size = 0;
     CHECK(mnavCreateBaker(&s_def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0, &report) ==
-                  mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0,
+                                   &report) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
     // The tile and its border of 3 cells: 134 by 134 open spans.
     int32_t walkable = 0;
@@ -193,12 +193,12 @@ static mnavAreaType AreaAt(double x, double y, double z)
 {
     mnavNearest n;
     mnavAreaType area = NO_POLYGON;
-    CHECK(mnavFindNearest(s_navmesh, nullptr, (mnavPos3){x, y, z}, (mnavVec3){0.01f, 1.0f, 0.01f},
-                          &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(s_navmesh, (mnavPos3){x, y, z}, (mnavVec3){0.01f, 1.0f, 0.01f},
+                                  nullptr, &n) == mnav_success,
           "nearest");
     if (n.polygon.slot != 0 && n.over)
     {
-        CHECK(mnavGetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
+        CHECK(mnavPolygon_GetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
     }
     return area;
 }
@@ -216,15 +216,15 @@ static void TestLevelLandmarks(void)
     const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
     size_t size = 0;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+              mnavBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
     // A surface's solid is at least one cell tall, so the platform's top,
     // 1 m or 8 cell heights up, is at 9, 1.125 m; the ramp's cell at z =

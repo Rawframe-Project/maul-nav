@@ -170,7 +170,7 @@ static int32_t ReadObstacles(Reader* r)
     return count;
 }
 
-// Whether a step is one mnavAvoid3D takes.
+// Whether a step is one mnavAvoidance_Avoid3D takes.
 static bool GoodStep(double step)
 {
     return isfinite(step) && step >= MNAV_MIN_AVOIDANCE_TIME;
@@ -221,13 +221,13 @@ static void Space(Reader* r, mnavAvoidance* avoidance)
     int32_t spheres = ReadSpheres(r);
     double step = Byte(r) % 8 == 0 ? Value(r) : 0.05 + (double)(Byte(r) % 10) * 0.05;
     mnavResult result =
-        mnavAvoid3D(avoidance, s_fliers, agents, s_spheres, spheres, step, s_first3);
+        mnavAvoidance_Avoid3D(avoidance, s_fliers, agents, s_spheres, spheres, step, s_first3);
     Expect(Typed(result));
     // Drawing refuses what the call refuses, given a good step.
     mnavDebugBuffer buffer = {{0.0, 0.0, 0.0}, s_vertices, 1 << 14, 0, nullptr, 0, 0,
                               s_lines,         1 << 14,    0};
     mnavResult drawn =
-        mnavDebugAvoidance3D(avoidance, s_fliers, agents, s_spheres, spheres, &buffer);
+        mnavAvoidance_Debug3D(avoidance, s_fliers, agents, s_spheres, spheres, &buffer);
     Expect(Typed(drawn));
     // A full buffer is mnav_errorCapacity too.
     Expect(!GoodStep(step) || drawn == result ||
@@ -243,8 +243,8 @@ static void Space(Reader* r, mnavAvoidance* avoidance)
         double speed = sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
         Expect(speed <= s_fliers[i].maxSpeed * (1.0 + 1e-9) + 1e-12);
     }
-    Expect(mnavAvoid3D(avoidance, s_fliers, agents, s_spheres, spheres, step, s_second3) ==
-               mnav_success &&
+    Expect(mnavAvoidance_Avoid3D(avoidance, s_fliers, agents, s_spheres, spheres, step,
+                                 s_second3) == mnav_success &&
            memcmp(s_first3, s_second3, (size_t)agents * sizeof(mnavVec3)) == 0);
     if (!distinct)
     {
@@ -258,8 +258,8 @@ static void Space(Reader* r, mnavAvoidance* avoidance)
     {
         s_spheresReversed[o] = s_spheres[spheres - 1 - o];
     }
-    Expect(mnavAvoid3D(avoidance, s_fliersReversed, agents, s_spheresReversed, spheres, step,
-                       s_second3) == mnav_success);
+    Expect(mnavAvoidance_Avoid3D(avoidance, s_fliersReversed, agents, s_spheresReversed, spheres,
+                                 step, s_second3) == mnav_success);
     for (int32_t i = 0; i < agents; ++i)
     {
         Expect(memcmp(&s_first3[i], &s_second3[agents - 1 - i], sizeof(mnavVec3)) == 0);
@@ -282,7 +282,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     int32_t obstacles = ReadObstacles(&r);
     double step = Byte(&r) % 8 == 0 ? Value(&r) : 0.05 + (double)(Byte(&r) % 10) * 0.05;
     mnavResult result =
-        mnavAvoid(avoidance, s_agents, agents, s_obstacles, obstacles, step, s_first);
+        mnavAvoidance_Avoid(avoidance, s_agents, agents, s_obstacles, obstacles, step, s_first);
     Expect(Typed(result));
     if (result == mnav_success)
     {
@@ -293,8 +293,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
             Expect(speed <= s_agents[i].maxSpeed * (1.0 + 1e-9) + 1e-12);
         }
         // Again, the same; reversed, the same per agent when ids differ.
-        Expect(mnavAvoid(avoidance, s_agents, agents, s_obstacles, obstacles, step, s_second) ==
-                   mnav_success &&
+        Expect(mnavAvoidance_Avoid(avoidance, s_agents, agents, s_obstacles, obstacles, step,
+                                   s_second) == mnav_success &&
                memcmp(s_first, s_second, (size_t)agents * sizeof(mnavVec2)) == 0);
         if (distinct)
         {
@@ -302,8 +302,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
             {
                 s_reversed[i] = s_agents[agents - 1 - i];
             }
-            Expect(mnavAvoid(avoidance, s_reversed, agents, s_obstacles, obstacles, step,
-                             s_second) == mnav_success);
+            Expect(mnavAvoidance_Avoid(avoidance, s_reversed, agents, s_obstacles, obstacles, step,
+                                       s_second) == mnav_success);
             for (int32_t i = 0; i < agents; ++i)
             {
                 Expect(memcmp(&s_first[i], &s_second[agents - 1 - i], sizeof(mnavVec2)) == 0);
@@ -312,7 +312,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     }
     mnavDebugBuffer buffer = {{0.0, 0.0, 0.0}, s_vertices, 1 << 14, 0, nullptr, 0, 0,
                               s_lines,         1 << 14,    0};
-    mnavResult drawn = mnavDebugAvoidance(avoidance, s_agents, agents, Value(&r), &buffer);
+    mnavResult drawn = mnavAvoidance_Debug(avoidance, s_agents, agents, Value(&r), &buffer);
     Expect(Typed(drawn));
     if (r.at < r.size)
     {

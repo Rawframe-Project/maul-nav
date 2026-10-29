@@ -41,7 +41,7 @@ void mnavDestroyQuery(mnavQuery* query)
     mnavRelease(&last, query, 1, sizeof(mnavQuery), alignof(mnavQuery));
 }
 
-uint64_t mnavGetQueryMisuse(const mnavQuery* query)
+uint64_t mnavQuery_GetMisuse(const mnavQuery* query)
 {
     return query != nullptr ? mnavHostMisuse(&query->host) : 0;
 }

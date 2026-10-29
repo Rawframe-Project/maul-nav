@@ -65,11 +65,12 @@ static bool Load(mnavNavmesh* navmesh, const DiffScene* scene, int64_t* bytes)
         for (int32_t x = TileOf(lo[0]); x <= TileOf(hi[0]) && good; ++x)
         {
             size_t size = 0;
-            good =
-                mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, x,
-                             z, nullptr) == mnav_success &&
-                mnavCopyBakedTile(baker, tile, TILE_ROOM, &size) == mnav_success &&
-                (navmesh == nullptr || mnavStageTile(navmesh, tile, size).result == mnav_success);
+            good = mnavBaker_BakeTile(baker,
+                                      &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                                      x, z, nullptr) == mnav_success &&
+                   mnavBaker_CopyTile(baker, tile, TILE_ROOM, &size) == mnav_success &&
+                   (navmesh == nullptr ||
+                    mnavNavmesh_StageTile(navmesh, tile, size).result == mnav_success);
             total += (int64_t)size;
         }
     }
@@ -78,7 +79,7 @@ static bool Load(mnavNavmesh* navmesh, const DiffScene* scene, int64_t* bytes)
     {
         *bytes = total;
     }
-    return good && (navmesh == nullptr || mnavCommit(navmesh) == mnav_success);
+    return good && (navmesh == nullptr || mnavNavmesh_Commit(navmesh) == mnav_success);
 }
 
 int64_t DiffMaulBake(const DiffScene* scene)
@@ -115,7 +116,7 @@ void DiffMaulDestroy(DiffMaul* maul)
 bool DiffMaulPoint(DiffMaul* maul, uint64_t seed, float out[3])
 {
     mnavRandomPoint p;
-    if (mnavFindRandomPoint(maul->navmesh, nullptr, seed, &p) != mnav_success)
+    if (mnavNavmesh_FindRandomPoint(maul->navmesh, seed, nullptr, &p) != mnav_success)
     {
         return false;
     }
@@ -128,7 +129,7 @@ bool DiffMaulPoint(DiffMaul* maul, uint64_t seed, float out[3])
 static bool Nearest(const DiffMaul* maul, const float at[3], mnavNearest* n)
 {
     mnavPos3 p = {at[0], at[1], at[2]};
-    return mnavFindNearest(maul->navmesh, nullptr, p, (mnavVec3){0.5f, 2.0f, 0.5f}, n) ==
+    return mnavNavmesh_FindNearest(maul->navmesh, p, (mnavVec3){0.5f, 2.0f, 0.5f}, nullptr, n) ==
                mnav_success &&
            n->polygon.slot != 0;
 }
@@ -143,8 +144,8 @@ int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double*
         return -1;
     }
     mnavPath path;
-    mnavResult result = mnavFindPath(maul->query, maul->navmesh, nullptr, s.polygon, s.point,
-                                     e.polygon, e.point, &path);
+    mnavResult result = mnavQuery_FindPath(maul->query, maul->navmesh, s.polygon, s.point,
+                                           e.polygon, e.point, nullptr, &path);
     if (nodes != nullptr)
     {
         *nodes = maul->query->nodeCount;

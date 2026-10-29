@@ -6,7 +6,7 @@
 // segment against the plain one, voxel by voxel; every broken structure
 // of the payload refused in its section.
 //
-// White-box: the API answers openness point by point (mnavIsFlightOpen)
+// White-box: the API answers openness point by point (mnavFlightVolume_IsOpen)
 // but shows no tile's octree to check it against, no walk to compare, and
 // no payload to break past its hash without the format's writer.
 
@@ -63,7 +63,7 @@ static int32_t Wrong(const mnavFlightVolume* volume, const mnavFlightTile* tile,
                 mnavPos3 p = {(x0 + x + 0.5) * 0.5, (floorVoxel + y + 0.5) * 0.5,
                               (z0 + z + 0.5) * 0.5};
                 bool got = false;
-                wrong += mnavIsFlightOpen(volume, p, &got) != mnav_success ? 1 : 0;
+                wrong += mnavFlightVolume_IsOpen(volume, p, &got) != mnav_success ? 1 : 0;
                 wrong += got == mnavFlightSolid(tile, x, y, z) ? 1 : 0;
                 *openOut += got ? 1 : 0;
             }
@@ -99,9 +99,9 @@ static void TestVoxelsAsTheOctree(void)
     int32_t staged = 0;
     for (int32_t t = 0; t < 4; ++t)
     {
-        staged += mnavStageFlightTile(volume, s_bytes[t], s_sizes[t]).result == mnav_success;
+        staged += mnavFlightVolume_StageTile(volume, s_bytes[t], s_sizes[t]).result == mnav_success;
     }
-    CHECK(staged == 4 && mnavCommitFlight(volume) == mnav_success, "committed");
+    CHECK(staged == 4 && mnavFlightVolume_Commit(volume) == mnav_success, "committed");
     for (int32_t t = 0; t < 4; ++t)
     {
         CheckVoxels(volume, t);
@@ -246,9 +246,9 @@ static void TestWalk(void)
     int32_t staged = 0;
     for (int32_t t = 0; t < 4; ++t)
     {
-        staged += mnavStageFlightTile(volume, s_bytes[t], s_sizes[t]).result == mnav_success;
+        staged += mnavFlightVolume_StageTile(volume, s_bytes[t], s_sizes[t]).result == mnav_success;
     }
-    CHECK(staged == 4 && mnavCommitFlight(volume) == mnav_success, "committed");
+    CHECK(staged == 4 && mnavFlightVolume_Commit(volume) == mnav_success, "committed");
     mnavFlightCursor cursor = mnavMakeFlightCursor(volume);
     int32_t wrong = 0;
     int32_t held[3] = {0, 0, 0};

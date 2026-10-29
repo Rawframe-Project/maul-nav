@@ -29,9 +29,10 @@ static mnavNavmesh* LoadWorld(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -47,8 +48,8 @@ static mnavQuery* MakeQuery(int32_t nodes)
 static mnavNearest On(const mnavNavmesh* navmesh, double x, double z, float box)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 0.0, z}, (mnavVec3){box, 2.0f, box},
-                          &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 0.0, z}, (mnavVec3){box, 2.0f, box},
+                                  nullptr, &n) == mnav_success,
           "nearest");
     return n;
 }
@@ -81,17 +82,18 @@ static void TestCornersAreThePathsStraightPath(void)
         mnavPath path;
         mnavCorridor corridor;
         mnavCorners out;
-        CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &path) == mnav_success &&
+        CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &path) == mnav_success &&
                   mnavResetCorridor(&corridor, buffer, 8192, a.polygon, a.point) == mnav_success &&
                   mnavSetCorridor(&corridor, &path) == mnav_success,
               "loaded");
         loaded += 1;
         int32_t valid = -1;
-        CHECK(mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success &&
+        CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
                   valid == path.polygonCount,
               "every polygon valid");
-        CHECK(mnavCorridorCorners(corners, navmesh, &corridor, &out) == mnav_success, "corners");
+        CHECK(mnavQuery_FindCorridorCorners(corners, &corridor, navmesh, &out) == mnav_success,
+              "corners");
         same +=
             out.pointCount == path.pointCount &&
                     memcmp(out.points, path.points, (size_t)path.pointCount * sizeof(mnavPos3)) == 0
@@ -111,8 +113,8 @@ static void TestChecksAndLimits(void)
     mnavNearest a = On(navmesh, 2.0, 2.0, 2.0f);
     mnavNearest b = On(navmesh, 62.0, 62.0, 2.0f);
     mnavPath path;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
               path.polygonCount > 4,
           "a long path");
     mnavPolygonId buffer[256];
@@ -122,14 +124,14 @@ static void TestChecksAndLimits(void)
               corridor.count == 1,
           "too long for two polygons, unchanged");
     mnavCorners out;
-    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &out) == mnav_success &&
+    CHECK(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &out) == mnav_success &&
               out.pointCount == 1 && out.points[0].x == a.point.x,
           "a fresh corridor's one point");
     CHECK(mnavResetCorridor(&corridor, buffer, 256, a.polygon, a.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success,
           "loaded");
     mnavQuery* small = MakeQuery(4);
-    CHECK(mnavCorridorCorners(small, navmesh, &corridor, &out) == mnav_errorCapacity,
+    CHECK(mnavQuery_FindCorridorCorners(small, &corridor, navmesh, &out) == mnav_errorCapacity,
           "more polygons than the context's nodes");
     mnavDestroyQuery(small);
     // Two polygons swapped: not joined from there on.
@@ -137,28 +139,29 @@ static void TestChecksAndLimits(void)
     buffer[1] = buffer[3];
     buffer[3] = swap;
     int32_t valid = -1;
-    CHECK(mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success && valid == 1 &&
-              mnavCorridorCorners(query, navmesh, &corridor, &out) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
+              valid == 1 &&
+              mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &out) == mnav_errorInvalid,
           "not joined after the first");
     buffer[3] = buffer[1];
     buffer[1] = swap;
     // A tile replaced: its polygons' ids go stale.
     mnavTileId tile;
-    CHECK(mnavGetTile(navmesh, 1, 0, &tile) == mnav_success, "tile (1, 0)");
+    CHECK(mnavNavmesh_GetTile(navmesh, 1, 0, &tile) == mnav_success, "tile (1, 0)");
     int32_t onOther = -1;
     for (int32_t i = 0; i < corridor.count && onOther < 0; ++i)
     {
         onOther = buffer[i].slot == tile.slot ? i : -1;
     }
     CHECK(onOther > 0, "the path crosses tile (1, 0)");
-    CHECK(mnavStageTile(navmesh, s_tiles[1], s_sizes[1]).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[1], s_sizes[1]).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "tile (1, 0) replaced");
-    CHECK(mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success &&
+    CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
               valid == onOther &&
-              mnavCorridorCorners(query, navmesh, &corridor, &out) == mnav_errorStale,
+              mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &out) == mnav_errorStale,
           "valid up to its first polygon on the replaced tile");
-    CHECK(mnavCheckCorridor(nullptr, nullptr, &corridor, &valid) == mnav_errorInvalid &&
+    CHECK(mnavNavmesh_CheckCorridor(nullptr, &corridor, nullptr, &valid) == mnav_errorInvalid &&
               mnavResetCorridor(&corridor, buffer, 0, a.polygon, a.point) == mnav_errorInvalid &&
               mnavSetCorridor(&corridor, nullptr) == mnav_errorInvalid,
           "bad arguments");
@@ -194,23 +197,25 @@ static void TestMalformedCorridors(void)
         bool shortened = false;
         mnavPath path;
         bool refused =
-            mnavCheckCorridor(navmesh, nullptr, &c, &valid) == mnav_errorInvalid &&
-            mnavCorridorCorners(query, navmesh, &c, &corners) == mnav_errorInvalid &&
-            mnavCorridorAreas(query, navmesh, &c, nullptr, runs, 4, &count) == mnav_errorInvalid &&
-            mnavMoveCorridor(query, navmesh, nullptr, &c, a.point, &move) == mnav_errorInvalid &&
-            mnavMoveCorridorTarget(query, navmesh, nullptr, &c, a.point, &move) ==
+            mnavNavmesh_CheckCorridor(navmesh, &c, nullptr, &valid) == mnav_errorInvalid &&
+            mnavQuery_FindCorridorCorners(query, &c, navmesh, &corners) == mnav_errorInvalid &&
+            mnavQuery_FindCorridorAreas(query, &c, navmesh, nullptr, runs, 4, &count) ==
                 mnav_errorInvalid &&
-            mnavShortcutCorridor(query, navmesh, nullptr, &c, a.point, &shortened) ==
+            mnavQuery_MoveCorridor(query, &c, navmesh, a.point, nullptr, &move) ==
                 mnav_errorInvalid &&
-            mnavReplanCorridor(query, navmesh, nullptr, &c, (mnavVec3){1.0f, 1.0f, 1.0f}, &path) ==
-                mnav_errorInvalid;
+            mnavQuery_MoveCorridorTarget(query, &c, navmesh, a.point, nullptr, &move) ==
+                mnav_errorInvalid &&
+            mnavQuery_ShortcutCorridor(query, &c, navmesh, a.point, nullptr, &shortened) ==
+                mnav_errorInvalid &&
+            mnavQuery_ReplanCorridor(query, &c, navmesh, (mnavVec3){1.0f, 1.0f, 1.0f}, nullptr,
+                                     &path) == mnav_errorInvalid;
         CHECK(refused && c.count == bad[k].count && c.capacity == bad[k].capacity && valid == 0 &&
                   !shortened,
               "a malformed corridor refused by every call, unchanged, the outputs zeroed");
     }
     mnavPath path;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, a.polygon, a.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, a.polygon, a.point, nullptr,
+                             &path) == mnav_success &&
               path.polygonCount == 1,
           "a path of one polygon");
     mnavCorridor noRoom = bad[1];
@@ -233,7 +238,8 @@ static void TestAreaRuns(mnavQuery* query, const mnavNavmesh* navmesh, mnavCorri
     int32_t count = -1;
     mnavCorners corners;
     mnavAreaType first = 0;
-    CHECK(mnavCorridorAreas(query, navmesh, corridor, &corners, runs, 8, &count) == mnav_success &&
+    CHECK(mnavQuery_FindCorridorAreas(query, corridor, navmesh, &corners, runs, 8, &count) ==
+                  mnav_success &&
               count == 4 && corners.pointCount == 4,
           "four runs along the corners");
     first = runs[0].area;
@@ -243,19 +249,19 @@ static void TestAreaRuns(mnavQuery* query, const mnavNavmesh* navmesh, mnavCorri
               runs[3].corner == 2 && runs[3].area == first,
           "into area 2 at 10 m, out at 15 m, and from the landing");
     runs[2].area = 77;
-    CHECK(mnavCorridorAreas(query, navmesh, corridor, nullptr, runs, 2, &count) ==
+    CHECK(mnavQuery_FindCorridorAreas(query, corridor, navmesh, nullptr, runs, 2, &count) ==
                   mnav_errorCapacity &&
               count == 4 && runs[1].area == 2 && runs[2].area == 77,
           "two places for four runs: the first two, nothing past them, and the count");
-    CHECK(mnavCorridorAreas(query, navmesh, corridor, nullptr, nullptr, 0, &count) ==
+    CHECK(mnavQuery_FindCorridorAreas(query, corridor, navmesh, nullptr, nullptr, 0, &count) ==
                   mnav_errorCapacity &&
               count == 4,
           "counted with no places");
-    CHECK(mnavCorridorAreas(query, navmesh, corridor, nullptr, runs, 8, nullptr) ==
+    CHECK(mnavQuery_FindCorridorAreas(query, corridor, navmesh, nullptr, runs, 8, nullptr) ==
                   mnav_errorInvalid &&
-              mnavCorridorAreas(query, navmesh, corridor, nullptr, nullptr, 1, &count) ==
+              mnavQuery_FindCorridorAreas(query, corridor, navmesh, nullptr, nullptr, 1, &count) ==
                   mnav_errorInvalid &&
-              mnavCorridorAreas(query, navmesh, corridor, nullptr, runs, -1, &count) ==
+              mnavQuery_FindCorridorAreas(query, corridor, navmesh, nullptr, runs, -1, &count) ==
                   mnav_errorInvalid,
           "no count, no runs or a negative capacity refused");
     // From (6, 5.5) to (14, 9.5): into area 2 at (10, 7.5).
@@ -264,11 +270,12 @@ static void TestAreaRuns(mnavQuery* query, const mnavNavmesh* navmesh, mnavCorri
     mnavPath path;
     mnavPolygonId buffer[8];
     mnavCorridor slant;
-    CHECK(mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon, to.point,
-                       &path) == mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, from.polygon, from.point, to.polygon, to.point,
+                             nullptr, &path) == mnav_success &&
               mnavResetCorridor(&slant, buffer, 8, from.polygon, from.point) == mnav_success &&
               mnavSetCorridor(&slant, &path) == mnav_success &&
-              mnavCorridorAreas(query, navmesh, &slant, nullptr, runs, 8, &count) == mnav_success &&
+              mnavQuery_FindCorridorAreas(query, &slant, navmesh, nullptr, runs, 8, &count) ==
+                  mnav_success &&
               count == 2 && fabs(runs[1].start.x - 10.0) < 1e-9 &&
               fabs(runs[1].start.z - 7.5) < 1e-9 && runs[1].area == 2,
           "a slanting path crosses into area 2 at (10, 7.5)");
@@ -284,9 +291,9 @@ static void TestAreaRunsRoundAWall(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_handRoundAWall, sizeof(s_handRoundAWall)).result ==
+              mnavNavmesh_StageTile(navmesh, s_handRoundAWall, sizeof(s_handRoundAWall)).result ==
                   mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "the U loaded");
     mnavQuery* query = MakeQuery(64);
     mnavNearest a = On(navmesh, 6.0, 14.0, 0.1f);
@@ -297,12 +304,12 @@ static void TestAreaRunsRoundAWall(void)
     mnavAreaRun runs[8];
     int32_t count = -1;
     mnavCorners corners;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
               path.polygonCount == 7 &&
               mnavResetCorridor(&corridor, buffer, 16, a.polygon, a.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success &&
-              mnavCorridorAreas(query, navmesh, &corridor, &corners, runs, 8, &count) ==
+              mnavQuery_FindCorridorAreas(query, &corridor, navmesh, &corners, runs, 8, &count) ==
                   mnav_success,
           "round the wall");
     CHECK(corners.pointCount == 4 && count == 3 && runs[1].area == 2 && runs[1].corner == 2 &&
@@ -323,10 +330,10 @@ static void TestFiltersAndLinks(void)
     mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false, 0.0f};
     mnavLinkId id;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_handRowWithBridge, sizeof(s_handRowWithBridge)).result ==
-                  mnav_success &&
+              mnavNavmesh_StageTile(navmesh, s_handRowWithBridge, sizeof(s_handRowWithBridge))
+                      .result == mnav_success &&
               mnavStageLink(navmesh, &jump, &id) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
     mnavQuery* query = MakeQuery(64);
     mnavNearest a = On(navmesh, 6.0, 7.5, 0.1f);
@@ -334,14 +341,14 @@ static void TestFiltersAndLinks(void)
     mnavPath path;
     mnavPolygonId buffer[16];
     mnavCorridor corridor;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
               path.end == mnav_pathFound && path.linkCount == 1 &&
               mnavResetCorridor(&corridor, buffer, 16, a.polygon, a.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success,
           "a path with a jump");
     mnavCorners out;
-    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &out) == mnav_success &&
+    CHECK(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &out) == mnav_success &&
               out.pointCount == 4 && out.linkCount == 1 && out.links[0].point == 1 &&
               out.links[0].kind == mnav_linkJump && out.points[1].x == 19.5,
           "the jump among the corners");
@@ -349,29 +356,31 @@ static void TestFiltersAndLinks(void)
     int32_t valid = -1;
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     filter.areas &= ~((uint64_t)1 << 2);
-    CHECK(mnavCheckCorridor(navmesh, &filter, &corridor, &valid) == mnav_success && valid == 1,
+    CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, &filter, &valid) == mnav_success &&
+              valid == 1,
           "the middle square left out");
     filter = mnavDefaultQueryFilter();
     filter.kinds &= ~((uint64_t)1 << mnav_linkJump);
-    CHECK(mnavCheckCorridor(navmesh, &filter, &corridor, &valid) == mnav_success && valid == 3,
+    CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, &filter, &valid) == mnav_success &&
+              valid == 3,
           "no jumping: valid to the gap");
     filter.cookie = 0;
-    CHECK(mnavCheckCorridor(navmesh, &filter, &corridor, &valid) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, &filter, &valid) == mnav_errorInvalid,
           "a filter not from the default");
     // Standing on a square left out, the agent may still leave it: the
     // corridor's first polygon counts whatever its area.
     mnavNearest middle = On(navmesh, 12.5, 7.5, 0.1f);
     filter = mnavDefaultQueryFilter();
     filter.areas &= ~((uint64_t)1 << 2);
-    CHECK(mnavFindPath(query, navmesh, nullptr, middle.polygon, middle.point, b.polygon, b.point,
-                       &path) == mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, middle.polygon, middle.point, b.polygon, b.point,
+                             nullptr, &path) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success &&
-              mnavCheckCorridor(navmesh, &filter, &corridor, &valid) == mnav_success &&
+              mnavNavmesh_CheckCorridor(navmesh, &corridor, &filter, &valid) == mnav_success &&
               valid == corridor.count,
           "starting on a square left out");
     // An id never handed out is invalid, not stale.
     buffer[1].slot = 99;
-    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &out) == mnav_errorInvalid,
+    CHECK(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &out) == mnav_errorInvalid,
           "an id never handed out");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -395,9 +404,9 @@ static void TestMovingTheEnds(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_handRowOfFive, sizeof(s_handRowOfFive)).result ==
+              mnavNavmesh_StageTile(navmesh, s_handRowOfFive, sizeof(s_handRowOfFive)).result ==
                   mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
     mnavQuery* query = MakeQuery(64);
     mnavNearest a = On(navmesh, 6.0, 7.5, 0.1f);
@@ -405,65 +414,65 @@ static void TestMovingTheEnds(void)
     mnavPath path;
     mnavPolygonId buffer[5];
     mnavCorridor corridor;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
               mnavResetCorridor(&corridor, buffer, 5, a.polygon, a.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success && Indices(&corridor) == 12345,
           "the whole row");
     mnavMove move;
-    CHECK(mnavMoveCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){12.0, 0.0, 7.5}, &move) ==
-                  mnav_success &&
+    CHECK(mnavQuery_MoveCorridor(query, &corridor, navmesh, (mnavPos3){12.0, 0.0, 7.5}, nullptr,
+                                 &move) == mnav_success &&
               move.end == mnav_moveReached && corridor.position.x == 12.0 &&
               Indices(&corridor) == 2345,
           "forward: the first square dropped");
-    CHECK(mnavMoveCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){12.0, 0.0, 12.0},
-                           &move) == mnav_success &&
+    CHECK(mnavQuery_MoveCorridor(query, &corridor, navmesh, (mnavPos3){12.0, 0.0, 12.0}, nullptr,
+                                 &move) == mnav_success &&
               move.end == mnav_moveWall && corridor.position.z == 10.0 &&
               Indices(&corridor) == 2345,
           "into the side: held at the wall");
-    CHECK(mnavMoveCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){6.0, 0.0, 7.5},
-                           nullptr) == mnav_success &&
+    CHECK(mnavQuery_MoveCorridor(query, &corridor, navmesh, (mnavPos3){6.0, 0.0, 7.5}, nullptr,
+                                 nullptr) == mnav_success &&
               Indices(&corridor) == 12345,
           "back: the first square again");
     // Target moves: nearer drops the end, farther again restores it.
-    CHECK(mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor, (mnavPos3){18.0, 0.0, 7.5},
-                                 &move) == mnav_success &&
+    CHECK(mnavQuery_MoveCorridorTarget(query, &corridor, navmesh, (mnavPos3){18.0, 0.0, 7.5},
+                                       nullptr, &move) == mnav_success &&
               corridor.target.x == 18.0 && Indices(&corridor) == 123,
           "the target nearer");
-    CHECK(mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor, (mnavPos3){28.0, 0.0, 7.5},
-                                 nullptr) == mnav_success &&
+    CHECK(mnavQuery_MoveCorridorTarget(query, &corridor, navmesh, (mnavPos3){28.0, 0.0, 7.5},
+                                       nullptr, nullptr) == mnav_success &&
               Indices(&corridor) == 12345,
           "the target back at the end");
     // A buffer of four: the walk back would not fit.
     mnavPolygonId small[4];
     CHECK(mnavResetCorridor(&corridor, small, 4, a.polygon, a.point) == mnav_success &&
-              mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor, (mnavPos3){22.0, 0.0, 7.5},
-                                     nullptr) == mnav_success &&
+              mnavQuery_MoveCorridorTarget(query, &corridor, navmesh, (mnavPos3){22.0, 0.0, 7.5},
+                                           nullptr, nullptr) == mnav_success &&
               Indices(&corridor) == 1234,
           "four squares");
-    CHECK(mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor, (mnavPos3){28.0, 0.0, 7.5},
-                                 nullptr) == mnav_errorCapacity &&
+    CHECK(mnavQuery_MoveCorridorTarget(query, &corridor, navmesh, (mnavPos3){28.0, 0.0, 7.5},
+                                       nullptr, nullptr) == mnav_errorCapacity &&
               Indices(&corridor) == 1234 && corridor.target.x == 22.0,
           "a fifth does not fit; nothing changed");
     // Forward to the second square, then back: the first would not fit.
-    CHECK(mnavMoveCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){12.0, 0.0, 7.5},
-                           nullptr) == mnav_success &&
-              mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor, (mnavPos3){28.0, 0.0, 7.5},
-                                     nullptr) == mnav_success &&
+    CHECK(mnavQuery_MoveCorridor(query, &corridor, navmesh, (mnavPos3){12.0, 0.0, 7.5}, nullptr,
+                                 nullptr) == mnav_success &&
+              mnavQuery_MoveCorridorTarget(query, &corridor, navmesh, (mnavPos3){28.0, 0.0, 7.5},
+                                           nullptr, nullptr) == mnav_success &&
               Indices(&corridor) == 2345,
           "the second square on");
-    CHECK(mnavMoveCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){8.0, 0.0, 7.5},
-                           nullptr) == mnav_errorCapacity &&
+    CHECK(mnavQuery_MoveCorridor(query, &corridor, navmesh, (mnavPos3){8.0, 0.0, 7.5}, nullptr,
+                                 nullptr) == mnav_errorCapacity &&
               Indices(&corridor) == 2345 && corridor.position.x == 12.0,
           "back to the first does not fit; nothing changed");
     // A target moved into the row's side stops there.
-    CHECK(mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor, (mnavPos3){28.0, 0.0, 12.0},
-                                 nullptr) == mnav_success &&
+    CHECK(mnavQuery_MoveCorridorTarget(query, &corridor, navmesh, (mnavPos3){28.0, 0.0, 12.0},
+                                       nullptr, nullptr) == mnav_success &&
               corridor.target.x == 28.0 && corridor.target.z == 10.0,
           "the target held at the wall");
-    CHECK(mnavMoveCorridor(query, navmesh, nullptr, nullptr, a.point, nullptr) ==
+    CHECK(mnavQuery_MoveCorridor(query, nullptr, navmesh, a.point, nullptr, nullptr) ==
                   mnav_errorInvalid &&
-              mnavMoveCorridorTarget(query, navmesh, nullptr, nullptr, a.point, nullptr) ==
+              mnavQuery_MoveCorridorTarget(query, nullptr, navmesh, a.point, nullptr, nullptr) ==
                   mnav_errorInvalid,
           "no corridor");
     mnavDestroyQuery(query);
@@ -496,8 +505,8 @@ static void TestFollowingCorridors(void)
         mnavPath path;
         mnavCorridor corridor;
         if (a.polygon.slot == 0 || b.polygon.slot == 0 ||
-            mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) !=
-                mnav_success ||
+            mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                               &path) != mnav_success ||
             path.end != mnav_pathFound)
         {
             continue;
@@ -509,7 +518,8 @@ static void TestFollowingCorridors(void)
         for (int32_t step = 0; step < 400; ++step)
         {
             mnavCorners corners;
-            CHECK(mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success,
+            CHECK(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &corners) ==
+                      mnav_success,
                   "corners");
             mnavPos3 next = corners.pointCount > 1 ? corners.points[1] : corridor.target;
             double dx = next.x - corridor.position.x;
@@ -522,13 +532,14 @@ static void TestFollowingCorridors(void)
             }
             double f = d > 0.5 ? 0.5 / d : 1.0;
             mnavPos3 wanted = {corridor.position.x + f * dx, 0.0, corridor.position.z + f * dz};
-            CHECK(mnavMoveCorridor(query, navmesh, nullptr, &corridor, wanted, nullptr) ==
+            CHECK(mnavQuery_MoveCorridor(query, &corridor, navmesh, wanted, nullptr, nullptr) ==
                       mnav_success,
                   "stepped");
             int32_t count = -1;
-            valid = valid &&
-                    mnavCheckCorridor(navmesh, nullptr, &corridor, &count) == mnav_success &&
-                    count == corridor.count;
+            valid =
+                valid &&
+                mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &count) == mnav_success &&
+                count == corridor.count;
             hash = mnavHash64(hash, &corridor.position, (int32_t)sizeof(corridor.position));
         }
     }
@@ -550,9 +561,9 @@ static void TestShortcuts(void)
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_handGridWithCentre, sizeof(s_handGridWithCentre)).result ==
-                  mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, s_handGridWithCentre, sizeof(s_handGridWithCentre))
+                      .result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
     mnavQuery* query = MakeQuery(64);
     mnavNearest a = On(navmesh, 6.0, 12.5, 0.1f);
@@ -562,35 +573,35 @@ static void TestShortcuts(void)
     mnavPath path;
     mnavPolygonId buffer[16];
     mnavCorridor corridor;
-    CHECK(mnavFindPath(query, navmesh, &round, a.polygon, a.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, &round,
+                             &path) == mnav_success &&
               mnavResetCorridor(&corridor, buffer, 16, a.polygon, a.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success && corridor.count == 5,
           "round the centre, five squares");
     bool shortened = true;
-    CHECK(mnavShortcutCorridor(query, navmesh, &round, &corridor, (mnavPos3){19.0, 0.0, 12.5},
-                               &shortened) == mnav_success &&
+    CHECK(mnavQuery_ShortcutCorridor(query, &corridor, navmesh, (mnavPos3){19.0, 0.0, 12.5}, &round,
+                                     &shortened) == mnav_success &&
               !shortened && corridor.count == 5,
           "without the centre the ray meets a wall");
     // Through the centre to the far wall: the ray passes the corridor's
     // last square but meets the wall before the point, so nothing changes.
-    CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){25.0, 0.0, 12.5},
-                               &shortened) == mnav_success &&
+    CHECK(mnavQuery_ShortcutCorridor(query, &corridor, navmesh, (mnavPos3){25.0, 0.0, 12.5},
+                                     nullptr, &shortened) == mnav_success &&
               !shortened && corridor.count == 5,
           "a ray that meets a wall shortens nothing");
-    CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){19.0, 0.0, 12.5},
-                               &shortened) == mnav_success &&
+    CHECK(mnavQuery_ShortcutCorridor(query, &corridor, navmesh, (mnavPos3){19.0, 0.0, 12.5},
+                                     nullptr, &shortened) == mnav_success &&
               shortened && Indices(&corridor) == 456,
           "straight across the centre");
     mnavCorners corners;
-    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+    CHECK(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &corners) == mnav_success &&
               corners.pointCount == 2,
           "a straight line now");
-    CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, (mnavPos3){19.0, 0.0, 12.5},
-                               &shortened) == mnav_success &&
+    CHECK(mnavQuery_ShortcutCorridor(query, &corridor, navmesh, (mnavPos3){19.0, 0.0, 12.5},
+                                     nullptr, &shortened) == mnav_success &&
               !shortened,
           "nothing shorter left");
-    CHECK(mnavShortcutCorridor(query, navmesh, nullptr, &corridor, a.point, nullptr) ==
+    CHECK(mnavQuery_ShortcutCorridor(query, &corridor, navmesh, a.point, nullptr, nullptr) ==
               mnav_errorInvalid,
           "nowhere to say");
     // Replanned from the centre square with the centre left out: the
@@ -598,21 +609,22 @@ static void TestShortcuts(void)
     // though no search for the nearest usable polygon would find it.
     mnavNearest centre = On(navmesh, 12.5, 12.5, 0.1f);
     CHECK(mnavResetCorridor(&corridor, buffer, 16, centre.polygon, centre.point) == mnav_success &&
-              mnavMoveCorridorTarget(query, navmesh, nullptr, &corridor,
-                                     (mnavPos3){19.0, 0.0, 12.5}, nullptr) == mnav_success &&
-              mnavReplanCorridor(query, navmesh, &round, &corridor, (mnavVec3){0.1f, 1.0f, 0.1f},
-                                 &path) == mnav_success &&
+              mnavQuery_MoveCorridorTarget(query, &corridor, navmesh, (mnavPos3){19.0, 0.0, 12.5},
+                                           nullptr, nullptr) == mnav_success &&
+              mnavQuery_ReplanCorridor(query, &corridor, navmesh, (mnavVec3){0.1f, 1.0f, 0.1f},
+                                       &round, &path) == mnav_success &&
               path.end == mnav_pathFound && path.polygons[0].polygon == 4,
           "planned from the corridor's own start");
     // A position off the navmesh with its polygon gone: found again
     // within the box, and the corridor starts on the navmesh.
-    CHECK(mnavStageTile(navmesh, s_handGridWithCentre, sizeof(s_handGridWithCentre)).result ==
-                  mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
-          "the tile replaced");
+    CHECK(
+        mnavNavmesh_StageTile(navmesh, s_handGridWithCentre, sizeof(s_handGridWithCentre)).result ==
+                mnav_success &&
+            mnavNavmesh_Commit(navmesh) == mnav_success,
+        "the tile replaced");
     corridor.position = (mnavPos3){4.7, 0.0, 12.5};
-    CHECK(mnavReplanCorridor(query, navmesh, nullptr, &corridor, (mnavVec3){1.0f, 1.0f, 1.0f},
-                             &path) == mnav_success &&
+    CHECK(mnavQuery_ReplanCorridor(query, &corridor, navmesh, (mnavVec3){1.0f, 1.0f, 1.0f}, nullptr,
+                                   &path) == mnav_success &&
               path.end == mnav_pathFound && corridor.position.x == 5.0,
           "the position snapped back on");
     mnavDestroyQuery(query);
@@ -628,8 +640,8 @@ static void TestReplanning(void)
     mnavPath path;
     static mnavPolygonId buffer[256];
     mnavCorridor corridor;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
               mnavResetCorridor(&corridor, buffer, 256, a.polygon, a.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success,
           "loaded");
@@ -638,28 +650,33 @@ static void TestReplanning(void)
     // are found again and the corridor planned anew.
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "replaced");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "replaced");
     int32_t valid = -1;
-    CHECK(mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success && valid == 0,
+    CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
+              valid == 0,
           "nothing valid");
     mnavPos3 target = corridor.target;
-    CHECK(mnavReplanCorridor(query, navmesh, nullptr, &corridor, box, &path) == mnav_success &&
+    CHECK(mnavQuery_ReplanCorridor(query, &corridor, navmesh, box, nullptr, &path) ==
+                  mnav_success &&
               path.end == mnav_pathFound &&
-              mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success &&
+              mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
               valid == corridor.count && corridor.position.x == a.point.x &&
               corridor.target.x == target.x && corridor.target.z == target.z,
           "planned again between the same points");
     // The target's tile gone: no polygon to plan to, the corridor kept.
     int32_t count = corridor.count;
-    CHECK(mnavStageTileRemoval(navmesh, 1, 1) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 1) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "tile (1, 1) removed");
-    CHECK(mnavReplanCorridor(query, navmesh, nullptr, &corridor, box, &path) == mnav_success &&
+    CHECK(mnavQuery_ReplanCorridor(query, &corridor, navmesh, box, nullptr, &path) ==
+                  mnav_success &&
               path.end == mnav_pathNotLoaded && path.polygonCount == 0 && corridor.count == count,
           "nothing loaded at the target");
-    CHECK(mnavReplanCorridor(query, navmesh, nullptr, nullptr, box, &path) == mnav_errorInvalid,
+    CHECK(mnavQuery_ReplanCorridor(query, nullptr, navmesh, box, nullptr, &path) ==
+              mnav_errorInvalid,
           "no corridor");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -680,11 +697,11 @@ static void TestStartOnASeam(void)
     mnavPolygonId buffer[2] = {above, below};
     mnavCorridor corridor = {{6.0, 0.0, 32.0}, {6.0, 0.0, 32.0}, buffer, 2, 2};
     mnavCorners corners;
-    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+    CHECK(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &corners) == mnav_success &&
               corners.pointCount == 1 && corners.points[0].x == 6.0 && corners.points[0].z == 32.0,
           "at the target: one corner, the target");
     corridor.target = (mnavPos3){7.0, 0.0, 32.0};
-    CHECK(mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+    CHECK(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &corners) == mnav_success &&
               corners.pointCount == 2 && corners.points[1].x == 7.0 && corners.points[1].z == 32.0,
           "along the seam: straight to the target");
     mnavDestroyQuery(query);

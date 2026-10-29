@@ -9,7 +9,7 @@
 // White-box: it encodes and decodes tiles with the format's own codec
 // (mnavEncodeTile, mnavDecodeTile), and builds meshes with one flaw each
 // that only that encoder can wrap in otherwise well-formed bytes. The
-// loader's refusals are public (mnavStageTile); the inputs that reach
+// loader's refusals are public (mnavNavmesh_StageTile); the inputs that reach
 // each of them are not.
 
 // The seed writer uses fopen, which the Microsoft C library deprecates.

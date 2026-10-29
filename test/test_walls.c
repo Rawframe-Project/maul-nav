@@ -24,12 +24,13 @@ static mnavNavmesh* Square(mnavPolygonId* polygonOut)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(mnavStageTile(navmesh, s_handSquare, sizeof(s_handSquare)).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, s_handSquare, sizeof(s_handSquare)).result ==
+                  mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "committed");
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){5.0, 0.0, 5.0}, (mnavVec3){1.0f, 4.0f, 1.0f},
-                          &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){5.0, 0.0, 5.0}, (mnavVec3){1.0f, 4.0f, 1.0f},
+                                  nullptr, &n) == mnav_success &&
               n.polygon.slot != 0,
           "found");
     *polygonOut = n.polygon;
@@ -48,8 +49,8 @@ static void TestTiesAndTheRadius(void)
     const double corners[4][2] = {{0, 0}, {0, 10}, {10, 10}, {10, 0}};
     mnavWall walls[4];
     mnavWallsFound found;
-    CHECK(mnavFindWalls(query, navmesh, nullptr, polygon, (mnavPos3){5.0, 0.0, 5.0}, 5.0, walls, 4,
-                        &found) == mnav_success &&
+    CHECK(mnavQuery_FindWalls(query, navmesh, polygon, (mnavPos3){5.0, 0.0, 5.0}, 5.0, nullptr,
+                              walls, 4, &found) == mnav_success &&
               found.count == 4 && !found.limited,
           "the four sides at the radius");
     bool ordered = true;
@@ -62,8 +63,8 @@ static void TestTiesAndTheRadius(void)
     CHECK(ordered, "in the order met, at 5 m");
     // Off the middle the nearest comes first: the side x = 0 at 1 m, then
     // z = 0 and z = 10 at 5 m in the order met, then x = 10 at 9 m.
-    CHECK(mnavFindWalls(query, navmesh, nullptr, polygon, (mnavPos3){1.0, 0.0, 5.0}, 9.0, walls, 4,
-                        &found) == mnav_success &&
+    CHECK(mnavQuery_FindWalls(query, navmesh, polygon, (mnavPos3){1.0, 0.0, 5.0}, 9.0, nullptr,
+                              walls, 4, &found) == mnav_success &&
               found.count == 4 && walls[0].distance == 1.0 && walls[0].start.z == 0.0 &&
               walls[1].distance == 5.0 && walls[1].start.x == 0.0 && walls[1].start.z == 10.0 &&
               walls[2].distance == 5.0 && walls[2].start.x == 10.0 && walls[2].start.z == 0.0 &&
@@ -85,8 +86,8 @@ static void TestShortBuffer(void)
     mnavWall walls[3];
     walls[2] = (mnavWall){.distance = -1.0};
     mnavWallsFound found;
-    CHECK(mnavFindWalls(query, navmesh, nullptr, polygon, (mnavPos3){1.0, 0.0, 2.0}, 10.0, walls, 2,
-                        &found) == mnav_errorCapacity &&
+    CHECK(mnavQuery_FindWalls(query, navmesh, polygon, (mnavPos3){1.0, 0.0, 2.0}, 10.0, nullptr,
+                              walls, 2, &found) == mnav_errorCapacity &&
               found.count == 4,
           "all four counted");
     CHECK(walls[0].distance == 1.0 && walls[1].distance == 2.0 && walls[2].distance == -1.0,
@@ -105,18 +106,18 @@ static void TestPartlyLinkedSide(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_handSeamWest, sizeof(s_handSeamWest)).result ==
+              mnavNavmesh_StageTile(navmesh, s_handSeamWest, sizeof(s_handSeamWest)).result ==
                   mnav_success &&
-              mnavStageTile(navmesh, s_handSeamSouth, sizeof(s_handSeamSouth)).result ==
+              mnavNavmesh_StageTile(navmesh, s_handSeamSouth, sizeof(s_handSeamSouth)).result ==
                   mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "committed");
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success, "query");
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){30.0, 0.0, 8.0},
-                          (mnavVec3){1.0f, 4.0f, 1.0f}, &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){30.0, 0.0, 8.0}, (mnavVec3){1.0f, 4.0f, 1.0f},
+                                  nullptr, &n) == mnav_success &&
               n.polygon.slot != 0,
           "found");
     // From (30, 8): the north side and the seam's open part, 2 m each, in
@@ -124,8 +125,8 @@ static void TestPartlyLinkedSide(void)
     // to 5 m, as the side runs.
     mnavWall walls[4];
     mnavWallsFound found;
-    CHECK(mnavFindWalls(query, navmesh, nullptr, n.polygon, (mnavPos3){30.0, 0.0, 8.0}, 2.5, walls,
-                        4, &found) == mnav_success &&
+    CHECK(mnavQuery_FindWalls(query, navmesh, n.polygon, (mnavPos3){30.0, 0.0, 8.0}, 2.5, nullptr,
+                              walls, 4, &found) == mnav_success &&
               found.count == 2,
           "two walls within 2.5 m");
     CHECK(walls[0].distance == 2.0 && walls[0].start.z == 10.0 && walls[0].end.z == 10.0 &&
@@ -134,14 +135,14 @@ static void TestPartlyLinkedSide(void)
               (double)walls[1].normal.x == -1.0,
           "the north side, then the seam's open part");
     mnavNearestWall wall;
-    CHECK(mnavFindWallDistance(query, navmesh, nullptr, n.polygon, (mnavPos3){31.0, 0.0, 8.0}, 2.5,
-                               &wall) == mnav_success &&
+    CHECK(mnavQuery_FindWallDistance(query, navmesh, n.polygon, (mnavPos3){31.0, 0.0, 8.0}, 2.5,
+                                     nullptr, &wall) == mnav_success &&
               wall.found && wall.wall.distance == 1.0 && wall.wall.point.x == 32.0,
           "the seam's open part is the nearest wall");
     // From (30, 2), beside the linked part: only the south side, 2 m away;
     // the open part lies over 3.6 m off.
-    CHECK(mnavFindWalls(query, navmesh, nullptr, n.polygon, (mnavPos3){30.0, 0.0, 2.0}, 2.5, walls,
-                        4, &found) == mnav_success &&
+    CHECK(mnavQuery_FindWalls(query, navmesh, n.polygon, (mnavPos3){30.0, 0.0, 2.0}, 2.5, nullptr,
+                              walls, 4, &found) == mnav_success &&
               found.count == 1 && walls[0].start.z == 0.0 && walls[0].end.z == 0.0,
           "the linked part is no wall");
     mnavDestroyNavmesh(navmesh);
@@ -149,17 +150,17 @@ static void TestPartlyLinkedSide(void)
     // z = 10 to 0 m, the linked part comes first and the open part after
     // it, from z = 5 to 0 m.
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_handSeamWest, sizeof(s_handSeamWest)).result ==
+              mnavNavmesh_StageTile(navmesh, s_handSeamWest, sizeof(s_handSeamWest)).result ==
                   mnav_success &&
-              mnavStageTile(navmesh, s_handSeamNorth, sizeof(s_handSeamNorth)).result ==
+              mnavNavmesh_StageTile(navmesh, s_handSeamNorth, sizeof(s_handSeamNorth)).result ==
                   mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "committed");
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){30.0, 0.0, 2.0},
-                          (mnavVec3){1.0f, 4.0f, 1.0f}, &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){30.0, 0.0, 2.0}, (mnavVec3){1.0f, 4.0f, 1.0f},
+                                  nullptr, &n) == mnav_success &&
               n.polygon.slot != 0 &&
-              mnavFindWalls(query, navmesh, nullptr, n.polygon, (mnavPos3){30.0, 0.0, 2.0}, 2.5,
-                            walls, 4, &found) == mnav_success &&
+              mnavQuery_FindWalls(query, navmesh, n.polygon, (mnavPos3){30.0, 0.0, 2.0}, 2.5,
+                                  nullptr, walls, 4, &found) == mnav_success &&
               found.count == 2 && walls[0].start.x == 32.0 && walls[0].start.z == 5.0 &&
               walls[0].end.z == 0.0 && walls[1].start.z == 0.0 && walls[1].end.z == 0.0,
           "the open part after the linked one");

@@ -33,13 +33,13 @@ static void GuideObstacles(mnavBaker* baker, const mnavTriangleMesh* world, int3
     mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};
     if (cached == mnav_success)
     {
-        cached = mnavBakeTileCached(baker, cache, &input, tileX, tileZ, &report);
+        cached = mnavBaker_BakeTileCached(baker, cache, &input, tileX, tileZ, &report);
     }
 
     // A crate on the tile: a ring on the ground and a height range.
     const mnavVec2 ring[4] = {{36, 4}, {38, 4}, {38, 6}, {36, 6}};
     const mnavBakeVolume crate = {ring, 4, -1.0f, 2.0f, mnav_volumeExclude, 0};
-    mnavResult rebuilt = mnavRebuildTile(baker, cache, tileX, tileZ, &crate, 1, &report);
+    mnavResult rebuilt = mnavBaker_RebuildTile(baker, cache, tileX, tileZ, &crate, 1, &report);
     // clang-format on
     CHECK(cached == mnav_success && rebuilt == mnav_success && report.polygons > 0,
           "the obstacle snippet rebuilds a tile");
@@ -67,10 +67,10 @@ static void GuideBake(void)
     mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};   // meshes, terrains, volumes, index
     mnavBakeReport report;
     size_t size = 0;
-    mnavResult baked = mnavBakeTile(baker, &input, tileX, tileZ, &report);
+    mnavResult baked = mnavBaker_BakeTile(baker, &input, tileX, tileZ, &report);
     if (baked == mnav_success)
     {
-        baked = mnavCopyBakedTile(baker, bytes, capacity, &size);   // the tile's bytes
+        baked = mnavBaker_CopyTile(baker, bytes, capacity, &size);   // the tile's bytes
     }
     // clang-format on
     CHECK(made.result == mnav_success && baked == mnav_success && size > 0 && report.polygons > 0,
@@ -87,9 +87,9 @@ static void GuideNavmesh(void)
     // clang-format off
     mnavNavmesh* navmesh = NULL;
     mnavBakeDefResult created = mnavCreateNavmesh(&def, &navmesh);   // the bake def
-    mnavTileResult staged = mnavStageTile(navmesh, bytes, size);     // copied
+    mnavTileResult staged = mnavNavmesh_StageTile(navmesh, bytes, size);     // copied
     // staged.result; refused bytes are named by section and element
-    mnavResult committed = mnavCommit(navmesh);
+    mnavResult committed = mnavNavmesh_Commit(navmesh);
     // clang-format on
     CHECK(created.result == mnav_success && staged.result == mnav_success &&
               committed == mnav_success,
@@ -105,9 +105,10 @@ static mnavNavmesh* Loaded(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -121,13 +122,13 @@ static void GuideQueryAndCorridor(void)
 
     mnavNearest a, b;
     const mnavVec3 box = {1.0f, 2.0f, 1.0f};      // half extents of the search
-    mnavResult nearA = mnavFindNearest(navmesh, NULL, (mnavPos3){8.0, 0.0, 8.0}, box, &a);
-    mnavResult nearB = mnavFindNearest(navmesh, NULL, (mnavPos3){8.0, 0.0, 56.0}, box, &b);
+    mnavResult nearA = mnavNavmesh_FindNearest(navmesh, (mnavPos3){8.0, 0.0, 8.0}, box, NULL, &a);
+    mnavResult nearB = mnavNavmesh_FindNearest(navmesh, (mnavPos3){8.0, 0.0, 56.0}, box, NULL, &b);
     // a.polygon.slot is 0 when no polygon lies in the box
 
     mnavPath path;
     mnavResult searched =
-        mnavFindPath(query, navmesh, NULL, a.polygon, a.point, b.polygon, b.point, &path);
+        mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, NULL, &path);
     // path.end: found, partial (out of nodes or too long), no path, not loaded
     // path.points: the straight path; path.polygons: the corridor; path.links
     // clang-format on
@@ -144,9 +145,9 @@ static void GuideQueryAndCorridor(void)
 
     // Each tick:
     mnavCorners corners;
-    mnavResult cornered = mnavCorridorCorners(query, navmesh, &corridor, &corners);
+    mnavResult cornered = mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &corners);
     // head for corners.points[1]
-    mnavResult moved = mnavMoveCorridor(query, navmesh, NULL, &corridor, wanted, NULL);
+    mnavResult moved = mnavQuery_MoveCorridor(query, &corridor, navmesh, wanted, NULL, NULL);
     // clang-format on
     CHECK(reset == mnav_success && set == mnav_success && cornered == mnav_success &&
               corners.pointCount >= 2 && moved == mnav_success,
@@ -171,7 +172,7 @@ static void GuideAvoidance(void)
     // Each step: positions, velocities and preferred velocities in, new
     // velocities out.
     mnavResult stepped =
-        mnavAvoid(avoidance, agents, agentCount, obstacles, obstacleCount, 0.1, velocities);
+        mnavAvoidance_Avoid(avoidance, agents, agentCount, obstacles, obstacleCount, 0.1, velocities);
     // clang-format on
     CHECK(made == mnav_success && stepped == mnav_success, "the avoidance snippet steps");
     mnavDestroyAvoidance(avoidance);
@@ -208,12 +209,12 @@ static void GuideCrowd(void)
         mnavNearest from;
         mnavNearest to;
         mnavPath path;
-        CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){ends[i][0], 0.0, ends[i][1]}, box,
-                              &from) == mnav_success &&
-                  mnavFindNearest(navmesh, nullptr, (mnavPos3){ends[1 - i][0], 0.0, ends[1 - i][1]},
-                                  box, &to) == mnav_success &&
-                  mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon,
-                               to.point, &path) == mnav_success &&
+        CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){ends[i][0], 0.0, ends[i][1]}, box,
+                                      nullptr, &from) == mnav_success &&
+                  mnavNavmesh_FindNearest(navmesh, (mnavPos3){ends[1 - i][0], 0.0, ends[1 - i][1]},
+                                          box, nullptr, &to) == mnav_success &&
+                  mnavQuery_FindPath(query, navmesh, from.polygon, from.point, to.polygon, to.point,
+                                     nullptr, &path) == mnav_success &&
                   mnavResetCorridor(&corridors[i], buffers[i], 64, from.polygon, from.point) ==
                       mnav_success &&
                   mnavSetCorridor(&corridors[i], &path) == mnav_success,
@@ -233,20 +234,20 @@ static void GuideCrowd(void)
         {
             mnavCorners corners;
             mnavSteering steering;
-            if (mnavCorridorCorners(query, navmesh, &corridors[i], &corners) == mnav_success &&
+            if (mnavQuery_FindCorridorCorners(query, &corridors[i], navmesh, &corners) == mnav_success &&
                 mnavSteer(&corners, &steer, &steering) == mnav_success)
             {
                 agents[i].preferred = (mnavVec2){steering.velocity.x, steering.velocity.z};
             }
         }
-        mnavResult avoided = mnavAvoid(avoidance, agents, count, obstacles, obstacleCount, dt, velocities);
+        mnavResult avoided = mnavAvoidance_Avoid(avoidance, agents, count, obstacles, obstacleCount, dt, velocities);
         for (int32_t i = 0; i < count && avoided == mnav_success; ++i)
         {
             // Limit the change from agents[i].velocity by the agent's acceleration.
             mnavPos3 at = corridors[i].position;
             mnavPos3 wanted = {at.x + (double)velocities[i].x * dt, at.y,
                                at.z + (double)velocities[i].y * dt};
-            if (mnavMoveCorridor(query, navmesh, NULL, &corridors[i], wanted, NULL) == mnav_success)
+            if (mnavQuery_MoveCorridor(query, &corridors[i], navmesh, wanted, NULL, NULL) == mnav_success)
             {
                 agents[i].position = (mnavPos2){corridors[i].position.x, corridors[i].position.z};
                 agents[i].velocity = velocities[i];

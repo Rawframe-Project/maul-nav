@@ -82,10 +82,11 @@ static bool Alike(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput* i
     mnavBakeReport rebuilt;
     size_t expected = 0;
     size_t size = 0;
-    if (mnavBakeTile(baker, &full, tileX, tileZ, &baked) != mnav_success ||
-        mnavCopyBakedTile(baker, s_expected, TILE_CAPACITY, &expected) != mnav_success ||
-        mnavRebuildTile(baker, cache, tileX, tileZ, obstacles, count, &rebuilt) != mnav_success ||
-        mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &size) != mnav_success)
+    if (mnavBaker_BakeTile(baker, &full, tileX, tileZ, &baked) != mnav_success ||
+        mnavBaker_CopyTile(baker, s_expected, TILE_CAPACITY, &expected) != mnav_success ||
+        mnavBaker_RebuildTile(baker, cache, tileX, tileZ, obstacles, count, &rebuilt) !=
+            mnav_success ||
+        mnavBaker_CopyTile(baker, s_rebuilt, TILE_CAPACITY, &size) != mnav_success)
     {
         return false;
     }
@@ -155,10 +156,11 @@ static int32_t Scene(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput
     {
         size_t size = 0;
         size_t cached = 0;
-        CHECK(mnavBakeTile(baker, input, t & 1, t >> 1, nullptr) == mnav_success &&
-                  mnavCopyBakedTile(baker, s_expected, TILE_CAPACITY, &size) == mnav_success &&
-                  mnavBakeTileCached(baker, cache, input, t & 1, t >> 1, nullptr) == mnav_success &&
-                  mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &cached) == mnav_success &&
+        CHECK(mnavBaker_BakeTile(baker, input, t & 1, t >> 1, nullptr) == mnav_success &&
+                  mnavBaker_CopyTile(baker, s_expected, TILE_CAPACITY, &size) == mnav_success &&
+                  mnavBaker_BakeTileCached(baker, cache, input, t & 1, t >> 1, nullptr) ==
+                      mnav_success &&
+                  mnavBaker_CopyTile(baker, s_rebuilt, TILE_CAPACITY, &cached) == mnav_success &&
                   size == cached && memcmp(s_expected, s_rebuilt, size) == 0,
               "a cached bake gives a plain bake's bytes");
         for (int32_t k = 0; k < setCount; ++k)
@@ -213,11 +215,11 @@ static void TestAlike(mnavBaker* baker, mnavTileCache* cache)
     const mnavBakeVolume crate = Volume(&s_crate, -1, 2, mnav_volumeExclude, 0);
     size_t plain = 0;
     size_t carved = 0;
-    CHECK(mnavBakeTileCached(baker, cache, &scenes[1], 0, 0, nullptr) == mnav_success &&
-              mnavRebuildTile(baker, cache, 0, 0, nullptr, 0, nullptr) == mnav_success &&
-              mnavCopyBakedTile(baker, s_expected, TILE_CAPACITY, &plain) == mnav_success &&
-              mnavRebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_success &&
-              mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &carved) == mnav_success &&
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &scenes[1], 0, 0, nullptr) == mnav_success &&
+              mnavBaker_RebuildTile(baker, cache, 0, 0, nullptr, 0, nullptr) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_expected, TILE_CAPACITY, &plain) == mnav_success &&
+              mnavBaker_RebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_rebuilt, TILE_CAPACITY, &carved) == mnav_success &&
               (plain != carved || memcmp(s_expected, s_rebuilt, plain) != 0),
           "a crate changes the tile");
 }
@@ -227,11 +229,11 @@ static mnavBakeReport Rebuilt(mnavBaker* baker, mnavTileCache* cache, int32_t ti
 {
     mnavBakeReport report;
     size_t size = 0;
-    CHECK(mnavRebuildTile(baker, cache, tileX, 0, obstacles, count, &report) == result &&
+    CHECK(mnavBaker_RebuildTile(baker, cache, tileX, 0, obstacles, count, &report) == result &&
               report.result == result,
           "the rebuild's result");
     CHECK((result == mnav_success) ==
-              (mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_success),
+              (mnavBaker_CopyTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_success),
           "a tile only after a rebuild that succeeded");
     return report;
 }
@@ -301,13 +303,13 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
     mnavTriangleMesh world = World();
     const mnavBakeInput input = {&world, 1, nullptr, 0, nullptr, 0, nullptr};
     mnavBakeReport cached;
-    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, &cached) == mnav_success, "cached");
-    CHECK(mnavBakeTileCached(baker, nullptr, &input, 0, 0, nullptr) == mnav_errorInvalid &&
-              mnavBakeTileCached(baker, cache, nullptr, 0, 0, nullptr) == mnav_errorInvalid &&
-              mnavBakeTileCached(nullptr, cache, &input, 0, 0, nullptr) == mnav_errorInvalid,
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &input, 0, 0, &cached) == mnav_success, "cached");
+    CHECK(mnavBaker_BakeTileCached(baker, nullptr, &input, 0, 0, nullptr) == mnav_errorInvalid &&
+              mnavBaker_BakeTileCached(baker, cache, nullptr, 0, 0, nullptr) == mnav_errorInvalid &&
+              mnavBaker_BakeTileCached(nullptr, cache, &input, 0, 0, nullptr) == mnav_errorInvalid,
           "a cached bake of NULL arguments refused");
     Rebuilt(baker, cache, 5, nullptr, 0, mnav_errorNotLoaded);
-    CHECK(mnavRebuildTile(nullptr, cache, 0, 0, nullptr, 0, nullptr) == mnav_errorInvalid,
+    CHECK(mnavBaker_RebuildTile(nullptr, cache, 0, 0, nullptr, 0, nullptr) == mnav_errorInvalid,
           "no baker");
     Rebuilt(baker, nullptr, 0, nullptr, 0, mnav_errorInvalid);
     Rebuilt(baker, cache, 0, nullptr, -1, mnav_errorInvalid);
@@ -345,7 +347,7 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
     mnavDestroyBaker(other);
     // The cached volumes' points count too.
     const mnavBakeInput shaped = {&world, 1, nullptr, 0, obstacles, 1, nullptr};
-    CHECK(mnavBakeTileCached(baker, cache, &shaped, 0, 0, &cached) == mnav_success,
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &shaped, 0, 0, &cached) == mnav_success,
           "cached with a volume");
     def.limits.inputTriangles = cached.triangles + 4 + 4;
     CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "a baker at the limit");
@@ -357,13 +359,14 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
     mnavDestroyBaker(other);
     // A cached bake that fails leaves nothing cached for the tile.
     const mnavBakeInput missing = {&world, 1, nullptr, 0, nullptr, 1, nullptr};
-    CHECK(mnavBakeTileCached(baker, cache, &missing, 0, 0, nullptr) == mnav_errorInvalid,
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &missing, 0, 0, nullptr) == mnav_errorInvalid,
           "refused input");
     Rebuilt(baker, cache, 0, nullptr, 0, mnav_errorNotLoaded);
-    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success, "cached again");
-    mnavDropCachedTile(cache, 0, 0);
-    mnavDropCachedTile(cache, 0, 0);
-    mnavDropCachedTile(nullptr, 0, 0);
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success,
+          "cached again");
+    mnavTileCache_DropTile(cache, 0, 0);
+    mnavTileCache_DropTile(cache, 0, 0);
+    mnavTileCache_DropTile(nullptr, 0, 0);
     Rebuilt(baker, cache, 0, nullptr, 0, mnav_errorNotLoaded);
 }
 
@@ -390,7 +393,7 @@ static void TestCreate(void)
     def.limits.memoryBytes = 16;
     CHECK(mnavCreateTileCache(&def, &cache) == mnav_errorCapacity && cache == nullptr,
           "too few bytes for the cache itself");
-    CHECK(mnavGetTileCacheBytes(nullptr) == 0, "a NULL cache holds nothing");
+    CHECK(mnavTileCache_GetBytes(nullptr) == 0, "a NULL cache holds nothing");
     mnavDestroyTileCache(nullptr);
 }
 
@@ -403,30 +406,30 @@ static void TestLimits(mnavBaker* baker)
     def.limits.tiles = 1;
     mnavTileCache* cache = nullptr;
     CHECK(mnavCreateTileCache(&def, &cache) == mnav_success, "a cache of one tile");
-    uint64_t empty = mnavGetTileCacheBytes(cache);
+    uint64_t empty = mnavTileCache_GetBytes(cache);
     mnavBakeReport report;
-    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success &&
-              mnavBakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success,
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success &&
+              mnavBaker_BakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success,
           "a tile cached again replaces itself");
-    uint64_t one = mnavGetTileCacheBytes(cache);
+    uint64_t one = mnavTileCache_GetBytes(cache);
     printf("cache: %llu bytes empty, %llu bytes for a 32 m tile of the world\n",
            (unsigned long long)empty, (unsigned long long)(one - empty));
     CHECK(one > empty, "a tile takes bytes");
     size_t size = 0;
-    CHECK(mnavBakeTileCached(baker, cache, &input, 1, 0, &report) == mnav_errorCapacity &&
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &input, 1, 0, &report) == mnav_errorCapacity &&
               report.result == mnav_errorCapacity &&
-              mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_errorState,
+              mnavBaker_CopyTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_errorState,
           "a second tile over the limit, not baked");
     Rebuilt(baker, cache, 1, nullptr, 0, mnav_errorNotLoaded);
     Rebuilt(baker, cache, 0, nullptr, 0, mnav_success);
-    mnavDropCachedTile(cache, 0, 0);
-    CHECK(mnavGetTileCacheBytes(cache) == empty, "a dropped tile's bytes given back");
+    mnavTileCache_DropTile(cache, 0, 0);
+    CHECK(mnavTileCache_GetBytes(cache) == empty, "a dropped tile's bytes given back");
     mnavDestroyTileCache(cache);
     def.limits.memoryBytes = empty + (one - empty) / 2;
     CHECK(mnavCreateTileCache(&def, &cache) == mnav_success, "a small cache");
-    uint64_t small = mnavGetTileCacheBytes(cache);
-    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, &report) == mnav_errorCapacity &&
-              mnavGetTileCacheBytes(cache) == small,
+    uint64_t small = mnavTileCache_GetBytes(cache);
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &input, 0, 0, &report) == mnav_errorCapacity &&
+              mnavTileCache_GetBytes(cache) == small,
           "a tile over the bytes, nothing kept");
     Rebuilt(baker, cache, 0, nullptr, 0, mnav_errorNotLoaded);
     mnavDestroyTileCache(cache);

@@ -123,7 +123,7 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. It may be read at any time, also while host
     /// code the object runs calls back in.
-    MNAV_API uint64_t mnavGetHierarchyMisuse(const mnavHierarchy* hierarchy);
+    MNAV_API uint64_t mnavHierarchy_GetMisuse(const mnavHierarchy* hierarchy);
 
     /// Builds the hierarchy for a navmesh as committed and a filter. Each
     /// run of tile links along a cluster border, one way, is an entrance
@@ -155,11 +155,11 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the hierarchy and the context are used by one
     /// thread at a time, and no commit runs on the navmesh.
-    MNAV_NODISCARD MNAV_API mnavResult mnavBuildHierarchy(mnavHierarchy* hierarchy,
-                                                          mnavQuery* query,
-                                                          const mnavNavmesh* navmesh,
-                                                          const mnavQueryFilter* filter,
-                                                          mnavHierarchyReport* reportOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavHierarchy_Build(mnavHierarchy* hierarchy,
+                                                           mnavQuery* query,
+                                                           const mnavNavmesh* navmesh,
+                                                           const mnavQueryFilter* filter,
+                                                           mnavHierarchyReport* reportOut);
 
     /// Brings the hierarchy up to the navmesh's last commit. When only
     /// polygon areas changed, only the edges of transitions entering the
@@ -176,19 +176,19 @@ extern "C"
     ///                  NULL. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// hierarchy built for another navmesh; `mnav_errorState` for a hierarchy
-    /// with no graph; `mnav_errorCapacity` as mnavBuildHierarchy. On an error
+    /// with no graph; `mnav_errorCapacity` as mnavHierarchy_Build. On an error
     /// the hierarchy holds no graph. Also `mnav_errorBusy` when called back in
     /// from the hierarchy's allocator, or from a clearance test whose link
     /// generation uses the context, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the hierarchy and the context are used by one
     /// thread at a time, and no commit runs on the navmesh.
-    MNAV_NODISCARD MNAV_API mnavResult mnavUpdateHierarchy(mnavHierarchy* hierarchy,
-                                                           mnavQuery* query,
-                                                           const mnavNavmesh* navmesh,
-                                                           mnavHierarchyReport* reportOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavHierarchy_Update(mnavHierarchy* hierarchy,
+                                                            mnavQuery* query,
+                                                            const mnavNavmesh* navmesh,
+                                                            mnavHierarchyReport* reportOut);
 
-    /// Finds a path as mnavFindPath does, with the hierarchy's filter,
+    /// Finds a path as mnavQuery_FindPath does, with the hierarchy's filter,
     /// through the hierarchy: the start and the end join their clusters'
     /// transitions by searches within those clusters, A* over the
     /// transitions picks the clusters to cross, and the navmesh search
@@ -210,17 +210,17 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// with a NaN coordinate, or a hierarchy built for another navmesh;
     /// `mnav_errorState` for a hierarchy with no graph, or a navmesh committed
-    /// since the build; the errors of mnavFindPath otherwise. Also
+    /// since the build; the errors of mnavQuery_FindPath otherwise. Also
     /// `mnav_errorBusy` when called back in from host code a call using the
     /// context runs (a link generation's clearance test, a hierarchy's
     /// allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context and the hierarchy are used by one
     /// thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult
-    mnavFindHierarchicalPath(mnavQuery* query, mnavHierarchy* hierarchy, const mnavNavmesh* navmesh,
-                             mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
-                             mnavPos3 end, mnavPath* pathOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_FindHierarchicalPath(
+        mnavQuery* query, mnavHierarchy* hierarchy, const mnavNavmesh* navmesh,
+        mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
+        mnavPath* pathOut);
 
 #ifdef __cplusplus
 }

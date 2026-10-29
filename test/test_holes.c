@@ -89,16 +89,16 @@ static void Load(const Floor* floor)
     def.maxEdgeError = 0.0f;
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){outlines, 1 + floor->holes, nullptr}, 0, 0,
-                             &s_report) == mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &s_size) == mnav_success,
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){outlines, 1 + floor->holes, nullptr},
+                                   0, 0, &s_report) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &s_size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, s_size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, s_size).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
 }
 
@@ -106,9 +106,9 @@ static void Load(const Floor* floor)
 static bool Covered(int32_t x, int32_t z)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(s_navmesh, nullptr,
-                          (mnavPos3){(double)Meters(x) + 0.125, 0.0, (double)Meters(z) + 0.125},
-                          (mnavVec3){0.01f, 1.0f, 0.01f}, &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(
+              s_navmesh, (mnavPos3){(double)Meters(x) + 0.125, 0.0, (double)Meters(z) + 0.125},
+              (mnavVec3){0.01f, 1.0f, 0.01f}, nullptr, &n) == mnav_success,
           "nearest");
     return n.polygon.slot != 0 && n.over;
 }
@@ -127,7 +127,7 @@ static int64_t TwiceArea(void)
                          0,
                          0};
     // The edges go uncounted into a buffer with no line room.
-    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
+    (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the polygons fit");
     int64_t area = 0;
     for (int32_t t = 0; t < b.triangleCount / 3; ++t)
@@ -262,7 +262,7 @@ static void TestLevelMergesEveryHole(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success,
+              mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
     CHECK(report.droppedHoles == 0 && report.partialRings == 0, "every hole joined");
     mnavDestroyBaker(baker);

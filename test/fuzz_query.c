@@ -87,7 +87,7 @@ static bool Finite(mnavPos3 p)
 static bool Typed(mnavResult result)
 {
     // Every status the library defines has a name.
-    return strcmp(mnavResultName(result), "unknown result") != 0;
+    return strcmp(mnavGetResultName(result), "unknown result") != 0;
 }
 
 static mnavNavmesh* s_navmesh;
@@ -105,14 +105,14 @@ static void Load(void)
     Expect(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success);
     for (int32_t t = 0; t < 3; ++t)
     {
-        Expect(mnavStageTile(s_navmesh, s_tiles[t], s_sizes[t]).result == mnav_success);
+        Expect(mnavNavmesh_StageTile(s_navmesh, s_tiles[t], s_sizes[t]).result == mnav_success);
     }
     const mnavLinkDef link = {{5, 0, 5}, {40, 0, 5}, 1.0f, 2.0f, mnav_linkJump, true, 0.0f};
     const mnavLinkDef edge = {{20, 0, 30}, {20, 0, 50}, 1.0f, 3.0f, mnav_linkClimb, true, 6.0f};
     mnavLinkId id;
     Expect(mnavStageLink(s_navmesh, &edge, &id) == mnav_success);
     Expect(mnavStageLink(s_navmesh, &link, &id) == mnav_success &&
-           mnavCommit(s_navmesh) == mnav_success);
+           mnavNavmesh_Commit(s_navmesh) == mnav_success);
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     queryDef.allocator = CountingAllocator();
     queryDef.limits.nodes = 512;
@@ -121,7 +121,7 @@ static void Load(void)
     {
         mnavNearest nearest;
         mnavPos3 at = {4.0 + 7.0 * i, 0.0, 3.0 + 3.0 * i};
-        Expect(mnavFindNearest(s_navmesh, nullptr, at, (mnavVec3){2, 2, 2}, &nearest) ==
+        Expect(mnavNavmesh_FindNearest(s_navmesh, at, (mnavVec3){2, 2, 2}, nullptr, &nearest) ==
                mnav_success);
         s_ids[i] = nearest.polygon;
     }
@@ -178,20 +178,21 @@ static void FindPath(Reader* r, const mnavQueryFilter* filter, bool sliced)
     mnavPath path;
     if (!sliced)
     {
-        CheckPath(mnavFindPath(s_query, s_navmesh, filter, a, start, b, end, &path), &path);
-        CheckPath(mnavFindShortestPath(s_query, s_navmesh, filter, a, start, b, end, &path), &path);
+        CheckPath(mnavQuery_FindPath(s_query, s_navmesh, a, start, b, end, filter, &path), &path);
+        CheckPath(mnavQuery_FindShortestPath(s_query, s_navmesh, a, start, b, end, filter, &path),
+                  &path);
         return;
     }
-    mnavResult result = mnavBeginPath(s_query, s_navmesh, filter, a, start, b, end);
+    mnavResult result = mnavQuery_BeginPath(s_query, s_navmesh, a, start, b, end, filter);
     Expect(Typed(result));
     int32_t budget = 1 + Byte(r) % 64;
     bool ended = false;
     for (int32_t k = 0; k < 64 && result == mnav_success && !ended; ++k)
     {
-        result = mnavContinuePath(s_query, s_navmesh, budget, &ended);
+        result = mnavQuery_ContinuePath(s_query, s_navmesh, budget, &ended);
     }
     Expect(Typed(result));
-    CheckPath(mnavFinishPath(s_query, s_navmesh, &path), &path);
+    CheckPath(mnavQuery_FinishPath(s_query, s_navmesh, &path), &path);
 }
 
 static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
@@ -203,19 +204,19 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
     if (op == 0)
     {
         mnavRay ray;
-        result = mnavRaycast(s_query, s_navmesh, filter, id, a, b, &ray);
+        result = mnavQuery_Raycast(s_query, s_navmesh, id, a, b, filter, &ray);
         Expect(result != mnav_success || (ray.polygonCount >= 0 && isfinite(ray.normal.x)));
     }
     else if (op == 1)
     {
         mnavMove move;
-        result = mnavMoveAlongSurface(s_query, s_navmesh, filter, id, a, b, &move);
+        result = mnavQuery_MoveAlongSurface(s_query, s_navmesh, id, a, b, filter, &move);
         Expect(result != mnav_success || Finite(move.point));
     }
     else if (op == 2 && Byte(r) % 2 == 0)
     {
         mnavNearestWall wall;
-        result = mnavFindWallDistance(s_query, s_navmesh, filter, id, a, Length(r), &wall);
+        result = mnavQuery_FindWallDistance(s_query, s_navmesh, id, a, Length(r), filter, &wall);
         Expect(result != mnav_success || !wall.found || isfinite(wall.wall.distance));
     }
     else if (op == 2)
@@ -223,8 +224,8 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
         mnavWall walls[16];
         int32_t capacity = Byte(r) % 17;
         mnavWallsFound found;
-        result =
-            mnavFindWalls(s_query, s_navmesh, filter, id, a, Length(r), walls, capacity, &found);
+        result = mnavQuery_FindWalls(s_query, s_navmesh, id, a, Length(r), filter, walls, capacity,
+                                     &found);
         bool listed = result == mnav_success || result == mnav_errorCapacity;
         Expect(!listed ||
                (found.count >= 0 && (result == mnav_errorCapacity) == (found.count > capacity)));
@@ -237,7 +238,7 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
     else if (op == 3)
     {
         double height = 0.0;
-        result = mnavGetHeight(s_navmesh, id, a.x, a.z, &height);
+        result = mnavPolygon_GetHeight(s_navmesh, id, a.x, a.z, &height);
         Expect(result != mnav_success || isfinite(height));
     }
     else if (op == 4)
@@ -246,15 +247,15 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
         double bits = Raw(r);
         uint64_t seed;
         memcpy(&seed, &bits, sizeof(seed));
-        result = Byte(r) % 2 == 0 ? mnavFindRandomPoint(s_navmesh, filter, seed, &point)
-                                  : mnavFindRandomPointAround(s_query, s_navmesh, filter, id, a,
-                                                              Length(r), seed, &point);
+        result = Byte(r) % 2 == 0 ? mnavNavmesh_FindRandomPoint(s_navmesh, seed, filter, &point)
+                                  : mnavQuery_FindRandomPointAround(
+                                        s_query, s_navmesh, id, a, Length(r), seed, filter, &point);
         Expect(result != mnav_success || Finite(point.point));
     }
     else
     {
         mnavPathEnd end;
-        result = mnavCheckReachable(s_query, s_navmesh, filter, id, a, Id(r), b, &end);
+        result = mnavQuery_CheckReachable(s_query, s_navmesh, id, a, Id(r), b, filter, &end);
     }
     Expect(Typed(result));
 }
@@ -266,7 +267,7 @@ static void Boxes(Reader* r, const mnavQueryFilter* filter)
     if (Byte(r) % 2 == 0)
     {
         mnavNearest nearest;
-        mnavResult result = mnavFindNearest(s_navmesh, filter, center, half, &nearest);
+        mnavResult result = mnavNavmesh_FindNearest(s_navmesh, center, half, filter, &nearest);
         Expect(Typed(result) && (result != mnav_success || Finite(nearest.point)));
         return;
     }
@@ -274,7 +275,7 @@ static void Boxes(Reader* r, const mnavQueryFilter* filter)
     int32_t capacity = Byte(r) % 17;
     mnavFound found;
     mnavResult result =
-        mnavFindPolygons(s_navmesh, filter, center, half, polygons, capacity, &found);
+        mnavNavmesh_FindPolygons(s_navmesh, center, half, filter, polygons, capacity, &found);
     Expect(Typed(result) && (result != mnav_success || found.count <= capacity));
 }
 
@@ -298,14 +299,14 @@ static mnavResult Areas(Reader* r, const mnavCorridor* corridor)
     int32_t count = -1;
     mnavCorners corners;
     mnavResult result =
-        mnavCorridorAreas(s_query, s_navmesh, corridor, &corners, runs, capacity, &count);
+        mnavQuery_FindCorridorAreas(s_query, corridor, s_navmesh, &corners, runs, capacity, &count);
     if (result != mnav_success && result != mnav_errorCapacity)
     {
         return result;
     }
     Expect(count >= 1 && (result == mnav_success) == (count <= capacity));
     int32_t again = -1;
-    Expect(mnavCorridorAreas(s_query, s_navmesh, corridor, &corners, runs, 16, &again) ==
+    Expect(mnavQuery_FindCorridorAreas(s_query, corridor, s_navmesh, &corners, runs, 16, &again) ==
                (again <= 16 ? mnav_success : mnav_errorCapacity) &&
            again == count);
     int32_t written = count < 16 ? count : 16;
@@ -331,7 +332,7 @@ static mnavResult Areas(Reader* r, const mnavCorridor* corridor)
 static mnavResult Steer(Reader* r, const mnavCorridor* corridor)
 {
     mnavCorners corners;
-    mnavResult result = mnavCorridorCorners(s_query, s_navmesh, corridor, &corners);
+    mnavResult result = mnavQuery_FindCorridorCorners(s_query, corridor, s_navmesh, &corners);
     if (result != mnav_success)
     {
         return result;
@@ -340,7 +341,7 @@ static mnavResult Steer(Reader* r, const mnavCorridor* corridor)
     def.maxSpeed = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.25);
     def.slowDistance = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.1);
     def.arriveDistance = (float)(Byte(r) % 4 == 0 ? Raw(r) : Byte(r) * 0.01);
-    def.anticipateTurns = Byte(r) % 2 == 0;
+    def.enableTurnAnticipation = Byte(r) % 2 == 0;
     // A NaN or a value below 0 is wrong; an infinity passes the bound.
     bool valid = def.maxSpeed >= 0.0f && def.slowDistance >= 0.0f && def.arriveDistance >= 0.0f;
     bool within = def.maxSpeed <= MNAV_MAX_STEER_SPEED &&
@@ -378,8 +379,8 @@ static void Corridor(Reader* r, const mnavQueryFilter* filter)
         return;
     }
     mnavPath path;
-    result =
-        mnavFindPath(s_query, s_navmesh, filter, id, corridor.position, Id(r), Point(r), &path);
+    result = mnavQuery_FindPath(s_query, s_navmesh, id, corridor.position, Id(r), Point(r), filter,
+                                &path);
     if (result == mnav_success)
     {
         Expect(Typed(mnavSetCorridor(&corridor, &path)));
@@ -392,15 +393,15 @@ static void Corridor(Reader* r, const mnavQueryFilter* filter)
         int32_t valid = 0;
         bool shortened = false;
         result =
-            op == 0 ? mnavMoveCorridor(s_query, s_navmesh, filter, &corridor, Point(r), &move)
-            : op == 1
-                ? mnavMoveCorridorTarget(s_query, s_navmesh, filter, &corridor, Point(r), &move)
-            : op == 2 ? mnavCorridorCorners(s_query, s_navmesh, &corridor, &corners)
-            : op == 3 ? mnavCheckCorridor(s_navmesh, filter, &corridor, &valid)
-            : op == 4
-                ? mnavShortcutCorridor(s_query, s_navmesh, filter, &corridor, Point(r), &shortened)
-            : op == 5 ? mnavReplanCorridor(s_query, s_navmesh, filter, &corridor,
-                                           (mnavVec3){1, 1, 1}, &path)
+            op == 0 ? mnavQuery_MoveCorridor(s_query, &corridor, s_navmesh, Point(r), filter, &move)
+            : op == 1 ? mnavQuery_MoveCorridorTarget(s_query, &corridor, s_navmesh, Point(r),
+                                                     filter, &move)
+            : op == 2 ? mnavQuery_FindCorridorCorners(s_query, &corridor, s_navmesh, &corners)
+            : op == 3 ? mnavNavmesh_CheckCorridor(s_navmesh, &corridor, filter, &valid)
+            : op == 4 ? mnavQuery_ShortcutCorridor(s_query, &corridor, s_navmesh, Point(r), filter,
+                                                   &shortened)
+            : op == 5 ? mnavQuery_ReplanCorridor(s_query, &corridor, s_navmesh, (mnavVec3){1, 1, 1},
+                                                 filter, &path)
             : op == 6 ? Areas(r, &corridor)
                       : Steer(r, &corridor);
         Expect(Typed(result) && corridor.count >= 1 && corridor.count <= corridor.capacity);
@@ -423,7 +424,7 @@ static void Grid(Reader* r, const mnavQueryFilter* filter)
     mnavCell a = {(int32_t)(Byte(r) % 14) - 1, (int32_t)(Byte(r) % 14) - 1};
     mnavCell b = {(int32_t)(Byte(r) % 14) - 1, (int32_t)(Byte(r) % 14) - 1};
     mnavGridPath path;
-    mnavResult result = mnavFindGridPath(s_query, &grid, filter, a, b, &path);
+    mnavResult result = mnavQuery_FindGridPath(s_query, &grid, a, b, filter, &path);
     Expect(Typed(result) && (result != mnav_success || path.cellCount >= 0));
     mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
     def.allocator = CountingAllocator();
@@ -433,22 +434,22 @@ static void Grid(Reader* r, const mnavQueryFilter* filter)
     mnavCellRange region = {Byte(r) % 6, Byte(r) % 6, Byte(r) % 10, Byte(r) % 10};
     mnavCell goals[2] = {a, b};
     result =
-        mnavBeginFlowField(field, &grid, filter, Byte(r) % 2 == 0 ? &region : nullptr, goals, 2);
+        mnavFlowField_Begin(field, &grid, Byte(r) % 2 == 0 ? &region : nullptr, goals, 2, filter);
     Expect(Typed(result));
     bool ended = false;
     for (int32_t k = 0; k < 200 && result == mnav_success && !ended; ++k)
     {
-        result = mnavContinueFlowField(field, &grid, 1 + Byte(r) % 16, &ended);
+        result = mnavFlowField_Continue(field, &grid, 1 + Byte(r) % 16, &ended);
     }
     if (ended)
     {
         mnavCell changed = {Byte(r) % 12, Byte(r) % 12};
         areas[changed.y * 12 + changed.x] = (mnavAreaType)(Byte(r) % 3);
-        result = mnavUpdateFlowField(field, &grid, &b, 1, &changed, 1);
+        result = mnavFlowField_Update(field, &grid, &b, 1, &changed, 1);
         Expect(Typed(result));
         for (int32_t k = 0; k < 400 && result == mnav_success && !ended; ++k)
         {
-            result = mnavContinueFlowField(field, &grid, 1 + Byte(r) % 16, &ended);
+            result = mnavFlowField_Continue(field, &grid, 1 + Byte(r) % 16, &ended);
         }
     }
     Expect(Typed(result));

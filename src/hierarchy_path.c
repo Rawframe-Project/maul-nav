@@ -457,10 +457,10 @@ FindHierarchicalPathCounted(mnavQuery* query, mnavHierarchy* hierarchy, const mn
     return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
-mnavResult mnavFindHierarchicalPath(mnavQuery* query, mnavHierarchy* hierarchy,
-                                    const mnavNavmesh* navmesh, mnavPolygonId startPolygon,
-                                    mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
-                                    mnavPath* pathOut)
+mnavResult mnavQuery_FindHierarchicalPath(mnavQuery* query, mnavHierarchy* hierarchy,
+                                          const mnavNavmesh* navmesh, mnavPolygonId startPolygon,
+                                          mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
+                                          mnavPath* pathOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = FindHierarchicalPathCounted(query, hierarchy, navmesh, startPolygon, start,

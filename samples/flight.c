@@ -48,7 +48,7 @@ static void Check(mnavResult result, const char* what)
 {
     if (result != mnav_success)
     {
-        fprintf(stderr, "%s: %s\n", what, mnavResultName(result));
+        fprintf(stderr, "%s: %s\n", what, mnavGetResultName(result));
         exit(1);
     }
 }
@@ -108,9 +108,9 @@ static void BakeTiles(mnavFlightVolume* volume, bool raised, const int32_t tiles
     for (int32_t t = 0; t < count; ++t)
     {
         size_t size = 0;
-        Check(mnavBakeFlightTile(baker, &input, tiles[t][0], tiles[t][1], NULL), "bake");
-        Check(mnavCopyFlightTile(baker, bytes, TILE_ROOM, &size), "copy");
-        Check(mnavStageFlightTile(volume, bytes, size).result, "stage");
+        Check(mnavFlightBaker_BakeTile(baker, &input, tiles[t][0], tiles[t][1], NULL), "bake");
+        Check(mnavFlightBaker_CopyTile(baker, bytes, TILE_ROOM, &size), "copy");
+        Check(mnavFlightVolume_StageTile(volume, bytes, size).result, "stage");
     }
     free(bytes);
     mnavDestroyFlightBaker(baker);
@@ -124,7 +124,7 @@ static mnavFlightVolume* BakeAndLoad(void)
     Check(mnavCreateFlightVolume(&def, &volume).result, "volume");
     static const int32_t all[4][2] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
     BakeTiles(volume, false, all, 4);
-    Check(mnavCommitFlight(volume), "commit");
+    Check(mnavFlightVolume_Commit(volume), "commit");
     return volume;
 }
 
@@ -141,10 +141,10 @@ static double FindRoute(mnavQuery* query, const mnavFlightVolume* volume, mnavPo
                         mnavPos3 to, Route* route)
 {
     bool found = false;
-    Check(mnavFindNearestFlightPoint(volume, from, 2.0f, &from, &found), "nearest");
-    Check(mnavFindNearestFlightPoint(volume, to, 2.0f, &to, &found), "nearest");
+    Check(mnavFlightVolume_FindNearestPoint(volume, from, 2.0f, &from, &found), "nearest");
+    Check(mnavFlightVolume_FindNearestPoint(volume, to, 2.0f, &to, &found), "nearest");
     mnavFlightPath path;
-    Check(mnavFindFlightPath(query, volume, from, to, &path), "path");
+    Check(mnavQuery_FindFlightPath(query, volume, from, to, &path), "path");
     if (path.end != mnav_pathFound || path.pointCount > MOST_POINTS)
     {
         fprintf(stderr, "no path\n");
@@ -168,7 +168,7 @@ static double Distance(mnavPos3 a, mnavPos3 b)
 static bool Clear(const mnavFlightVolume* volume, mnavPos3 from, mnavPos3 to)
 {
     mnavFlightHit hit;
-    Check(mnavFlightRaycast(volume, from, to, &hit), "raycast");
+    Check(mnavFlightVolume_Raycast(volume, from, to, &hit), "raycast");
     return hit.stop == mnav_flightClear;
 }
 
@@ -260,7 +260,7 @@ static int32_t Raise(mnavQuery* query, mnavFlightVolume* volume, mnavAgent3D* fl
 {
     static const int32_t changed[1][2] = {{1, 1}};
     BakeTiles(volume, true, changed, 1);
-    Check(mnavCommitFlight(volume), "commit");
+    Check(mnavFlightVolume_Commit(volume), "commit");
     int32_t replanned = 0;
     for (int32_t i = 0; i < FLIERS; ++i)
     {
@@ -273,7 +273,7 @@ static int32_t Raise(mnavQuery* query, mnavFlightVolume* volume, mnavAgent3D* fl
             left[count++] = r->points[k];
         }
         int32_t step = -1;
-        Check(mnavCheckFlightPath(volume, left, count, &step, NULL), "check");
+        Check(mnavFlightVolume_CheckPath(volume, left, count, &step, NULL), "check");
         if (step >= 0)
         {
             (void)FindRoute(query, volume, fliers[i].position, r->points[r->count - 1], r);
@@ -325,14 +325,14 @@ int main(void)
         rejoined += Rejoin(query, volume, fliers, routes);
         Prefer(volume, fliers, routes);
         mnavVec3 velocities[FLIERS];
-        Check(mnavAvoid3D(avoidance, fliers, FLIERS, NULL, 0, STEP, velocities), "avoid");
+        Check(mnavAvoidance_Avoid3D(avoidance, fliers, FLIERS, NULL, 0, STEP, velocities), "avoid");
         arrived = 0;
         for (int32_t i = 0; i < FLIERS; ++i)
         {
             Move(volume, &fliers[i], velocities[i]);
             arrived += Distance(fliers[i].position, routes[i].points[routes[i].count - 1]) < 0.05;
             bool open = false;
-            Check(mnavIsFlightOpen(volume, fliers[i].position, &open), "open");
+            Check(mnavFlightVolume_IsOpen(volume, fliers[i].position, &open), "open");
             blocked += open ? 0 : 1;
         }
         for (int32_t i = 0; i < FLIERS; ++i)

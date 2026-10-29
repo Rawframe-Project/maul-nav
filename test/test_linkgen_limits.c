@@ -38,9 +38,9 @@ static mnavNavmesh* Load(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 2; ++t)
     {
-        CHECK(mnavStageTile(navmesh, tiles[t], sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, tiles[t], sizes[t]).result == mnav_success, "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -54,8 +54,8 @@ static void TestLimits(void)
     def.jumpMax = 3.0f;
     const mnavTileRange range = {0, 0, 1, 0};
     int32_t all = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
-                            LINKS, &all) == mnav_success &&
+    CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
+                                  s_links, LINKS, &all) == mnav_success &&
               all > 2,
           "more than two links in all");
     int32_t count = 0;

@@ -145,8 +145,8 @@ static MNAV_NOINLINE mnavResult DebugNavmeshCounted(const mnavNavmesh* navmesh,
     return mnavHostCountInvalid(MNAV_HOST(navmesh), DebugNavmeshWork(navmesh, tiles, buffer));
 }
 
-mnavResult mnavDebugNavmesh(const mnavNavmesh* navmesh, const mnavTileRange* tiles,
-                            mnavDebugBuffer* buffer)
+mnavResult mnavNavmesh_Debug(const mnavNavmesh* navmesh, const mnavTileRange* tiles,
+                             mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = DebugNavmeshCounted(navmesh, tiles, buffer);
@@ -195,7 +195,7 @@ static MNAV_NOINLINE mnavResult DebugLinksCounted(const mnavNavmesh* navmesh,
     return mnavHostCountInvalid(MNAV_HOST(navmesh), DebugLinksWork(navmesh, buffer));
 }
 
-mnavResult mnavDebugLinks(const mnavNavmesh* navmesh, mnavDebugBuffer* buffer)
+mnavResult mnavNavmesh_DebugLinks(const mnavNavmesh* navmesh, mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = DebugLinksCounted(navmesh, buffer);
@@ -258,8 +258,8 @@ static MNAV_NOINLINE mnavResult DebugCorridorCounted(const mnavNavmesh* navmesh,
                                 DebugCorridorWork(navmesh, polygons, count, buffer));
 }
 
-mnavResult mnavDebugCorridor(const mnavNavmesh* navmesh, const mnavPolygonId* polygons,
-                             int32_t count, mnavDebugBuffer* buffer)
+mnavResult mnavNavmesh_DebugCorridor(const mnavNavmesh* navmesh, const mnavPolygonId* polygons,
+                                     int32_t count, mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = DebugCorridorCounted(navmesh, polygons, count, buffer);

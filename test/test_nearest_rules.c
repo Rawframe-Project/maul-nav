@@ -28,8 +28,8 @@ static mnavNavmesh* TwoFloors(const uint8_t* bytes, size_t size)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(mnavStageTile(navmesh, bytes, size).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "committed");
     return navmesh;
 }
@@ -37,8 +37,8 @@ static mnavNavmesh* TwoFloors(const uint8_t* bytes, size_t size)
 static uint32_t NearestPolygon(const mnavNavmesh* navmesh, double x, double y)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, y, 5.0}, (mnavVec3){4.0f, 4.0f, 4.0f},
-                          &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, y, 5.0}, (mnavVec3){4.0f, 4.0f, 4.0f},
+                                  nullptr, &n) == mnav_success,
           "queried");
     return n.polygon.slot != 0 ? n.polygon.polygon : 99;
 }
@@ -81,12 +81,12 @@ static mnavNavmesh* OneSquare(const uint8_t* bytes, size_t size, mnavPolygonId* 
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(mnavStageTile(navmesh, bytes, size).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "committed");
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){1.0, 0.0, 1.0}, (mnavVec3){1.0f, 4.0f, 1.0f},
-                          &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){1.0, 0.0, 1.0}, (mnavVec3){1.0f, 4.0f, 1.0f},
+                                  nullptr, &n) == mnav_success &&
               n.polygon.slot != 0,
           "found");
     *polygonOut = n.polygon;
@@ -107,7 +107,7 @@ static void TestHeightsOnADiagonal(void)
     {
         double t = (double)i / 1000.0;
         double height = 0.0;
-        CHECK(mnavGetHeight(navmesh, polygon, t * 20.0, t * 12.0, &height) == mnav_success,
+        CHECK(mnavPolygon_GetHeight(navmesh, polygon, t * 20.0, t * 12.0, &height) == mnav_success,
               "a height");
         off += fabs(height - (3.0 + t * (1.0 - 3.0)) * 0.125) < 1e-9 ? 0 : 1;
         hash = mnavHash64(hash, &height, (int32_t)sizeof(height));
@@ -130,7 +130,7 @@ static void TestDegenerateTriangle(void)
     {
         double t = (double)i / 100.0;
         double height = 0.0;
-        CHECK(mnavGetHeight(navmesh, polygon, t * 10.0, t * 10.0, &height) == mnav_success,
+        CHECK(mnavPolygon_GetHeight(navmesh, polygon, t * 10.0, t * 10.0, &height) == mnav_success,
               "a height");
         off += fabs(height - t * 8.0 * 0.125) < 1e-9 ? 0 : 1;
     }

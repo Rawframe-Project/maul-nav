@@ -39,7 +39,7 @@ static uint8_t s_raw[MOST_SIDE][MOST_SIDE][MOST_LAYERS];
 // Marks the heightfield's spans in the plain grid, offset columns in, and
 // below each column's lowest span when asked.
 static void MarkPlain(const mnavHeightfield* hf, int32_t offset, int32_t width, int32_t floorVoxel,
-                      int32_t layers, bool groundBelow)
+                      int32_t layers, bool enableGroundFill)
 {
     memset(s_raw, 0, sizeof(s_raw));
     for (int32_t z = 0; z < width; ++z)
@@ -51,7 +51,7 @@ static void MarkPlain(const mnavHeightfield* hf, int32_t offset, int32_t width, 
             {
                 int32_t lo = hf->spans[s].bottom - MNAV_HEIGHT_OFFSET - floorVoxel;
                 int32_t hi = hf->spans[s].top - MNAV_HEIGHT_OFFSET - floorVoxel;
-                lo = groundBelow && s == hf->columns[at] ? 0 : lo;
+                lo = enableGroundFill && s == hf->columns[at] ? 0 : lo;
                 for (int32_t y = lo < 0 ? 0 : lo; y < hi && y < layers; ++y)
                 {
                     s_raw[x][z][y] = 1;
@@ -63,7 +63,7 @@ static void MarkPlain(const mnavHeightfield* hf, int32_t offset, int32_t width, 
 
 // A flight def of the default's limits with these settings.
 static mnavFlightDef Def(float voxel, int32_t side, float floor, float ceiling, float radius,
-                         bool groundBelow)
+                         bool enableGroundFill)
 {
     mnavFlightDef f = mnavDefaultFlightDef();
     f.voxelSize = voxel;
@@ -71,7 +71,7 @@ static mnavFlightDef Def(float voxel, int32_t side, float floor, float ceiling, 
     f.floor = floor;
     f.ceiling = ceiling;
     f.radius = radius;
-    f.groundBelow = groundBelow;
+    f.enableGroundFill = enableGroundFill;
     return f;
 }
 
@@ -94,7 +94,7 @@ static int32_t Plain(const mnavFlightDef* f, const mnavBakeInput* input, int32_t
     int32_t r = cells.agentRadius;
     int32_t width = f->tileVoxels + 2 * r;
     CHECK(width <= MOST_SIDE && layers <= MOST_LAYERS, "the plain grid holds the tile");
-    MarkPlain(&hf, cells.border - r, width, floorVoxel, layers, f->groundBelow);
+    MarkPlain(&hf, cells.border - r, width, floorVoxel, layers, f->enableGroundFill);
     mnavReleaseHeightfield(&memory, &hf);
     *rOut = r;
     *floorOut = floorVoxel;

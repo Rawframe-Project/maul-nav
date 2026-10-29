@@ -31,20 +31,21 @@ static mnavNavmesh* Make(const uint8_t* first, size_t firstSize, const uint8_t* 
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(mnavStageTile(navmesh, first, firstSize).result == mnav_success, "first staged");
+    CHECK(mnavNavmesh_StageTile(navmesh, first, firstSize).result == mnav_success, "first staged");
     if (second != nullptr)
     {
-        CHECK(mnavStageTile(navmesh, second, secondSize).result == mnav_success, "second staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, second, secondSize).result == mnav_success,
+              "second staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
 static mnavNearest On(const mnavNavmesh* navmesh, double x, double z)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 0.0, z}, (mnavVec3){0.1f, 1.0f, 0.1f},
-                          &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 0.0, z}, (mnavVec3){0.1f, 1.0f, 0.1f},
+                                  nullptr, &n) == mnav_success &&
               n.over,
           "on a polygon");
     return n;
@@ -56,8 +57,8 @@ static mnavPath Walk(mnavQuery* query, const mnavNavmesh* navmesh, double x0, do
     mnavNearest a = On(navmesh, x0, z0);
     mnavNearest b = On(navmesh, x1, z1);
     mnavPath path = {0};
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
               path.end == mnav_pathFound,
           "found");
     return path;
@@ -159,8 +160,8 @@ static void TestShortOfTheEnd(void)
     mnavNearest a = On(navmesh, 2.5, 1.0);
     mnavNearest b = On(navmesh, 12.5, 1.0);
     mnavPath path = {0};
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-              mnav_success,
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success,
           "searched");
     // Three nodes reach the edge into the third square, at x = 5 from
     // z = 5 to 10; the line to its midpoint clears the first edge.
@@ -180,8 +181,8 @@ static int32_t FewestNodes(const mnavNavmesh* navmesh, double x0, double z0, dou
     {
         mnavQuery* query = MakeQuery(nodes);
         mnavPath path = {0};
-        CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &path) == mnav_success,
+        CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &path) == mnav_success,
               "searched");
         mnavDestroyQuery(query);
         if (path.end == mnav_pathFound)
@@ -255,8 +256,8 @@ static void WalkLayout(mnavQuery* query, const uint8_t* tile, size_t size, uint3
             mnavNearest from = On(navmesh, centers[a][0], centers[a][1]);
             mnavNearest to = On(navmesh, centers[b][0], centers[b][1]);
             mnavPath path = {0};
-            CHECK(mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon,
-                               to.point, &path) == mnav_success,
+            CHECK(mnavQuery_FindPath(query, navmesh, from.polygon, from.point, to.polygon, to.point,
+                                     nullptr, &path) == mnav_success,
                   "searched");
             *found += path.end == mnav_pathFound ? 1 : 0;
             *hash = mnavHash64(*hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));

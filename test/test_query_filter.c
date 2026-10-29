@@ -23,8 +23,9 @@ static mnavNavmesh* MakeBridge(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_handBridge, sizeof(s_handBridge)).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, s_handBridge, sizeof(s_handBridge)).result ==
+                  mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
     return navmesh;
 }
@@ -32,8 +33,8 @@ static mnavNavmesh* MakeBridge(void)
 static mnavNearest On(const mnavNavmesh* navmesh, const mnavQueryFilter* filter, double x, double z)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, filter, (mnavPos3){x, 0.0, z}, (mnavVec3){0.1f, 1.0f, 0.1f},
-                          &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 0.0, z}, (mnavVec3){0.1f, 1.0f, 0.1f},
+                                  filter, &n) == mnav_success,
           "nearest");
     return n;
 }
@@ -43,8 +44,8 @@ static mnavPath Walk(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQue
     mnavNearest a = On(navmesh, nullptr, 7.5, 7.5);
     mnavNearest b = On(navmesh, nullptr, 17.5, 7.5);
     mnavPath path = {0};
-    CHECK(mnavFindPath(query, navmesh, filter, a.polygon, a.point, b.polygon, b.point, &path) ==
-              mnav_success,
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, filter,
+                             &path) == mnav_success,
           "searched");
     return path;
 }
@@ -135,33 +136,33 @@ static void TestExcludedAreasElsewhere(void)
     // The nearest point skips the bridge: from its middle, the square above.
     mnavNearest n = On(navmesh, &filter, 12.5, 7.5);
     CHECK(n.polygon.slot == 0, "nothing usable within 0.1 m");
-    CHECK(mnavFindNearest(navmesh, &filter, (mnavPos3){12.5, 0.0, 9.0},
-                          (mnavVec3){2.0f, 1.0f, 2.0f}, &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){12.5, 0.0, 9.0}, (mnavVec3){2.0f, 1.0f, 2.0f},
+                                  &filter, &n) == mnav_success &&
               n.polygon.polygon == 4 && n.point.z == 10.0,
           "the square above the bridge");
     // A ray along the row meets the bridge as a wall.
     mnavNearest a = On(navmesh, nullptr, 7.5, 7.5);
     mnavRay ray = {0};
-    CHECK(mnavRaycast(query, navmesh, &filter, a.polygon, a.point, (mnavPos3){17.5, 0.0, 7.5},
-                      &ray) == mnav_success &&
+    CHECK(mnavQuery_Raycast(query, navmesh, a.polygon, a.point, (mnavPos3){17.5, 0.0, 7.5}, &filter,
+                            &ray) == mnav_success &&
               ray.end == mnav_rayWall && ray.t == 0.25 && ray.normal.x == -1.0f &&
               ray.polygonCount == 1,
           "the bridge's edge a wall");
-    CHECK(mnavRaycast(query, navmesh, nullptr, a.polygon, a.point, (mnavPos3){17.5, 0.0, 7.5},
-                      &ray) == mnav_success &&
+    CHECK(mnavQuery_Raycast(query, navmesh, a.polygon, a.point, (mnavPos3){17.5, 0.0, 7.5}, nullptr,
+                            &ray) == mnav_success &&
               ray.end == mnav_rayReached,
           "with every area, across");
     // Starting on the bridge, the search may leave it.
     mnavNearest on = On(navmesh, nullptr, 12.5, 7.5);
     mnavNearest b = On(navmesh, nullptr, 17.5, 7.5);
     mnavPath path = {0};
-    CHECK(mnavFindPath(query, navmesh, &filter, on.polygon, on.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, on.polygon, on.point, b.polygon, b.point, &filter,
+                             &path) == mnav_success &&
               path.end == mnav_pathFound && path.polygonCount == 2,
           "off the bridge");
     // The end on the bridge cannot be reached.
-    CHECK(mnavFindPath(query, navmesh, &filter, b.polygon, b.point, on.polygon, on.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, b.polygon, b.point, on.polygon, on.point, &filter,
+                             &path) == mnav_success &&
               path.end == mnav_pathNone,
           "onto it, no path");
     mnavDestroyQuery(query);
@@ -178,33 +179,38 @@ static void TestFiltersAreChecked(void)
     mnavPath path;
     mnavRay ray;
     filter.costs[5] = 0.0f;
-    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorLimit &&
-              mnavFindPath(query, navmesh, &filter, a.polygon, a.point, a.polygon, a.point,
-                           &path) == mnav_errorLimit &&
-              mnavRaycast(query, navmesh, &filter, a.polygon, a.point, a.point, &ray) ==
+    CHECK(mnavNavmesh_FindNearest(navmesh, a.point, (mnavVec3){1, 1, 1}, &filter, &n) ==
+                  mnav_errorLimit &&
+              mnavQuery_FindPath(query, navmesh, a.polygon, a.point, a.polygon, a.point, &filter,
+                                 &path) == mnav_errorLimit &&
+              mnavQuery_Raycast(query, navmesh, a.polygon, a.point, a.point, &filter, &ray) ==
                   mnav_errorLimit,
           "a cost of 0");
     filter.costs[5] = NAN;
-    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_FindNearest(navmesh, a.point, (mnavVec3){1, 1, 1}, &filter, &n) ==
+              mnav_errorInvalid,
           "a NaN cost");
     filter.costs[5] = MNAV_MAX_AREA_COST * 2.0f;
-    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorLimit,
+    CHECK(mnavNavmesh_FindNearest(navmesh, a.point, (mnavVec3){1, 1, 1}, &filter, &n) ==
+              mnav_errorLimit,
           "too dear");
     filter.costs[5] = INFINITY;
-    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorLimit,
+    CHECK(mnavNavmesh_FindNearest(navmesh, a.point, (mnavVec3){1, 1, 1}, &filter, &n) ==
+              mnav_errorLimit,
           "an infinite cost, past the bound");
     filter.costs[5] = MNAV_MIN_AREA_COST;
     filter.costs[6] = MNAV_MAX_AREA_COST;
-    CHECK(mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, a.point, (mnavVec3){1, 1, 1}, &filter, &n) ==
+              mnav_success,
           "the ends of the range");
     filter = (mnavQueryFilter){0};
-    CHECK(
-        mnavFindNearest(navmesh, &filter, a.point, (mnavVec3){1, 1, 1}, &n) == mnav_errorInvalid &&
-            mnavFindPath(query, navmesh, &filter, a.polygon, a.point, a.polygon, a.point, &path) ==
-                mnav_errorInvalid &&
-            mnavRaycast(query, navmesh, &filter, a.polygon, a.point, a.point, &ray) ==
-                mnav_errorInvalid,
-        "not from the default");
+    CHECK(mnavNavmesh_FindNearest(navmesh, a.point, (mnavVec3){1, 1, 1}, &filter, &n) ==
+                  mnav_errorInvalid &&
+              mnavQuery_FindPath(query, navmesh, a.polygon, a.point, a.polygon, a.point, &filter,
+                                 &path) == mnav_errorInvalid &&
+              mnavQuery_Raycast(query, navmesh, a.polygon, a.point, a.point, &filter, &ray) ==
+                  mnav_errorInvalid,
+          "not from the default");
     filter = mnavDefaultQueryFilter();
     CHECK(filter.areas == ~(uint64_t)1 && filter.costs[0] == 1.0f && filter.costs[63] == 1.0f,
           "the default");

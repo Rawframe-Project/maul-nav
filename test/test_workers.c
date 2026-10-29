@@ -59,9 +59,9 @@ static mnavTriangleMesh s_world;
 
 static bool BakeOne(mnavBaker* baker, int32_t t, uint8_t* bytes, size_t* size)
 {
-    return mnavBakeTile(baker, &(mnavBakeInput){&s_world, 1, nullptr, 0, nullptr, 0, nullptr},
-                        t % SIDE - 1, t / SIDE - 1, nullptr) == mnav_success &&
-           mnavCopyBakedTile(baker, bytes, ROOM, size) == mnav_success;
+    return mnavBaker_BakeTile(baker, &(mnavBakeInput){&s_world, 1, nullptr, 0, nullptr, 0, nullptr},
+                              t % SIDE - 1, t / SIDE - 1, nullptr) == mnav_success &&
+           mnavBaker_CopyTile(baker, bytes, ROOM, size) == mnav_success;
 }
 
 // Bakes tiles as they come, under the host setting its index names; a
@@ -149,9 +149,10 @@ static mnavNavmesh* Load(bool backward)
     for (int32_t i = 0; i < TILES; ++i)
     {
         int32_t t = backward ? TILES - 1 - i : i;
-        CHECK(mnavStageTile(navmesh, s_one[t], s_oneSizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_one[t], s_oneSizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -179,15 +180,15 @@ static uint64_t PathHash(mnavQuery* query, const mnavNavmesh* navmesh, int32_t i
     mnavNearest na = {0};
     mnavNearest nb = {0};
     const mnavVec3 box = {1.0f, 2.0f, 1.0f};
-    if (mnavFindNearest(navmesh, nullptr, a, box, &na) != mnav_success ||
-        mnavFindNearest(navmesh, nullptr, b, box, &nb) != mnav_success || na.polygon.slot == 0 ||
-        nb.polygon.slot == 0)
+    if (mnavNavmesh_FindNearest(navmesh, a, box, nullptr, &na) != mnav_success ||
+        mnavNavmesh_FindNearest(navmesh, b, box, nullptr, &nb) != mnav_success ||
+        na.polygon.slot == 0 || nb.polygon.slot == 0)
     {
         return 1;
     }
     mnavPath path;
-    if (mnavFindPath(query, navmesh, nullptr, na.polygon, na.point, nb.polygon, nb.point, &path) !=
-        mnav_success)
+    if (mnavQuery_FindPath(query, navmesh, na.polygon, na.point, nb.polygon, nb.point, nullptr,
+                           &path) != mnav_success)
     {
         return 2;
     }

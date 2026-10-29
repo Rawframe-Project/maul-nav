@@ -635,8 +635,8 @@ static MNAV_NOINLINE mnavResult BeginFlightPathCounted(mnavQuery* query,
                                 BeginFlightPathWork(query, volume, start, end));
 }
 
-mnavResult mnavBeginFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 start,
-                               mnavPos3 end)
+mnavResult mnavQuery_BeginFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
+                                     mnavPos3 start, mnavPos3 end)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = BeginFlightPathCounted(query, volume, start, end);
@@ -680,8 +680,8 @@ static MNAV_NOINLINE mnavResult ContinueFlightPathCounted(mnavQuery* query,
     return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
 }
 
-mnavResult mnavContinueFlightPath(mnavQuery* query, const mnavFlightVolume* volume, int32_t nodes,
-                                  bool* endedOut)
+mnavResult mnavQuery_ContinueFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
+                                        int32_t nodes, bool* endedOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = ContinueFlightPathCounted(query, volume, nodes, endedOut);
@@ -739,8 +739,8 @@ static MNAV_NOINLINE mnavResult FinishFlightPathCounted(mnavQuery* query,
     return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
-mnavResult mnavFinishFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
-                                mnavFlightPath* pathOut)
+mnavResult mnavQuery_FinishFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
+                                      mnavFlightPath* pathOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = FinishFlightPathCounted(query, volume, pathOut);
@@ -781,8 +781,8 @@ static MNAV_NOINLINE mnavResult FindFlightPathCounted(mnavQuery* query,
     return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
-mnavResult mnavFindFlightPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 start,
-                              mnavPos3 end, mnavFlightPath* pathOut)
+mnavResult mnavQuery_FindFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
+                                    mnavPos3 start, mnavPos3 end, mnavFlightPath* pathOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = FindFlightPathCounted(query, volume, start, end, pathOut);

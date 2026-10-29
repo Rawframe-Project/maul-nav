@@ -4,7 +4,7 @@ How the navmesh holds tiles while they stream in and out, how it names polygons 
 
 ## Staged, then committed
 
-Queries run on many threads and must never see a set of changes half applied. So nothing a query reads changes outside `mnavCommit`. `mnavStageTile` loads and checks a tile's bytes ([bake.md](bake.md#the-tile-format)) into staging, where the last change staged at a place wins. `mnavCommit` works out the whole result beside the live navmesh (tiles, places, cross-tile links, off-mesh links and their snaps) and swaps it in only when all of it fits within the limits; on failure nothing changes and the staged changes stay, so the host can raise a limit and commit again. No cross-tile link is ever dropped to make a commit fit.
+Queries run on many threads and must never see a set of changes half applied. So nothing a query reads changes outside `mnavNavmesh_Commit`. `mnavNavmesh_StageTile` loads and checks a tile's bytes ([bake.md](bake.md#the-tile-format)) into staging, where the last change staged at a place wins. `mnavNavmesh_Commit` works out the whole result beside the live navmesh (tiles, places, cross-tile links, off-mesh links and their snaps) and swaps it in only when all of it fits within the limits; on failure nothing changes and the staged changes stay, so the host can raise a limit and commit again. No cross-tile link is ever dropped to make a commit fit.
 
 A commit costs work in proportion to the tiles next to its changes, plus copies of the slot and place arrays.
 

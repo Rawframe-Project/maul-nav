@@ -38,7 +38,7 @@ static void Check(mnavResult result, const char* what)
 {
     if (result != mnav_success)
     {
-        fprintf(stderr, "%s: %s\n", what, mnavResultName(result));
+        fprintf(stderr, "%s: %s\n", what, mnavGetResultName(result));
         exit(1);
     }
 }
@@ -60,14 +60,14 @@ static mnavNavmesh* BakeAndLoad(void)
         for (int32_t x = 0; x < 2; ++x)
         {
             size_t size = 0;
-            Check(
-                mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, NULL, 0, NULL, 0, NULL}, x, z, NULL),
-                "bake");
-            Check(mnavCopyBakedTile(baker, bytes, TILE_ROOM, &size), "copy");
-            Check(mnavStageTile(navmesh, bytes, size).result, "stage");
+            Check(mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, NULL, 0, NULL, 0, NULL}, x,
+                                     z, NULL),
+                  "bake");
+            Check(mnavBaker_CopyTile(baker, bytes, TILE_ROOM, &size), "copy");
+            Check(mnavNavmesh_StageTile(navmesh, bytes, size).result, "stage");
         }
     }
-    Check(mnavCommit(navmesh), "commit");
+    Check(mnavNavmesh_Commit(navmesh), "commit");
     free(bytes);
     mnavDestroyBaker(baker);
     return navmesh;
@@ -82,11 +82,11 @@ int main(void)
     const mnavVec3 box = {1.0f, 2.0f, 1.0f};
     mnavNearest start;
     mnavNearest end;
-    Check(mnavFindNearest(navmesh, NULL, (mnavPos3){8.0, 0.0, 8.0}, box, &start), "start");
-    Check(mnavFindNearest(navmesh, NULL, (mnavPos3){8.0, 0.0, 56.0}, box, &end), "end");
+    Check(mnavNavmesh_FindNearest(navmesh, (mnavPos3){8.0, 0.0, 8.0}, box, NULL, &start), "start");
+    Check(mnavNavmesh_FindNearest(navmesh, (mnavPos3){8.0, 0.0, 56.0}, box, NULL, &end), "end");
     mnavPath path;
-    Check(mnavFindPath(query, navmesh, NULL, start.polygon, start.point, end.polygon, end.point,
-                       &path),
+    Check(mnavQuery_FindPath(query, navmesh, start.polygon, start.point, end.polygon, end.point,
+                             NULL, &path),
           "path");
     if (path.end != mnav_pathFound)
     {
@@ -112,7 +112,7 @@ int main(void)
     {
         mnavCorners corners;
         mnavSteering steering;
-        Check(mnavCorridorCorners(query, navmesh, &corridor, &corners), "corners");
+        Check(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &corners), "corners");
         Check(mnavSteer(&corners, &steer, &steering), "steer");
         if (steering.state == mnav_steerArrived)
         {
@@ -121,7 +121,7 @@ int main(void)
         mnavPos3 at = corridor.position;
         mnavPos3 wanted = {at.x + (double)steering.velocity.x * 0.1, at.y,
                            at.z + (double)steering.velocity.z * 0.1};
-        Check(mnavMoveCorridor(query, navmesh, NULL, &corridor, wanted, NULL), "move");
+        Check(mnavQuery_MoveCorridor(query, &corridor, navmesh, wanted, NULL, NULL), "move");
     }
     double dx = corridor.position.x - end.point.x;
     double dz = corridor.position.z - end.point.z;

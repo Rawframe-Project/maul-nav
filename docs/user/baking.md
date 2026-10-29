@@ -12,10 +12,10 @@ mnavTriangleMesh mesh = {vertices, vertexCount, indices, triangleCount, NULL};
 mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};   // meshes, terrains, volumes, index
 mnavBakeReport report;
 size_t size = 0;
-mnavResult baked = mnavBakeTile(baker, &input, tileX, tileZ, &report);
+mnavResult baked = mnavBaker_BakeTile(baker, &input, tileX, tileZ, &report);
 if (baked == mnav_success)
 {
-    baked = mnavCopyBakedTile(baker, bytes, capacity, &size);   // the tile's bytes
+    baked = mnavBaker_CopyTile(baker, bytes, capacity, &size);   // the tile's bytes
 }
 ```
 
@@ -34,16 +34,16 @@ The bytes are the tile: store them as cooked content, and load them into a [navm
 - **Triangle meshes** (`mnavTriangleMesh`): vertices, three indices per triangle, and an optional area type per triangle. Area 0 (`mnav_areaNone`) is not walkable and blocks what lies under it; 1 to 63 are walkable kinds that query filters cost and include. Without areas, every triangle is `mnav_areaWalkable`.
 - **Terrains** (`mnavTerrain`): heights on a regular grid with an optional area per cell; a cell of `mnav_areaNone` is a hole. A terrain is the compact form of the largest input and bakes to the same tile as the same triangles given as a mesh.
 - **Bake volumes** (`mnavBakeVolume`): a prism on a ring of points with a height range. An exclude volume drops the ground inside, and agents then keep their radius from it as from a wall. When a bake has include volumes, only the ground inside them is kept. An area volume gives the walkable ground inside its area type without shrinking it.
-- **2D outlines** (`mnavOutline`): closed rings of points with an area, for top-down games. `mnavBakeTile2D` fills the cells a walkable outline holds as a flat floor at height 0; an outline of `mnav_areaNone` cuts an obstruction. The result is an ordinary tile that every query serves.
+- **2D outlines** (`mnavOutline`): closed rings of points with an area, for top-down games. `mnavBaker_BakeTile2D` fills the cells a walkable outline holds as a flat floor at height 0; an outline of `mnav_areaNone` cuts an obstruction. The result is an ordinary tile that every query serves.
 
-`mnavBakeTile` takes meshes, terrains and volumes together in an `mnavBakeInput`, and `mnavBakeTile2D` takes outlines in an `mnavBake2DInput`.
+`mnavBaker_BakeTile` takes meshes, terrains and volumes together in an `mnavBakeInput`, and `mnavBaker_BakeTile2D` takes outlines in an `mnavBake2DInput`.
 
 Input is hostile: a NaN coordinate, an index out of range or an area past 63 is `mnav_errorInvalid`, a point past the extent, an infinity included, is `mnav_errorLimit`, and the report names the first mesh and the vertex, triangle or point refused. `mnavValidateTriangleMesh` and `mnavValidateOutline` run the same checks without baking, for an import step that wants to catch bad geometry early. Degenerate and duplicate triangles are accepted and contribute nothing.
 
 ## Many tiles
 
 - **Workers.** Tiles are independent calls. Run them on the host's own task system with one baker per worker; bakers share nothing, and the bytes are the same at any worker count.
-- **Large meshes.** A bake tests every input triangle against its tile. When many tiles bake from meshes much larger than a tile, make a tile index of the meshes once (`mnavCreateTileIndex`) and pass it as `mnavBakeInput.index`: each bake then reads only the triangles near its tile and makes the same bytes. An index is never changed after it is made, so workers share one. After editing a mesh, make a new index: a bake refuses an index whose counts no longer match, but a triangle moved into a tile it was not listed for is missed. Outlines have their own index, `mnavCreateTileIndex2D`, passed in the `mnavBake2DInput` of `mnavBakeTile2D`.
+- **Large meshes.** A bake tests every input triangle against its tile. When many tiles bake from meshes much larger than a tile, make a tile index of the meshes once (`mnavCreateTileIndex`) and pass it as `mnavBakeInput.index`: each bake then reads only the triangles near its tile and makes the same bytes. An index is never changed after it is made, so workers share one. After editing a mesh, make a new index: a bake refuses an index whose counts no longer match, but a triangle moved into a tile it was not listed for is missed. Outlines have their own index, `mnavCreateTileIndex2D`, passed in the `mnavBake2DInput` of `mnavBaker_BakeTile2D`.
 - **Skipping unchanged tiles.** The report's `fingerprint`, also written into the tile, hashes the bake's generation (`MNAV_BAKE_GENERATOR`, which rises only when a bake of the same input would differ), the def's settings, the tile's place and every input triangle that reaches it. A host can skip rebaking a tile whose fingerprint has not changed.
 
 ## The report
@@ -61,17 +61,17 @@ mnavResult cached = mnavCreateTileCache(&cacheDef, &cache);
 mnavBakeInput input = {&mesh, 1, NULL, 0, NULL, 0, NULL};
 if (cached == mnav_success)
 {
-    cached = mnavBakeTileCached(baker, cache, &input, tileX, tileZ, &report);
+    cached = mnavBaker_BakeTileCached(baker, cache, &input, tileX, tileZ, &report);
 }
 
 // A crate on the tile: a ring on the ground and a height range.
 const mnavVec2 ring[4] = {{36, 4}, {38, 4}, {38, 6}, {36, 6}};
 const mnavBakeVolume crate = {ring, 4, -1.0f, 2.0f, mnav_volumeExclude, 0};
-mnavResult rebuilt = mnavRebuildTile(baker, cache, tileX, tileZ, &crate, 1, &report);
+mnavResult rebuilt = mnavBaker_RebuildTile(baker, cache, tileX, tileZ, &crate, 1, &report);
 ```
 
-- A rebuilt tile is, to the byte, the tile `mnavBakeTile` bakes from the same input with the obstacles added to its volumes, in about a third of the time. Copy it out with `mnavCopyBakedTile` and replace the tile in a navmesh of `mnav_tierDynamic`.
+- A rebuilt tile is, to the byte, the tile `mnavBaker_BakeTile` bakes from the same input with the obstacles added to its volumes, in about a third of the time. Copy it out with `mnavBaker_CopyTile` and replace the tile in a navmesh of `mnav_tierDynamic`.
 - A rebuild applies the cached volumes and the obstacles it is given, so pass every obstacle on the tile each time; rebuild with none to clear them.
 - An obstacle reaches the tiles its ring touches, widened by a tile's border: the agent's radius rounded up to whole cells, and three cells more. Rebuild each of them.
-- A cached tile is about 10 KB for a 32 m tile of hilly terrain at the default cells. Drop tiles with `mnavDropCachedTile` as they stream out; `mnavGetTileCacheBytes` gives what the cache holds. The cache lives in memory only.
+- A cached tile is about 10 KB for a 32 m tile of hilly terrain at the default cells. Drop tiles with `mnavTileCache_DropTile` as they stream out; `mnavTileCache_GetBytes` gives what the cache holds. The cache lives in memory only.
 - Obstacles that move are for [avoidance](crowds.md), not the tile cache. 2D bakes have no volumes and are not cached.

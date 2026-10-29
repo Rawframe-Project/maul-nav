@@ -52,7 +52,7 @@ static void Check(mnavResult result, const char* what)
 {
     if (result != mnav_success)
     {
-        fprintf(stderr, "%s: %s\n", what, mnavResultName(result));
+        fprintf(stderr, "%s: %s\n", what, mnavGetResultName(result));
         exit(1);
     }
 }
@@ -124,8 +124,8 @@ typedef struct World
 static void Stage(World* w)
 {
     size_t size = 0;
-    Check(mnavCopyBakedTile(w->baker, w->bytes, TILE_ROOM, &size), "copy");
-    Check(mnavStageTile(w->navmesh, w->bytes, size).result, "stage");
+    Check(mnavBaker_CopyTile(w->baker, w->bytes, TILE_ROOM, &size), "copy");
+    Check(mnavNavmesh_StageTile(w->navmesh, w->bytes, size).result, "stage");
 }
 
 static void Load(World* w)
@@ -145,11 +145,11 @@ static void Load(World* w)
     w->bytes = malloc(TILE_ROOM);
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
-        Check(mnavBakeTileCached(w->baker, w->cache, &input, t % TILES, t / TILES, NULL),
+        Check(mnavBaker_BakeTileCached(w->baker, w->cache, &input, t % TILES, t / TILES, NULL),
               "cached bake");
         Stage(w);
     }
-    Check(mnavCommit(w->navmesh), "commit");
+    Check(mnavNavmesh_Commit(w->navmesh), "commit");
 }
 
 // Sets crates first to last standing or not, and rebuilds the tiles they
@@ -171,13 +171,14 @@ static void Change(World* w, int32_t first, int32_t last, bool standing)
         {
             if (reached[z][x])
             {
-                Check(mnavRebuildTile(w->baker, w->cache, x, z, obstacles, count, NULL), "rebuild");
+                Check(mnavBaker_RebuildTile(w->baker, w->cache, x, z, obstacles, count, NULL),
+                      "rebuild");
                 Stage(w);
                 rebuilt += 1;
             }
         }
     }
-    Check(mnavCommit(w->navmesh), "commit");
+    Check(mnavNavmesh_Commit(w->navmesh), "commit");
     printf("%s %d crate%s: %d tile%s rebuilt, %d crate%s standing\n",
            standing ? "dropped" : "lifted", last - first + 1, last > first ? "s" : "", rebuilt,
            rebuilt > 1 ? "s" : "", count, count == 1 ? "" : "s");
@@ -202,12 +203,14 @@ static void Start(World* w, mnavQuery* query)
         double z = 4.0 + 7.0 * a;
         mnavNearest start;
         mnavNearest end;
-        Check(mnavFindNearest(w->navmesh, NULL, (mnavPos3){4.0, 0.0, z}, BOX, &start), "start");
-        Check(mnavFindNearest(w->navmesh, NULL, (mnavPos3){60.0, 0.0, z}, BOX, &end), "end");
+        Check(mnavNavmesh_FindNearest(w->navmesh, (mnavPos3){4.0, 0.0, z}, BOX, NULL, &start),
+              "start");
+        Check(mnavNavmesh_FindNearest(w->navmesh, (mnavPos3){60.0, 0.0, z}, BOX, NULL, &end),
+              "end");
         Agent* agent = &s_agents[a];
         mnavPath path;
-        Check(mnavFindPath(query, w->navmesh, NULL, start.polygon, start.point, end.polygon,
-                           end.point, &path),
+        Check(mnavQuery_FindPath(query, w->navmesh, start.polygon, start.point, end.polygon,
+                                 end.point, NULL, &path),
               "path");
         Check(mnavResetCorridor(&agent->corridor, agent->buffer, CORRIDOR, start.polygon,
                                 start.point),
@@ -224,11 +227,11 @@ static int32_t Replan(World* w, mnavQuery* query)
     {
         Agent* agent = &s_agents[a];
         int32_t valid = 0;
-        Check(mnavCheckCorridor(w->navmesh, NULL, &agent->corridor, &valid), "check");
+        Check(mnavNavmesh_CheckCorridor(w->navmesh, &agent->corridor, NULL, &valid), "check");
         if (!agent->arrived && valid < agent->corridor.count)
         {
             mnavPath path;
-            Check(mnavReplanCorridor(query, w->navmesh, NULL, &agent->corridor, BOX, &path),
+            Check(mnavQuery_ReplanCorridor(query, &agent->corridor, w->navmesh, BOX, NULL, &path),
                   "replan");
             replanned += 1;
         }
@@ -268,7 +271,8 @@ static int32_t Walk(World* w, mnavQuery* query)
         }
         mnavCorners corners;
         mnavSteering steering;
-        Check(mnavCorridorCorners(query, w->navmesh, &agent->corridor, &corners), "corners");
+        Check(mnavQuery_FindCorridorCorners(query, &agent->corridor, w->navmesh, &corners),
+              "corners");
         Check(mnavSteer(&corners, &steer, &steering), "steer");
         if (steering.state == mnav_steerArrived)
         {
@@ -278,7 +282,8 @@ static int32_t Walk(World* w, mnavQuery* query)
         mnavPos3 at = agent->corridor.position;
         mnavPos3 wanted = {at.x + (double)steering.velocity.x * STEP, at.y,
                            at.z + (double)steering.velocity.z * STEP};
-        Check(mnavMoveCorridor(query, w->navmesh, NULL, &agent->corridor, wanted, NULL), "move");
+        Check(mnavQuery_MoveCorridor(query, &agent->corridor, w->navmesh, wanted, NULL, NULL),
+              "move");
         inside += InCrate(agent->corridor.position) ? 1 : 0;
     }
     return inside;

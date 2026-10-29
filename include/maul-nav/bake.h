@@ -625,12 +625,12 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. It may be read at any time, also while host
     /// code the object runs calls back in.
-    MNAV_API uint64_t mnavGetBakerMisuse(const mnavBaker* baker);
+    MNAV_API uint64_t mnavBaker_GetMisuse(const mnavBaker* baker);
 
     /// Bakes tile (tileX, tileZ) of triangle meshes and terrains, shaped
     /// by volumes: checks the input, then rasterizes, filters,
     /// partitions, traces and triangulates the tile and lays its detail,
-    /// and keeps the tile's bytes for mnavCopyBakedTile, in place of any
+    /// and keeps the tile's bytes for mnavBaker_CopyTile, in place of any
     /// tile baked before. The same input and def give the same bytes on
     /// every platform. A terrain's triangles count as input triangles,
     /// after the meshes', toward the limits and the fingerprint, and a
@@ -670,9 +670,9 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     /// Bakers share nothing, so one per thread bakes tiles in parallel.
-    MNAV_NODISCARD MNAV_API mnavResult mnavBakeTile(mnavBaker* baker, const mnavBakeInput* input,
-                                                    int32_t tileX, int32_t tileZ,
-                                                    mnavBakeReport* reportOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavBaker_BakeTile(mnavBaker* baker,
+                                                          const mnavBakeInput* input, int32_t tileX,
+                                                          int32_t tileZ, mnavBakeReport* reportOut);
 
     /// Makes a tile index of meshes for a def's tile grid:
     /// checks every mesh as a bake does, then lists for each tile the
@@ -754,13 +754,13 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. It may be read at any time, also while host
     /// code the object runs calls back in.
-    MNAV_API uint64_t mnavGetTileIndexMisuse(const mnavTileIndex* index);
+    MNAV_API uint64_t mnavTileIndex_GetMisuse(const mnavTileIndex* index);
 
     /// Bakes tile (tileX, tileZ) of 2D outlines: checks the outlines,
     /// fills the cells whose centers a walkable outline holds and no
     /// obstruction does as a flat floor at height 0, with the highest
     /// area among the outlines holding them, then erodes, partitions,
-    /// traces and triangulates as mnavBakeTile does; the walkable filters,
+    /// traces and triangulates as mnavBaker_BakeTile does; the walkable filters,
     /// which judge heights, do not run. The report's mesh names a refused
     /// outline and its triangles count the outlines reaching the tile.
     /// Given a tile index of the outlines, the bake checks only the
@@ -774,7 +774,7 @@ extern "C"
     /// @param tileZ     The tile's row.
     /// @param reportOut Receives what the bake did. May be NULL. Written on failure
     ///                  too, naming it.
-    /// @return As mnavBakeTile, for outlines: a NULL input is
+    /// @return As mnavBaker_BakeTile, for outlines: a NULL input is
     /// `mnav_errorInvalid`, and so is a tile index made for another grid, for
     /// meshes, or for another number of outlines or of points in one; also
     /// `mnav_errorCapacity` for more points in all than the inputTriangles
@@ -784,9 +784,10 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
     /// Bakers share nothing, so one per thread bakes tiles in parallel.
-    MNAV_NODISCARD MNAV_API mnavResult mnavBakeTile2D(mnavBaker* baker,
-                                                      const mnavBake2DInput* input, int32_t tileX,
-                                                      int32_t tileZ, mnavBakeReport* reportOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavBaker_BakeTile2D(mnavBaker* baker,
+                                                            const mnavBake2DInput* input,
+                                                            int32_t tileX, int32_t tileZ,
+                                                            mnavBakeReport* reportOut);
 
     /// Copies the last baked tile's bytes into caller memory.
     ///
@@ -803,8 +804,9 @@ extern "C"
     /// before its first bake or after a failed one.
     /// @par Thread safety
     /// Safe from any thread; the baker is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* bufferOut,
-                                                         size_t capacity, size_t* sizeOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavBaker_CopyTile(const mnavBaker* baker,
+                                                          uint8_t* bufferOut, size_t capacity,
+                                                          size_t* sizeOut);
 
     // The limits of a tile cache.
     typedef struct mnavTileCacheLimits
@@ -890,19 +892,19 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. It may be read at any time, also while host
     /// code the object runs calls back in.
-    MNAV_API uint64_t mnavGetTileCacheMisuse(const mnavTileCache* cache);
+    MNAV_API uint64_t mnavTileCache_GetMisuse(const mnavTileCache* cache);
 
-    /// Bakes a tile as mnavBakeTile does and keeps what a rebuild
+    /// Bakes a tile as mnavBaker_BakeTile does and keeps what a rebuild
     /// needs in the cache, replacing what it held for the tile.
     ///
     /// @param baker     The baker.
     /// @param cache     The cache.
-    /// @param input     The input, as mnavBakeTile takes it.
+    /// @param input     The input, as mnavBaker_BakeTile takes it.
     /// @param tileX     The tile's column.
     /// @param tileZ     The tile's row.
     /// @param reportOut Receives the report. May be NULL. Written on failure too,
     ///                  naming it.
-    /// @return As mnavBakeTile; `mnav_errorInvalid` for a NULL cache;
+    /// @return As mnavBaker_BakeTile; `mnav_errorInvalid` for a NULL cache;
     /// `mnav_errorCapacity` when the cache holds its most tiles or bytes, with
     /// no tile baked and the tile's old entry dropped. Also `mnav_errorBusy`
     /// when called back in from host code a call on the baker or the cache runs
@@ -910,13 +912,15 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the baker and the cache are used by one thread
     /// at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavBakeTileCached(mnavBaker* baker, mnavTileCache* cache,
-                                                          const mnavBakeInput* input, int32_t tileX,
-                                                          int32_t tileZ, mnavBakeReport* reportOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavBaker_BakeTileCached(mnavBaker* baker,
+                                                                mnavTileCache* cache,
+                                                                const mnavBakeInput* input,
+                                                                int32_t tileX, int32_t tileZ,
+                                                                mnavBakeReport* reportOut);
 
     /// Rebuilds a cached tile with obstacles, without its triangles: the
     /// cached field, the cached volumes and then the obstacles, run from
-    /// the volumes on. The bytes are those mnavBakeTile gives the same
+    /// the volumes on. The bytes are those mnavBaker_BakeTile gives the same
     /// input with the obstacles appended to its volumes. An exclude
     /// obstacle carves, an area obstacle changes the area within it.
     ///
@@ -934,17 +938,17 @@ extern "C"
     /// not hold; `mnav_errorInvalid` for a NULL argument, a negative count or a
     /// baker of another def; for an obstacle a bake refuses as a volume, the
     /// status the bake gives, the obstacle named in the report; otherwise as
-    /// mnavBakeTile. Also `mnav_errorBusy` when called back in from host code a
+    /// mnavBaker_BakeTile. Also `mnav_errorBusy` when called back in from host code a
     /// call on the baker or the cache runs (an allocator, the clock), one
     /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the baker and the cache are used by one thread
     /// at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavRebuildTile(mnavBaker* baker, mnavTileCache* cache,
-                                                       int32_t tileX, int32_t tileZ,
-                                                       const mnavBakeVolume* obstacles,
-                                                       int32_t obstacleCount,
-                                                       mnavBakeReport* reportOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavBaker_RebuildTile(mnavBaker* baker, mnavTileCache* cache,
+                                                             int32_t tileX, int32_t tileZ,
+                                                             const mnavBakeVolume* obstacles,
+                                                             int32_t obstacleCount,
+                                                             mnavBakeReport* reportOut);
 
     /// Drops what the cache holds for a tile, if anything. Called back in from
     /// host code a call on the cache runs (an allocator, the clock), it does
@@ -955,7 +959,7 @@ extern "C"
     /// @param tileZ The tile's row.
     /// @par Thread safety
     /// Safe from any thread; the cache is used by one thread at a time.
-    MNAV_API void mnavDropCachedTile(mnavTileCache* cache, int32_t tileX, int32_t tileZ);
+    MNAV_API void mnavTileCache_DropTile(mnavTileCache* cache, int32_t tileX, int32_t tileZ);
 
     /// Returns the bytes a tile cache holds, its tiles' and its own.
     ///
@@ -963,7 +967,7 @@ extern "C"
     /// @return The bytes; 0 for NULL.
     /// @par Thread safety
     /// Safe from any thread; the cache is used by one thread at a time.
-    MNAV_API uint64_t mnavGetTileCacheBytes(const mnavTileCache* cache);
+    MNAV_API uint64_t mnavTileCache_GetBytes(const mnavTileCache* cache);
 
 #ifdef __cplusplus
 }

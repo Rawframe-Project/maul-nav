@@ -248,8 +248,8 @@ static MNAV_NOINLINE mnavResult CheckCorridorCounted(const mnavNavmesh* navmesh,
     return mnavClearOnFailure(result, validOut, sizeof(*validOut));
 }
 
-mnavResult mnavCheckCorridor(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                             const mnavCorridor* corridor, int32_t* validOut)
+mnavResult mnavNavmesh_CheckCorridor(const mnavNavmesh* navmesh, const mnavCorridor* corridor,
+                                     const mnavQueryFilter* filter, int32_t* validOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = CheckCorridorCounted(navmesh, filter, corridor, validOut);
@@ -308,8 +308,8 @@ static MNAV_NOINLINE mnavResult CorridorCornersCounted(mnavQuery* query, const m
     return mnavClearOnFailure(result, cornersOut, sizeof(*cornersOut));
 }
 
-mnavResult mnavCorridorCorners(mnavQuery* query, const mnavNavmesh* navmesh,
-                               const mnavCorridor* corridor, mnavCorners* cornersOut)
+mnavResult mnavQuery_FindCorridorCorners(mnavQuery* query, const mnavCorridor* corridor,
+                                         const mnavNavmesh* navmesh, mnavCorners* cornersOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = CorridorCornersCounted(query, navmesh, corridor, cornersOut);
@@ -460,9 +460,9 @@ static MNAV_NOINLINE mnavResult CorridorAreasCounted(mnavQuery* query, const mna
                                    countOut, sizeof(*countOut));
 }
 
-mnavResult mnavCorridorAreas(mnavQuery* query, const mnavNavmesh* navmesh,
-                             const mnavCorridor* corridor, mnavCorners* cornersOut,
-                             mnavAreaRun* runsOut, int32_t capacity, int32_t* countOut)
+mnavResult mnavQuery_FindCorridorAreas(mnavQuery* query, const mnavCorridor* corridor,
+                                       const mnavNavmesh* navmesh, mnavCorners* cornersOut,
+                                       mnavAreaRun* runsOut, int32_t capacity, int32_t* countOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
@@ -584,9 +584,9 @@ static MNAV_NOINLINE mnavResult MoveCorridorCounted(mnavQuery* query, const mnav
     return mnavClearOnFailure(result, moveOut, sizeof(*moveOut));
 }
 
-mnavResult mnavMoveCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
-                            const mnavQueryFilter* filter, mnavCorridor* corridor, mnavPos3 wanted,
-                            mnavMove* moveOut)
+mnavResult mnavQuery_MoveCorridor(mnavQuery* query, mnavCorridor* corridor,
+                                  const mnavNavmesh* navmesh, mnavPos3 wanted,
+                                  const mnavQueryFilter* filter, mnavMove* moveOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = MoveCorridorCounted(query, navmesh, filter, corridor, wanted, moveOut);
@@ -637,9 +637,9 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetCounted(mnavQuery* query,
     return mnavClearOnFailure(result, moveOut, sizeof(*moveOut));
 }
 
-mnavResult mnavMoveCorridorTarget(mnavQuery* query, const mnavNavmesh* navmesh,
-                                  const mnavQueryFilter* filter, mnavCorridor* corridor,
-                                  mnavPos3 wanted, mnavMove* moveOut)
+mnavResult mnavQuery_MoveCorridorTarget(mnavQuery* query, mnavCorridor* corridor,
+                                        const mnavNavmesh* navmesh, mnavPos3 wanted,
+                                        const mnavQueryFilter* filter, mnavMove* moveOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
@@ -705,9 +705,9 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorCounted(mnavQuery* query,
     return mnavClearOnFailure(result, shortenedOut, sizeof(*shortenedOut));
 }
 
-mnavResult mnavShortcutCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
-                                const mnavQueryFilter* filter, mnavCorridor* corridor,
-                                mnavPos3 toward, bool* shortenedOut)
+mnavResult mnavQuery_ShortcutCorridor(mnavQuery* query, mnavCorridor* corridor,
+                                      const mnavNavmesh* navmesh, mnavPos3 toward,
+                                      const mnavQueryFilter* filter, bool* shortenedOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
@@ -792,9 +792,9 @@ static MNAV_NOINLINE mnavResult ReplanCorridorCounted(mnavQuery* query, const mn
     return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
-mnavResult mnavReplanCorridor(mnavQuery* query, const mnavNavmesh* navmesh,
-                              const mnavQueryFilter* filter, mnavCorridor* corridor,
-                              mnavVec3 halfExtents, mnavPath* pathOut)
+mnavResult mnavQuery_ReplanCorridor(mnavQuery* query, mnavCorridor* corridor,
+                                    const mnavNavmesh* navmesh, mnavVec3 halfExtents,
+                                    const mnavQueryFilter* filter, mnavPath* pathOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =

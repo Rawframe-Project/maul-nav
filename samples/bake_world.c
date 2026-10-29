@@ -100,13 +100,13 @@ static void BakeTiles(Worker* w)
     w->result = mnavCreateBaker(w->def, &baker).result;
     for (int32_t t = w->first; t < TILES * TILES && w->result == mnav_success; t += WORKERS)
     {
-        w->result = mnavBakeTile(baker, w->input, t % TILES, t / TILES, NULL);
+        w->result = mnavBaker_BakeTile(baker, w->input, t % TILES, t / TILES, NULL);
         if (w->result == mnav_success)
         {
             s_tiles[t] = malloc(TILE_ROOM);
             w->result = s_tiles[t] == NULL
                             ? mnav_errorCapacity
-                            : mnavCopyBakedTile(baker, s_tiles[t], TILE_ROOM, &s_sizes[t]);
+                            : mnavBaker_CopyTile(baker, s_tiles[t], TILE_ROOM, &s_sizes[t]);
         }
     }
     mnavDestroyBaker(baker);
@@ -165,9 +165,9 @@ static int32_t SameAsOneThread(const mnavBakeDef* def, const mnavTriangleMesh* m
         for (int32_t t = 0; t < TILES * TILES; ++t)
         {
             size_t size = 0;
-            same += mnavBakeTile(baker, &(mnavBakeInput){mesh, 1, NULL, 0, NULL, 0, NULL},
-                                 t % TILES, t / TILES, NULL) == mnav_success &&
-                            mnavCopyBakedTile(baker, bytes, TILE_ROOM, &size) == mnav_success &&
+            same += mnavBaker_BakeTile(baker, &(mnavBakeInput){mesh, 1, NULL, 0, NULL, 0, NULL},
+                                       t % TILES, t / TILES, NULL) == mnav_success &&
+                            mnavBaker_CopyTile(baker, bytes, TILE_ROOM, &size) == mnav_success &&
                             size == s_sizes[t] && memcmp(bytes, s_tiles[t], size) == 0
                         ? 1
                         : 0;
@@ -193,18 +193,20 @@ static int32_t Cross(const mnavBakeDef* def)
     mnavResult loaded = mnav_success;
     for (int32_t t = 0; t < TILES * TILES && loaded == mnav_success; ++t)
     {
-        loaded = mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result;
+        loaded = mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result;
     }
     mnavNearest from = {0};
     mnavNearest to = {0};
     mnavPath path = {0};
     const mnavVec3 box = {2.0f, 4.0f, 2.0f};
     int32_t points = -1;
-    if (loaded == mnav_success && mnavCommit(navmesh) == mnav_success &&
-        mnavFindNearest(navmesh, NULL, (mnavPos3){4.0, 0.0, 4.0}, box, &from) == mnav_success &&
-        mnavFindNearest(navmesh, NULL, (mnavPos3){124.0, 0.0, 124.0}, box, &to) == mnav_success &&
-        mnavFindPath(query, navmesh, NULL, from.polygon, from.point, to.polygon, to.point, &path) ==
+    if (loaded == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success &&
+        mnavNavmesh_FindNearest(navmesh, (mnavPos3){4.0, 0.0, 4.0}, box, NULL, &from) ==
             mnav_success &&
+        mnavNavmesh_FindNearest(navmesh, (mnavPos3){124.0, 0.0, 124.0}, box, NULL, &to) ==
+            mnav_success &&
+        mnavQuery_FindPath(query, navmesh, from.polygon, from.point, to.polygon, to.point, NULL,
+                           &path) == mnav_success &&
         path.end == mnav_pathFound)
     {
         printf("path: %d points, %.1f m\n", path.pointCount, path.length);

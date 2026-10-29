@@ -36,9 +36,9 @@ static void BakeLedge(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                           nullptr) == mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &s_size) == mnav_success,
+              mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                                 0, 0, nullptr) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &s_size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
 }
@@ -50,8 +50,8 @@ static mnavNavmesh* Load(int32_t links, mnavTier tier)
     def.tier = tier;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_tile, s_size).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, s_tile, s_size).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
     return navmesh;
 }
@@ -68,14 +68,14 @@ static double Across(mnavQuery* query, const mnavNavmesh* navmesh, mnavLinkId li
 {
     mnavNearest a;
     mnavNearest b;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){5, 3, z}, (mnavVec3){0.5f, 1, 0.5f}, &a) ==
-                  mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){17, 0, z}, (mnavVec3){0.5f, 1, 0.5f},
-                              &b) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){5, 3, z}, (mnavVec3){0.5f, 1, 0.5f}, nullptr,
+                                  &a) == mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){17, 0, z}, (mnavVec3){0.5f, 1, 0.5f},
+                                      nullptr, &b) == mnav_success,
           "ends");
     mnavPath path;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-              mnav_success,
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success,
           "searched");
     if (path.end != mnav_pathFound)
     {
@@ -94,10 +94,10 @@ static void TestCrossings(mnavQuery* query)
     mnavLinkId link;
     mnavLinkDef def = Ledge(10.0, 16.0f);
     CHECK(mnavStageLink(navmesh, &def, &link) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "staged");
     mnavLinkState state;
-    CHECK(mnavGetLink(navmesh, link, &state) == mnav_success && state.attached &&
+    CHECK(mnavLink_GetState(navmesh, link, &state) == mnav_success && state.attached &&
               state.crossings == 33 && fabs(state.start.z - 2.0) < 1e-9,
           "33 crossings 0.5 m apart, all attached, the first at one side");
     // Each path crosses near its own z, within half a spacing.
@@ -115,29 +115,29 @@ static void TestCrossings(mnavQuery* query)
     mnavLinkId wide;
     def = Ledge(10.0, 30.0f);
     CHECK(mnavStageLink(navmesh, &def, &wide) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavGetLink(navmesh, wide, &state) == mnav_success && state.attached &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavLink_GetState(navmesh, wide, &state) == mnav_success && state.attached &&
               state.crossings > 30 && state.crossings < 61 && state.start.z > 0.0,
           "partly attached");
     // A child slot is named by no id.
     mnavLinkId child = {link.slot + 1, link.generation};
-    CHECK(mnavGetLink(navmesh, child, &state) == mnav_errorInvalid &&
+    CHECK(mnavLink_GetState(navmesh, child, &state) == mnav_errorInvalid &&
               mnavStageLinkRemoval(navmesh, child) == mnav_errorInvalid,
           "a crossing's own slot is no link");
     // A width that is no whole number of spacings gets one crossing more.
     mnavLinkId odd;
     def = Ledge(10.0, 16.2f);
     CHECK(mnavStageLink(navmesh, &def, &odd) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavGetLink(navmesh, odd, &state) == mnav_success && state.crossings == 34,
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavLink_GetState(navmesh, odd, &state) == mnav_success && state.crossings == 34,
           "a spacing under the agent's radius");
     // Along z on the ledge itself: the crossings spread along x, the first
     // on the right of the link's direction.
     mnavLinkId along;
     def = (mnavLinkDef){{5, 3, 4}, {5, 3, 16}, 0.5f, 1.0f, mnav_linkJump, false, 4.0f};
     CHECK(mnavStageLink(navmesh, &def, &along) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavGetLink(navmesh, along, &state) == mnav_success && state.crossings == 9 &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavLink_GetState(navmesh, along, &state) == mnav_success && state.crossings == 9 &&
               fabs(state.start.x - 7.0) < 1e-9 && fabs(state.start.z - 4.0) < 1e-9,
           "a link along z");
     CHECK(mnavStageLinkRemoval(navmesh, odd) == mnav_success &&
@@ -147,24 +147,24 @@ static void TestCrossings(mnavQuery* query)
     def = Ledge(10.0, MNAV_MAX_LINK_WIDTH);
     mnavLinkId widest;
     CHECK(mnavStageLink(navmesh, &def, &widest) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "the widest");
     // Removed, all crossings go: no way across is left but the others'.
     CHECK(mnavStageLinkRemoval(navmesh, wide) == mnav_success &&
               mnavStageLinkRemoval(navmesh, widest) == mnav_success &&
               mnavStageLinkRemoval(navmesh, link) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavGetLink(navmesh, link, &state) == mnav_errorStale,
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavLink_GetState(navmesh, link, &state) == mnav_errorStale,
           "removed");
     mnavNearest a;
     mnavNearest b;
     mnavPath path;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){5, 3, 5}, (mnavVec3){0.5f, 1, 0.5f}, &a) ==
-                  mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){17, 0, 5}, (mnavVec3){0.5f, 1, 0.5f},
-                              &b) == mnav_success &&
-              mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &path) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){5, 3, 5}, (mnavVec3){0.5f, 1, 0.5f}, nullptr,
+                                  &a) == mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){17, 0, 5}, (mnavVec3){0.5f, 1, 0.5f},
+                                      nullptr, &b) == mnav_success &&
+              mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &path) == mnav_success &&
               path.end != mnav_pathFound,
           "no way across");
     mnavDestroyNavmesh(navmesh);
@@ -198,17 +198,18 @@ static void TestLimitsAndToggles(mnavQuery* query)
         CHECK(mnavStageLinkRemoval(navmesh, points[i]) == mnav_success, "removed");
     }
     CHECK(mnavStageLinkRemoval(navmesh, point) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "committed without the point links");
     // Toggled off and on again, as a door.
     mnavLinkState state;
-    CHECK(mnavStageLinkEnabled(navmesh, edge, false) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success && isnan(Across(query, navmesh, edge, 6.0)) &&
-              mnavGetLink(navmesh, edge, &state) == mnav_success && !state.enabled &&
+    CHECK(mnavLink_StageEnable(navmesh, edge, false) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              isnan(Across(query, navmesh, edge, 6.0)) &&
+              mnavLink_GetState(navmesh, edge, &state) == mnav_success && !state.enabled &&
               state.crossings == 33,
           "disabled: still snapped, never crossed");
-    CHECK(mnavStageLinkEnabled(navmesh, edge, true) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
+    CHECK(mnavLink_StageEnable(navmesh, edge, true) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
               fabs(Across(query, navmesh, edge, 6.0) - 6.0) < 1e-9,
           "enabled again");
     // A corridor across it: its corners carry the link.
@@ -218,15 +219,15 @@ static void TestLimitsAndToggles(mnavQuery* query)
     static mnavPolygonId buffer[64];
     mnavCorridor corridor;
     mnavCorners corners;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){5, 3, 6}, (mnavVec3){0.5f, 1, 0.5f},
-                          &from) == mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){17, 0, 14}, (mnavVec3){0.5f, 1, 0.5f},
-                              &to) == mnav_success &&
-              mnavFindPath(query, navmesh, nullptr, from.polygon, from.point, to.polygon, to.point,
-                           &path) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){5, 3, 6}, (mnavVec3){0.5f, 1, 0.5f}, nullptr,
+                                  &from) == mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){17, 0, 14}, (mnavVec3){0.5f, 1, 0.5f},
+                                      nullptr, &to) == mnav_success &&
+              mnavQuery_FindPath(query, navmesh, from.polygon, from.point, to.polygon, to.point,
+                                 nullptr, &path) == mnav_success &&
               mnavResetCorridor(&corridor, buffer, 64, from.polygon, from.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success &&
-              mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+              mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &corners) == mnav_success &&
               corners.linkCount == 1 && corners.links[0].link.slot == edge.slot,
           "a corridor across the edge link");
     mnavDestroyNavmesh(navmesh);

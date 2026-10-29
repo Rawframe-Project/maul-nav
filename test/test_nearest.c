@@ -28,17 +28,18 @@ static mnavNavmesh* Load(int32_t tiles)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < tiles; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
 static mnavNearest Near(const mnavNavmesh* navmesh, double x, double y, double z, float extent)
 {
     mnavNearest nearest;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, y, z}, (mnavVec3){extent, extent, extent},
-                          &nearest) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, y, z}, (mnavVec3){extent, extent, extent},
+                                  nullptr, &nearest) == mnav_success,
           "queried");
     return nearest;
 }
@@ -65,8 +66,8 @@ static void TestPointInsideAnObstacle(void)
     // height of 1 m keeps its top out of reach.
     mnavNavmesh* navmesh = Load(4);
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){22.0, 0.3, 22.0},
-                          (mnavVec3){4.0f, 0.5f, 4.0f}, &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){22.0, 0.3, 22.0},
+                                  (mnavVec3){4.0f, 0.5f, 4.0f}, nullptr, &n) == mnav_success,
           "queried");
     CHECK(n.polygon.slot != 0 && !n.over, "beside a polygon, not over one");
     double dx = n.point.x - 22.0;
@@ -98,26 +99,26 @@ static void TestBadArgumentsAreRefused(void)
 {
     mnavNavmesh* navmesh = Load(1);
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){(double)NAN, 0, 0}, (mnavVec3){1, 1, 1},
-                          &n) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){(double)NAN, 0, 0}, (mnavVec3){1, 1, 1},
+                                  nullptr, &n) == mnav_errorInvalid,
           "a NaN point");
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){0, (double)INFINITY, 0}, (mnavVec3){1, 1, 1},
-                          &n) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){0, (double)INFINITY, 0}, (mnavVec3){1, 1, 1},
+                                  nullptr, &n) == mnav_errorInvalid,
           "an infinite point");
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){-1, 1, 1}, &n) ==
-              mnav_errorInvalid,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){0, 0, 0}, (mnavVec3){-1, 1, 1}, nullptr,
+                                  &n) == mnav_errorInvalid,
           "a negative extent");
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){1, NAN, 1}, &n) ==
-              mnav_errorInvalid,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){0, 0, 0}, (mnavVec3){1, NAN, 1}, nullptr,
+                                  &n) == mnav_errorInvalid,
           "a NaN extent");
-    CHECK(mnavFindNearest(nullptr, nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){1, 1, 1}, &n) ==
+    CHECK(mnavNavmesh_FindNearest(nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){1, 1, 1}, nullptr, &n) ==
               mnav_errorInvalid,
           "no navmesh");
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){0, 0, 0}, (mnavVec3){1, 1, 1}, nullptr) ==
-              mnav_errorInvalid,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){0, 0, 0}, (mnavVec3){1, 1, 1}, nullptr,
+                                  nullptr) == mnav_errorInvalid,
           "nowhere to put it");
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){1.0e300, 0, 0}, (mnavVec3){1.0e30f, 1, 1},
-                          &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){1.0e300, 0, 0}, (mnavVec3){1.0e30f, 1, 1},
+                                  nullptr, &n) == mnav_success,
           "a huge box past the extent is clamped to it");
     mnavDestroyNavmesh(navmesh);
 }
@@ -171,8 +172,9 @@ static void TestPolygonsInBoxes(void)
             mnavVec3 half = {1.0f + (float)(i % 3), 1.5f, 1.0f + (float)(j % 4)};
             mnavFound found;
             mnavNearest n;
-            CHECK(mnavFindPolygons(navmesh, nullptr, c, half, list, 1024, &found) == mnav_success &&
-                      mnavFindNearest(navmesh, nullptr, c, half, &n) == mnav_success,
+            CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, list, 1024, &found) ==
+                          mnav_success &&
+                      mnavNavmesh_FindNearest(navmesh, c, half, nullptr, &n) == mnav_success,
                   "queried");
             bool held = n.polygon.slot == 0;
             for (int32_t k = 0; k < found.count; ++k)
@@ -198,39 +200,45 @@ static void TestPolygonsInBoxes(void)
     mnavFound all;
     mnavFound some;
     mnavPolygonId few[3];
-    CHECK(mnavFindPolygons(navmesh, nullptr, c, half, list, 1024, &all) == mnav_success &&
+    CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, list, 1024, &all) == mnav_success &&
               all.count > 3 && all.incomplete,
           "many, the fourth tile not loaded");
-    CHECK(mnavFindPolygons(navmesh, nullptr, c, half, few, 3, &some) == mnav_errorCapacity &&
+    CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, few, 3, &some) ==
+                  mnav_errorCapacity &&
               some.count == all.count && memcmp(few, list, sizeof(few)) == 0,
           "the first three, and the count of all");
-    CHECK(mnavFindPolygons(navmesh, nullptr, c, half, nullptr, 0, &some) == mnav_errorCapacity &&
+    CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, nullptr, 0, &some) ==
+                  mnav_errorCapacity &&
               some.count == all.count,
           "counted without a buffer");
-    CHECK(mnavFindPolygons(navmesh, nullptr, (mnavPos3){500.0, 0.0, 500.0}, half, nullptr, 0,
-                           &some) == mnav_success &&
+    CHECK(mnavNavmesh_FindPolygons(navmesh, (mnavPos3){500.0, 0.0, 500.0}, half, nullptr, nullptr,
+                                   0, &some) == mnav_success &&
               some.count == 0 && some.incomplete,
           "nothing loaded there");
     mnavQueryFilter none = mnavDefaultQueryFilter();
     none.areas = 0;
-    CHECK(mnavFindPolygons(navmesh, &none, c, half, list, 1024, &some) == mnav_success &&
+    CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, &none, list, 1024, &some) == mnav_success &&
               some.count == 0,
           "no area wanted");
-    CHECK(mnavFindPolygons(navmesh, nullptr, c, half, nullptr, 2, &some) == mnav_errorInvalid &&
-              mnavFindPolygons(navmesh, nullptr, c, half, list, -1, &some) == mnav_errorInvalid &&
-              mnavFindPolygons(navmesh, nullptr, c, (mnavVec3){-1.0f, 1.0f, 1.0f}, list, 4,
-                               &some) == mnav_errorInvalid &&
-              mnavFindPolygons(navmesh, nullptr, c, (mnavVec3){1.0f, -1.0f, 1.0f}, list, 4,
-                               &some) == mnav_errorInvalid &&
-              mnavFindPolygons(navmesh, nullptr, c, (mnavVec3){1.0f, 1.0f, -1.0f}, list, 4,
-                               &some) == mnav_errorInvalid &&
-              mnavFindPolygons(navmesh, nullptr, (mnavPos3){(double)NAN, 0.0, 0.0}, half, list, 4,
-                               &some) == mnav_errorInvalid &&
-              mnavFindPolygons(navmesh, nullptr, c, half, list, 4, nullptr) == mnav_errorInvalid &&
-              mnavFindPolygons(nullptr, nullptr, c, half, list, 4, &some) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, nullptr, 2, &some) ==
+                  mnav_errorInvalid &&
+              mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, list, -1, &some) ==
+                  mnav_errorInvalid &&
+              mnavNavmesh_FindPolygons(navmesh, c, (mnavVec3){-1.0f, 1.0f, 1.0f}, nullptr, list, 4,
+                                       &some) == mnav_errorInvalid &&
+              mnavNavmesh_FindPolygons(navmesh, c, (mnavVec3){1.0f, -1.0f, 1.0f}, nullptr, list, 4,
+                                       &some) == mnav_errorInvalid &&
+              mnavNavmesh_FindPolygons(navmesh, c, (mnavVec3){1.0f, 1.0f, -1.0f}, nullptr, list, 4,
+                                       &some) == mnav_errorInvalid &&
+              mnavNavmesh_FindPolygons(navmesh, (mnavPos3){(double)NAN, 0.0, 0.0}, half, nullptr,
+                                       list, 4, &some) == mnav_errorInvalid &&
+              mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, list, 4, nullptr) ==
+                  mnav_errorInvalid &&
+              mnavNavmesh_FindPolygons(nullptr, c, half, nullptr, list, 4, &some) ==
+                  mnav_errorInvalid,
           "bad arguments");
     none.cookie = 0;
-    CHECK(mnavFindPolygons(navmesh, &none, c, half, list, 4, &some) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, &none, list, 4, &some) == mnav_errorInvalid,
           "a filter not from the default");
     mnavDestroyNavmesh(navmesh);
 }

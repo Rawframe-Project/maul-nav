@@ -56,7 +56,7 @@ static void TestMoving(void)
     CHECK(Near((double)s.velocity.x, 3.5 * x / length) &&
               Near((double)s.velocity.z, 3.5 * z / length),
           "swinging wide of the turn, away from it");
-    def.anticipateTurns = false;
+    def.enableTurnAnticipation = false;
     s = Steer(&c, &def);
     CHECK(Near((double)s.velocity.x, 3.5) && (double)s.velocity.z == 0.0,
           "without anticipation, straight");

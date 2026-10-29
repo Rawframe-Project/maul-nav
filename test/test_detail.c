@@ -67,7 +67,7 @@ static Part Read(mnavPolygonId polygon)
                          nullptr,
                          0,
                          0};
-    CHECK(mnavDebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
+    CHECK(mnavNavmesh_DebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
     Part part = {b.triangleCount / 3, 0, 0, true, 0};
     for (int32_t i = 0; i < b.vertexCount; ++i)
     {
@@ -124,7 +124,7 @@ static bool HasCorner(mnavPolygonId polygon, int64_t x, int64_t y, int64_t z)
                          nullptr,
                          0,
                          0};
-    CHECK(mnavDebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
+    CHECK(mnavNavmesh_DebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
     for (int32_t i = 0; i < b.vertexCount; ++i)
     {
         Corner c = At16((uint32_t)i);
@@ -150,7 +150,7 @@ static int32_t OnLine(mnavPolygonId polygon, int64_t lineX, int64_t lineZ)
                          nullptr,
                          0,
                          0};
-    CHECK(mnavDebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
+    CHECK(mnavNavmesh_DebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
     int32_t count = 0;
     for (int32_t i = 0; i < b.vertexCount; ++i)
     {
@@ -171,7 +171,7 @@ static mnavPolygonId Over(int32_t x, int32_t z, int32_t level)
 {
     mnavPos3 center = {(AT + x + 0.5) * 0.25, level * 0.125, (AT + z + 0.5) * 0.25};
     mnavNearest n;
-    CHECK(mnavFindNearest(s_navmesh, nullptr, center, (mnavVec3){0.01f, 1.0f, 0.01f}, &n) ==
+    CHECK(mnavNavmesh_FindNearest(s_navmesh, center, (mnavVec3){0.01f, 1.0f, 0.01f}, nullptr, &n) ==
                   mnav_success &&
               n.polygon.slot != 0 && n.over,
           "a polygon over the cell");
@@ -424,15 +424,15 @@ static void TestNoHeightsFallBackAndCount(void)
     def.detailMaxError = 0.0f;
     UseDef(&def);
     size_t size = 0;
-    CHECK(mnavBakeTile2D(s_baker, &(mnavBake2DInput){outlines, 2, nullptr}, 0, 0, &s_report) ==
-                  mnav_success &&
-              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
+    CHECK(mnavBaker_BakeTile2D(s_baker, &(mnavBake2DInput){outlines, 2, nullptr}, 0, 0,
+                               &s_report) == mnav_success &&
+              mnavBaker_CopyTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
     mnavDebugBuffer b = {{0.0, 0.0, 0.0},
                          s_drawVertices,
@@ -444,7 +444,7 @@ static void TestNoHeightsFallBackAndCount(void)
                          nullptr,
                          0,
                          0};
-    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
+    (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     bool level = b.vertexCount > 0;
     for (int32_t i = 0; i < b.vertexCount; ++i)
     {
@@ -526,7 +526,7 @@ static void TestBumpyGroundReachesTheCap(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success,
+              mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
     CHECK(report.cappedDetail > 0 && report.partialRings == 0, "some polygons reach the cap");
@@ -551,7 +551,7 @@ static void TestLevelDetailIsSound(void)
         mnavBakeReport report;
         mnavBaker* baker = nullptr;
         CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-                  mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success,
+                  mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
               "baked");
         mnavDestroyBaker(baker);
         CHECK(report.partialRings == 0 && report.detailTriangles >= report.polygons,
@@ -574,7 +574,7 @@ static bool EveryTriangleHasArea(void)
                          0,
                          0};
     // Polygon edges go uncounted into a buffer with no line room.
-    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
+    (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the triangles fit");
     bool area = b.triangleCount > 0;
     for (int32_t t = 0; t + 2 < b.triangleCount; t += 3)
