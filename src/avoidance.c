@@ -328,18 +328,11 @@ static mnavPos2 Solve(mnavAvoidance* a, const mnavAgent* agents, double step, in
     }
     // The programs stay within the speed circle up to rounding, which
     // lines meeting at a narrow angle make larger; the maximum speed is
-    // kept exactly.
-    double speedSq = mnavDot2(velocity, velocity);
-    if (speedSq > self->maxSpeed * self->maxSpeed)
-    {
-        velocity = mnavScale2(velocity, self->maxSpeed / sqrt(speedSq));
-    }
-    // Within the speed circle, but for the scaling's last bits: relative,
-    // and a few units of the least subnormal where the squares are
-    // subnormal and round absolutely.
+    // kept exactly. The scaling rounds too, so a velocity it leaves a unit
+    // outside steps toward zero until it is within.
+    velocity = mnavKeepSpeed2(velocity, self->maxSpeed);
     MNAV_ASSERT(isfinite(velocity.x) && isfinite(velocity.y) &&
-                mnavDot2(velocity, velocity) <=
-                    self->maxSpeed * self->maxSpeed * (1.0 + 0x1p-40) + 0x1p-1072);
+                mnavWithinSpeed2(velocity, self->maxSpeed));
     return velocity;
 }
 

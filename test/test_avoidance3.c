@@ -609,6 +609,23 @@ static void TestChecks(void)
     mnavDestroyAvoidance(avoidance);
 }
 
+// A lone flier that would go faster than it may: the velocity scaled
+// back onto the speed sphere came out a unit past it, its squared speed
+// 0x1.2000000000001p+1 against 2.25.
+static void TestSpeedScaledBack(void)
+{
+    mnavAvoidance* avoidance = Make(1, 1, 2.0);
+    mnavAgent3D agent = Agent(0.0, 0.0, 0.0, 1);
+    agent.preferred = (mnavPos3){0x1.d50b790a82134p+0, 0x1.15aa2f1c7bda8p-2, 0x1.8ba9bab5226e6p+0};
+    mnavPos3 velocity;
+    CHECK(mnavAvoid3D(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) == mnav_success, "stepped");
+    CHECK(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z <= 2.25,
+          "no faster than the maximum");
+    CHECK(velocity.x > 1.1 && velocity.y > 0.1 && velocity.z > 0.9,
+          "toward the preferred velocity");
+    mnavDestroyAvoidance(avoidance);
+}
+
 // A maximum speed whose square is subnormal, about 3.4 units of the least
 // subnormal: the squares round absolutely, so a velocity clamped to the
 // sphere may square to a unit or so past the speed's square, and is kept.
@@ -644,6 +661,7 @@ int main(void)
     TestFastSphereFarOff();
     TestSphereTie();
     TestChecks();
+    TestSpeedScaledBack();
     TestSubnormalSpeed();
     return s_failures == 0 ? 0 : 1;
 }
