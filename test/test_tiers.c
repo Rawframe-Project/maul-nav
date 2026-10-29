@@ -208,12 +208,20 @@ static void TestLinkToggles(void)
               mnavLink_GetState(navmesh, link, &state) == mnav_success && state.enabled &&
               Reach(query, navmesh, 28.0) == mnav_pathFound,
           "enabled: crossed");
+    bool enabled = false;
     CHECK(mnavLink_StageEnable(navmesh, link, false) == mnav_success &&
-              mnavLink_GetState(navmesh, link, &state) == mnav_success && state.enabled,
+              mnavLink_GetState(navmesh, link, &state) == mnav_success && state.enabled &&
+              mnavLink_IsEnabled(navmesh, link, &enabled) == mnav_success && enabled,
           "a staged toggle waits for the commit");
     CHECK(mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavLink_IsEnabled(navmesh, link, &enabled) == mnav_success && !enabled &&
               Reach(query, navmesh, 28.0) != mnav_pathFound,
           "disabled again");
+    mnavLinkId staged;
+    enabled = true;
+    CHECK(mnavStageLink(navmesh, &jump, &staged) == mnav_success &&
+              mnavLink_IsEnabled(navmesh, staged, &enabled) == mnav_errorState && !enabled,
+          "a link not yet committed has no state");
     CHECK(mnavStageLinkRemoval(navmesh, link) == mnav_success &&
               mnavLink_StageEnable(navmesh, link, true) == mnav_errorStale &&
               mnavLink_StageEnable(nullptr, link, true) == mnav_errorInvalid,

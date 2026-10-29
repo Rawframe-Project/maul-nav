@@ -162,6 +162,10 @@ static void TestNoOwner(void)
               CLEARED(link),
           "mnavLink_GetState");
     FillAll();
+    CHECK(mnavLink_IsEnabled(nullptr, (mnavLinkId){1, 1}, &s_out.flag) == mnav_errorInvalid &&
+              CLEARED(flag),
+          "mnavLink_IsEnabled");
+    FillAll();
     CHECK(mnavNavmesh_FindPolygons(nullptr, at, extents, nullptr, found, ROOM, &s_out.found) ==
                   mnav_errorInvalid &&
               CLEARED(found),
@@ -440,6 +444,10 @@ static void TestPastTheOwner(void)
     CHECK(mnavLink_GetState(navmesh, (mnavLinkId){7, 1}, &s_out.link) == mnav_errorInvalid &&
               CLEARED(link),
           "a link never handed out");
+    FillAll();
+    CHECK(mnavLink_IsEnabled(navmesh, (mnavLinkId){7, 1}, &s_out.flag) == mnav_errorInvalid &&
+              CLEARED(flag),
+          "a link never handed out, read as a switch");
     // A buffer too small defines its count: the total, past the room.
     mnavPolygonId one[1];
     FillAll();

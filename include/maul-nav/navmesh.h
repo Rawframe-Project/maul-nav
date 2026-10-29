@@ -386,6 +386,23 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavLink_StageEnable(mnavNavmesh* navmesh, mnavLinkId link,
                                                             bool enabled);
 
+    /// Reads whether an off-mesh link may be crossed, as committed: a
+    /// toggle mnavLink_StageEnable stages shows only after the next commit.
+    ///
+    /// @param navmesh    The navmesh.
+    /// @param link       The link.
+    /// @param enabledOut Receives whether it is enabled. False on any
+    ///                   failure.
+    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or an
+    /// id never handed out; `mnav_errorState` for a link staged and not yet
+    /// committed; `mnav_errorStale` for a link removed.
+    /// @par Thread safety
+    /// Safe from any thread. Any number of threads may read links and
+    /// query at once between commits; none may while a stage or commit
+    /// call runs.
+    MNAV_NODISCARD MNAV_API mnavResult mnavLink_IsEnabled(const mnavNavmesh* navmesh,
+                                                          mnavLinkId link, bool* enabledOut);
+
     /// Reads an off-mesh link as committed.
     ///
     /// @param navmesh  The navmesh.

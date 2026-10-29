@@ -399,6 +399,41 @@ mnavResult mnavLink_GetState(const mnavNavmesh* navmesh, mnavLinkId id, mnavLink
     return result;
 }
 
+static MNAV_NOINLINE mnavResult IsLinkEnabledWork(const mnavNavmesh* navmesh, mnavLinkId id,
+                                                  bool* enabledOut)
+{
+    if (navmesh == nullptr || enabledOut == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    int32_t s = -1;
+    mnavResult result = Find(navmesh, id, &s);
+    if (result == mnav_success && navmesh->links[s].phase == MNAV_LINK_ADDING)
+    {
+        result = mnav_errorState;
+    }
+    // The committed state; the link's own flag holds a staged toggle.
+    *enabledOut = result == mnav_success && navmesh->links[s].state.enabled;
+    return result;
+}
+
+static MNAV_NOINLINE mnavResult IsLinkEnabledCounted(const mnavNavmesh* navmesh, mnavLinkId id,
+                                                     bool* enabledOut)
+{
+    mnavClearOutput(enabledOut, sizeof(*enabledOut));
+    mnavResult result =
+        mnavHostCountInvalid(MNAV_HOST(navmesh), IsLinkEnabledWork(navmesh, id, enabledOut));
+    return mnavClearOnFailure(result, enabledOut, sizeof(*enabledOut));
+}
+
+mnavResult mnavLink_IsEnabled(const mnavNavmesh* navmesh, mnavLinkId id, bool* enabledOut)
+{
+    uint64_t env = mnavFloatEnvEnter();
+    mnavResult result = IsLinkEnabledCounted(navmesh, id, enabledOut);
+    mnavFloatEnvLeave(env);
+    return result;
+}
+
 // The half sizes of the box a link end snaps within: its radius on the
 // ground and the agent's step in height.
 static mnavPos3 SnapHalf(const mnavNavmesh* navmesh, float radius)
