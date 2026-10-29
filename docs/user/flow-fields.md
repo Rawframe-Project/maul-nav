@@ -7,7 +7,7 @@ When many agents share goals, one search serves them all: a flow field holds, fo
 - `mnavCreateFlowField` with a def of the most cells it covers (65,536 by default), then `mnavBuildFlowField` over an `mnavGrid` of area types, a [filter](paths.md#filters) and a set of goal cells.
 - `mnavFlowAt` gives a cell's cost and its next cell; following next cells walks a cheapest grid path, each step strictly downhill. A cell no goal reaches has an infinite cost; a cell outside the field's region is `mnav_errorOutside`.
 - Steps are the grid path's: eight neighbors, never across a blocked corner, each costing its length times the mean of its two cells' area costs. Blocked goals and goals in areas the filter leaves out are dropped.
-- **In steps.** `mnavBeginFlowField` takes a region of the grid (cells outside count as blocked), and `mnavContinueFlowField` does the work a budget of cells at a time. The field is the same for any budgets; read it when the work is done.
+- **In steps.** `mnavBeginFlowField` takes a region of the grid, an `mnavCellRange` from one corner cell to the other, both included (cells outside count as blocked), and `mnavContinueFlowField` does the work a budget of cells at a time. The field is the same for any budgets; read it when the work is done.
 - **Repairs.** When goals move or cells change area, `mnavUpdateFlowField` takes the new goals and the changed cells and repairs only what they reach, in steps too. The repaired field is the one a rebuild gives, bit for bit.
 
 ## Over a navmesh

@@ -19,16 +19,13 @@ extern "C"
 {
 #endif
 
-    /// Appends the committed tiles on a range of places: each polygon's
+    /// Appends the committed tiles on a box of places: each polygon's
     /// detail triangles (mnav_debugPolygon, its area), its edges as lines
     /// (inner edges once, walls, tile sides) and each tile's bounds on the
     /// ground at its lowest detail height.
     ///
     /// @param navmesh The navmesh.
-    /// @param tileX0  The first tile column.
-    /// @param tileZ0  The first tile row.
-    /// @param tileX1  The last tile column, at least tileX0.
-    /// @param tileZ1  The last tile row, at least tileZ0.
+    /// @param tiles   The tile places drawn, or NULL for every tile.
     /// @param buffer  The buffer appended to.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// range backward, or a buffer with a count out of range, an array
@@ -38,9 +35,9 @@ extern "C"
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it; the buffer is used by one
     /// thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavDebugNavmesh(const mnavNavmesh* navmesh, int32_t tileX0,
-                                                        int32_t tileZ0, int32_t tileX1,
-                                                        int32_t tileZ1, mnavDebugBuffer* buffer);
+    MNAV_NODISCARD MNAV_API mnavResult mnavDebugNavmesh(const mnavNavmesh* navmesh,
+                                                        const mnavTileRange* tiles,
+                                                        mnavDebugBuffer* buffer);
 
     /// Appends every committed off-mesh link as an arc of eight lines from
     /// its start to its end, rising a quarter of its length: at its

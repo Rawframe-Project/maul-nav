@@ -125,10 +125,8 @@ extern "C"
     /// @param filter    The areas links may start and land on, and walk
     ///                  through, or NULL.
     /// @param def       The def, from mnavDefaultLinkGenDef.
-    /// @param tileX0    The first tile column.
-    /// @param tileZ0    The first tile row.
-    /// @param tileX1    The last tile column, at least tileX0.
-    /// @param tileZ1    The last tile row, at least tileZ0.
+    /// @param tiles     The tile places whose edges are sampled, or NULL for
+    ///                  every tile.
     /// @param linksOut  Receives the links, up to capacity.
     /// @param capacity  The buffer's size in links, at least 0.
     /// @param countOut  Receives the number of links generated, also beyond the
@@ -159,8 +157,8 @@ extern "C"
     /// with `mnav_errorBusy` from any thread.
     MNAV_NODISCARD MNAV_API mnavResult
     mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                      const mnavLinkGenDef* def, int32_t tileX0, int32_t tileZ0, int32_t tileX1,
-                      int32_t tileZ1, mnavLinkDef* linksOut, int32_t capacity, int32_t* countOut);
+                      const mnavLinkGenDef* def, const mnavTileRange* tiles, mnavLinkDef* linksOut,
+                      int32_t capacity, int32_t* countOut);
 
 #ifdef __cplusplus
 }

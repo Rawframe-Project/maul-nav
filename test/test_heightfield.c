@@ -127,7 +127,8 @@ static uint64_t DrawHash(void)
 {
     mnavDebugBuffer buffer = {{0, 0, 0}, s_drawVertices, DRAW_ROOM, 0, s_drawTriangles, DRAW_ROOM,
                               0,         s_drawLines,    DRAW_ROOM, 0};
-    CHECK(mnavDebugNavmesh(s_navmesh, 0, 0, 1, 1, &buffer) == mnav_success, "drawn");
+    CHECK(mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 1, 1}, &buffer) == mnav_success,
+          "drawn");
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t i = 0; i < buffer.vertexCount; ++i)
     {

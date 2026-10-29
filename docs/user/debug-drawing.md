@@ -8,7 +8,7 @@ The library never draws. It fills an `mnavDebugBuffer` the host owns with vertic
 
 | Function | Draws |
 |---|---|
-| `mnavDebugNavmesh` | Polygons by area, inner edges, walls, tile sides and tile bounds, over a range of tile places. |
+| `mnavDebugNavmesh` | Polygons by area, inner edges, walls, tile sides and tile bounds, over an `mnavTileRange` of tile places, or every tile for NULL. |
 | `mnavDebugLinks` | Every off-mesh link as an arc, at its snapped ends when attached. |
 | `mnavDebugPath`, `mnavDebugCorridor` | A path's straight line; a corridor's polygons. |
 | `mnavDebugFlowField`, `mnavDebugNavFlow` | An arrow for each cell or polygon with a way on. |

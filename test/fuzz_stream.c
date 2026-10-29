@@ -205,7 +205,7 @@ typedef struct Drawing
 static mnavResult DrawTiles(void* context, mnavDebugBuffer* buffer)
 {
     const Drawing* d = context;
-    return mnavDebugNavmesh(d->run->navmesh, d->x0, d->z0, d->x1, d->z1, buffer);
+    return mnavDebugNavmesh(d->run->navmesh, &(mnavTileRange){d->x0, d->z0, d->x1, d->z1}, buffer);
 }
 
 static mnavResult DrawLinks(void* context, mnavDebugBuffer* buffer)

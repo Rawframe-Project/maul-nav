@@ -115,7 +115,8 @@ static void CallQuery(mnavQuery* q, const mnavNavmesh* n)
     Count(mnavRaycast(q, n, nullptr, p, a, a, nullptr));
     Count(mnavFindShortestPath(q, n, nullptr, p, a, p, a, nullptr));
     Count(mnavFindRandomPointAround(q, n, nullptr, p, a, 1.0, 1, nullptr));
-    Count(mnavGenerateLinks(q, n, nullptr, nullptr, 0, 0, 0, 0, nullptr, 0, nullptr));
+    Count(mnavGenerateLinks(q, n, nullptr, nullptr, &(mnavTileRange){0, 0, 0, 0}, nullptr, 0,
+                            nullptr));
     mnavDestroyQuery(q);
     s_reentry.made += 1;
 }
@@ -201,8 +202,8 @@ static int32_t Generate(void)
     mnavQuery* query = Query();
     mnavLinkGenDef gen = Def();
     int32_t count = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &gen, 0, 0, 1, 0, s_links, LINKS, &count) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &gen, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success &&
               count > 0,
           "links to stage");
     mnavDestroyQuery(query);
@@ -311,8 +312,8 @@ static void TestClearance(void)
     int32_t expected = 0;
     s_tests = 0;
     s_reenter = false;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_again, LINKS, &expected) ==
-              mnav_success,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_again,
+                            LINKS, &expected) == mnav_success,
           "links with a clearance test");
     s_reentry = (Reentry){navmesh, query, link, Polygon(navmesh), false, false, 0, 0, 0};
     uint64_t tiles = Tiles(navmesh);
@@ -321,8 +322,8 @@ static void TestClearance(void)
     int32_t count = 0;
     s_tests = 0;
     s_reenter = true;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success &&
               count == expected &&
               memcmp(s_links, s_again, (size_t)count * sizeof(s_links[0])) == 0,
           "the same links");
@@ -380,8 +381,8 @@ static void TestClearanceReads(void)
     def.context = navmesh;
     int32_t count = 0;
     s_read = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, 0, 0, 1, 0, s_links, LINKS, &count) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
+                            LINKS, &count) == mnav_success &&
               count > 0 && s_read > 0,
           "read from the test");
     CHECK(mnavGetNavmeshMisuse(navmesh) == 0 && mnavGetQueryMisuse(query) == 0 &&

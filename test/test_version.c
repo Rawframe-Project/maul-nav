@@ -220,13 +220,13 @@ static void TestCookieOnly(void)
           "a filter with a wrong cookie");
     mnavLinkGenDef linkDef = mnavDefaultLinkGenDef();
     int32_t count = -1;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &linkDef, 0, 0, 0, 0, nullptr, 0, &count) ==
-                  mnav_success &&
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &linkDef, &(mnavTileRange){0, 0, 0, 0},
+                            nullptr, 0, &count) == mnav_success &&
               count == 0,
           "a default link generation def is read");
     linkDef.cookie ^= 1u;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &linkDef, 0, 0, 0, 0, nullptr, 0, &count) ==
-              mnav_errorInvalid,
+    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &linkDef, &(mnavTileRange){0, 0, 0, 0},
+                            nullptr, 0, &count) == mnav_errorInvalid,
           "a link generation def with a wrong cookie");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);

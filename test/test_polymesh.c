@@ -131,7 +131,7 @@ static int64_t TwiceArea(void)
     mnavDebugBuffer b = {
         {0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, s_drawIndices, DRAW_ROOM, 0, nullptr, 0, 0};
     // The edges go uncounted into a buffer with no line room.
-    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the polygons fit");
     int64_t area = 0;
     for (int32_t t = 0; t < b.triangleCount / 3; ++t)
@@ -163,7 +163,7 @@ static bool CornersMeet(void)
     mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
                          s_drawIndices,   DRAW_ROOM,      0};
     // Polygon fills go uncounted into a buffer with no triangle room.
-    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     bool meet = true;
     for (int32_t l = 0; l < b.lineCount / 2; ++l)
     {
@@ -196,7 +196,7 @@ static int32_t Sides(void)
     mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
                          s_drawIndices,   DRAW_ROOM,      0};
     // Polygon fills go uncounted into a buffer with no triangle room.
-    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     int32_t count = 0;
     for (int32_t l = 0; l < b.lineCount / 2; ++l)
     {

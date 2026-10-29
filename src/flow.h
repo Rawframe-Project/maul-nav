@@ -16,6 +16,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// The cells a field covers: columns x to x + width - 1 and rows y to
+// y + height - 1 of its grid, from the mnavCellRange its work began with.
+typedef struct mnavFlowWindow
+{
+    int32_t x;
+    int32_t y;
+    int32_t width;
+    int32_t height;
+} mnavFlowWindow;
+
 // A cell's place in the heap when it is not in it: never reached, or done.
 #define MNAV_FLOW_NOT_OPEN (-1)
 #define MNAV_FLOW_DONE     (-2)
@@ -59,7 +69,7 @@ struct mnavFlowField
     int32_t fixed;
     bool repairing;
     // The work's region, its grid's size and cell size, and the filter.
-    mnavFlowRegion region;
+    mnavFlowWindow region;
     int32_t gridWidth;
     int32_t gridHeight;
     float cellSize;

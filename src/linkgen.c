@@ -388,32 +388,31 @@ static mnavResult Generate(mnavQuery* query, const mnavNavmesh* navmesh,
 
 static MNAV_NOINLINE mnavResult GenerateLinksWork(mnavQuery* query, const mnavNavmesh* navmesh,
                                                   const mnavQueryFilter* filter,
-                                                  const mnavLinkGenDef* def, int32_t tileX0,
-                                                  int32_t tileZ0, int32_t tileX1, int32_t tileZ1,
-                                                  mnavLinkDef* linksOut, int32_t capacity,
-                                                  int32_t* countOut)
+                                                  const mnavLinkGenDef* def,
+                                                  const mnavTileRange* tiles, mnavLinkDef* linksOut,
+                                                  int32_t capacity, int32_t* countOut)
 {
     if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }
-    return Generate(query, navmesh, filter, def, (mnavTileRange){tileX0, tileZ0, tileX1, tileZ1},
-                    linksOut, capacity, countOut,
+    mnavTileRange range =
+        tiles != nullptr ? *tiles : (mnavTileRange){INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX};
+    return Generate(query, navmesh, filter, def, range, linksOut, capacity, countOut,
                     (mnavLinkGenLimits){MNAV_MAX_LINKS, MNAV_MAX_LINK_LANDINGS});
 }
 
 static MNAV_NOINLINE mnavResult GenerateLinksCounted(mnavQuery* query, const mnavNavmesh* navmesh,
                                                      const mnavQueryFilter* filter,
-                                                     const mnavLinkGenDef* def, int32_t tileX0,
-                                                     int32_t tileZ0, int32_t tileX1, int32_t tileZ1,
+                                                     const mnavLinkGenDef* def,
+                                                     const mnavTileRange* tiles,
                                                      mnavLinkDef* linksOut, int32_t capacity,
                                                      int32_t* countOut)
 {
     mnavClearOutput(countOut, sizeof(*countOut));
-    mnavResult result =
-        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                             GenerateLinksWork(query, navmesh, filter, def, tileX0, tileZ0, tileX1,
-                                               tileZ1, linksOut, capacity, countOut));
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        GenerateLinksWork(query, navmesh, filter, def, tiles, linksOut, capacity, countOut));
     // Generation that stopped at a bound counts the links found, as a
     // buffer too small does.
     return result == mnav_errorLimit ? result
@@ -422,12 +421,12 @@ static MNAV_NOINLINE mnavResult GenerateLinksCounted(mnavQuery* query, const mna
 
 mnavResult mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,
                              const mnavQueryFilter* filter, const mnavLinkGenDef* def,
-                             int32_t tileX0, int32_t tileZ0, int32_t tileX1, int32_t tileZ1,
-                             mnavLinkDef* linksOut, int32_t capacity, int32_t* countOut)
+                             const mnavTileRange* tiles, mnavLinkDef* linksOut, int32_t capacity,
+                             int32_t* countOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = GenerateLinksCounted(query, navmesh, filter, def, tileX0, tileZ0, tileX1,
-                                             tileZ1, linksOut, capacity, countOut);
+    mnavResult result =
+        GenerateLinksCounted(query, navmesh, filter, def, tiles, linksOut, capacity, countOut);
     mnavFloatEnvLeave(env);
     return result;
 }

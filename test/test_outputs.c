@@ -262,8 +262,8 @@ static void TestNoOwner(void)
               CLEARED(ray),
           "mnavRaycast");
     FillAll();
-    CHECK(mnavGenerateLinks(nullptr, navmesh, nullptr, &genDef, 0, 0, 0, 0, links, ROOM,
-                            &s_out.count) == mnav_errorInvalid &&
+    CHECK(mnavGenerateLinks(nullptr, navmesh, nullptr, &genDef, &(mnavTileRange){0, 0, 0, 0}, links,
+                            ROOM, &s_out.count) == mnav_errorInvalid &&
               CLEARED(count),
           "mnavGenerateLinks");
     FillAll();
@@ -446,7 +446,7 @@ static void TestFlowOutside(void)
     mnavAreaType areas[16];
     memset(areas, 1, sizeof(areas));
     mnavGrid grid = {areas, 4, 4, 1.0f};
-    mnavFlowRegion region = {0, 0, 2, 2};
+    mnavCellRange region = {0, 0, 1, 1};
     mnavCell goal = {0, 0};
     bool ended = false;
     CHECK(mnavBeginFlowField(field, &grid, nullptr, &region, &goal, 1) == mnav_success &&
@@ -463,7 +463,7 @@ static void TestFlowOutside(void)
     CHECK(mnavCreateNavFlow(&navDef, &navFlow) == mnav_success, "a navmesh field");
     mnavPolygonId polygon = FirstPolygon(navmesh);
     mnavNavFlowGoal navGoal = {polygon, {1.0, 0.0, 1.0}};
-    mnavNavFlowRegion tiles = {0, 0, 0, 0};
+    mnavTileRange tiles = {0, 0, 0, 0};
     CHECK(mnavBeginNavFlow(navFlow, navmesh, nullptr, &tiles, &navGoal, 1) == mnav_success &&
               mnavContinueNavFlow(navFlow, navmesh, 1 << 16, &ended) == mnav_success && ended,
           "built over one tile");

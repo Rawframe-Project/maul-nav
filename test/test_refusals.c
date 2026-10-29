@@ -155,8 +155,8 @@ static void TestQueries(mnavNavmesh* navmesh)
     mnavLinkGenDef genDef = mnavDefaultLinkGenDef();
     mnavLinkDef links[4];
     int32_t count = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, &bad, &genDef, 0, 0, 1, 1, links, 4, &count) ==
-              mnav_errorInvalid,
+    CHECK(mnavGenerateLinks(query, navmesh, &bad, &genDef, &(mnavTileRange){0, 0, 1, 1}, links, 4,
+                            &count) == mnav_errorInvalid,
           "links generated with a filter not made by its default");
     // A navmesh flow field read for a polygon never handed out.
     mnavNavFlowDef def = mnavDefaultNavFlowDef();

@@ -444,7 +444,7 @@ static void TestNoHeightsFallBackAndCount(void)
                          nullptr,
                          0,
                          0};
-    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     bool level = b.vertexCount > 0;
     for (int32_t i = 0; i < b.vertexCount; ++i)
     {
@@ -574,7 +574,7 @@ static bool EveryTriangleHasArea(void)
                          0,
                          0};
     // Polygon edges go uncounted into a buffer with no line room.
-    (void)mnavDebugNavmesh(s_navmesh, 0, 0, 0, 0, &b);
+    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the triangles fit");
     bool area = b.triangleCount > 0;
     for (int32_t t = 0; t + 2 < b.triangleCount; t += 3)
