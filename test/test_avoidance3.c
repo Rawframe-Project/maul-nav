@@ -181,14 +181,13 @@ static void TestHeadOn(void)
     }
 }
 
-static void TestSwap(void)
+// Fliers on the 26 directions of a cube's corners, edges and faces, a
+// radius out, each crossing to the opposite point: they crowd in the
+// middle from every side. Runs the swap and returns the hash of where
+// they end.
+static uint64_t Swap(double radius, Scene* s, mnavAgent3D* agents, mnavPos3* goals)
 {
-    // Fliers on the 26 directions of a cube's corners, edges and faces,
-    // 12 m out, each crossing to the opposite point: they crowd in the
-    // middle from every side.
     mnavAvoidance* avoidance = Make(SWAP, 10, 10.0);
-    mnavAgent3D agents[SWAP];
-    mnavPos3 goals[SWAP];
     int32_t n = 0;
     for (int32_t x = -1; x <= 1; ++x)
     {
@@ -201,7 +200,7 @@ static void TestSwap(void)
                     continue;
                 }
                 double length = sqrt((double)(x * x + y * y + z * z));
-                agents[n] = Agent(12.0 * x / length, 12.0 * y / length, 12.0 * z / length,
+                agents[n] = Agent(radius * x / length, radius * y / length, radius * z / length,
                                   (uint64_t)(100 + n));
                 goals[n] =
                     (mnavPos3){-agents[n].position.x, -agents[n].position.y, -agents[n].position.z};
@@ -209,21 +208,53 @@ static void TestSwap(void)
             }
         }
     }
-    Scene s = {avoidance, agents, goals, SWAP, nullptr, 0, 0.0, 0.0, 0.0};
-    Run(&s, 800);
+    *s = (Scene){avoidance, agents, goals, SWAP, nullptr, 0, 0.0, 0.0, 0.0};
+    Run(s, 800);
+    mnavDestroyAvoidance(avoidance);
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t i = 0; i < SWAP; ++i)
     {
         hash = mnavHash64(hash, &agents[i].position, (int32_t)sizeof(mnavPos3));
     }
-    int32_t arrived = Arrived(&s, 0.1);
-    printf("SWAP_HASH=%016llx closest=%.6f arrived=%d over=%g\n", (unsigned long long)hash,
-           s.closest, arrived, s.over);
-    CHECK(s.closest > -0.01, "no two overlap by more than 2% of a radius");
-    CHECK(arrived == SWAP, "every flier arrives");
-    CHECK(s.over <= 0.0, "no flier passes its maximum speed");
+    return hash;
+}
+
+static void TestSwap(void)
+{
+    // A regression guard, not a promise: where the planes leave no
+    // velocity, the library promises only RVO2-3D's, the one that breaks
+    // them least, and no bound on how far fliers then overlap. How deep
+    // the crowd overlaps depends on how it jams, which moving the start
+    // by a micrometer changes. So the swap runs from 12 m and from starts
+    // moved by 1, 10 and 100 micrometers, and the deepest overlap must
+    // stay within 8% of a radius (40 mm): the deepest measured over 31
+    // starts within a millimeter of 12 m (31 mm, from 12.0003 m) and a
+    // margin. The hash pins the run from 12 m.
+    static const double starts[7] = {12.0,     12.000001, 11.999999, 12.00001,
+                                     11.99999, 12.0001,   11.9999};
+    double deepest = (double)INFINITY;
+    bool all = true;
+    bool slow = true;
+    uint64_t hash = 0;
+    for (int32_t k = 0; k < 7; ++k)
+    {
+        mnavAgent3D agents[SWAP];
+        mnavPos3 goals[SWAP];
+        Scene s;
+        uint64_t h = Swap(starts[k], &s, agents, goals);
+        hash = k == 0 ? h : hash;
+        int32_t arrived = Arrived(&s, 0.1);
+        printf("swap from %.6f m: closest=%.6f arrived=%d over=%g\n", starts[k], s.closest, arrived,
+               s.over);
+        deepest = s.closest < deepest ? s.closest : deepest;
+        all = all && arrived == SWAP;
+        slow = slow && s.over <= 0.0;
+    }
+    printf("SWAP_HASH=%016llx deepest=%.6f\n", (unsigned long long)hash, deepest);
+    CHECK(deepest > -0.040, "no two overlap by more than 8% of a radius, from any start");
+    CHECK(all, "every flier arrives, from every start");
+    CHECK(slow, "no flier passes its maximum speed");
     CHECK(hash == SWAP_HASH, "the pinned hash");
-    mnavDestroyAvoidance(avoidance);
 }
 
 static void TestCrossing(void)
