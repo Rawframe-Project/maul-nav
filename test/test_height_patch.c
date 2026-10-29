@@ -43,7 +43,7 @@ static int32_t Draw(void)
                          0,
                          0};
     // Polygon edges go uncounted into a buffer with no line room.
-    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
+    (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the triangles fit");
     return b.vertexCount;
 }
@@ -229,14 +229,14 @@ static void LoadRampLevel(const mnavBakeDef* def, int32_t turns, float top, floa
                                    MakeRampLevelTo(vertices, indices, turns, top, end), nullptr};
     const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
     UseDef(def);
-    CHECK(mnavBakeTile(s_baker, &input, 0, 0, &s_report) == mnav_success &&
-              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &s_tileSize) == mnav_success,
+    CHECK(mnavBaker_BakeTile(s_baker, &input, 0, 0, &s_report) == mnav_success &&
+              mnavBaker_CopyTile(s_baker, s_tile, TILE_ROOM, &s_tileSize) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, s_tileSize).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, s_tileSize).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
 }
 
@@ -246,8 +246,8 @@ static bool OnTheLevel(float x, float z, float y, int32_t turns)
 {
     TurnOnTile(&x, &z, turns);
     mnavNearest n;
-    CHECK(mnavFindNearest(s_navmesh, nullptr, (mnavPos3){(double)x, (double)y, (double)z},
-                          (mnavVec3){0.01f, 0.4f, 0.01f}, &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(s_navmesh, (mnavPos3){(double)x, (double)y, (double)z},
+                                  (mnavVec3){0.01f, 0.4f, 0.01f}, nullptr, &n) == mnav_success,
           "nearest");
     double off = n.point.y - (double)y;
     return n.over && off >= 0.0 && off <= 0.15;

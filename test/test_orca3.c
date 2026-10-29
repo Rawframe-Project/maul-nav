@@ -5,7 +5,7 @@
 // parallel ones included, and random ones against a search of sampled
 // velocities.
 //
-// White-box: through mnavAvoid3D the planes come from fliers' positions
+// White-box: through mnavAvoidance_Avoid3D the planes come from fliers' positions
 // and velocities, which cannot lay out a given plane; a plane program
 // that wrongly finds parallel or infeasible planes feasible lives through
 // the public avoidance suites.

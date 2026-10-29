@@ -35,9 +35,9 @@ extern "C"
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it; the buffer is used by one
     /// thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavDebugNavmesh(const mnavNavmesh* navmesh,
-                                                        const mnavTileRange* tiles,
-                                                        mnavDebugBuffer* buffer);
+    MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_Debug(const mnavNavmesh* navmesh,
+                                                         const mnavTileRange* tiles,
+                                                         mnavDebugBuffer* buffer);
 
     /// Appends every committed off-mesh link as an arc of eight lines from
     /// its start to its end, rising a quarter of its length: at its
@@ -45,19 +45,19 @@ extern "C"
     ///
     /// @param navmesh The navmesh.
     /// @param buffer  The buffer appended to.
-    /// @return As mnavDebugNavmesh.
+    /// @return As mnavNavmesh_Debug.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it; the buffer is used by one
     /// thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavDebugLinks(const mnavNavmesh* navmesh,
-                                                      mnavDebugBuffer* buffer);
+    MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_DebugLinks(const mnavNavmesh* navmesh,
+                                                              mnavDebugBuffer* buffer);
 
     /// Appends a path's straight line, point to point.
     ///
     /// @param path   The path.
     /// @param buffer The buffer appended to.
-    /// @return As mnavDebugNavmesh.
+    /// @return As mnavNavmesh_Debug.
     /// @par Thread safety
     /// Safe from any thread; the buffer is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavDebugPath(const mnavPath* path, mnavDebugBuffer* buffer);
@@ -70,15 +70,16 @@ extern "C"
     /// @param polygons The polygons.
     /// @param count    How many, at least 0.
     /// @param buffer   The buffer appended to.
-    /// @return As mnavDebugNavmesh, and `mnav_errorInvalid` for a polygon id
+    /// @return As mnavNavmesh_Debug, and `mnav_errorInvalid` for a polygon id
     /// never handed out.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it; the buffer is used by one
     /// thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavDebugCorridor(const mnavNavmesh* navmesh,
-                                                         const mnavPolygonId* polygons,
-                                                         int32_t count, mnavDebugBuffer* buffer);
+    MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_DebugCorridor(const mnavNavmesh* navmesh,
+                                                                 const mnavPolygonId* polygons,
+                                                                 int32_t count,
+                                                                 mnavDebugBuffer* buffer);
 
 #ifdef __cplusplus
 }

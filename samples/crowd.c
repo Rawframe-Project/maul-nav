@@ -60,7 +60,8 @@ int main(void)
                                       : (mnavVec2){0.0f, 0.0f};
         }
         mnavVec2 velocities[AGENTS];
-        if (mnavAvoid(avoidance, agents, AGENTS, &pillar, 1, STEP, velocities) != mnav_success)
+        if (mnavAvoidance_Avoid(avoidance, agents, AGENTS, &pillar, 1, STEP, velocities) !=
+            mnav_success)
         {
             return 1;
         }

@@ -68,7 +68,7 @@ static mnavPos3 Point(Reader* r)
 static bool Typed(mnavResult result)
 {
     // Every status the library defines has a name.
-    return strcmp(mnavResultName(result), "unknown result") != 0;
+    return strcmp(mnavGetResultName(result), "unknown result") != 0;
 }
 
 static bool Finite(mnavPos3 p)
@@ -95,9 +95,10 @@ static void BakeVariants(void)
     Expect(mnavCreateBaker(&def, &baker).result == mnav_success);
     for (int32_t t = 0; t < 4; ++t)
     {
-        Expect(mnavBakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr},
-                            t % 2, t / 2, nullptr) == mnav_success &&
-               mnavCopyBakedTile(baker, s_variants[t], VARIANT_CAPACITY, &s_variantSizes[t]) ==
+        Expect(mnavBaker_BakeTile(baker,
+                                  &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr},
+                                  t % 2, t / 2, nullptr) == mnav_success &&
+               mnavBaker_CopyTile(baker, s_variants[t], VARIANT_CAPACITY, &s_variantSizes[t]) ==
                    mnav_success);
     }
     mnavDestroyBaker(baker);
@@ -166,25 +167,25 @@ static void AfterCommit(Run* run)
     for (int32_t i = 0; i < IDS; ++i)
     {
         mnavAreaType area = 0;
-        mnavResult read = mnavGetArea(run->navmesh, run->polygons[i], &area);
+        mnavResult read = mnavPolygon_GetArea(run->navmesh, run->polygons[i], &area);
         NoteResult(run, read);
         mnavLinkState state;
-        NoteResult(run, mnavGetLink(run->navmesh, run->links[i], &state));
+        NoteResult(run, mnavLink_GetState(run->navmesh, run->links[i], &state));
     }
     if (!run->walking)
     {
         return;
     }
     int32_t valid = -1;
-    mnavResult checked = mnavCheckCorridor(run->navmesh, nullptr, &run->corridor, &valid);
+    mnavResult checked = mnavNavmesh_CheckCorridor(run->navmesh, &run->corridor, nullptr, &valid);
     NoteResult(run, checked);
     Expect(checked != mnav_success || (valid >= 0 && valid <= run->corridor.count));
     Note(run, &valid, sizeof(valid));
     if (checked == mnav_success && valid < run->corridor.count)
     {
         mnavPath path;
-        mnavResult replanned = mnavReplanCorridor(run->query, run->navmesh, nullptr, &run->corridor,
-                                                  (mnavVec3){2, 2, 2}, &path);
+        mnavResult replanned = mnavQuery_ReplanCorridor(run->query, &run->corridor, run->navmesh,
+                                                        (mnavVec3){2, 2, 2}, nullptr, &path);
         NotePath(run, replanned, &path);
         Expect(run->corridor.count >= 0 && run->corridor.count <= CORRIDOR);
     }
@@ -205,20 +206,20 @@ typedef struct Drawing
 static mnavResult DrawTiles(void* context, mnavDebugBuffer* buffer)
 {
     const Drawing* d = context;
-    return mnavDebugNavmesh(d->run->navmesh, &(mnavTileRange){d->x0, d->z0, d->x1, d->z1}, buffer);
+    return mnavNavmesh_Debug(d->run->navmesh, &(mnavTileRange){d->x0, d->z0, d->x1, d->z1}, buffer);
 }
 
 static mnavResult DrawLinks(void* context, mnavDebugBuffer* buffer)
 {
     const Drawing* d = context;
-    return mnavDebugLinks(d->run->navmesh, buffer);
+    return mnavNavmesh_DebugLinks(d->run->navmesh, buffer);
 }
 
 static mnavResult DrawCorridor(void* context, mnavDebugBuffer* buffer)
 {
     const Drawing* d = context;
-    return mnavDebugCorridor(d->run->navmesh, d->run->corridor.polygons, d->run->corridor.count,
-                             buffer);
+    return mnavNavmesh_DebugCorridor(d->run->navmesh, d->run->corridor.polygons,
+                                     d->run->corridor.count, buffer);
 }
 
 static mnavResult DrawPath(void* context, mnavDebugBuffer* buffer)
@@ -248,13 +249,15 @@ static void Step(Run* run, Reader* r)
     {
         int32_t t = Byte(r) % 4;
         bool variant = (pick & 1) != 0;
-        mnavTileResult staged = mnavStageTile(run->navmesh, variant ? s_variants[t] : s_tiles[t],
-                                              variant ? s_variantSizes[t] : s_sizes[t]);
+        mnavTileResult staged =
+            mnavNavmesh_StageTile(run->navmesh, variant ? s_variants[t] : s_tiles[t],
+                                  variant ? s_variantSizes[t] : s_sizes[t]);
         NoteResult(run, staged.result);
     }
     else if (op == 1)
     {
-        NoteResult(run, mnavStageTileRemoval(run->navmesh, Byte(r) % 4 - 1, Byte(r) % 4 - 1));
+        NoteResult(run,
+                   mnavNavmesh_StageTileRemoval(run->navmesh, Byte(r) % 4 - 1, Byte(r) % 4 - 1));
     }
     else if (op == 2)
     {
@@ -270,23 +273,24 @@ static void Step(Run* run, Reader* r)
     }
     else if (op == 4)
     {
-        NoteResult(run, mnavStageLinkEnabled(run->navmesh, run->links[k], (pick & 8) != 0));
+        NoteResult(run, mnavLink_StageEnable(run->navmesh, run->links[k], (pick & 8) != 0));
     }
     else if (op == 5)
     {
-        NoteResult(run, mnavStageArea(run->navmesh, run->polygons[k], (mnavAreaType)(pick % 4)));
+        NoteResult(run,
+                   mnavPolygon_StageArea(run->navmesh, run->polygons[k], (mnavAreaType)(pick % 4)));
     }
     else if (op <= 7)
     {
-        mnavResult committed = mnavCommit(run->navmesh);
+        mnavResult committed = mnavNavmesh_Commit(run->navmesh);
         NoteResult(run, committed);
         AfterCommit(run);
     }
     else if (op == 8)
     {
         mnavNearest nearest = {0};
-        mnavResult found = mnavFindNearest(run->navmesh, nullptr, Point(r),
-                                           (mnavVec3){2.0f, 2.0f, 2.0f}, &nearest);
+        mnavResult found = mnavNavmesh_FindNearest(run->navmesh, Point(r),
+                                                   (mnavVec3){2.0f, 2.0f, 2.0f}, nullptr, &nearest);
         NoteResult(run, found);
         if (found == mnav_success && nearest.polygon.slot != 0)
         {
@@ -298,8 +302,9 @@ static void Step(Run* run, Reader* r)
     {
         int32_t j = Byte(r) % IDS;
         mnavPath path;
-        mnavResult found = mnavFindPath(run->query, run->navmesh, nullptr, run->polygons[k],
-                                        run->points[k], run->polygons[j], run->points[j], &path);
+        mnavResult found =
+            mnavQuery_FindPath(run->query, run->navmesh, run->polygons[k], run->points[k],
+                               run->polygons[j], run->points[j], nullptr, &path);
         NotePath(run, found, &path);
         if (found == mnav_success && (pick & 16) != 0)
         {
@@ -321,8 +326,8 @@ static void Step(Run* run, Reader* r)
     else if (run->walking)
     {
         mnavMove move;
-        mnavResult moved =
-            mnavMoveCorridor(run->query, run->navmesh, nullptr, &run->corridor, Point(r), &move);
+        mnavResult moved = mnavQuery_MoveCorridor(run->query, &run->corridor, run->navmesh,
+                                                  Point(r), nullptr, &move);
         NoteResult(run, moved);
         Expect(moved != mnav_success || Finite(move.point));
         Expect(run->corridor.count >= 0 && run->corridor.count <= CORRIDOR);

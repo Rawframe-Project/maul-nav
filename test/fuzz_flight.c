@@ -178,7 +178,7 @@ static mnavFlightVolume* Bake(Input* in)
     def.ceiling = 16.0f;
     uint8_t flags = Next(in);
     def.radius = (float)(flags % 3) * 0.75f;
-    def.groundBelow = (flags & 4) != 0;
+    def.enableGroundFill = (flags & 4) != 0;
     mnavTriangleMesh scene = Scene(in);
     mnavBakeInput input = {&scene, 1, nullptr, 0, nullptr, 0, nullptr};
     mnavFlightBaker* baker = nullptr;
@@ -189,11 +189,11 @@ static mnavFlightVolume* Bake(Input* in)
     for (int32_t t = 0; t < 4; ++t)
     {
         size_t size = 0;
-        Expect(mnavBakeFlightTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success);
-        Expect(mnavCopyFlightTile(baker, bytes, TILE_BYTES, &size) == mnav_success);
-        Expect(mnavStageFlightTile(volume, bytes, size).result == mnav_success);
+        Expect(mnavFlightBaker_BakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success);
+        Expect(mnavFlightBaker_CopyTile(baker, bytes, TILE_BYTES, &size) == mnav_success);
+        Expect(mnavFlightVolume_StageTile(volume, bytes, size).result == mnav_success);
     }
-    Expect(mnavCommitFlight(volume) == mnav_success);
+    Expect(mnavFlightVolume_Commit(volume) == mnav_success);
     mnavDestroyFlightBaker(baker);
     for (int32_t x = 0; x < SIDE; ++x)
     {
@@ -202,8 +202,8 @@ static mnavFlightVolume* Bake(Input* in)
             for (int32_t z = 0; z < SIDE; ++z)
             {
                 bool open = false;
-                Expect(mnavIsFlightOpen(volume, (mnavPos3){x + 0.5, y + 0.5, z + 0.5}, &open) ==
-                       mnav_success);
+                Expect(mnavFlightVolume_IsOpen(volume, (mnavPos3){x + 0.5, y + 0.5, z + 0.5},
+                                               &open) == mnav_success);
                 s_open[x][y][z] = open;
             }
         }
@@ -313,12 +313,12 @@ static void CheckSlices(mnavQuery* query, const mnavFlightVolume* volume, mnavPo
     memcpy(whole, once->points, (size_t)once->pointCount * sizeof(mnavPos3));
     mnavFlightPath sliced;
     bool ended = false;
-    Expect(mnavBeginFlightPath(query, volume, a, b) == mnav_success);
+    Expect(mnavQuery_BeginFlightPath(query, volume, a, b) == mnav_success);
     while (!ended)
     {
-        Expect(mnavContinueFlightPath(query, volume, nodes, &ended) == mnav_success);
+        Expect(mnavQuery_ContinueFlightPath(query, volume, nodes, &ended) == mnav_success);
     }
-    Expect(mnavFinishFlightPath(query, volume, &sliced) == mnav_success);
+    Expect(mnavQuery_FinishFlightPath(query, volume, &sliced) == mnav_success);
     Expect(sliced.end == once->end && sliced.length == once->length &&
            sliced.pointCount == once->pointCount &&
            memcmp(sliced.points, whole, (size_t)once->pointCount * sizeof(mnavPos3)) == 0);
@@ -328,9 +328,9 @@ static void CheckPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3
                       int32_t slice)
 {
     mnavFlightPath path;
-    Expect(mnavFindFlightPath(query, volume, a, b, &path) == mnav_success);
+    Expect(mnavQuery_FindFlightPath(query, volume, a, b, &path) == mnav_success);
     CheckSlices(query, volume, a, b, &path, slice);
-    Expect(mnavFindFlightPath(query, volume, a, b, &path) == mnav_success);
+    Expect(mnavQuery_FindFlightPath(query, volume, a, b, &path) == mnav_success);
     int32_t va[3];
     int32_t vb[3];
     Voxel(a, va);
@@ -365,12 +365,12 @@ static void CheckPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3
     mnavDebugBuffer buffer = {{0.0, 0.0, 0.0}, vertices, 1 << 15, 0, nullptr, 0, 0,
                               lines,           1 << 15,  0};
     Expect(mnavDebugFlightPath(&path, &buffer) == mnav_success && buffer.lineCount == 2 * last);
-    mnavResult drawn = mnavDebugFlight(volume, (mnavPos3){a.x - 4.0, a.y - 4.0, a.z - 4.0},
-                                       (mnavPos3){a.x + 4.0, a.y + 4.0, a.z + 4.0}, &buffer);
+    mnavResult drawn = mnavFlightVolume_Debug(volume, (mnavPos3){a.x - 4.0, a.y - 4.0, a.z - 4.0},
+                                              (mnavPos3){a.x + 4.0, a.y + 4.0, a.z + 4.0}, &buffer);
     Expect(drawn == mnav_success || drawn == mnav_errorCapacity || drawn == mnav_errorLimit);
     // A path found is clear by the path check too.
     int32_t step = 0;
-    Expect(mnavCheckFlightPath(volume, path.points, path.pointCount, &step, nullptr) ==
+    Expect(mnavFlightVolume_CheckPath(volume, path.points, path.pointCount, &step, nullptr) ==
                mnav_success &&
            step == -1);
 }
@@ -378,7 +378,7 @@ static void CheckPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3
 static void CheckRaycast(const mnavFlightVolume* volume, mnavPos3 a, mnavPos3 b)
 {
     mnavFlightHit hit;
-    Expect(mnavFlightRaycast(volume, a, b, &hit) == mnav_success);
+    Expect(mnavFlightVolume_Raycast(volume, a, b, &hit) == mnav_success);
     double step = 0.0;
     int32_t held = 0;
     double first = FirstStop(a, b, &step, &held);
@@ -405,7 +405,7 @@ static void CheckNearest(const mnavFlightVolume* volume, mnavPos3 p, float radiu
 {
     mnavPos3 nearest;
     bool found = false;
-    Expect(mnavFindNearestFlightPoint(volume, p, radius, &nearest, &found) == mnav_success);
+    Expect(mnavFlightVolume_FindNearestPoint(volume, p, radius, &nearest, &found) == mnav_success);
     double best = (double)INFINITY;
     for (int32_t x = 0; x < SIDE; ++x)
     {
@@ -427,7 +427,7 @@ static void CheckNearest(const mnavFlightVolume* volume, mnavPos3 p, float radiu
     if (found)
     {
         bool open = false;
-        Expect(mnavIsFlightOpen(volume, nearest, &open) == mnav_success && open);
+        Expect(mnavFlightVolume_IsOpen(volume, nearest, &open) == mnav_success && open);
         Expect(Length(p, nearest) <= (double)radius + 2e-3 && Length(p, nearest) <= best + 2e-3);
     }
     else

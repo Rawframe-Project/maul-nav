@@ -15,7 +15,7 @@
 
 // Where generation stops with mnav_errorLimit: past links found, or at a
 // landing box meeting more than landings polygons, at most
-// MNAV_MAX_LINK_LANDINGS. mnavGenerateLinks gives MNAV_MAX_LINKS and
+// MNAV_MAX_LINK_LANDINGS. mnavQuery_GenerateLinks gives MNAV_MAX_LINKS and
 // MNAV_MAX_LINK_LANDINGS.
 typedef struct mnavLinkGenLimits
 {
@@ -23,7 +23,7 @@ typedef struct mnavLinkGenLimits
     int32_t landings;
 } mnavLinkGenLimits;
 
-// mnavGenerateLinks over a range, within the limits given.
+// mnavQuery_GenerateLinks over a range, within the limits given.
 mnavResult mnavGenerateLinksWithin(mnavQuery* query, const mnavNavmesh* navmesh,
                                    const mnavQueryFilter* filter, const mnavLinkGenDef* def,
                                    mnavTileRange range, mnavLinkDef* linksOut, int32_t capacity,

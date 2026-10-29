@@ -100,7 +100,7 @@ static bool Finite(mnavPos3 p)
 static bool Typed(mnavResult result)
 {
     // Every status the library defines has a name.
-    return strcmp(mnavResultName(result), "unknown result") != 0;
+    return strcmp(mnavGetResultName(result), "unknown result") != 0;
 }
 
 static bool SameId(mnavPolygonId a, mnavPolygonId b)
@@ -153,7 +153,7 @@ static mnavNavmesh* Navmesh(Reader* r)
     {
         if ((tiles >> t & 1) == 0 || t == 0)
         {
-            Expect(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success);
+            Expect(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success);
         }
     }
     int32_t links = Byte(r) % (MOST_LINKS + 1);
@@ -163,7 +163,7 @@ static mnavNavmesh* Navmesh(Reader* r)
         mnavLinkId id;
         Expect(Typed(mnavStageLink(navmesh, &link, &id)));
     }
-    mnavResult committed = mnavCommit(navmesh);
+    mnavResult committed = mnavNavmesh_Commit(navmesh);
     Expect(Typed(committed));
     if (committed != mnav_success)
     {
@@ -177,7 +177,7 @@ static mnavPolygonId Near(const mnavNavmesh* navmesh, mnavPos3 at, mnavPos3* poi
 {
     mnavNearest nearest = {0};
     mnavResult result =
-        mnavFindNearest(navmesh, nullptr, at, (mnavVec3){3.0f, 4.0f, 3.0f}, &nearest);
+        mnavNavmesh_FindNearest(navmesh, at, (mnavVec3){3.0f, 4.0f, 3.0f}, nullptr, &nearest);
     Expect(Typed(result));
     *pointOut = nearest.point;
     return nearest.polygon;
@@ -216,7 +216,7 @@ static mnavHierarchy* Hierarchy(const mnavHierarchyDef* def, mnavQuery* query,
 {
     mnavHierarchy* h = nullptr;
     Expect(mnavCreateHierarchy(def, &h) == mnav_success);
-    *resultOut = mnavBuildHierarchy(h, query, navmesh, filter, reportOut);
+    *resultOut = mnavHierarchy_Build(h, query, navmesh, filter, reportOut);
     Expect(Typed(*resultOut));
     return h;
 }
@@ -238,11 +238,13 @@ static void Hierarchies(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
     mnavPolygonId from = Near(navmesh, Point(r), &start);
     mnavPolygonId to = Near(navmesh, Point(r), &end);
     mnavPath path = {0};
-    mnavResult first = mnavFindHierarchicalPath(query, h, navmesh, from, start, to, end, &path);
+    mnavResult first =
+        mnavQuery_FindHierarchicalPath(query, h, navmesh, from, start, to, end, &path);
     CheckPath(first, &path);
     KeepPoints(first, &path, 0);
     int32_t count = path.pointCount;
-    mnavResult again = mnavFindHierarchicalPath(query, h, navmesh, from, start, to, end, &path);
+    mnavResult again =
+        mnavQuery_FindHierarchicalPath(query, h, navmesh, from, start, to, end, &path);
     Expect(again == first);
     Expect(first != mnav_success ||
            (path.pointCount == count &&
@@ -251,11 +253,11 @@ static void Hierarchies(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
     mnavPos3 at;
     mnavPolygonId changed = Near(navmesh, Point(r), &at);
     if (result == mnav_success && changed.slot != 0 &&
-        mnavStageArea(navmesh, changed, (mnavAreaType)(Byte(r) % 4)) == mnav_success)
+        mnavPolygon_StageArea(navmesh, changed, (mnavAreaType)(Byte(r) % 4)) == mnav_success)
     {
-        Expect(mnavCommit(navmesh) == mnav_success);
+        Expect(mnavNavmesh_Commit(navmesh) == mnav_success);
         mnavHierarchyReport updated;
-        mnavResult up = mnavUpdateHierarchy(h, query, navmesh, &updated);
+        mnavResult up = mnavHierarchy_Update(h, query, navmesh, &updated);
         Expect(Typed(up));
         mnavHierarchyReport fresh;
         mnavResult made;
@@ -266,13 +268,13 @@ static void Hierarchies(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
             Expect(updated.clusters == fresh.clusters && updated.transitions == fresh.transitions &&
                    updated.edges == fresh.edges);
             mnavResult ra =
-                mnavFindHierarchicalPath(query, h, navmesh, from, start, to, end, &path);
+                mnavQuery_FindHierarchicalPath(query, h, navmesh, from, start, to, end, &path);
             CheckPath(ra, &path);
             KeepPoints(ra, &path, 1);
             int32_t n = path.pointCount;
             mnavPathEnd ended = path.end;
-            mnavResult rb =
-                mnavFindHierarchicalPath(query, rebuilt, navmesh, from, start, to, end, &path);
+            mnavResult rb = mnavQuery_FindHierarchicalPath(query, rebuilt, navmesh, from, start, to,
+                                                           end, &path);
             Expect(ra == rb);
             Expect(ra != mnav_success ||
                    (path.end == ended && path.pointCount == n &&
@@ -299,7 +301,7 @@ typedef struct FieldDrawing
 static mnavResult DrawField(void* context, mnavDebugBuffer* buffer)
 {
     const FieldDrawing* d = context;
-    return mnavDebugNavFlow(d->field, d->navmesh, buffer);
+    return mnavNavFlow_Debug(d->field, d->navmesh, buffer);
 }
 
 static void Fields(Reader* r, const mnavNavmesh* navmesh, const mnavQueryFilter* filter)
@@ -320,14 +322,14 @@ static void Fields(Reader* r, const mnavNavmesh* navmesh, const mnavQueryFilter*
         goals[g].polygon = Near(navmesh, Point(r), &goals[g].point);
         goals[g].point = Byte(r) % 8 == 0 ? Point(r) : goals[g].point;
     }
-    mnavResult built = mnavBuildNavFlow(whole, navmesh, filter, goals, goalCount);
+    mnavResult built = mnavNavFlow_Build(whole, navmesh, goals, goalCount, filter);
     Expect(Typed(built));
-    mnavResult begun = mnavBeginNavFlow(stepped, navmesh, filter, nullptr, goals, goalCount);
+    mnavResult begun = mnavNavFlow_Begin(stepped, navmesh, nullptr, goals, goalCount, filter);
     Expect(begun == built);
     bool ended = begun != mnav_success;
     for (int32_t step = 0; !ended && step < 100000; ++step)
     {
-        Expect(mnavContinueNavFlow(stepped, navmesh, 1 + Byte(r) % 32, &ended) == mnav_success);
+        Expect(mnavNavFlow_Continue(stepped, navmesh, 1 + Byte(r) % 32, &ended) == mnav_success);
     }
     Expect(ended);
     for (int32_t p = 0; built == mnav_success && p < PROBES; ++p)
@@ -336,8 +338,8 @@ static void Fields(Reader* r, const mnavNavmesh* navmesh, const mnavQueryFilter*
         mnavPolygonId polygon = Near(navmesh, Point(r), &at);
         mnavPolygonFlow a;
         mnavPolygonFlow b;
-        mnavResult ra = mnavNavFlowAt(whole, navmesh, polygon, &a);
-        Expect(Typed(ra) && mnavNavFlowAt(stepped, navmesh, polygon, &b) == ra);
+        mnavResult ra = mnavNavFlow_GetFlow(whole, navmesh, polygon, &a);
+        Expect(Typed(ra) && mnavNavFlow_GetFlow(stepped, navmesh, polygon, &b) == ra);
         if (ra != mnav_success)
         {
             continue;
@@ -346,7 +348,7 @@ static void Fields(Reader* r, const mnavNavmesh* navmesh, const mnavQueryFilter*
         if (isfinite(a.cost) && a.next.slot != 0)
         {
             mnavPolygonFlow next;
-            Expect(mnavNavFlowAt(whole, navmesh, a.next, &next) == mnav_success &&
+            Expect(mnavNavFlow_GetFlow(whole, navmesh, a.next, &next) == mnav_success &&
                    next.cost <= a.cost);
         }
     }
@@ -354,12 +356,12 @@ static void Fields(Reader* r, const mnavNavmesh* navmesh, const mnavQueryFilter*
     Draw(DrawField, &drawing, Byte(r), Byte(r), Byte(r));
     // A region from the bytes, perhaps backward or outside the world.
     mnavTileRange region = {Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1, Byte(r) % 4 - 1};
-    begun = mnavBeginNavFlow(stepped, navmesh, filter, &region, goals, goalCount);
+    begun = mnavNavFlow_Begin(stepped, navmesh, &region, goals, goalCount, filter);
     Expect(Typed(begun));
     ended = begun != mnav_success;
     for (int32_t step = 0; !ended && step < 100000; ++step)
     {
-        Expect(mnavContinueNavFlow(stepped, navmesh, 1 + Byte(r) % 32, &ended) == mnav_success);
+        Expect(mnavNavFlow_Continue(stepped, navmesh, 1 + Byte(r) % 32, &ended) == mnav_success);
     }
     Expect(ended);
     mnavDestroyNavFlow(stepped);
@@ -405,7 +407,7 @@ static void Generate(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
         def.jumpKind = (mnavLinkKind)(Byte(r) % MNAV_LINK_KINDS);
     }
     uint8_t seed = Byte(r);
-    def.clear = pick % 4 == 1 ? Clear : nullptr;
+    def.clearance = pick % 4 == 1 ? Clear : nullptr;
     def.context = &seed;
     int32_t x0 = Byte(r) % 4 - 1;
     int32_t z0 = Byte(r) % 4 - 1;
@@ -416,9 +418,8 @@ static void Generate(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
     mnavResult results[2];
     for (int32_t k = 0; k < 2; ++k)
     {
-        results[k] =
-            mnavGenerateLinks(query, navmesh, filter, &def, &(mnavTileRange){x0, z0, x1, z1},
-                              s_links[k], capacity, &counts[k]);
+        results[k] = mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){x0, z0, x1, z1},
+                                             filter, s_links[k], capacity, &counts[k]);
         Expect(Typed(results[k]));
     }
     Expect(results[0] == results[1]);
@@ -439,7 +440,7 @@ static void Generate(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
         mnavLinkId id;
         Expect(Typed(mnavStageLink(navmesh, &s_links[0][i], &id)));
     }
-    Expect(Typed(mnavCommit(navmesh)));
+    Expect(Typed(mnavNavmesh_Commit(navmesh)));
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)

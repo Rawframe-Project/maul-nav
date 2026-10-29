@@ -926,10 +926,10 @@ static MNAV_NOINLINE mnavResult FindShortestPathCounted(mnavQuery* query,
     return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
-mnavResult mnavFindShortestPath(mnavQuery* query, const mnavNavmesh* navmesh,
-                                const mnavQueryFilter* filter, mnavPolygonId startPolygon,
-                                mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
-                                mnavPath* pathOut)
+mnavResult mnavQuery_FindShortestPath(mnavQuery* query, const mnavNavmesh* navmesh,
+                                      mnavPolygonId startPolygon, mnavPos3 start,
+                                      mnavPolygonId endPolygon, mnavPos3 end,
+                                      const mnavQueryFilter* filter, mnavPath* pathOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = FindShortestPathCounted(query, navmesh, filter, startPolygon, start,

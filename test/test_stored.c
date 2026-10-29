@@ -72,7 +72,7 @@ static mnavFlightDef FlightDef(void)
     def.floor = -2.0f;
     def.ceiling = 20.0f;
     def.radius = 0.5f;
-    def.groundBelow = true;
+    def.enableGroundFill = true;
     return def;
 }
 
@@ -132,9 +132,9 @@ static int Write(void)
     size_t size = 0;
     for (int32_t t = 0; t < 4; ++t)
     {
-        if (mnavBakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr}, t & 1,
-                         t >> 1, nullptr) != mnav_success ||
-            mnavCopyBakedTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
+        if (mnavBaker_BakeTile(baker, &(mnavBakeInput){&world, 1, nullptr, 0, nullptr, 0, nullptr},
+                               t & 1, t >> 1, nullptr) != mnav_success ||
+            mnavBaker_CopyTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
         {
             return 1;
         }
@@ -143,8 +143,8 @@ static int Write(void)
     }
     const mnavTerrain terrain = Terrain();
     const mnavBakeInput terrainInput = {nullptr, 0, &terrain, 1, nullptr, 0, nullptr};
-    if (mnavBakeTile(baker, &terrainInput, 0, 0, nullptr) != mnav_success ||
-        mnavCopyBakedTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
+    if (mnavBaker_BakeTile(baker, &terrainInput, 0, 0, nullptr) != mnav_success ||
+        mnavBaker_CopyTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
     {
         return 1;
     }
@@ -152,9 +152,9 @@ static int Write(void)
     const mnavTriangleMesh trench = Trench();
     for (int32_t t = 0; t < 2; ++t)
     {
-        if (mnavBakeTile(baker, &(mnavBakeInput){&trench, 1, nullptr, 0, nullptr, 0, nullptr}, t, 0,
-                         nullptr) != mnav_success ||
-            mnavCopyBakedTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
+        if (mnavBaker_BakeTile(baker, &(mnavBakeInput){&trench, 1, nullptr, 0, nullptr, 0, nullptr},
+                               t, 0, nullptr) != mnav_success ||
+            mnavBaker_CopyTile(baker, bytes, sizeof(bytes), &size) != mnav_success)
         {
             return 1;
         }
@@ -170,10 +170,10 @@ static int Write(void)
     }
     for (int32_t t = 0; t < 2; ++t)
     {
-        if (mnavBakeTile(doorwayBaker,
-                         &(mnavBakeInput){&doorway, 1, nullptr, 0, nullptr, 0, nullptr}, t, 0,
-                         nullptr) != mnav_success ||
-            mnavCopyBakedTile(doorwayBaker, bytes, sizeof(bytes), &size) != mnav_success)
+        if (mnavBaker_BakeTile(doorwayBaker,
+                               &(mnavBakeInput){&doorway, 1, nullptr, 0, nullptr, 0, nullptr}, t, 0,
+                               nullptr) != mnav_success ||
+            mnavBaker_CopyTile(doorwayBaker, bytes, sizeof(bytes), &size) != mnav_success)
         {
             return 1;
         }
@@ -183,8 +183,8 @@ static int Write(void)
     mnavDestroyBaker(doorwayBaker);
     for (int32_t t = 0; t < 4; ++t)
     {
-        if (mnavBakeFlightTile(flightBaker, &input, t & 1, t >> 1, nullptr) != mnav_success ||
-            mnavCopyFlightTile(flightBaker, bytes, sizeof(bytes), &size) != mnav_success)
+        if (mnavFlightBaker_BakeTile(flightBaker, &input, t & 1, t >> 1, nullptr) != mnav_success ||
+            mnavFlightBaker_CopyTile(flightBaker, bytes, sizeof(bytes), &size) != mnav_success)
         {
             return 1;
         }
@@ -216,10 +216,10 @@ static void TestFormat1(void)
     CHECK(mnavCreateFlightVolume(&flightDef, &volume).result == mnav_success, "a flight volume");
     for (int32_t k = 0; k < 2; ++k)
     {
-        mnavTileResult got = mnavStageTile(navmesh, grounds[k], groundSizes[k]);
+        mnavTileResult got = mnavNavmesh_StageTile(navmesh, grounds[k], groundSizes[k]);
         CHECK(got.result == mnav_errorVersion && got.section == mnav_tileHeader,
               "a format 1 tile refused as another version");
-        got = mnavStageFlightTile(volume, flights[k], flightSizes[k]);
+        got = mnavFlightVolume_StageTile(volume, flights[k], flightSizes[k]);
         CHECK(got.result == mnav_errorVersion && got.section == mnav_tileHeader,
               "a format 1 flight tile refused as another version");
     }
@@ -259,10 +259,10 @@ static uint64_t Path(const mnavNavmesh* navmesh, mnavPos3 from, mnavPos3 to)
     mnavNearest end;
     mnavPath path;
     uint64_t hash = 0;
-    if (mnavFindNearest(navmesh, nullptr, from, box, &start) == mnav_success &&
-        mnavFindNearest(navmesh, nullptr, to, box, &end) == mnav_success &&
-        mnavFindPath(query, navmesh, nullptr, start.polygon, start.point, end.polygon, end.point,
-                     &path) == mnav_success &&
+    if (mnavNavmesh_FindNearest(navmesh, from, box, nullptr, &start) == mnav_success &&
+        mnavNavmesh_FindNearest(navmesh, to, box, nullptr, &end) == mnav_success &&
+        mnavQuery_FindPath(query, navmesh, start.polygon, start.point, end.polygon, end.point,
+                           nullptr, &path) == mnav_success &&
         path.end == mnav_pathFound)
     {
         hash = HashPoints(MNAV_HASH_INIT, path.points, path.pointCount);
@@ -282,10 +282,10 @@ static uint64_t GroundHash(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_grounds[t], s_groundSizes[t]).result == mnav_success,
+        CHECK(mnavNavmesh_StageTile(navmesh, s_grounds[t], s_groundSizes[t]).result == mnav_success,
               "a stored ground tile staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     uint64_t hash = Path(navmesh, (mnavPos3){2.0, 0.0, 2.0}, (mnavPos3){62.0, 0.0, 62.0});
     mnavDestroyNavmesh(navmesh);
     return hash;
@@ -306,16 +306,16 @@ static uint64_t TerrainHash(void)
     mnavBakeDef def = GroundDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
-    CHECK(mnavStageTile(navmesh, s_terrain, sizeof(s_terrain)).result == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, s_terrain, sizeof(s_terrain)).result == mnav_success,
           "the stored terrain tile staged");
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     uint64_t hash = Path(navmesh, (mnavPos3){1.0, 1.5, 12.0}, (mnavPos3){30.0, 5.0, 12.0});
     mnavNearest on;
     const mnavVec3 box = {1.0f, 4.0f, 1.0f};
     double height = 0.0;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){10.0, 3.0, 25.0}, box, &on) ==
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){10.0, 3.0, 25.0}, box, nullptr, &on) ==
                   mnav_success &&
-              mnavGetHeight(navmesh, on.polygon, 10.0, 25.0, &height) == mnav_success,
+              mnavPolygon_GetHeight(navmesh, on.polygon, 10.0, 25.0, &height) == mnav_success,
           "a height on the slope");
     hash = mnavHash64(hash, &height, (int32_t)sizeof(height));
     mnavDestroyNavmesh(navmesh);
@@ -340,24 +340,26 @@ static uint64_t FlightHash(void)
     CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success, "a flight volume");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageFlightTile(volume, s_flights[t], s_flightSizes[t]).result == mnav_success,
+        CHECK(mnavFlightVolume_StageTile(volume, s_flights[t], s_flightSizes[t]).result ==
+                  mnav_success,
               "a stored flight tile staged");
     }
-    CHECK(mnavCommitFlight(volume) == mnav_success, "committed");
+    CHECK(mnavFlightVolume_Commit(volume) == mnav_success, "committed");
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success, "a query");
     mnavFlightPath path;
     uint64_t hash = 0;
-    if (mnavFindFlightPath(query, volume, (mnavPos3){2.0, 1.0, 2.0}, (mnavPos3){62.0, 1.0, 62.0},
-                           &path) == mnav_success &&
+    if (mnavQuery_FindFlightPath(query, volume, (mnavPos3){2.0, 1.0, 2.0},
+                                 (mnavPos3){62.0, 1.0, 62.0}, &path) == mnav_success &&
         path.end == mnav_pathFound)
     {
         hash = HashPoints(MNAV_HASH_INIT, path.points, path.pointCount);
         hash = mnavHash64(hash, &path.length, (int32_t)sizeof(path.length));
     }
     bool open = true;
-    CHECK(mnavIsFlightOpen(volume, (mnavPos3){31.0, 0.5, 11.0}, &open) == mnav_success && !open,
+    CHECK(mnavFlightVolume_IsOpen(volume, (mnavPos3){31.0, 0.5, 11.0}, &open) == mnav_success &&
+              !open,
           "inside a box, closed");
     mnavDestroyQuery(query);
     mnavDestroyFlightVolume(volume);

@@ -132,8 +132,8 @@ static void Run(Scene* s, int32_t steps)
     for (int32_t step = 0; step < steps; ++step)
     {
         Prefer(s->agents, s->goals, s->count);
-        CHECK(mnavAvoid3D(s->avoidance, s->agents, s->count, s->spheres, s->sphereCount, 0.1,
-                          velocities) == mnav_success,
+        CHECK(mnavAvoidance_Avoid3D(s->avoidance, s->agents, s->count, s->spheres, s->sphereCount,
+                                    0.1, velocities) == mnav_success,
               "stepped");
         for (int32_t i = 0; i < s->count; ++i)
         {
@@ -324,10 +324,11 @@ static void TestAnyOrder(void)
                              {{2.0, 1.0, -1.0}, 0.5, {0.5, 0.0, 0.0}, 8, 0}};
     mnavVec3 forward[MOST];
     mnavVec3 backward[MOST];
-    CHECK(mnavAvoid3D(avoidance, agents, MOST, spheres, 2, 0.1, forward) == mnav_success,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, MOST, spheres, 2, 0.1, forward) == mnav_success,
           "forward");
     mnavSphere swapped[2] = {spheres[1], spheres[0]};
-    CHECK(mnavAvoid3D(avoidance, reversed, MOST, swapped, 2, 0.1, backward) == mnav_success,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, reversed, MOST, swapped, 2, 0.1, backward) ==
+              mnav_success,
           "backward");
     bool same = true;
     for (int32_t i = 0; i < MOST; ++i)
@@ -352,7 +353,8 @@ static void TestPriority(void)
     for (int32_t step = 0; step < 200; ++step)
     {
         Prefer(agents, goals, 2);
-        CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_success,
+        CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, nullptr, 0, 0.1, velocities) ==
+                  mnav_success,
               "stepped");
         for (int32_t i = 0; i < 2; ++i)
         {
@@ -376,7 +378,7 @@ static void TestOneSpot(void)
     mnavAvoidance* avoidance = Make(16, 10, 2.0);
     mnavAgent3D agents[2] = {Agent(1.0, 2.0, 3.0, 1), Agent(1.0, 2.0, 3.0, 2)};
     mnavVec3 velocities[2];
-    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_success,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_success,
           "stepped");
     CHECK((double)velocities[0].x < 0.0 && (double)velocities[1].x > 0.0, "opposite ways");
     mnavDestroyAvoidance(avoidance);
@@ -430,10 +432,12 @@ static void TestLayers(void)
     agents[1].maxSpeed = 3.0;
     mnavVec3 shared[2];
     mnavVec3 alone[2];
-    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, shared) == mnav_success, "stepped");
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, nullptr, 0, 0.1, shared) == mnav_success,
+          "stepped");
     agents[0].layers = 1;
     agents[1].ignores = 1;
-    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, alone) == mnav_success, "stepped");
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, nullptr, 0, 0.1, alone) == mnav_success,
+          "stepped");
     mnavPos3 n = Sub(Wide(alone[0]), Wide(shared[0]));
     mnavPos3 off = Sub(Wide(shared[0]), (mnavPos3){1.5, 0.0, 0.0});
     double across = off.x * n.x + off.y * n.y + off.z * n.z;
@@ -445,7 +449,7 @@ static void TestLayers(void)
     // Each ignoring the other, they fly through each other.
     agents[0].ignores = 2;
     agents[1].layers = 2;
-    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, alone) == mnav_success &&
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, nullptr, 0, 0.1, alone) == mnav_success &&
               (double)alone[0].x == 1.5 && (double)alone[0].y == 0.0 &&
               (double)alone[1].x == -1.5 && (double)alone[1].y == 0.0,
           "ghosts pass through each other");
@@ -462,7 +466,7 @@ static void TestSphereKept(void)
     agents[1].priority = 1e6;
     mnavSphere sphere = {{1.0, 0.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 9, 0};
     mnavVec3 velocities[2];
-    CHECK(mnavAvoid3D(avoidance, agents, 2, &sphere, 1, 0.1, velocities) == mnav_success,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, &sphere, 1, 0.1, velocities) == mnav_success,
           "stepped");
     CHECK((double)velocities[0].x <= -1.5 + 1e-9, "out of the sphere at full speed");
     mnavDestroyAvoidance(avoidance);
@@ -477,7 +481,7 @@ static void TestFastSphere(void)
     const mnavPos3 goals[1] = {{0.0, 0.0, 0.0}};
     mnavSphere spheres[1] = {{{6.0, 0.3, 0.0}, 1.0, {-3.0, 0.0, 0.0}, 9, 0}};
     mnavVec3 velocities[1];
-    CHECK(mnavAvoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
           "stepped");
     CHECK(Length(Wide(velocities[0])) > 0.1, "it moves off at once");
     // Kept to the new velocity, it stays clear of the sphere for the whole
@@ -507,7 +511,7 @@ static void TestFastSphereFarOff(void)
     const mnavPos3 goals[1] = {{0.0, 0.0, 0.0}};
     mnavSphere spheres[1] = {{{14.0, 0.3, 0.0}, 1.0, {-8.0, 0.0, 0.0}, 9, 0}};
     mnavVec3 velocities[1];
-    CHECK(mnavAvoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 1, spheres, 1, 0.1, velocities) == mnav_success,
           "stepped");
     CHECK(Length(Wide(velocities[0])) > 0.1, "it moves off at once");
     Scene s = {avoidance, agents, goals, 1, spheres, 1, 0.0, 0.0, 0.0};
@@ -532,8 +536,8 @@ static void TestSphereTie(void)
     mnavSphere swapped[2] = {spheres[1], spheres[0]};
     mnavVec3 first;
     mnavVec3 second;
-    CHECK(mnavAvoid3D(avoidance, &agent, 1, spheres, 2, 0.1, &first) == mnav_success &&
-              mnavAvoid3D(avoidance, &agent, 1, swapped, 2, 0.1, &second) == mnav_success,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, &agent, 1, spheres, 2, 0.1, &first) == mnav_success &&
+              mnavAvoidance_Avoid3D(avoidance, &agent, 1, swapped, 2, 0.1, &second) == mnav_success,
           "stepped");
     CHECK(memcmp(&first, &agent.preferred, sizeof(mnavVec3)) != 0 &&
               memcmp(&first, &second, sizeof(mnavVec3)) == 0,
@@ -548,67 +552,72 @@ static void TestChecks(void)
                              Agent(6.0, 0.0, 0.0, 3)};
     mnavSphere sphere = {{0.0, 5.0, 0.0}, 1.0, {0.0, 0.0, 0.0}, 9, 0};
     mnavVec3 out[3];
-    CHECK(mnavAvoid3D(nullptr, agents, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid, "no set");
-    CHECK(mnavAvoid3D(avoidance, nullptr, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(nullptr, agents, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
+          "no set");
+    CHECK(mnavAvoidance_Avoid3D(avoidance, nullptr, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
           "no agents");
-    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.1, nullptr) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, nullptr, 0, 0.1, nullptr) ==
+              mnav_errorInvalid,
           "no output");
-    CHECK(mnavAvoid3D(avoidance, agents, -1, nullptr, 0, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, -1, nullptr, 0, 0.1, out) == mnav_errorInvalid,
           "a negative count");
-    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 1, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, nullptr, 1, 0.1, out) == mnav_errorInvalid,
           "no spheres");
-    CHECK(mnavAvoid3D(avoidance, agents, 2, &sphere, -1, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, &sphere, -1, 0.1, out) == mnav_errorInvalid,
           "a negative sphere count");
-    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, 0.0, out) == mnav_errorLimit, "no step");
-    CHECK(mnavAvoid3D(avoidance, agents, 2, nullptr, 0, (double)NAN, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, nullptr, 0, 0.0, out) == mnav_errorLimit,
+          "no step");
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, nullptr, 0, (double)NAN, out) ==
+              mnav_errorInvalid,
           "a step not finite");
-    CHECK(mnavAvoid3D(avoidance, agents, 3, nullptr, 0, 0.1, out) == mnav_errorCapacity,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 3, nullptr, 0, 0.1, out) == mnav_errorCapacity,
           "too many agents");
-    CHECK(mnavAvoid3D(avoidance, nullptr, 0, nullptr, 0, 0.1, nullptr) == mnav_success,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, nullptr, 0, nullptr, 0, 0.1, nullptr) == mnav_success,
           "nothing to do");
     mnavAgent3D bad = agents[1];
     bad.position.z = (double)NAN;
     mnavAgent3D pair[2] = {agents[0], bad};
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
           "a position not finite");
     pair[1] = agents[1];
     pair[1].position.z = 2.0 * MNAV_MAX_AVOIDANCE_COORDINATE;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
           "a position out of range");
     pair[1] = agents[1];
     pair[1].preferred.z = 2.0 * MNAV_MAX_AVOIDANCE_SPEED;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
           "a preferred velocity out of range");
     pair[1] = agents[1];
     pair[1].velocity.y = (double)INFINITY;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
           "an infinite velocity, past the speed bound");
     pair[1] = agents[1];
     pair[1].radius = 0.0;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid, "no radius");
+    CHECK(mnavAvoidance_Avoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
+          "no radius");
     pair[1] = agents[1];
     pair[1].maxSpeed = -1.0;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
           "a negative speed");
     pair[1] = agents[1];
     pair[1].maxSpeed = 1.5 * MNAV_MAX_AVOIDANCE_SPEED;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorLimit,
           "a maximum speed out of range");
     pair[1] = agents[1];
     pair[1].priority = 0.0;
-    CHECK(mnavAvoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, pair, 2, nullptr, 0, 0.1, out) == mnav_errorInvalid,
           "no priority");
     mnavSphere wrong = sphere;
     wrong.radius = 0.0;
-    CHECK(mnavAvoid3D(avoidance, agents, 2, &wrong, 1, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, &wrong, 1, 0.1, out) == mnav_errorInvalid,
           "a sphere with no radius");
     wrong = sphere;
     wrong.velocity.x = (double)NAN;
-    CHECK(mnavAvoid3D(avoidance, agents, 2, &wrong, 1, 0.1, out) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, &wrong, 1, 0.1, out) == mnav_errorInvalid,
           "a sphere's velocity not finite");
     wrong = sphere;
     wrong.center.y = -2.0 * MNAV_MAX_AVOIDANCE_COORDINATE;
-    CHECK(mnavAvoid3D(avoidance, agents, 2, &wrong, 1, 0.1, out) == mnav_errorLimit,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, &wrong, 1, 0.1, out) == mnav_errorLimit,
           "a sphere out of range");
     mnavDestroyAvoidance(avoidance);
     // Spheres count against the set's obstacle points.
@@ -617,8 +626,9 @@ static void TestChecks(void)
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "created");
     mnavSphere two[2] = {sphere, sphere};
     two[1].id = 10;
-    CHECK(mnavAvoid3D(avoidance, agents, 2, two, 1, 0.1, out) == mnav_success, "one sphere");
-    CHECK(mnavAvoid3D(avoidance, agents, 2, two, 2, 0.1, out) == mnav_errorCapacity,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, two, 1, 0.1, out) == mnav_success,
+          "one sphere");
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 2, two, 2, 0.1, out) == mnav_errorCapacity,
           "too many spheres");
     mnavDestroyAvoidance(avoidance);
 }
@@ -632,7 +642,8 @@ static void TestSpeedScaledBack(void)
     mnavAgent3D agent = Agent(0.0, 0.0, 0.0, 1);
     agent.preferred = (mnavVec3){0x1.7d0e8p-3f, -0x1.464268p+0f, 0x1.e6476cp+0f};
     mnavVec3 velocity;
-    CHECK(mnavAvoid3D(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) == mnav_success, "stepped");
+    CHECK(mnavAvoidance_Avoid3D(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) == mnav_success,
+          "stepped");
     mnavPos3 v = {(double)velocity.x, (double)velocity.y, (double)velocity.z};
     double speedSq = v.x * v.x + v.y * v.y + v.z * v.z;
     CHECK(speedSq <= 2.25, "no faster than the maximum");
@@ -660,7 +671,7 @@ static void TestSubnormalSpeed(void)
     agent.maxSpeed = sqrt(3.4) * 0x1p-537;
     agent.preferred = (mnavVec3){0.80622577f, 0.80622577f, 1.4491377f};
     mnavVec3 velocity;
-    CHECK(mnavAvoid3D(avoidance, &agent, 1, nullptr, 0, 0.05, &velocity) == mnav_success,
+    CHECK(mnavAvoidance_Avoid3D(avoidance, &agent, 1, nullptr, 0, 0.05, &velocity) == mnav_success,
           "stepped");
     CHECK(velocity.x == 0.0f && velocity.y == 0.0f && velocity.z == 0.0f, "zero in binary32");
     mnavDestroyAvoidance(avoidance);

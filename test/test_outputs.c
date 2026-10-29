@@ -104,9 +104,10 @@ static mnavNavmesh* WorldNavmesh(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -122,7 +123,7 @@ static mnavQuery* Query(void)
 static mnavPolygonId FirstPolygon(const mnavNavmesh* navmesh)
 {
     mnavTileId tile = {0};
-    CHECK(mnavGetTile(navmesh, 0, 0, &tile) == mnav_success, "the first tile");
+    CHECK(mnavNavmesh_GetTile(navmesh, 0, 0, &tile) == mnav_success, "the first tile");
     return (mnavPolygonId){tile.slot, tile.generation, 0};
 }
 
@@ -148,160 +149,166 @@ static void TestNoOwner(void)
     mnavGrid grid = {areas, 2, 2, 1.0f};
 
     FillAll();
-    CHECK(mnavGetArea(nullptr, polygon, &s_out.area) == mnav_errorInvalid && CLEARED(area),
-          "mnavGetArea");
+    CHECK(mnavPolygon_GetArea(nullptr, polygon, &s_out.area) == mnav_errorInvalid && CLEARED(area),
+          "mnavPolygon_GetArea");
     FillAll();
-    CHECK(mnavGetTile(nullptr, 0, 0, &s_out.tile) == mnav_errorInvalid && CLEARED(tile),
-          "mnavGetTile");
+    CHECK(mnavNavmesh_GetTile(nullptr, 0, 0, &s_out.tile) == mnav_errorInvalid && CLEARED(tile),
+          "mnavNavmesh_GetTile");
     FillAll();
     CHECK(mnavStageLink(nullptr, &linkDef, &s_out.linkId) == mnav_errorInvalid && CLEARED(linkId),
           "mnavStageLink");
     FillAll();
-    CHECK(mnavGetLink(nullptr, (mnavLinkId){1, 1}, &s_out.link) == mnav_errorInvalid &&
+    CHECK(mnavLink_GetState(nullptr, (mnavLinkId){1, 1}, &s_out.link) == mnav_errorInvalid &&
               CLEARED(link),
-          "mnavGetLink");
+          "mnavLink_GetState");
     FillAll();
-    CHECK(mnavFindPolygons(nullptr, nullptr, at, extents, found, ROOM, &s_out.found) ==
+    CHECK(mnavNavmesh_FindPolygons(nullptr, at, extents, nullptr, found, ROOM, &s_out.found) ==
                   mnav_errorInvalid &&
               CLEARED(found),
-          "mnavFindPolygons");
+          "mnavNavmesh_FindPolygons");
     FillAll();
-    CHECK(mnavFindNearest(nullptr, nullptr, at, extents, &s_out.nearest) == mnav_errorInvalid &&
+    CHECK(mnavNavmesh_FindNearest(nullptr, at, extents, nullptr, &s_out.nearest) ==
+                  mnav_errorInvalid &&
               CLEARED(nearest),
-          "mnavFindNearest");
+          "mnavNavmesh_FindNearest");
     FillAll();
-    CHECK(mnavFindPath(nullptr, navmesh, nullptr, polygon, at, polygon, at, &s_out.path) ==
+    CHECK(mnavQuery_FindPath(nullptr, navmesh, polygon, at, polygon, at, nullptr, &s_out.path) ==
                   mnav_errorInvalid &&
               CLEARED(path),
-          "mnavFindPath");
+          "mnavQuery_FindPath");
     FillAll();
-    CHECK(mnavFindShortestPath(nullptr, navmesh, nullptr, polygon, at, polygon, at, &s_out.path) ==
-                  mnav_errorInvalid &&
+    CHECK(mnavQuery_FindShortestPath(nullptr, navmesh, polygon, at, polygon, at, nullptr,
+                                     &s_out.path) == mnav_errorInvalid &&
               CLEARED(path),
-          "mnavFindShortestPath");
+          "mnavQuery_FindShortestPath");
     FillAll();
-    CHECK(mnavContinuePath(nullptr, navmesh, 1, &s_out.flag) == mnav_errorInvalid && CLEARED(flag),
-          "mnavContinuePath");
+    CHECK(mnavQuery_ContinuePath(nullptr, navmesh, 1, &s_out.flag) == mnav_errorInvalid &&
+              CLEARED(flag),
+          "mnavQuery_ContinuePath");
     FillAll();
-    CHECK(mnavFinishPath(nullptr, navmesh, &s_out.path) == mnav_errorInvalid && CLEARED(path),
-          "mnavFinishPath");
+    CHECK(mnavQuery_FinishPath(nullptr, navmesh, &s_out.path) == mnav_errorInvalid && CLEARED(path),
+          "mnavQuery_FinishPath");
     FillAll();
-    CHECK(mnavMoveAlongSurface(nullptr, navmesh, nullptr, polygon, at, at, &s_out.move) ==
+    CHECK(mnavQuery_MoveAlongSurface(nullptr, navmesh, polygon, at, at, nullptr, &s_out.move) ==
                   mnav_errorInvalid &&
               CLEARED(move),
-          "mnavMoveAlongSurface");
+          "mnavQuery_MoveAlongSurface");
     FillAll();
-    CHECK(mnavCheckCorridor(nullptr, nullptr, &corridor, &s_out.count) == mnav_errorInvalid &&
+    CHECK(mnavNavmesh_CheckCorridor(nullptr, &corridor, nullptr, &s_out.count) ==
+                  mnav_errorInvalid &&
               CLEARED(count),
-          "mnavCheckCorridor");
+          "mnavNavmesh_CheckCorridor");
     FillAll();
-    CHECK(mnavCorridorCorners(nullptr, navmesh, &corridor, &s_out.corners) == mnav_errorInvalid &&
+    CHECK(mnavQuery_FindCorridorCorners(nullptr, &corridor, navmesh, &s_out.corners) ==
+                  mnav_errorInvalid &&
               CLEARED(corners),
-          "mnavCorridorCorners");
+          "mnavQuery_FindCorridorCorners");
     FillAll();
-    CHECK(mnavCorridorAreas(nullptr, navmesh, &corridor, &s_out.corners, runs, ROOM,
-                            &s_out.count) == mnav_errorInvalid &&
+    CHECK(mnavQuery_FindCorridorAreas(nullptr, &corridor, navmesh, &s_out.corners, runs, ROOM,
+                                      &s_out.count) == mnav_errorInvalid &&
               CLEARED(corners) && CLEARED(count),
-          "mnavCorridorAreas");
+          "mnavQuery_FindCorridorAreas");
     FillAll();
-    CHECK(mnavMoveCorridor(nullptr, navmesh, nullptr, &corridor, at, &s_out.move) ==
+    CHECK(mnavQuery_MoveCorridor(nullptr, &corridor, navmesh, at, nullptr, &s_out.move) ==
                   mnav_errorInvalid &&
               CLEARED(move),
-          "mnavMoveCorridor");
+          "mnavQuery_MoveCorridor");
     FillAll();
-    CHECK(mnavMoveCorridorTarget(nullptr, navmesh, nullptr, &corridor, at, &s_out.move) ==
+    CHECK(mnavQuery_MoveCorridorTarget(nullptr, &corridor, navmesh, at, nullptr, &s_out.move) ==
                   mnav_errorInvalid &&
               CLEARED(move),
-          "mnavMoveCorridorTarget");
+          "mnavQuery_MoveCorridorTarget");
     FillAll();
-    CHECK(mnavShortcutCorridor(nullptr, navmesh, nullptr, &corridor, at, &s_out.flag) ==
+    CHECK(mnavQuery_ShortcutCorridor(nullptr, &corridor, navmesh, at, nullptr, &s_out.flag) ==
                   mnav_errorInvalid &&
               CLEARED(flag),
-          "mnavShortcutCorridor");
+          "mnavQuery_ShortcutCorridor");
     FillAll();
-    CHECK(mnavReplanCorridor(nullptr, navmesh, nullptr, &corridor, extents, &s_out.path) ==
+    CHECK(mnavQuery_ReplanCorridor(nullptr, &corridor, navmesh, extents, nullptr, &s_out.path) ==
                   mnav_errorInvalid &&
               CLEARED(path),
-          "mnavReplanCorridor");
+          "mnavQuery_ReplanCorridor");
     FillAll();
-    CHECK(mnavFindGridPath(nullptr, &grid, nullptr, (mnavCell){0, 0}, (mnavCell){1, 1},
-                           &s_out.gridPath) == mnav_errorInvalid &&
+    CHECK(mnavQuery_FindGridPath(nullptr, &grid, (mnavCell){0, 0}, (mnavCell){1, 1}, nullptr,
+                                 &s_out.gridPath) == mnav_errorInvalid &&
               CLEARED(gridPath),
-          "mnavFindGridPath");
+          "mnavQuery_FindGridPath");
     FillAll();
-    CHECK(mnavGetHeight(nullptr, polygon, 1.0, 1.0, &s_out.height) == mnav_errorInvalid &&
+    CHECK(mnavPolygon_GetHeight(nullptr, polygon, 1.0, 1.0, &s_out.height) == mnav_errorInvalid &&
               CLEARED(height),
-          "mnavGetHeight");
+          "mnavPolygon_GetHeight");
     FillAll();
-    CHECK(mnavFindWallDistance(nullptr, navmesh, nullptr, polygon, at, 1.0, &s_out.wall) ==
+    CHECK(mnavQuery_FindWallDistance(nullptr, navmesh, polygon, at, 1.0, nullptr, &s_out.wall) ==
                   mnav_errorInvalid &&
               CLEARED(wall),
-          "mnavFindWallDistance");
+          "mnavQuery_FindWallDistance");
     FillAll();
-    CHECK(mnavFindWalls(nullptr, navmesh, nullptr, polygon, at, 1.0, walls, ROOM, &s_out.walls) ==
-                  mnav_errorInvalid &&
+    CHECK(mnavQuery_FindWalls(nullptr, navmesh, polygon, at, 1.0, nullptr, walls, ROOM,
+                              &s_out.walls) == mnav_errorInvalid &&
               CLEARED(walls),
-          "mnavFindWalls");
+          "mnavQuery_FindWalls");
     FillAll();
-    CHECK(mnavFindRandomPoint(nullptr, nullptr, 1, &s_out.point) == mnav_errorInvalid &&
+    CHECK(mnavNavmesh_FindRandomPoint(nullptr, 1, nullptr, &s_out.point) == mnav_errorInvalid &&
               CLEARED(point),
-          "mnavFindRandomPoint");
+          "mnavNavmesh_FindRandomPoint");
     FillAll();
-    CHECK(mnavFindRandomPointAround(nullptr, navmesh, nullptr, polygon, at, 1.0, 1, &s_out.point) ==
-                  mnav_errorInvalid &&
+    CHECK(mnavQuery_FindRandomPointAround(nullptr, navmesh, polygon, at, 1.0, 1, nullptr,
+                                          &s_out.point) == mnav_errorInvalid &&
               CLEARED(point),
-          "mnavFindRandomPointAround");
+          "mnavQuery_FindRandomPointAround");
     FillAll();
-    CHECK(mnavCheckReachable(nullptr, navmesh, nullptr, polygon, at, polygon, at, &s_out.end) ==
-                  mnav_errorInvalid &&
+    CHECK(mnavQuery_CheckReachable(nullptr, navmesh, polygon, at, polygon, at, nullptr,
+                                   &s_out.end) == mnav_errorInvalid &&
               CLEARED(end),
-          "mnavCheckReachable");
+          "mnavQuery_CheckReachable");
     FillAll();
-    CHECK(mnavRaycast(nullptr, navmesh, nullptr, polygon, at, at, &s_out.ray) ==
+    CHECK(mnavQuery_Raycast(nullptr, navmesh, polygon, at, at, nullptr, &s_out.ray) ==
                   mnav_errorInvalid &&
               CLEARED(ray),
-          "mnavRaycast");
+          "mnavQuery_Raycast");
     FillAll();
-    CHECK(mnavGenerateLinks(nullptr, navmesh, nullptr, &genDef, &(mnavTileRange){0, 0, 0, 0}, links,
-                            ROOM, &s_out.count) == mnav_errorInvalid &&
+    CHECK(mnavQuery_GenerateLinks(nullptr, navmesh, &genDef, &(mnavTileRange){0, 0, 0, 0}, nullptr,
+                                  links, ROOM, &s_out.count) == mnav_errorInvalid &&
               CLEARED(count),
-          "mnavGenerateLinks");
+          "mnavQuery_GenerateLinks");
     FillAll();
-    CHECK(mnavFindHierarchicalPath(nullptr, nullptr, navmesh, polygon, at, polygon, at,
-                                   &s_out.path) == mnav_errorInvalid &&
+    CHECK(mnavQuery_FindHierarchicalPath(nullptr, nullptr, navmesh, polygon, at, polygon, at,
+                                         &s_out.path) == mnav_errorInvalid &&
               CLEARED(path),
-          "mnavFindHierarchicalPath");
+          "mnavQuery_FindHierarchicalPath");
     FillAll();
-    CHECK(mnavBuildHierarchy(nullptr, query, navmesh, nullptr, &s_out.hierarchy) ==
+    CHECK(mnavHierarchy_Build(nullptr, query, navmesh, nullptr, &s_out.hierarchy) ==
                   mnav_errorInvalid &&
               CLEARED(hierarchy),
-          "mnavBuildHierarchy");
+          "mnavHierarchy_Build");
     FillAll();
-    CHECK(mnavUpdateHierarchy(nullptr, query, navmesh, &s_out.hierarchy) == mnav_errorInvalid &&
+    CHECK(mnavHierarchy_Update(nullptr, query, navmesh, &s_out.hierarchy) == mnav_errorInvalid &&
               CLEARED(hierarchy),
-          "mnavUpdateHierarchy");
+          "mnavHierarchy_Update");
     FillAll();
-    CHECK(mnavContinueFlowField(nullptr, &grid, 1, &s_out.flag) == mnav_errorInvalid &&
+    CHECK(mnavFlowField_Continue(nullptr, &grid, 1, &s_out.flag) == mnav_errorInvalid &&
               CLEARED(flag),
-          "mnavContinueFlowField");
+          "mnavFlowField_Continue");
     FillAll();
-    CHECK(mnavFlowAt(nullptr, (mnavCell){0, 0}, &s_out.flow) == mnav_errorInvalid && CLEARED(flow),
-          "mnavFlowAt");
+    CHECK(mnavFlowField_GetFlow(nullptr, (mnavCell){0, 0}, &s_out.flow) == mnav_errorInvalid &&
+              CLEARED(flow),
+          "mnavFlowField_GetFlow");
     FillAll();
-    CHECK(mnavContinueNavFlow(nullptr, navmesh, 1, &s_out.flag) == mnav_errorInvalid &&
+    CHECK(mnavNavFlow_Continue(nullptr, navmesh, 1, &s_out.flag) == mnav_errorInvalid &&
               CLEARED(flag),
-          "mnavContinueNavFlow");
+          "mnavNavFlow_Continue");
     FillAll();
-    CHECK(mnavNavFlowAt(nullptr, navmesh, polygon, &s_out.polygonFlow) == mnav_errorInvalid &&
+    CHECK(mnavNavFlow_GetFlow(nullptr, navmesh, polygon, &s_out.polygonFlow) == mnav_errorInvalid &&
               CLEARED(polygonFlow),
-          "mnavNavFlowAt");
+          "mnavNavFlow_GetFlow");
     FillAll();
-    CHECK(mnavCopyBakedTile(nullptr, nullptr, 0, &s_out.size) == mnav_errorInvalid && CLEARED(size),
-          "mnavCopyBakedTile");
-    FillAll();
-    CHECK(mnavCopyFlightTile(nullptr, nullptr, 0, &s_out.size) == mnav_errorInvalid &&
+    CHECK(mnavBaker_CopyTile(nullptr, nullptr, 0, &s_out.size) == mnav_errorInvalid &&
               CLEARED(size),
-          "mnavCopyFlightTile");
+          "mnavBaker_CopyTile");
+    FillAll();
+    CHECK(mnavFlightBaker_CopyTile(nullptr, nullptr, 0, &s_out.size) == mnav_errorInvalid &&
+              CLEARED(size),
+          "mnavFlightBaker_CopyTile");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
@@ -313,36 +320,39 @@ static void TestNoFlightOwner(void)
     mnavPos3 at = {1.0, 1.0, 1.0};
     mnavPos3 points[2] = {at, at};
     FillAll();
-    CHECK(mnavGetFlightTile(nullptr, 0, 0, &s_out.fingerprint) == mnav_errorInvalid &&
+    CHECK(mnavFlightVolume_GetTile(nullptr, 0, 0, &s_out.fingerprint) == mnav_errorInvalid &&
               CLEARED(fingerprint),
-          "mnavGetFlightTile");
+          "mnavFlightVolume_GetTile");
     FillAll();
-    CHECK(mnavIsFlightOpen(nullptr, at, &s_out.flag) == mnav_errorInvalid && CLEARED(flag),
-          "mnavIsFlightOpen");
+    CHECK(mnavFlightVolume_IsOpen(nullptr, at, &s_out.flag) == mnav_errorInvalid && CLEARED(flag),
+          "mnavFlightVolume_IsOpen");
     FillAll();
-    CHECK(mnavFindFlightPath(nullptr, nullptr, at, at, &s_out.flightPath) == mnav_errorInvalid &&
+    CHECK(mnavQuery_FindFlightPath(nullptr, nullptr, at, at, &s_out.flightPath) ==
+                  mnav_errorInvalid &&
               CLEARED(flightPath),
-          "mnavFindFlightPath");
+          "mnavQuery_FindFlightPath");
     FillAll();
-    CHECK(mnavContinueFlightPath(nullptr, nullptr, 1, &s_out.flag) == mnav_errorInvalid &&
+    CHECK(mnavQuery_ContinueFlightPath(nullptr, nullptr, 1, &s_out.flag) == mnav_errorInvalid &&
               CLEARED(flag),
-          "mnavContinueFlightPath");
+          "mnavQuery_ContinueFlightPath");
     FillAll();
-    CHECK(mnavFinishFlightPath(nullptr, nullptr, &s_out.flightPath) == mnav_errorInvalid &&
+    CHECK(mnavQuery_FinishFlightPath(nullptr, nullptr, &s_out.flightPath) == mnav_errorInvalid &&
               CLEARED(flightPath),
-          "mnavFinishFlightPath");
+          "mnavQuery_FinishFlightPath");
     FillAll();
-    CHECK(mnavFlightRaycast(nullptr, at, at, &s_out.hit) == mnav_errorInvalid && CLEARED(hit),
-          "mnavFlightRaycast");
+    CHECK(mnavFlightVolume_Raycast(nullptr, at, at, &s_out.hit) == mnav_errorInvalid &&
+              CLEARED(hit),
+          "mnavFlightVolume_Raycast");
     FillAll();
-    CHECK(mnavCheckFlightPath(nullptr, points, 2, &s_out.count, &s_out.hit) == mnav_errorInvalid &&
+    CHECK(mnavFlightVolume_CheckPath(nullptr, points, 2, &s_out.count, &s_out.hit) ==
+                  mnav_errorInvalid &&
               CLEARED(count) && CLEARED(hit),
-          "mnavCheckFlightPath");
+          "mnavFlightVolume_CheckPath");
     FillAll();
-    CHECK(mnavFindNearestFlightPoint(nullptr, at, 1.0f, &s_out.position, &s_out.flag) ==
+    CHECK(mnavFlightVolume_FindNearestPoint(nullptr, at, 1.0f, &s_out.position, &s_out.flag) ==
                   mnav_errorInvalid &&
               CLEARED(position) && CLEARED(flag),
-          "mnavFindNearestFlightPoint");
+          "mnavFlightVolume_FindNearestPoint");
     mnavDestroyQuery(query);
 }
 
@@ -359,7 +369,8 @@ static void TestAvoidanceOutputs(void)
     };
     mnavVec2 velocities[2];
     Fill(velocities, sizeof(velocities));
-    CHECK(mnavAvoid(avoidance, agents, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid &&
+    CHECK(mnavAvoidance_Avoid(avoidance, agents, 2, nullptr, 0, 0.1, velocities) ==
+                  mnav_errorInvalid &&
               Zeroed(velocities, sizeof(velocities)),
           "an agent of no radius: every velocity cleared");
     mnavAgent3D fliers[2] = {
@@ -368,11 +379,13 @@ static void TestAvoidanceOutputs(void)
     };
     mnavVec3 velocities3[2];
     Fill(velocities3, sizeof(velocities3));
-    CHECK(mnavAvoid3D(avoidance, fliers, 2, nullptr, 0, 0.1, velocities3) == mnav_errorInvalid &&
+    CHECK(mnavAvoidance_Avoid3D(avoidance, fliers, 2, nullptr, 0, 0.1, velocities3) ==
+                  mnav_errorInvalid &&
               Zeroed(velocities3, sizeof(velocities3)),
           "a flier of no priority: every velocity cleared");
     Fill(velocities, sizeof(velocities));
-    CHECK(mnavAvoid(nullptr, agents, 2, nullptr, 0, 0.1, velocities) == mnav_errorInvalid &&
+    CHECK(mnavAvoidance_Avoid(nullptr, agents, 2, nullptr, 0, 0.1, velocities) ==
+                  mnav_errorInvalid &&
               (double)velocities[0].x != 0.0,
           "no set: nothing written");
     mnavDestroyAvoidance(avoidance);
@@ -387,49 +400,52 @@ static void TestPastTheOwner(void)
     mnavPolygonId polygon = FirstPolygon(navmesh);
     // A polygon of the tile at (1, 1), which a commit then removes.
     mnavTileId gone = {0};
-    CHECK(mnavGetTile(navmesh, 1, 1, &gone) == mnav_success &&
-              mnavStageTileRemoval(navmesh, 1, 1) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_GetTile(navmesh, 1, 1, &gone) == mnav_success &&
+              mnavNavmesh_StageTileRemoval(navmesh, 1, 1) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "a tile removed");
     mnavPolygonId stale = {gone.slot, gone.generation, 0};
     mnavPos3 at = {1.0, 0.0, 1.0};
     FillAll();
-    CHECK(mnavGetArea(navmesh, stale, &s_out.area) == mnav_errorStale && CLEARED(area),
+    CHECK(mnavPolygon_GetArea(navmesh, stale, &s_out.area) == mnav_errorStale && CLEARED(area),
           "a stale area");
     FillAll();
-    CHECK(mnavGetHeight(navmesh, polygon, 1000.0, 1000.0, &s_out.height) == mnav_errorOutside &&
+    CHECK(mnavPolygon_GetHeight(navmesh, polygon, 1000.0, 1000.0, &s_out.height) ==
+                  mnav_errorOutside &&
               CLEARED(height),
           "a height off the polygon");
     FillAll();
-    CHECK(mnavFindPath(query, navmesh, nullptr, stale, at, polygon, at, &s_out.path) ==
+    CHECK(mnavQuery_FindPath(query, navmesh, stale, at, polygon, at, nullptr, &s_out.path) ==
                   mnav_errorStale &&
               CLEARED(path),
           "a path from a stale polygon");
     FillAll();
-    CHECK(mnavRaycast(query, navmesh, nullptr, stale, at, at, &s_out.ray) == mnav_errorStale &&
+    CHECK(mnavQuery_Raycast(query, navmesh, stale, at, at, nullptr, &s_out.ray) ==
+                  mnav_errorStale &&
               CLEARED(ray),
           "a ray from a stale polygon");
     FillAll();
-    CHECK(mnavContinuePath(query, navmesh, 1, &s_out.flag) == mnav_errorState && CLEARED(flag),
+    CHECK(mnavQuery_ContinuePath(query, navmesh, 1, &s_out.flag) == mnav_errorState &&
+              CLEARED(flag),
           "no search begun");
     FillAll();
-    CHECK(mnavFinishPath(query, navmesh, &s_out.path) == mnav_errorState && CLEARED(path),
+    CHECK(mnavQuery_FinishPath(query, navmesh, &s_out.path) == mnav_errorState && CLEARED(path),
           "no search to finish");
     FillAll();
-    CHECK(mnavFindNearest(navmesh, nullptr, at, (mnavVec3){-1.0f, 1.0f, 1.0f}, &s_out.nearest) ==
-                  mnav_errorInvalid &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, at, (mnavVec3){-1.0f, 1.0f, 1.0f}, nullptr,
+                                  &s_out.nearest) == mnav_errorInvalid &&
               CLEARED(nearest),
           "a negative extent");
     FillAll();
-    CHECK(mnavGetLink(navmesh, (mnavLinkId){7, 1}, &s_out.link) == mnav_errorInvalid &&
+    CHECK(mnavLink_GetState(navmesh, (mnavLinkId){7, 1}, &s_out.link) == mnav_errorInvalid &&
               CLEARED(link),
           "a link never handed out");
     // A buffer too small defines its count: the total, past the room.
     mnavPolygonId one[1];
     FillAll();
-    CHECK(mnavFindPolygons(navmesh, nullptr, (mnavPos3){32.0, 0.0, 32.0},
-                           (mnavVec3){64.0f, 64.0f, 64.0f}, one, 1,
-                           &s_out.found) == mnav_errorCapacity &&
+    CHECK(mnavNavmesh_FindPolygons(navmesh, (mnavPos3){32.0, 0.0, 32.0},
+                                   (mnavVec3){64.0f, 64.0f, 64.0f}, nullptr, one, 1,
+                                   &s_out.found) == mnav_errorCapacity &&
               s_out.found.count > 1,
           "a count past the room is kept");
     mnavDestroyQuery(query);
@@ -449,11 +465,12 @@ static void TestFlowOutside(void)
     mnavCellRange region = {0, 0, 1, 1};
     mnavCell goal = {0, 0};
     bool ended = false;
-    CHECK(mnavBeginFlowField(field, &grid, nullptr, &region, &goal, 1) == mnav_success &&
-              mnavContinueFlowField(field, &grid, 64, &ended) == mnav_success && ended,
+    CHECK(mnavFlowField_Begin(field, &grid, &region, &goal, 1, nullptr) == mnav_success &&
+              mnavFlowField_Continue(field, &grid, 64, &ended) == mnav_success && ended,
           "built over a corner");
     FillAll();
-    CHECK(mnavFlowAt(field, (mnavCell){3, 3}, &s_out.flow) == mnav_errorOutside && CLEARED(flow),
+    CHECK(mnavFlowField_GetFlow(field, (mnavCell){3, 3}, &s_out.flow) == mnav_errorOutside &&
+              CLEARED(flow),
           "a cell outside the region");
     mnavDestroyFlowField(field);
 
@@ -464,14 +481,14 @@ static void TestFlowOutside(void)
     mnavPolygonId polygon = FirstPolygon(navmesh);
     mnavNavFlowGoal navGoal = {polygon, {1.0, 0.0, 1.0}};
     mnavTileRange tiles = {0, 0, 0, 0};
-    CHECK(mnavBeginNavFlow(navFlow, navmesh, nullptr, &tiles, &navGoal, 1) == mnav_success &&
-              mnavContinueNavFlow(navFlow, navmesh, 1 << 16, &ended) == mnav_success && ended,
+    CHECK(mnavNavFlow_Begin(navFlow, navmesh, &tiles, &navGoal, 1, nullptr) == mnav_success &&
+              mnavNavFlow_Continue(navFlow, navmesh, 1 << 16, &ended) == mnav_success && ended,
           "built over one tile");
     mnavTileId far = {0};
-    CHECK(mnavGetTile(navmesh, 1, 1, &far) == mnav_success, "a tile outside the region");
+    CHECK(mnavNavmesh_GetTile(navmesh, 1, 1, &far) == mnav_success, "a tile outside the region");
     FillAll();
-    CHECK(mnavNavFlowAt(navFlow, navmesh, (mnavPolygonId){far.slot, far.generation, 0},
-                        &s_out.polygonFlow) == mnav_errorOutside &&
+    CHECK(mnavNavFlow_GetFlow(navFlow, navmesh, (mnavPolygonId){far.slot, far.generation, 0},
+                              &s_out.polygonFlow) == mnav_errorOutside &&
               CLEARED(polygonFlow),
           "a polygon outside the region");
     mnavDestroyNavFlow(navFlow);
@@ -487,7 +504,7 @@ static mnavFlightDef FlightDef(void)
     def.floor = -2.0f;
     def.ceiling = 20.0f;
     def.radius = 0.5f;
-    def.groundBelow = true;
+    def.enableGroundFill = true;
     return def;
 }
 
@@ -502,23 +519,23 @@ static void TestFlightOutside(void)
                              sizeof(s_flight3)};
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageFlightTile(volume, stored[t], sizes[t]).result == mnav_success,
+        CHECK(mnavFlightVolume_StageTile(volume, stored[t], sizes[t]).result == mnav_success,
               "a flight tile");
     }
-    CHECK(mnavCommitFlight(volume) == mnav_success, "committed");
+    CHECK(mnavFlightVolume_Commit(volume) == mnav_success, "committed");
     mnavQuery* query = Query();
     mnavPos3 below = {1.0, -100.0, 1.0};
     mnavPos3 inside = {1.0, 5.0, 1.0};
     FillAll();
-    CHECK(mnavIsFlightOpen(volume, below, &s_out.flag) == mnav_errorOutside && CLEARED(flag),
+    CHECK(mnavFlightVolume_IsOpen(volume, below, &s_out.flag) == mnav_errorOutside && CLEARED(flag),
           "open below the volume");
     FillAll();
-    CHECK(mnavFindFlightPath(query, volume, below, inside, &s_out.flightPath) ==
+    CHECK(mnavQuery_FindFlightPath(query, volume, below, inside, &s_out.flightPath) ==
                   mnav_errorOutside &&
               CLEARED(flightPath),
           "a path from below the volume");
     FillAll();
-    CHECK(mnavGetFlightTile(volume, 9, 9, &s_out.fingerprint) == mnav_errorNotLoaded &&
+    CHECK(mnavFlightVolume_GetTile(volume, 9, 9, &s_out.fingerprint) == mnav_errorNotLoaded &&
               CLEARED(fingerprint),
           "a flight tile not loaded");
     mnavDestroyQuery(query);
@@ -527,7 +544,7 @@ static void TestFlightOutside(void)
     mnavFlightBaker* baker = nullptr;
     CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success, "a baker");
     FillAll();
-    CHECK(mnavCopyFlightTile(baker, nullptr, 0, &s_out.size) != mnav_success && CLEARED(size),
+    CHECK(mnavFlightBaker_CopyTile(baker, nullptr, 0, &s_out.size) != mnav_success && CLEARED(size),
           "no tile to copy");
     mnavDestroyFlightBaker(baker);
 }

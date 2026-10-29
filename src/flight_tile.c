@@ -65,7 +65,7 @@ static void WriteField(mnavByteWriter* w, int32_t field, const mnavFlightDef* de
         mnavPutU32(w, (uint32_t)tile->tileX);
         mnavPutU32(w, (uint32_t)tile->tileZ);
         mnavPutU16(w, (uint64_t)tile->side);
-        mnavPutU16(w, def->groundBelow ? FLAG_GROUND_BELOW : 0u);
+        mnavPutU16(w, def->enableGroundFill ? FLAG_GROUND_BELOW : 0u);
         mnavPutU32(w, mnavFloatBits(def->voxelSize));
         mnavPutU32(w, mnavFloatBits(def->radius));
         mnavPutU32(w, mnavFloatBits(def->floor));
@@ -166,7 +166,7 @@ static mnavTileResult Accept(void)
 static bool SameSettings(mnavByteReader* r, const mnavFlightDef* def, const mnavFlightShape* shape)
 {
     bool same = mnavGetU16(r) == (uint64_t)def->tileVoxels;
-    same &= mnavGetU16(r) == (def->groundBelow ? FLAG_GROUND_BELOW : 0u);
+    same &= mnavGetU16(r) == (def->enableGroundFill ? FLAG_GROUND_BELOW : 0u);
     same &= mnavGetU32(r) == mnavFloatBits(def->voxelSize);
     same &= mnavGetU32(r) == mnavFloatBits(def->radius);
     same &= mnavGetU32(r) == mnavFloatBits(def->floor);

@@ -58,8 +58,8 @@ static bool Get(const uint64_t* column, int32_t y)
 
 // Marks the heightfield's spans, offset columns in, and below the lowest
 // span of each column with ground when asked.
-static void Mark(const mnavHeightfield* hf, int32_t offset, int32_t floorVoxel, bool groundBelow,
-                 const Grid* g)
+static void Mark(const mnavHeightfield* hf, int32_t offset, int32_t floorVoxel,
+                 bool enableGroundFill, const Grid* g)
 {
     for (int32_t z = 0; z < g->width; ++z)
     {
@@ -76,7 +76,7 @@ static void Mark(const mnavHeightfield* hf, int32_t offset, int32_t floorVoxel, 
                 int32_t top = (int32_t)hf->spans[s].top - MNAV_HEIGHT_OFFSET - floorVoxel;
                 SetRange(g, column, bottom, top);
             }
-            if (groundBelow && first < last)
+            if (enableGroundFill && first < last)
             {
                 SetRange(g, column, 0,
                          (int32_t)hf->spans[first].bottom - MNAV_HEIGHT_OFFSET - floorVoxel);
@@ -362,7 +362,7 @@ typedef struct Build
     int32_t tileX;
     int32_t tileZ;
     int32_t floorVoxel;
-    bool groundBelow;
+    bool enableGroundFill;
 } Build;
 
 // The tile's voxels with a border of the radius's columns, dilated: the
@@ -382,7 +382,8 @@ static mnavResult Voxels(mnavMemory* memory, const Build* b, Grid* out, int32_t*
     if (r == mnav_success)
     {
         *spansOut = hf.spanCount;
-        Mark(&hf, b->cells->border - b->cells->agentRadius, b->floorVoxel, b->groundBelow, &raw);
+        Mark(&hf, b->cells->border - b->cells->agentRadius, b->floorVoxel, b->enableGroundFill,
+             &raw);
     }
     mnavReleaseHeightfield(memory, &hf);
     r = r == mnav_success ? MakeGrid(memory, out) : r;
@@ -486,7 +487,7 @@ mnavResult mnavBuildFlightTile(mnavMemory* memory, const mnavFlightDef* def,
     {
         return mnav_errorInvalid;
     }
-    const Build b = {&voxels, &cells, input, tileX, tileZ, t->floorVoxel, def->groundBelow};
+    const Build b = {&voxels, &cells, input, tileX, tileZ, t->floorVoxel, def->enableGroundFill};
     int32_t layers = t->cubeCount * t->side;
     Grid g = {nullptr, t->side + 2 * cells.agentRadius, layers, (layers + 63) / 64};
     mnavResult r = Voxels(memory, &b, &g, spansOut);

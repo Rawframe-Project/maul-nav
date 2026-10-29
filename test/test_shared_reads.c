@@ -152,70 +152,72 @@ static uint64_t Points(Reader* reader, uint32_t* state, uint64_t hash)
     const mnavVec3 box = {1.0f, 2.0f, 1.0f};
     mnavNearest a = {0};
     mnavNearest b = {0};
-    hash = MixResult(hash, mnavFindNearest(s_navmesh, nullptr, PointOf(state), box, &a));
-    hash = MixResult(hash, mnavFindNearest(s_navmesh, nullptr, PointOf(state), box, &b));
+    hash = MixResult(hash, mnavNavmesh_FindNearest(s_navmesh, PointOf(state), box, nullptr, &a));
+    hash = MixResult(hash, mnavNavmesh_FindNearest(s_navmesh, PointOf(state), box, nullptr, &b));
     hash = Mix(hash, &a.polygon, sizeof(a.polygon));
     hash = Mix(hash, &a.point, sizeof(a.point));
     hash = Mix(hash, &b.polygon, sizeof(b.polygon));
     mnavPolygonId found[32];
     mnavFound count = {0};
-    hash = MixResult(hash, mnavFindPolygons(s_navmesh, nullptr, a.point,
-                                            (mnavVec3){4.0f, 2.0f, 4.0f}, found, 32, &count));
+    hash =
+        MixResult(hash, mnavNavmesh_FindPolygons(s_navmesh, a.point, (mnavVec3){4.0f, 2.0f, 4.0f},
+                                                 nullptr, found, 32, &count));
     hash = MixInt(hash, count.count);
     hash = Mix(hash, found, (size_t)(count.count < 32 ? count.count : 32) * sizeof(mnavPolygonId));
     double height = 0.0;
-    hash = MixResult(hash, mnavGetHeight(s_navmesh, a.polygon, a.point.x, a.point.z, &height));
+    hash =
+        MixResult(hash, mnavPolygon_GetHeight(s_navmesh, a.polygon, a.point.x, a.point.z, &height));
     hash = MixDouble(hash, height);
     mnavAreaType area = 0;
-    hash = MixResult(hash, mnavGetArea(s_navmesh, a.polygon, &area));
+    hash = MixResult(hash, mnavPolygon_GetArea(s_navmesh, a.polygon, &area));
     hash = MixInt(hash, area);
     mnavTileId tile = {0};
-    hash = MixResult(hash, mnavGetTile(s_navmesh, (int32_t)(a.point.x / 32.0),
-                                       (int32_t)(a.point.z / 32.0), &tile));
+    hash = MixResult(hash, mnavNavmesh_GetTile(s_navmesh, (int32_t)(a.point.x / 32.0),
+                                               (int32_t)(a.point.z / 32.0), &tile));
     hash = Mix(hash, &tile, sizeof(tile));
-    hash = MixInt(hash, mnavGetTier(s_navmesh));
+    hash = MixInt(hash, mnavNavmesh_GetTier(s_navmesh));
     mnavLinkState link = {0};
-    hash = MixResult(hash, mnavGetLink(s_navmesh, (mnavLinkId){1, 1}, &link));
+    hash = MixResult(hash, mnavLink_GetState(s_navmesh, (mnavLinkId){1, 1}, &link));
     hash = MixInt(hash, link.crossings);
     mnavRay ray = {0};
-    hash =
-        MixResult(hash, mnavRaycast(query, s_navmesh, nullptr, a.polygon, a.point, b.point, &ray));
+    hash = MixResult(
+        hash, mnavQuery_Raycast(query, s_navmesh, a.polygon, a.point, b.point, nullptr, &ray));
     hash = MixDouble(hash, ray.t);
     hash = MixInt(hash, ray.polygonCount);
     mnavMove move = {0};
-    hash = MixResult(
-        hash, mnavMoveAlongSurface(query, s_navmesh, nullptr, a.polygon, a.point, b.point, &move));
+    hash = MixResult(hash, mnavQuery_MoveAlongSurface(query, s_navmesh, a.polygon, a.point, b.point,
+                                                      nullptr, &move));
     hash = Mix(hash, &move.point, sizeof(move.point));
     mnavNearestWall wall = {0};
-    hash = MixResult(
-        hash, mnavFindWallDistance(query, s_navmesh, nullptr, a.polygon, a.point, 4.0, &wall));
+    hash = MixResult(hash, mnavQuery_FindWallDistance(query, s_navmesh, a.polygon, a.point, 4.0,
+                                                      nullptr, &wall));
     hash = MixDouble(hash, wall.wall.distance);
     mnavRandomPoint random = {0};
-    hash = MixResult(hash, mnavFindRandomPoint(s_navmesh, nullptr, *state, &random));
+    hash = MixResult(hash, mnavNavmesh_FindRandomPoint(s_navmesh, *state, nullptr, &random));
     hash = Mix(hash, &random.point, sizeof(random.point));
-    hash = MixResult(hash, mnavFindRandomPointAround(query, s_navmesh, nullptr, a.polygon, a.point,
-                                                     6.0, *state, &random));
+    hash = MixResult(hash, mnavQuery_FindRandomPointAround(query, s_navmesh, a.polygon, a.point,
+                                                           6.0, *state, nullptr, &random));
     hash = Mix(hash, &random.point, sizeof(random.point));
     mnavPathEnd end = 0;
-    hash = MixResult(hash, mnavCheckReachable(query, s_navmesh, nullptr, a.polygon, a.point,
-                                              b.polygon, b.point, &end));
+    hash = MixResult(hash, mnavQuery_CheckReachable(query, s_navmesh, a.polygon, a.point, b.polygon,
+                                                    b.point, nullptr, &end));
     hash = MixInt(hash, end);
     mnavPath path = {0};
-    hash =
-        Path(hash,
-             mnavFindPath(query, s_navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path),
-             &path);
+    hash = Path(hash,
+                mnavQuery_FindPath(query, s_navmesh, a.polygon, a.point, b.polygon, b.point,
+                                   nullptr, &path),
+                &path);
     mnavResult sliced =
-        mnavBeginPath(query, s_navmesh, nullptr, a.polygon, a.point, b.polygon, b.point);
+        mnavQuery_BeginPath(query, s_navmesh, a.polygon, a.point, b.polygon, b.point, nullptr);
     bool ended = sliced != mnav_success;
     for (int32_t k = 0; !ended && k < 10000; ++k)
     {
-        sliced = mnavContinuePath(query, s_navmesh, 16, &ended);
+        sliced = mnavQuery_ContinuePath(query, s_navmesh, 16, &ended);
         ended = ended || sliced != mnav_success;
     }
     if (sliced == mnav_success)
     {
-        sliced = mnavFinishPath(query, s_navmesh, &path);
+        sliced = mnavQuery_FinishPath(query, s_navmesh, &path);
     }
     return Path(hash, sliced, &path);
 }
@@ -228,8 +230,8 @@ static uint64_t Corridor(Reader* reader, uint32_t* state, uint64_t hash)
     const mnavVec3 box = {1.0f, 2.0f, 1.0f};
     mnavNearest a = {0};
     mnavNearest b = {0};
-    if (mnavFindNearest(s_navmesh, nullptr, PointOf(state), box, &a) != mnav_success ||
-        mnavFindNearest(s_navmesh, nullptr, PointOf(state), box, &b) != mnav_success ||
+    if (mnavNavmesh_FindNearest(s_navmesh, PointOf(state), box, nullptr, &a) != mnav_success ||
+        mnavNavmesh_FindNearest(s_navmesh, PointOf(state), box, nullptr, &b) != mnav_success ||
         a.polygon.slot == 0 || b.polygon.slot == 0)
     {
         return MixInt(hash, -1);
@@ -238,31 +240,34 @@ static uint64_t Corridor(Reader* reader, uint32_t* state, uint64_t hash)
     hash = MixResult(hash,
                      mnavResetCorridor(&corridor, reader->corridor, CORRIDOR, a.polygon, a.point));
     mnavPath path = {0};
-    if (mnavFindPath(query, s_navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-        mnav_success)
+    if (mnavQuery_FindPath(query, s_navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                           &path) == mnav_success)
     {
         hash = MixResult(hash, mnavSetCorridor(&corridor, &path));
     }
     mnavCorners corners = {0};
-    hash = MixResult(hash, mnavCorridorCorners(query, s_navmesh, &corridor, &corners));
+    hash = MixResult(hash, mnavQuery_FindCorridorCorners(query, &corridor, s_navmesh, &corners));
     hash = Mix(hash, corners.points, (size_t)corners.pointCount * sizeof(mnavPos3));
     mnavMove move = {0};
     mnavPos3 toward = corners.pointCount > 1 ? corners.points[1] : b.point;
-    hash = MixResult(hash, mnavMoveCorridor(query, s_navmesh, nullptr, &corridor, toward, &move));
     hash = MixResult(hash,
-                     mnavMoveCorridorTarget(query, s_navmesh, nullptr, &corridor, b.point, &move));
+                     mnavQuery_MoveCorridor(query, &corridor, s_navmesh, toward, nullptr, &move));
+    hash = MixResult(
+        hash, mnavQuery_MoveCorridorTarget(query, &corridor, s_navmesh, b.point, nullptr, &move));
     int32_t valid = 0;
-    hash = MixResult(hash, mnavCheckCorridor(s_navmesh, nullptr, &corridor, &valid));
+    hash = MixResult(hash, mnavNavmesh_CheckCorridor(s_navmesh, &corridor, nullptr, &valid));
     hash = MixInt(hash, valid);
     bool shortened = false;
-    hash = MixResult(
-        hash, mnavShortcutCorridor(query, s_navmesh, nullptr, &corridor, b.point, &shortened));
+    hash = MixResult(hash, mnavQuery_ShortcutCorridor(query, &corridor, s_navmesh, b.point, nullptr,
+                                                      &shortened));
     hash = MixInt(hash, shortened);
-    hash = Path(hash, mnavReplanCorridor(query, s_navmesh, nullptr, &corridor, box, &path), &path);
+    hash = Path(hash, mnavQuery_ReplanCorridor(query, &corridor, s_navmesh, box, nullptr, &path),
+                &path);
     hash = Mix(hash, &corridor.position, sizeof(corridor.position));
     hash = Mix(hash, corridor.polygons, (size_t)corridor.count * sizeof(mnavPolygonId));
     mnavDebugBuffer buffer = Buffer(reader);
-    mnavResult drawn = mnavDebugCorridor(s_navmesh, corridor.polygons, corridor.count, &buffer);
+    mnavResult drawn =
+        mnavNavmesh_DebugCorridor(s_navmesh, corridor.polygons, corridor.count, &buffer);
     return Drawn(reader, drawn, &buffer, hash);
 }
 
@@ -290,33 +295,33 @@ static uint64_t Wide(Reader* reader, int32_t round, uint32_t* state, uint64_t ha
     const mnavVec3 box = {1.0f, 2.0f, 1.0f};
     mnavNearest a = {0};
     mnavNearest b = {0};
-    hash = MixResult(hash, mnavFindNearest(s_navmesh, nullptr, PointOf(state), box, &a));
-    hash = MixResult(hash, mnavFindNearest(s_navmesh, nullptr, PointOf(state), box, &b));
+    hash = MixResult(hash, mnavNavmesh_FindNearest(s_navmesh, PointOf(state), box, nullptr, &a));
+    hash = MixResult(hash, mnavNavmesh_FindNearest(s_navmesh, PointOf(state), box, nullptr, &b));
     mnavPolygonFlow flow;
-    hash = Flow(hash, mnavNavFlowAt(s_field, s_navmesh, a.polygon, &flow), &flow);
+    hash = Flow(hash, mnavNavFlow_GetFlow(s_field, s_navmesh, a.polygon, &flow), &flow);
     mnavNavFlowGoal goal = {b.polygon, b.point};
-    hash = MixResult(hash, mnavBuildNavFlow(reader->field, s_navmesh, nullptr, &goal, 1));
-    hash = Flow(hash, mnavNavFlowAt(reader->field, s_navmesh, a.polygon, &flow), &flow);
+    hash = MixResult(hash, mnavNavFlow_Build(reader->field, s_navmesh, &goal, 1, nullptr));
+    hash = Flow(hash, mnavNavFlow_GetFlow(reader->field, s_navmesh, a.polygon, &flow), &flow);
     mnavCell start = {(int32_t)(a.point.x) % GRID_SIDE, (int32_t)(a.point.z) % GRID_SIDE};
     mnavCell goalCell = {(int32_t)(b.point.x) % GRID_SIDE, (int32_t)(b.point.z) % GRID_SIDE};
     mnavGridPath gridPath = {0};
-    mnavResult walked = mnavFindGridPath(query, &s_grid, nullptr, start, goalCell, &gridPath);
+    mnavResult walked = mnavQuery_FindGridPath(query, &s_grid, start, goalCell, nullptr, &gridPath);
     hash = MixResult(hash, walked);
     if (walked == mnav_success)
     {
         hash = MixDouble(hash, gridPath.cost);
         hash = Mix(hash, gridPath.cells, (size_t)gridPath.cellCount * sizeof(mnavCell));
     }
-    hash = MixResult(hash, mnavBuildFlowField(reader->flow, &s_grid, nullptr, &goalCell, 1));
+    hash = MixResult(hash, mnavFlowField_Build(reader->flow, &s_grid, &goalCell, 1, nullptr));
     mnavFlow cell = {0};
-    hash = MixResult(hash, mnavFlowAt(reader->flow, start, &cell));
+    hash = MixResult(hash, mnavFlowField_GetFlow(reader->flow, start, &cell));
     hash = MixDouble(hash, cell.cost);
     hash = Mix(hash, &cell.next, sizeof(cell.next));
     mnavLinkGenDef def = mnavDefaultLinkGenDef();
     int32_t generated = 0;
-    hash = MixResult(hash, mnavGenerateLinks(query, s_navmesh, nullptr, &def,
-                                             &(mnavTileRange){round % 2, 0, round % 2, 1},
-                                             reader->links, GENERATED, &generated));
+    hash = MixResult(hash, mnavQuery_GenerateLinks(query, s_navmesh, &def,
+                                                   &(mnavTileRange){round % 2, 0, round % 2, 1},
+                                                   nullptr, reader->links, GENERATED, &generated));
     hash = MixInt(hash, generated);
     for (int32_t i = 0; i < generated && i < GENERATED; ++i)
     {
@@ -325,16 +330,17 @@ static uint64_t Wide(Reader* reader, int32_t round, uint32_t* state, uint64_t ha
     }
     mnavPath path = {0};
     hash = Path(hash,
-                mnavFindHierarchicalPath(query, reader->hierarchy, s_navmesh, a.polygon, a.point,
-                                         b.polygon, b.point, &path),
+                mnavQuery_FindHierarchicalPath(query, reader->hierarchy, s_navmesh, a.polygon,
+                                               a.point, b.polygon, b.point, &path),
                 &path);
     mnavDebugBuffer buffer = Buffer(reader);
-    hash = Drawn(reader, mnavDebugNavmesh(s_navmesh, &(mnavTileRange){round % 2, 0, 1, 1}, &buffer),
-                 &buffer, hash);
+    hash =
+        Drawn(reader, mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){round % 2, 0, 1, 1}, &buffer),
+              &buffer, hash);
     buffer = Buffer(reader);
-    hash = Drawn(reader, mnavDebugLinks(s_navmesh, &buffer), &buffer, hash);
+    hash = Drawn(reader, mnavNavmesh_DebugLinks(s_navmesh, &buffer), &buffer, hash);
     buffer = Buffer(reader);
-    return Drawn(reader, mnavDebugNavFlow(s_field, s_navmesh, &buffer), &buffer, hash);
+    return Drawn(reader, mnavNavFlow_Debug(s_field, s_navmesh, &buffer), &buffer, hash);
 }
 
 static uint64_t Round(Reader* reader, int32_t round)
@@ -363,8 +369,8 @@ static bool Open(Reader* reader)
            mnavCreateNavFlow(&fieldDef, &reader->field) == mnav_success &&
            mnavCreateFlowField(&flowDef, &reader->flow) == mnav_success &&
            mnavCreateHierarchy(&hierarchyDef, &reader->hierarchy) == mnav_success &&
-           mnavBuildHierarchy(reader->hierarchy, reader->query, s_navmesh, nullptr,
-                              &reader->report) == mnav_success;
+           mnavHierarchy_Build(reader->hierarchy, reader->query, s_navmesh, nullptr,
+                               &reader->report) == mnav_success;
 }
 
 static void Close(Reader* reader)
@@ -401,7 +407,8 @@ static void Share(void)
     CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success, "a navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(s_navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(s_navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
     const mnavLinkDef links[2] = {
         {{4.0, 0.0, 4.0}, {60.0, 0.0, 60.0}, 1.0f, 2.0f, mnav_linkJump, true, 0.0f},
@@ -411,16 +418,16 @@ static void Share(void)
         mnavLinkId id;
         CHECK(mnavStageLink(s_navmesh, &links[k], &id) == mnav_success, "a link");
     }
-    CHECK(mnavCommit(s_navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(s_navmesh) == mnav_success, "committed");
     mnavNavFlowDef fieldDef = mnavDefaultNavFlowDef();
     CHECK(mnavCreateNavFlow(&fieldDef, &s_field) == mnav_success, "a field");
     mnavNearest goal = {0};
-    CHECK(mnavFindNearest(s_navmesh, nullptr, (mnavPos3){32.0, 0.0, 33.0},
-                          (mnavVec3){1.0f, 2.0f, 1.0f}, &goal) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(s_navmesh, (mnavPos3){32.0, 0.0, 33.0},
+                                  (mnavVec3){1.0f, 2.0f, 1.0f}, nullptr, &goal) == mnav_success &&
               goal.polygon.slot != 0,
           "a goal");
     mnavNavFlowGoal goals[1] = {{goal.polygon, goal.point}};
-    CHECK(mnavBuildNavFlow(s_field, s_navmesh, nullptr, goals, 1) == mnav_success, "built");
+    CHECK(mnavNavFlow_Build(s_field, s_navmesh, goals, 1, nullptr) == mnav_success, "built");
     uint32_t seed = 5u;
     for (int32_t c = 0; c < GRID_SIDE * GRID_SIDE; ++c)
     {

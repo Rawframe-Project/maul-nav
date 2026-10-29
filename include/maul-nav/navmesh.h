@@ -106,7 +106,7 @@ extern "C"
     /// Queries do not see it until the commit.
     ///
     /// @param navmesh  The navmesh.
-    /// @param bytes    The tile's bytes, as mnavCopyBakedTile gives them.
+    /// @param bytes    The tile's bytes, as mnavBaker_CopyTile gives them.
     /// @param size     Their size in bytes.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument;
     /// `mnav_errorFormat` naming the section and element for malformed bytes,
@@ -121,8 +121,8 @@ extern "C"
     /// Safe from any thread; the navmesh is used by one thread at a time.
     /// Staging changes nothing queries read, but it may not run beside
     /// another call that stages or commits.
-    MNAV_NODISCARD MNAV_API mnavTileResult mnavStageTile(mnavNavmesh* navmesh, const uint8_t* bytes,
-                                                         size_t size);
+    MNAV_NODISCARD MNAV_API mnavTileResult mnavNavmesh_StageTile(mnavNavmesh* navmesh,
+                                                                 const uint8_t* bytes, size_t size);
 
     /// Stages the removal of the tile at a place for the next commit, in
     /// place of anything staged there before.
@@ -139,8 +139,8 @@ extern "C"
     /// Safe from any thread; the navmesh is used by one thread at a time.
     /// Staging changes nothing queries read, but it may not run beside
     /// another call that stages or commits.
-    MNAV_NODISCARD MNAV_API mnavResult mnavStageTileRemoval(mnavNavmesh* navmesh, int32_t tileX,
-                                                            int32_t tileZ);
+    MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_StageTileRemoval(mnavNavmesh* navmesh,
+                                                                    int32_t tileX, int32_t tileZ);
 
     /// Applies everything staged at once: installs and removes the tiles
     /// and links every polygon on a changed tile's sides to the polygons
@@ -159,7 +159,7 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a commit.
-    MNAV_NODISCARD MNAV_API mnavResult mnavCommit(mnavNavmesh* navmesh);
+    MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_Commit(mnavNavmesh* navmesh);
 
     /// Reads a navmesh's runtime tier.
     ///
@@ -169,7 +169,7 @@ extern "C"
     /// Safe from any thread. Any number of threads may read it and query
     /// at once between commits; none may while a stage or commit call
     /// runs.
-    MNAV_API mnavTier mnavGetTier(const mnavNavmesh* navmesh);
+    MNAV_API mnavTier mnavNavmesh_GetTier(const mnavNavmesh* navmesh);
 
     /// Returns how many calls against the navmesh were refused as misuse since
     /// it was made: an argument refused with `mnav_errorInvalid` when the
@@ -181,7 +181,7 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. It may be read at any time, also while host
     /// code the object runs calls back in.
-    MNAV_API uint64_t mnavGetNavmeshMisuse(const mnavNavmesh* navmesh);
+    MNAV_API uint64_t mnavNavmesh_GetMisuse(const mnavNavmesh* navmesh);
 
     /// Stages a change of a polygon's area, applied at the next commit;
     /// mnav_areaNone blocks it. The change lasts while the polygon's tile
@@ -201,8 +201,9 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a stage call.
-    MNAV_NODISCARD MNAV_API mnavResult mnavStageArea(mnavNavmesh* navmesh, mnavPolygonId polygon,
-                                                     mnavAreaType area);
+    MNAV_NODISCARD MNAV_API mnavResult mnavPolygon_StageArea(mnavNavmesh* navmesh,
+                                                             mnavPolygonId polygon,
+                                                             mnavAreaType area);
 
     /// Reads a polygon's area as committed.
     ///
@@ -216,8 +217,9 @@ extern "C"
     /// Safe from any thread. Any number of threads may read areas and
     /// query at once between commits; none may while a stage or commit
     /// call runs.
-    MNAV_NODISCARD MNAV_API mnavResult mnavGetArea(const mnavNavmesh* navmesh,
-                                                   mnavPolygonId polygon, mnavAreaType* areaOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavPolygon_GetArea(const mnavNavmesh* navmesh,
+                                                           mnavPolygonId polygon,
+                                                           mnavAreaType* areaOut);
 
     /// Finds the tile at a place.
     ///
@@ -232,8 +234,9 @@ extern "C"
     /// Safe from any thread. Any number of threads may find tiles and
     /// query at once between commits; none may while a stage or commit
     /// call runs.
-    MNAV_NODISCARD MNAV_API mnavResult mnavGetTile(const mnavNavmesh* navmesh, int32_t tileX,
-                                                   int32_t tileZ, mnavTileId* tileOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_GetTile(const mnavNavmesh* navmesh,
+                                                           int32_t tileX, int32_t tileZ,
+                                                           mnavTileId* tileOut);
 
 // The number of off-mesh link kinds.
 #define MNAV_LINK_KINDS 64
@@ -380,7 +383,7 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run during a stage call.
-    MNAV_NODISCARD MNAV_API mnavResult mnavStageLinkEnabled(mnavNavmesh* navmesh, mnavLinkId link,
+    MNAV_NODISCARD MNAV_API mnavResult mnavLink_StageEnable(mnavNavmesh* navmesh, mnavLinkId link,
                                                             bool enabled);
 
     /// Reads an off-mesh link as committed.
@@ -395,8 +398,8 @@ extern "C"
     /// Safe from any thread. Any number of threads may read links and
     /// query at once between commits; none may while a stage or commit
     /// call runs.
-    MNAV_NODISCARD MNAV_API mnavResult mnavGetLink(const mnavNavmesh* navmesh, mnavLinkId link,
-                                                   mnavLinkState* stateOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavLink_GetState(const mnavNavmesh* navmesh,
+                                                         mnavLinkId link, mnavLinkState* stateOut);
 
 #ifdef __cplusplus
 }

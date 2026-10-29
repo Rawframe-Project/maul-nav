@@ -59,7 +59,7 @@ static int32_t Lines(mnavDebugKind kind)
                          2 * LINE_ROOM,
                          0};
     // Polygon fills go uncounted into a buffer with no triangle room.
-    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
+    (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     CHECK(b.vertexCount <= 2 * LINE_ROOM && b.lineCount <= 2 * LINE_ROOM, "the edges fit");
     int32_t count = 0;
     for (int32_t l = 0; l < b.lineCount / 2; ++l)
@@ -401,15 +401,15 @@ static void TestTileSides(void)
     mnavBakeDef def = Exact();
     UseDef(&def);
     size_t size = 0;
-    CHECK(mnavBakeTile2D(s_baker, &(mnavBake2DInput){outlines, 4, nullptr}, 0, 0, &s_report) ==
-                  mnav_success &&
-              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
+    CHECK(mnavBaker_BakeTile2D(s_baker, &(mnavBake2DInput){outlines, 4, nullptr}, 0, 0,
+                               &s_report) == mnav_success &&
+              mnavBaker_CopyTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
     // The sides split where the areas inside change, at 16 m, where the
     // border's areas change, at 8 m on the -Z side, and where the cut
@@ -441,14 +441,14 @@ static void TestRegionsOfOneAreaMeetOnTheSide(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     UseDef(&def);
     size_t size = 0;
-    CHECK(mnavBakeTile(s_baker, &input, 0, 0, &s_report) == mnav_success &&
-              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
+    CHECK(mnavBaker_BakeTile(s_baker, &input, 0, 0, &s_report) == mnav_success &&
+              mnavBaker_CopyTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
     int32_t sides = Lines(mnav_debugTileSide);
     CHECK(s_report.regions == 2 && HasTileLine(sides, 128, 0, 128, 118),

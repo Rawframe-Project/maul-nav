@@ -203,7 +203,7 @@ mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def, mnavAvoidance** avoi
     return result;
 }
 
-uint64_t mnavGetAvoidanceMisuse(const mnavAvoidance* avoidance)
+uint64_t mnavAvoidance_GetMisuse(const mnavAvoidance* avoidance)
 {
     return avoidance != nullptr ? mnavHostMisuse(&avoidance->host) : 0;
 }
@@ -402,9 +402,9 @@ static MNAV_NOINLINE mnavResult AvoidCounted(mnavAvoidance* avoidance, const mna
     return mnavAvoidClear(result, avoidance, agentCount, velocitiesOut, sizeof(*velocitiesOut));
 }
 
-mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount,
-                     const mnavObstacle* obstacles, int32_t obstacleCount, double step,
-                     mnavVec2* velocitiesOut)
+mnavResult mnavAvoidance_Avoid(mnavAvoidance* avoidance, const mnavAgent* agents,
+                               int32_t agentCount, const mnavObstacle* obstacles,
+                               int32_t obstacleCount, double step, mnavVec2* velocitiesOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
@@ -486,8 +486,8 @@ static MNAV_NOINLINE mnavResult DebugAvoidanceCounted(mnavAvoidance* avoidance,
                                 DebugAvoidanceWork(avoidance, agents, agentCount, height, buffer));
 }
 
-mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount,
-                              double height, mnavDebugBuffer* buffer)
+mnavResult mnavAvoidance_Debug(mnavAvoidance* avoidance, const mnavAgent* agents,
+                               int32_t agentCount, double height, mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = DebugAvoidanceCounted(avoidance, agents, agentCount, height, buffer);

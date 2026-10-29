@@ -35,12 +35,13 @@ static mnavNavmesh* Make(const uint8_t* first, size_t firstSize, const uint8_t* 
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(mnavStageTile(navmesh, first, firstSize).result == mnav_success, "first staged");
+    CHECK(mnavNavmesh_StageTile(navmesh, first, firstSize).result == mnav_success, "first staged");
     if (second != nullptr)
     {
-        CHECK(mnavStageTile(navmesh, second, secondSize).result == mnav_success, "second staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, second, secondSize).result == mnav_success,
+              "second staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -57,8 +58,8 @@ static mnavQuery* MakeQuery(int32_t nodes, float length)
 static mnavNearest On(const mnavNavmesh* navmesh, double x, double z)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 0.0, z}, (mnavVec3){0.1f, 1.0f, 0.1f},
-                          &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 0.0, z}, (mnavVec3){0.1f, 1.0f, 0.1f},
+                                  nullptr, &n) == mnav_success &&
               n.over,
           "on a polygon");
     return n;
@@ -70,8 +71,8 @@ static mnavPath Shortest(mnavQuery* query, const mnavNavmesh* navmesh,
     mnavNearest a = On(navmesh, x0, z0);
     mnavNearest b = On(navmesh, x1, z1);
     mnavPath path = {0};
-    CHECK(mnavFindShortestPath(query, navmesh, filter, a.polygon, a.point, b.polygon, b.point,
-                               &path) == mnav_success,
+    CHECK(mnavQuery_FindShortestPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, filter,
+                                     &path) == mnav_success,
           "searched");
     return path;
 }
@@ -144,8 +145,9 @@ static bool NextPair(const mnavNavmesh* navmesh, uint32_t* state, mnavNearest* a
         p[k] = (double)(*state >> 8 & 0xFFFFu) / 65536.0 * 64.0;
     }
     mnavVec3 box = {3.0f, 2.0f, 3.0f};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){p[0], 0.0, p[1]}, box, a) == mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){p[2], 0.0, p[3]}, box, b) ==
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){p[0], 0.0, p[1]}, box, nullptr, a) ==
+                  mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){p[2], 0.0, p[3]}, box, nullptr, b) ==
                   mnav_success,
           "nearest");
     return a->polygon.slot != 0 && b->polygon.slot != 0;
@@ -159,9 +161,10 @@ static mnavNavmesh* LoadWorld(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -179,8 +182,8 @@ static void TestTheWorldsWork(void)
         mnavPath path;
         if (NextPair(navmesh, &state, &a, &b))
         {
-            CHECK(mnavFindShortestPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon,
-                                       b.point, &path) == mnav_success,
+            CHECK(mnavQuery_FindShortestPath(query, navmesh, a.polygon, a.point, b.polygon, b.point,
+                                             nullptr, &path) == mnav_success,
                   "searched");
             work += query->nodeCount;
         }

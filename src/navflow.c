@@ -166,7 +166,7 @@ mnavResult mnavCreateNavFlow(const mnavNavFlowDef* def, mnavNavFlow** fieldOut)
     return result;
 }
 
-uint64_t mnavGetNavFlowMisuse(const mnavNavFlow* field)
+uint64_t mnavNavFlow_GetMisuse(const mnavNavFlow* field)
 {
     return field != nullptr ? mnavHostMisuse(&field->host) : 0;
 }
@@ -560,9 +560,9 @@ static MNAV_NOINLINE mnavResult BeginNavFlowCounted(mnavNavFlow* field, const mn
                                 BeginNavFlowWork(field, navmesh, filter, region, goals, goalCount));
 }
 
-mnavResult mnavBeginNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
-                            const mnavQueryFilter* filter, const mnavTileRange* region,
-                            const mnavNavFlowGoal* goals, int32_t goalCount)
+mnavResult mnavNavFlow_Begin(mnavNavFlow* field, const mnavNavmesh* navmesh,
+                             const mnavTileRange* region, const mnavNavFlowGoal* goals,
+                             int32_t goalCount, const mnavQueryFilter* filter)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = BeginNavFlowCounted(field, navmesh, filter, region, goals, goalCount);
@@ -631,8 +631,8 @@ static MNAV_NOINLINE mnavResult ContinueNavFlowCounted(mnavNavFlow* field,
     return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
 }
 
-mnavResult mnavContinueNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh, int32_t polygons,
-                               bool* endedOut)
+mnavResult mnavNavFlow_Continue(mnavNavFlow* field, const mnavNavmesh* navmesh, int32_t polygons,
+                                bool* endedOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = ContinueNavFlowCounted(field, navmesh, polygons, endedOut);
@@ -657,9 +657,9 @@ static MNAV_NOINLINE mnavResult BuildNavFlowCounted(mnavNavFlow* field, const mn
                                 BuildNavFlowWork(field, navmesh, filter, goals, goalCount));
 }
 
-mnavResult mnavBuildNavFlow(mnavNavFlow* field, const mnavNavmesh* navmesh,
-                            const mnavQueryFilter* filter, const mnavNavFlowGoal* goals,
-                            int32_t goalCount)
+mnavResult mnavNavFlow_Build(mnavNavFlow* field, const mnavNavmesh* navmesh,
+                             const mnavNavFlowGoal* goals, int32_t goalCount,
+                             const mnavQueryFilter* filter)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = BuildNavFlowCounted(field, navmesh, filter, goals, goalCount);
@@ -720,8 +720,8 @@ static MNAV_NOINLINE mnavResult NavFlowAtCounted(const mnavNavFlow* field,
     return mnavClearOnFailure(result, flowOut, sizeof(*flowOut));
 }
 
-mnavResult mnavNavFlowAt(const mnavNavFlow* field, const mnavNavmesh* navmesh,
-                         mnavPolygonId polygon, mnavPolygonFlow* flowOut)
+mnavResult mnavNavFlow_GetFlow(const mnavNavFlow* field, const mnavNavmesh* navmesh,
+                               mnavPolygonId polygon, mnavPolygonFlow* flowOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = NavFlowAtCounted(field, navmesh, polygon, flowOut);
@@ -817,8 +817,8 @@ static MNAV_NOINLINE mnavResult DebugNavFlowCounted(const mnavNavFlow* field,
                                 DebugNavFlowWork(field, navmesh, buffer));
 }
 
-mnavResult mnavDebugNavFlow(const mnavNavFlow* field, const mnavNavmesh* navmesh,
-                            mnavDebugBuffer* buffer)
+mnavResult mnavNavFlow_Debug(const mnavNavFlow* field, const mnavNavmesh* navmesh,
+                             mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = DebugNavFlowCounted(field, navmesh, buffer);

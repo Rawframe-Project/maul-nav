@@ -66,7 +66,7 @@ static void DropEntries(mnavMemory* memory, mnavFlightEntry* entries, int32_t co
     }
 }
 
-uint64_t mnavGetFlightVolumeMisuse(const mnavFlightVolume* volume)
+uint64_t mnavFlightVolume_GetMisuse(const mnavFlightVolume* volume)
 {
     return volume != nullptr ? mnavHostMisuse(&volume->host) : 0;
 }
@@ -179,7 +179,8 @@ static MNAV_NOINLINE mnavTileResult StageFlightTileCounted(mnavFlightVolume* vol
     return result;
 }
 
-mnavTileResult mnavStageFlightTile(mnavFlightVolume* volume, const uint8_t* bytes, size_t size)
+mnavTileResult mnavFlightVolume_StageTile(mnavFlightVolume* volume, const uint8_t* bytes,
+                                          size_t size)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavTileResult result = StageFlightTileCounted(volume, bytes, size);
@@ -200,7 +201,7 @@ static mnavResult StageFlightTileRemovalWork(mnavFlightVolume* volume, int32_t t
     return Stage(volume, (mnavFlightEntry){.x = tileX, .z = tileZ, .removal = true});
 }
 
-mnavResult mnavStageFlightTileRemoval(mnavFlightVolume* volume, int32_t tileX, int32_t tileZ)
+mnavResult mnavFlightVolume_StageTileRemoval(mnavFlightVolume* volume, int32_t tileX, int32_t tileZ)
 {
     return mnavHostCountInvalid(MNAV_HOST(volume),
                                 StageFlightTileRemovalWork(volume, tileX, tileZ));
@@ -311,7 +312,7 @@ static MNAV_NOINLINE mnavResult CommitFlightCounted(mnavFlightVolume* volume)
     return mnavHostCountInvalid(MNAV_HOST(volume), CommitFlightWork(volume));
 }
 
-mnavResult mnavCommitFlight(mnavFlightVolume* volume)
+mnavResult mnavFlightVolume_Commit(mnavFlightVolume* volume)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = CommitFlightCounted(volume);
@@ -331,8 +332,8 @@ static mnavResult GetFlightTileWork(const mnavFlightVolume* volume, int32_t tile
     return e != nullptr ? mnav_success : mnav_errorNotLoaded;
 }
 
-mnavResult mnavGetFlightTile(const mnavFlightVolume* volume, int32_t tileX, int32_t tileZ,
-                             uint64_t* fingerprintOut)
+mnavResult mnavFlightVolume_GetTile(const mnavFlightVolume* volume, int32_t tileX, int32_t tileZ,
+                                    uint64_t* fingerprintOut)
 {
     mnavClearOutput(fingerprintOut, sizeof(*fingerprintOut));
     mnavResult result = mnavHostCountInvalid(
@@ -409,7 +410,7 @@ static MNAV_NOINLINE mnavResult IsFlightOpenCounted(const mnavFlightVolume* volu
     return mnavClearOnFailure(result, openOut, sizeof(*openOut));
 }
 
-mnavResult mnavIsFlightOpen(const mnavFlightVolume* volume, mnavPos3 point, bool* openOut)
+mnavResult mnavFlightVolume_IsOpen(const mnavFlightVolume* volume, mnavPos3 point, bool* openOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = IsFlightOpenCounted(volume, point, openOut);

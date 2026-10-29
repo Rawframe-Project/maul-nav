@@ -88,7 +88,7 @@ static void DropTile(mnavFlightBaker* baker)
     baker->tileSize = 0;
 }
 
-uint64_t mnavGetFlightBakerMisuse(const mnavFlightBaker* baker)
+uint64_t mnavFlightBaker_GetMisuse(const mnavFlightBaker* baker)
 {
     return baker != nullptr ? mnavHostMisuse(&baker->host) : 0;
 }
@@ -129,7 +129,7 @@ static uint64_t HashSettings(const mnavFlightDef* def, int32_t tileX, int32_t ti
         mnavFloatBits(def->floor),
         mnavFloatBits(def->ceiling),
         mnavFloatBits(def->radius),
-        def->groundBelow ? 1u : 0u,
+        def->enableGroundFill ? 1u : 0u,
         (uint32_t)tileX,
         (uint32_t)tileZ,
     };
@@ -209,8 +209,8 @@ static MNAV_NOINLINE mnavResult BakeFlightTileWork(mnavFlightBaker* baker,
                                                : result;
 }
 
-mnavResult mnavBakeFlightTile(mnavFlightBaker* baker, const mnavBakeInput* input, int32_t tileX,
-                              int32_t tileZ, mnavFlightBakeReport* reportOut)
+mnavResult mnavFlightBaker_BakeTile(mnavFlightBaker* baker, const mnavBakeInput* input,
+                                    int32_t tileX, int32_t tileZ, mnavFlightBakeReport* reportOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = BakeFlightTileWork(baker, input, tileX, tileZ, reportOut);
@@ -244,8 +244,8 @@ static mnavResult CopyFlightTileWork(const mnavFlightBaker* baker, uint8_t* buff
     return mnav_success;
 }
 
-mnavResult mnavCopyFlightTile(const mnavFlightBaker* baker, uint8_t* bufferOut, size_t capacity,
-                              size_t* sizeOut)
+mnavResult mnavFlightBaker_CopyTile(const mnavFlightBaker* baker, uint8_t* bufferOut,
+                                    size_t capacity, size_t* sizeOut)
 {
     mnavClearOutput(sizeOut, sizeof(*sizeOut));
     mnavResult result = mnavHostCountInvalid(

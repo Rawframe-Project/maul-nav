@@ -44,12 +44,12 @@ static void TestResultNames(void)
     for (size_t i = 0; i < sizeof(results) / sizeof(results[0]); ++i)
     {
         CHECK(results[i].result == results[i].value, "the family's value");
-        CHECK(strcmp(mnavResultName(results[i].result), results[i].name) == 0, "its name");
+        CHECK(strcmp(mnavGetResultName(results[i].result), results[i].name) == 0, "its name");
     }
-    CHECK(strcmp(mnavResultName(-5), "unknown result") == 0 &&
-              strcmp(mnavResultName(-34), "unknown result") == 0,
+    CHECK(strcmp(mnavGetResultName(-5), "unknown result") == 0 &&
+              strcmp(mnavGetResultName(-34), "unknown result") == 0,
           "values no error has");
-    CHECK(strcmp(mnavResultName(12345), "unknown result") == 0, "unknown name");
+    CHECK(strcmp(mnavGetResultName(12345), "unknown result") == 0, "unknown name");
 }
 
 static void TestHashIsTheFamilyHash(void)

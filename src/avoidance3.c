@@ -305,9 +305,9 @@ static MNAV_NOINLINE mnavResult Avoid3DCounted(mnavAvoidance* avoidance, const m
     return mnavAvoidClear(result, avoidance, agentCount, velocitiesOut, sizeof(*velocitiesOut));
 }
 
-mnavResult mnavAvoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
-                       const mnavSphere* spheres, int32_t sphereCount, double step,
-                       mnavVec3* velocitiesOut)
+mnavResult mnavAvoidance_Avoid3D(mnavAvoidance* avoidance, const mnavAgent3D* agents,
+                                 int32_t agentCount, const mnavSphere* spheres, int32_t sphereCount,
+                                 double step, mnavVec3* velocitiesOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
@@ -381,9 +381,9 @@ DebugAvoidance3DCounted(mnavAvoidance* avoidance, const mnavAgent3D* agents, int
         DebugAvoidance3DWork(avoidance, agents, agentCount, spheres, sphereCount, buffer));
 }
 
-mnavResult mnavDebugAvoidance3D(mnavAvoidance* avoidance, const mnavAgent3D* agents,
-                                int32_t agentCount, const mnavSphere* spheres, int32_t sphereCount,
-                                mnavDebugBuffer* buffer)
+mnavResult mnavAvoidance_Debug3D(mnavAvoidance* avoidance, const mnavAgent3D* agents,
+                                 int32_t agentCount, const mnavSphere* spheres, int32_t sphereCount,
+                                 mnavDebugBuffer* buffer)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =

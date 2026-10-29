@@ -91,10 +91,10 @@ static mnavBakeInput Input(void)
 static void CallBaker(void* object)
 {
     mnavBaker* baker = object;
-    Count(mnavBakeTile(baker, nullptr, 0, 0, nullptr));
-    Count(mnavBakeTile2D(baker, nullptr, 0, 0, nullptr));
-    Count(mnavBakeTileCached(baker, nullptr, nullptr, 0, 0, nullptr));
-    Count(mnavRebuildTile(baker, nullptr, 0, 0, nullptr, 0, nullptr));
+    Count(mnavBaker_BakeTile(baker, nullptr, 0, 0, nullptr));
+    Count(mnavBaker_BakeTile2D(baker, nullptr, 0, 0, nullptr));
+    Count(mnavBaker_BakeTileCached(baker, nullptr, nullptr, 0, 0, nullptr));
+    Count(mnavBaker_RebuildTile(baker, nullptr, 0, 0, nullptr, 0, nullptr));
     mnavDestroyBaker(baker);
     s_made += 1;
 }
@@ -102,9 +102,9 @@ static void CallBaker(void* object)
 static void CallCache(void* object)
 {
     mnavTileCache* cache = object;
-    Count(mnavBakeTileCached(nullptr, cache, nullptr, 0, 0, nullptr));
-    Count(mnavRebuildTile(nullptr, cache, 0, 0, nullptr, 0, nullptr));
-    mnavDropCachedTile(cache, 0, 0);
+    Count(mnavBaker_BakeTileCached(nullptr, cache, nullptr, 0, 0, nullptr));
+    Count(mnavBaker_RebuildTile(nullptr, cache, 0, 0, nullptr, 0, nullptr));
+    mnavTileCache_DropTile(cache, 0, 0);
     mnavDestroyTileCache(cache);
     s_made += 2;
 }
@@ -118,8 +118,8 @@ static void CallIndex(void* object)
 static void CallHierarchy(void* object)
 {
     mnavHierarchy* hierarchy = object;
-    Count(mnavBuildHierarchy(hierarchy, nullptr, nullptr, nullptr, nullptr));
-    Count(mnavUpdateHierarchy(hierarchy, nullptr, nullptr, nullptr));
+    Count(mnavHierarchy_Build(hierarchy, nullptr, nullptr, nullptr, nullptr));
+    Count(mnavHierarchy_Update(hierarchy, nullptr, nullptr, nullptr));
     mnavDestroyHierarchy(hierarchy);
     s_made += 1;
 }
@@ -127,10 +127,10 @@ static void CallHierarchy(void* object)
 static void CallFlow(void* object)
 {
     mnavFlowField* field = object;
-    Count(mnavBeginFlowField(field, nullptr, nullptr, nullptr, nullptr, 0));
-    Count(mnavContinueFlowField(field, nullptr, 1, nullptr));
-    Count(mnavUpdateFlowField(field, nullptr, nullptr, 0, nullptr, 0));
-    Count(mnavBuildFlowField(field, nullptr, nullptr, nullptr, 0));
+    Count(mnavFlowField_Begin(field, nullptr, nullptr, nullptr, 0, nullptr));
+    Count(mnavFlowField_Continue(field, nullptr, 1, nullptr));
+    Count(mnavFlowField_Update(field, nullptr, nullptr, 0, nullptr, 0));
+    Count(mnavFlowField_Build(field, nullptr, nullptr, 0, nullptr));
     mnavDestroyFlowField(field);
     s_made += 1;
 }
@@ -138,9 +138,9 @@ static void CallFlow(void* object)
 static void CallNavFlow(void* object)
 {
     mnavNavFlow* field = object;
-    Count(mnavBeginNavFlow(field, nullptr, nullptr, nullptr, nullptr, 0));
-    Count(mnavContinueNavFlow(field, nullptr, 1, nullptr));
-    Count(mnavBuildNavFlow(field, nullptr, nullptr, nullptr, 0));
+    Count(mnavNavFlow_Begin(field, nullptr, nullptr, nullptr, 0, nullptr));
+    Count(mnavNavFlow_Continue(field, nullptr, 1, nullptr));
+    Count(mnavNavFlow_Build(field, nullptr, nullptr, 0, nullptr));
     mnavDestroyNavFlow(field);
     s_made += 1;
 }
@@ -148,10 +148,10 @@ static void CallNavFlow(void* object)
 static void CallAvoidance(void* object)
 {
     mnavAvoidance* avoidance = object;
-    Count(mnavAvoid(avoidance, nullptr, 0, nullptr, 0, 1.0, nullptr));
-    Count(mnavAvoid3D(avoidance, nullptr, 0, nullptr, 0, 1.0, nullptr));
-    Count(mnavDebugAvoidance(avoidance, nullptr, 0, 0.0, nullptr));
-    Count(mnavDebugAvoidance3D(avoidance, nullptr, 0, nullptr, 0, nullptr));
+    Count(mnavAvoidance_Avoid(avoidance, nullptr, 0, nullptr, 0, 1.0, nullptr));
+    Count(mnavAvoidance_Avoid3D(avoidance, nullptr, 0, nullptr, 0, 1.0, nullptr));
+    Count(mnavAvoidance_Debug(avoidance, nullptr, 0, 0.0, nullptr));
+    Count(mnavAvoidance_Debug3D(avoidance, nullptr, 0, nullptr, 0, nullptr));
     mnavDestroyAvoidance(avoidance);
     s_made += 1;
 }
@@ -159,7 +159,7 @@ static void CallAvoidance(void* object)
 static void CallFlightBaker(void* object)
 {
     mnavFlightBaker* baker = object;
-    Count(mnavBakeFlightTile(baker, nullptr, 0, 0, nullptr));
+    Count(mnavFlightBaker_BakeTile(baker, nullptr, 0, 0, nullptr));
     mnavDestroyFlightBaker(baker);
     s_made += 1;
 }
@@ -167,9 +167,9 @@ static void CallFlightBaker(void* object)
 static void CallVolume(void* object)
 {
     mnavFlightVolume* volume = object;
-    Count(mnavStageFlightTile(volume, nullptr, 0).result);
-    Count(mnavStageFlightTileRemoval(volume, 0, 0));
-    Count(mnavCommitFlight(volume));
+    Count(mnavFlightVolume_StageTile(volume, nullptr, 0).result);
+    Count(mnavFlightVolume_StageTileRemoval(volume, 0, 0));
+    Count(mnavFlightVolume_Commit(volume));
     mnavDestroyFlightVolume(volume);
     s_made += 1;
 }
@@ -179,13 +179,13 @@ static void CallNavmesh(void* object)
     mnavNavmesh* navmesh = object;
     const mnavPolygonId none = {0, 0, 0};
     const mnavLinkId link = {0, 0};
-    Count(mnavStageTile(navmesh, s_trench0, sizeof(s_trench0)).result);
-    Count(mnavStageTileRemoval(navmesh, 0, 0));
-    Count(mnavCommit(navmesh));
-    Count(mnavStageArea(navmesh, none, mnav_areaWalkable));
+    Count(mnavNavmesh_StageTile(navmesh, s_trench0, sizeof(s_trench0)).result);
+    Count(mnavNavmesh_StageTileRemoval(navmesh, 0, 0));
+    Count(mnavNavmesh_Commit(navmesh));
+    Count(mnavPolygon_StageArea(navmesh, none, mnav_areaWalkable));
     Count(mnavStageLink(navmesh, nullptr, nullptr));
     Count(mnavStageLinkRemoval(navmesh, link));
-    Count(mnavStageLinkEnabled(navmesh, link, false));
+    Count(mnavLink_StageEnable(navmesh, link, false));
     mnavDestroyNavmesh(navmesh);
     s_made += 1;
 }
@@ -196,7 +196,7 @@ static void CallQuery(void* object)
     mnavQuery* query = object;
     const mnavPolygonId none = {0, 0, 0};
     const mnavPos3 a = {0.0, 0.0, 0.0};
-    Count(mnavFindPath(query, nullptr, nullptr, none, a, none, a, nullptr));
+    Count(mnavQuery_FindPath(query, nullptr, none, a, none, a, nullptr, nullptr));
     mnavDestroyQuery(query);
     s_made += 1;
 }
@@ -215,27 +215,27 @@ static uint64_t Misuse(int32_t kind, const void* object)
     switch (kind)
     {
     case BAKER:
-        return mnavGetBakerMisuse(object);
+        return mnavBaker_GetMisuse(object);
     case CACHE:
-        return mnavGetTileCacheMisuse(object);
+        return mnavTileCache_GetMisuse(object);
     case INDEX:
-        return mnavGetTileIndexMisuse(object);
+        return mnavTileIndex_GetMisuse(object);
     case HIERARCHY:
-        return mnavGetHierarchyMisuse(object);
+        return mnavHierarchy_GetMisuse(object);
     case FLOW:
-        return mnavGetFlowFieldMisuse(object);
+        return mnavFlowField_GetMisuse(object);
     case NAVFLOW:
-        return mnavGetNavFlowMisuse(object);
+        return mnavNavFlow_GetMisuse(object);
     case AVOIDANCE:
-        return mnavGetAvoidanceMisuse(object);
+        return mnavAvoidance_GetMisuse(object);
     case FLIGHT_BAKER:
-        return mnavGetFlightBakerMisuse(object);
+        return mnavFlightBaker_GetMisuse(object);
     case VOLUME:
-        return mnavGetFlightVolumeMisuse(object);
+        return mnavFlightVolume_GetMisuse(object);
     case NAVMESH:
-        return mnavGetNavmeshMisuse(object);
+        return mnavNavmesh_GetMisuse(object);
     default:
-        return mnavGetQueryMisuse(object);
+        return mnavQuery_GetMisuse(object);
     }
 }
 
@@ -294,7 +294,7 @@ static void* MakeBaker(void)
     mnavBaker* baker = nullptr;
     const mnavBakeInput input = Input();
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &input, 0, 0, nullptr) == mnav_success,
+              mnavBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success,
           "a baker with a tile");
     return baker;
 }
@@ -307,7 +307,7 @@ static void* MakeCache(void)
     mnavTileCache* cache = nullptr;
     const mnavBakeInput input = Input();
     CHECK(mnavCreateTileCache(&def, &cache) == mnav_success &&
-              mnavBakeTileCached(s_plainBaker, cache, &input, 0, 0, nullptr) == mnav_success,
+              mnavBaker_BakeTileCached(s_plainBaker, cache, &input, 0, 0, nullptr) == mnav_success,
           "a cache with a tile");
     return cache;
 }
@@ -380,7 +380,7 @@ static void* MakeFlightBaker(void)
     mnavFlightBaker* baker = nullptr;
     const mnavBakeInput input = Input();
     CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success &&
-              mnavBakeFlightTile(baker, &input, 0, 0, nullptr) == mnav_success,
+              mnavFlightBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success,
           "a flight baker with a tile");
     return baker;
 }
@@ -390,8 +390,8 @@ static void* MakeVolume(void)
     mnavFlightDef def = FlightDef();
     mnavFlightVolume* volume = nullptr;
     CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success &&
-              mnavStageFlightTile(volume, s_flight, s_flightSize).result == mnav_success &&
-              mnavCommitFlight(volume) == mnav_success,
+              mnavFlightVolume_StageTile(volume, s_flight, s_flightSize).result == mnav_success &&
+              mnavFlightVolume_Commit(volume) == mnav_success,
           "a flight volume with a tile");
     return volume;
 }
@@ -402,8 +402,8 @@ static void* MakeNavmesh(void)
     def.allocator = s_reentrant;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "a navmesh with a tile");
     return navmesh;
 }
@@ -514,9 +514,9 @@ static Outcome BakeOuter(void* object)
 {
     const mnavBakeInput input = Input();
     mnavBaker* baker = object;
-    Outcome out = {mnavBakeTile(baker, &input, 1, 0, nullptr), 0};
+    Outcome out = {mnavBaker_BakeTile(baker, &input, 1, 0, nullptr), 0};
     size_t size = 0;
-    if (mnavCopyBakedTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
+    if (mnavBaker_CopyTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
     {
         out.hash = mnavHash64(0, s_bytes, (int32_t)size);
     }
@@ -527,8 +527,8 @@ static Outcome CacheOuter(void* object)
 {
     const mnavBakeInput input = Input();
     mnavTileCache* cache = object;
-    Outcome out = {mnavBakeTileCached(s_plainBaker, cache, &input, 1, 0, nullptr),
-                   mnavGetTileCacheBytes(cache)};
+    Outcome out = {mnavBaker_BakeTileCached(s_plainBaker, cache, &input, 1, 0, nullptr),
+                   mnavTileCache_GetBytes(cache)};
     return out;
 }
 
@@ -536,9 +536,9 @@ static Outcome FlightBakeOuter(void* object)
 {
     const mnavBakeInput input = Input();
     mnavFlightBaker* baker = object;
-    Outcome out = {mnavBakeFlightTile(baker, &input, 1, 0, nullptr), 0};
+    Outcome out = {mnavFlightBaker_BakeTile(baker, &input, 1, 0, nullptr), 0};
     size_t size = 0;
-    if (mnavCopyFlightTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
+    if (mnavFlightBaker_CopyTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
     {
         out.hash = mnavHash64(0, s_bytes, (int32_t)size);
     }
@@ -549,12 +549,12 @@ static Outcome FlightBakeOuter(void* object)
 static Outcome VolumeOuter(void* object)
 {
     mnavFlightVolume* volume = object;
-    Outcome out = {mnavStageFlightTile(volume, s_flight, s_flightSize).result, 0};
+    Outcome out = {mnavFlightVolume_StageTile(volume, s_flight, s_flightSize).result, 0};
     if (out.result == mnav_success)
     {
-        out.result = mnavCommitFlight(volume);
+        out.result = mnavFlightVolume_Commit(volume);
     }
-    if (mnavGetFlightTile(volume, 0, 0, &out.hash) != mnav_success)
+    if (mnavFlightVolume_GetTile(volume, 0, 0, &out.hash) != mnav_success)
     {
         out.hash = 0;
     }
@@ -628,7 +628,7 @@ static Outcome Hashed(mnavResult result, const mnavBaker* baker)
 {
     Outcome out = {result, 0};
     size_t size = 0;
-    if (mnavCopyBakedTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
+    if (mnavBaker_CopyTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
     {
         out.hash = mnavHash64(0, s_bytes, (int32_t)size);
     }
@@ -637,29 +637,29 @@ static Outcome Hashed(mnavResult result, const mnavBaker* baker)
 
 static Outcome RebuildOuter(void* object)
 {
-    return Hashed(mnavRebuildTile(object, s_heldCache, 0, 0, nullptr, 0, nullptr), object);
+    return Hashed(mnavBaker_RebuildTile(object, s_heldCache, 0, 0, nullptr, 0, nullptr), object);
 }
 
 static Outcome CachedOuter(void* object)
 {
     const mnavBakeInput input = Input();
-    return Hashed(mnavBakeTileCached(object, s_heldCache, &input, 1, 0, nullptr), object);
+    return Hashed(mnavBaker_BakeTileCached(object, s_heldCache, &input, 1, 0, nullptr), object);
 }
 
 static Outcome IndexedOuter(void* object)
 {
     mnavBakeInput input = Input();
     input.index = s_heldIndex;
-    return Hashed(mnavBakeTile(object, &input, 1, 0, nullptr), object);
+    return Hashed(mnavBaker_BakeTile(object, &input, 1, 0, nullptr), object);
 }
 
 static Outcome FlightIndexedOuter(void* object)
 {
     mnavBakeInput input = Input();
     input.index = s_heldIndex;
-    Outcome out = {mnavBakeFlightTile(object, &input, 1, 0, nullptr), 0};
+    Outcome out = {mnavFlightBaker_BakeTile(object, &input, 1, 0, nullptr), 0};
     size_t size = 0;
-    if (mnavCopyFlightTile(object, s_bytes, sizeof(s_bytes), &size) == mnav_success)
+    if (mnavFlightBaker_CopyTile(object, s_bytes, sizeof(s_bytes), &size) == mnav_success)
     {
         out.hash = mnavHash64(0, s_bytes, (int32_t)size);
     }
@@ -703,7 +703,7 @@ static mnavNavmesh* s_heldNavmesh;
 static Outcome BuildOuter(void* object)
 {
     mnavHierarchyReport report = {0};
-    Outcome out = {mnavBuildHierarchy(object, s_heldQuery, s_heldNavmesh, nullptr, &report), 0};
+    Outcome out = {mnavHierarchy_Build(object, s_heldQuery, s_heldNavmesh, nullptr, &report), 0};
     out.hash = mnavHash64(0, &report, (int32_t)sizeof(report));
     return out;
 }
@@ -722,8 +722,8 @@ static void TestContextQuiet(void)
     CHECK(mnavCreateHierarchy(&def, &plain) == mnav_success, "a hierarchy");
     s_allocs = 0;
     s_frees = 0;
-    CHECK(mnavBuildHierarchy(plain, query, s_heldNavmesh, nullptr, nullptr) == mnav_success &&
-              mnavUpdateHierarchy(plain, query, s_heldNavmesh, nullptr) == mnav_success,
+    CHECK(mnavHierarchy_Build(plain, query, s_heldNavmesh, nullptr, nullptr) == mnav_success &&
+              mnavHierarchy_Update(plain, query, s_heldNavmesh, nullptr) == mnav_success,
           "built and updated");
     CHECK(s_allocs == 0 && s_frees == 0, "the context's allocator never ran");
     mnavDestroyHierarchy(plain);
@@ -741,23 +741,26 @@ static void Setup(void)
     mnavFlightBaker* baker = nullptr;
     const mnavBakeInput input = Input();
     CHECK(mnavCreateFlightBaker(&flight, &baker).result == mnav_success &&
-              mnavBakeFlightTile(baker, &input, 0, 0, nullptr) == mnav_success &&
-              mnavCopyFlightTile(baker, s_flight, sizeof(s_flight), &s_flightSize) == mnav_success,
+              mnavFlightBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
+              mnavFlightBaker_CopyTile(baker, s_flight, sizeof(s_flight), &s_flightSize) ==
+                  mnav_success,
           "a flight tile");
     mnavDestroyFlightBaker(baker);
     mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();
     cacheDef.limits.tiles = 4;
     CHECK(mnavCreateTileCache(&cacheDef, &s_heldCache) == mnav_success &&
-              mnavBakeTileCached(s_plainBaker, s_heldCache, &input, 0, 0, nullptr) ==
+              mnavBaker_BakeTileCached(s_plainBaker, s_heldCache, &input, 0, 0, nullptr) ==
                   mnav_success &&
               mnavCreateTileIndex(&def, &s_trench, 1, &s_heldIndex, nullptr) == mnav_success,
           "a cache with a tile, and an index");
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     CHECK(mnavCreateQuery(&queryDef, &s_heldQuery) == mnav_success &&
               mnavCreateNavmesh(&def, &s_heldNavmesh).result == mnav_success &&
-              mnavStageTile(s_heldNavmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
-              mnavStageTile(s_heldNavmesh, s_trench1, sizeof(s_trench1)).result == mnav_success &&
-              mnavCommit(s_heldNavmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_heldNavmesh, s_trench0, sizeof(s_trench0)).result ==
+                  mnav_success &&
+              mnavNavmesh_StageTile(s_heldNavmesh, s_trench1, sizeof(s_trench1)).result ==
+                  mnav_success &&
+              mnavNavmesh_Commit(s_heldNavmesh) == mnav_success,
           "a context, and a navmesh with the trench");
 }
 

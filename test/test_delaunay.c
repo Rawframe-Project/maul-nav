@@ -36,15 +36,15 @@ static void Load(const mnavBakeDef* def, const mnavBakeInput* input, mnavBakeRep
     mnavBaker* baker = nullptr;
     size_t size = 0;
     CHECK(mnavCreateBaker(def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, input, 0, 0, report) == mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+              mnavBaker_BakeTile(baker, input, 0, 0, report) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
 }
 
@@ -57,9 +57,9 @@ static int32_t Polygons(mnavPolygonId* polygons)
         for (int32_t x = 0; x < 128; x += 4)
         {
             mnavNearest n;
-            CHECK(mnavFindNearest(s_navmesh, nullptr,
-                                  (mnavPos3){(x + 0.5) * 0.25, 0.0, (z + 0.5) * 0.25},
-                                  (mnavVec3){0.01f, 20.0f, 0.01f}, &n) == mnav_success,
+            CHECK(mnavNavmesh_FindNearest(
+                      s_navmesh, (mnavPos3){(x + 0.5) * 0.25, 0.0, (z + 0.5) * 0.25},
+                      (mnavVec3){0.01f, 20.0f, 0.01f}, nullptr, &n) == mnav_success,
                   "nearest");
             bool seen = n.polygon.slot == 0 || !n.over;
             for (int32_t k = 0; k < count && !seen; ++k)
@@ -132,7 +132,7 @@ static Shape Read(mnavPolygonId polygon)
 {
     mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_vertices, VERTEX_ROOM, 0, s_triangles,
                          VERTEX_ROOM,     0,          nullptr,     0, 0};
-    CHECK(mnavDebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
+    CHECK(mnavNavmesh_DebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
     Shape shape = {b.triangleCount / 3, 0, 0, true, true, true};
     for (int32_t i = 0; i < b.vertexCount; ++i)
     {
@@ -233,8 +233,8 @@ static void TestSampleOnADiagonalSplitsBothTriangles(void)
     // diagonal: both triangles split there, into the pyramid's faces,
     // and no other sample is off them.
     mnavNearest n;
-    CHECK(mnavFindNearest(s_navmesh, nullptr, (mnavPos3){16.0, 4.0, 16.0},
-                          (mnavVec3){0.01f, 1.0f, 0.01f}, &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(s_navmesh, (mnavPos3){16.0, 4.0, 16.0},
+                                  (mnavVec3){0.01f, 1.0f, 0.01f}, nullptr, &n) == mnav_success &&
               n.over && report.polygons == 1,
           "one polygon");
     Shape s = Read(n.polygon);

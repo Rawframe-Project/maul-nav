@@ -99,10 +99,10 @@ extern "C"
     /// by tile, in place order (x, then z), then by polygon index.
     ///
     /// @param navmesh     The navmesh.
-    /// @param filter      The areas wanted, or NULL for every walkable one;
-    ///                    one including mnav_areaNone finds blocked polygons.
     /// @param center      The box's center.
     /// @param halfExtents The box's half sizes, in meters, at least 0.
+    /// @param filter      The areas wanted, or NULL for every walkable one;
+    ///                    one including mnav_areaNone finds blocked polygons.
     /// @param polygonsOut Receives up to capacity ids; NULL when capacity
     ///                    is 0.
     /// @param capacity    The room, at least 0.
@@ -119,11 +119,10 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. Any number of queries may run at once between
     /// commits.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindPolygons(const mnavNavmesh* navmesh,
-                                                        const mnavQueryFilter* filter,
-                                                        mnavPos3 center, mnavVec3 halfExtents,
-                                                        mnavPolygonId* polygonsOut,
-                                                        int32_t capacity, mnavFound* foundOut);
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavNavmesh_FindPolygons(const mnavNavmesh* navmesh, mnavPos3 center, mnavVec3 halfExtents,
+                             const mnavQueryFilter* filter, mnavPolygonId* polygonsOut,
+                             int32_t capacity, mnavFound* foundOut);
 
     /// Finds the polygon, among those the filter includes, nearest a point
     /// whose nearest point lies within a box round it, and that point. A
@@ -133,9 +132,9 @@ extern "C"
     /// polygon index.
     ///
     /// @param navmesh      The navmesh.
-    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param point        The query point.
     /// @param halfExtents  The box's half sizes, in meters, at least 0.
+    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param nearestOut   Receives the result. Zeroed on any failure.
     /// @return `mnav_success`, also when no polygon's nearest point lies in the
     /// box (the polygon's slot is then 0); `mnav_errorInvalid` for a NULL
@@ -146,10 +145,10 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. Any number of queries may run at once between
     /// commits.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindNearest(const mnavNavmesh* navmesh,
-                                                       const mnavQueryFilter* filter,
-                                                       mnavPos3 point, mnavVec3 halfExtents,
-                                                       mnavNearest* nearestOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_FindNearest(const mnavNavmesh* navmesh,
+                                                               mnavPos3 point, mnavVec3 halfExtents,
+                                                               const mnavQueryFilter* filter,
+                                                               mnavNearest* nearestOut);
 
 // The most corners a polygon clipped to a circle holds: a polygon's six
 // and one more for each of the 32 sides of the 32-gon standing for the
@@ -306,7 +305,7 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. It may be read at any time, also while host
     /// code the object runs calls back in.
-    MNAV_API uint64_t mnavGetQueryMisuse(const mnavQuery* query);
+    MNAV_API uint64_t mnavQuery_GetMisuse(const mnavQuery* query);
 
     /// Searches for the shortest way from a point on one polygon to a point
     /// on another: A* over the edges between polygons, its
@@ -322,13 +321,13 @@ extern "C"
     ///
     /// @param query        The context; its memory holds the result.
     /// @param navmesh      The navmesh.
-    /// @param filter       The areas usable and their costs, or NULL for
-    ///                     every walkable area at a cost of 1.
     /// @param startPolygon The polygon the start point lies on, as
-    ///                     mnavFindNearest gives it.
+    ///                     mnavNavmesh_FindNearest gives it.
     /// @param start        The start point.
     /// @param endPolygon   The polygon the end point lies on.
     /// @param end          The end point.
+    /// @param filter       The areas usable and their costs, or NULL for
+    ///                     every walkable area at a cost of 1.
     /// @param pathOut      Receives the result. Zeroed on any failure.
     /// @return `mnav_success` whenever a search ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
@@ -343,11 +342,9 @@ extern "C"
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may search one navmesh at once between
     /// commits.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindPath(mnavQuery* query, const mnavNavmesh* navmesh,
-                                                    const mnavQueryFilter* filter,
-                                                    mnavPolygonId startPolygon, mnavPos3 start,
-                                                    mnavPolygonId endPolygon, mnavPos3 end,
-                                                    mnavPath* pathOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_FindPath(
+        mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId startPolygon, mnavPos3 start,
+        mnavPolygonId endPolygon, mnavPos3 end, const mnavQueryFilter* filter, mnavPath* pathOut);
 
     /// Searches for the shortest way on the ground from a point on one
     /// polygon to a point on another: Polyanya (Cui, Harabor
@@ -361,20 +358,20 @@ extern "C"
     /// their declared cost, from the takeoff point to the landing point.
     /// Ties go to the node made first. When the nodes run out, the
     /// A* search tells whether the end can be reached at all, and an end it
-    /// cannot reach ends the search as no path. The result is that of mnavFindPath:
+    /// cannot reach ends the search as no path. The result is that of mnavQuery_FindPath:
     /// the polygons crossed, the turning points, which are the path, and
     /// the links crossed; cost and length are those of the points, in three
     /// dimensions. A sliced path search in the same context ends.
     ///
     /// @param query        The context; its memory holds the result.
     /// @param navmesh      The navmesh.
-    /// @param filter       The areas usable and their costs, or NULL for
-    ///                     every walkable area at a cost of 1.
     /// @param startPolygon The polygon the start point lies on, as
-    ///                     mnavFindNearest gives it.
+    ///                     mnavNavmesh_FindNearest gives it.
     /// @param start        The start point.
     /// @param endPolygon   The polygon the end point lies on.
     /// @param end          The end point.
+    /// @param filter       The areas usable and their costs, or NULL for
+    ///                     every walkable area at a cost of 1.
     /// @param pathOut      Receives the result. Zeroed on any failure.
     /// @return `mnav_success` whenever a search ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
@@ -390,26 +387,25 @@ extern "C"
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may search one navmesh at once between
     /// commits.
-    MNAV_NODISCARD MNAV_API mnavResult
-    mnavFindShortestPath(mnavQuery* query, const mnavNavmesh* navmesh,
-                         const mnavQueryFilter* filter, mnavPolygonId startPolygon, mnavPos3 start,
-                         mnavPolygonId endPolygon, mnavPos3 end, mnavPath* pathOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_FindShortestPath(
+        mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId startPolygon, mnavPos3 start,
+        mnavPolygonId endPolygon, mnavPos3 end, const mnavQueryFilter* filter, mnavPath* pathOut);
 
     /// Begins a path search to run in slices: the same search
-    /// as mnavFindPath, with its own copy of the filter, continued by
-    /// mnavContinuePath and ended by mnavFinishPath. Whatever the slices,
-    /// the result is the one mnavFindPath gives.
+    /// as mnavQuery_FindPath, with its own copy of the filter, continued by
+    /// mnavQuery_ContinuePath and ended by mnavQuery_FinishPath. Whatever the slices,
+    /// the result is the one mnavQuery_FindPath gives.
     ///
     /// @param query        The context; it holds the search until the next
     ///                     search of any kind, or a move along the
     ///                     surface, begins.
     /// @param navmesh      The navmesh.
-    /// @param filter       The areas usable and their costs, or NULL for
-    ///                     every walkable area at a cost of 1; copied.
     /// @param startPolygon The polygon the start point lies on.
     /// @param start        The start point.
     /// @param endPolygon   The polygon the end point lies on.
     /// @param end          The end point.
+    /// @param filter       The areas usable and their costs, or NULL for
+    ///                     every walkable area at a cost of 1; copied.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// that is not finite, a polygon id that never existed or a filter not
     /// built from mnavDefaultQueryFilter or with a NaN cost; `mnav_errorLimit`
@@ -420,12 +416,11 @@ extern "C"
     /// test, a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavBeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
-                                                     const mnavQueryFilter* filter,
-                                                     mnavPolygonId startPolygon, mnavPos3 start,
-                                                     mnavPolygonId endPolygon, mnavPos3 end);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_BeginPath(
+        mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId startPolygon, mnavPos3 start,
+        mnavPolygonId endPolygon, mnavPos3 end, const mnavQueryFilter* filter);
 
-    /// Continues a search begun by mnavBeginPath: closes up to a number of
+    /// Continues a search begun by mnavQuery_BeginPath: closes up to a number of
     /// nodes, fewer when the search ends first.
     ///
     /// @param query    The context.
@@ -441,12 +436,12 @@ extern "C"
     /// hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavContinuePath(mnavQuery* query,
-                                                        const mnavNavmesh* navmesh, int32_t nodes,
-                                                        bool* endedOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_ContinuePath(mnavQuery* query,
+                                                              const mnavNavmesh* navmesh,
+                                                              int32_t nodes, bool* endedOut);
 
-    /// Ends a search begun by mnavBeginPath and writes its result: as
-    /// mnavFindPath's when it has ended; otherwise toward the node nearest
+    /// Ends a search begun by mnavQuery_BeginPath and writes its result: as
+    /// mnavQuery_FindPath's when it has ended; otherwise toward the node nearest
     /// the end, its end mnav_pathUnfinished.
     ///
     /// @param query    The context; its memory holds the result.
@@ -460,8 +455,9 @@ extern "C"
     /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFinishPath(mnavQuery* query, const mnavNavmesh* navmesh,
-                                                      mnavPath* pathOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_FinishPath(mnavQuery* query,
+                                                            const mnavNavmesh* navmesh,
+                                                            mnavPath* pathOut);
 
     // How a move along the surface ended.
     typedef uint8_t mnavMoveEnd;
@@ -502,11 +498,11 @@ extern "C"
     ///
     /// @param query        The context; its memory holds the polygons.
     /// @param navmesh      The navmesh.
-    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param startPolygon The polygon the start point lies on.
     /// @param start        The start point.
     /// @param end          The wanted point; only its ground position
     ///                     counts.
+    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param moveOut      Receives the result. Zeroed on any failure.
     /// @return `mnav_success` whenever the move ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
@@ -521,9 +517,9 @@ extern "C"
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may move on one navmesh at once between
     /// commits.
-    MNAV_NODISCARD MNAV_API mnavResult mnavMoveAlongSurface(
-        mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-        mnavPolygonId startPolygon, mnavPos3 start, mnavPos3 end, mnavMove* moveOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_MoveAlongSurface(
+        mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId startPolygon, mnavPos3 start,
+        mnavPos3 end, const mnavQueryFilter* filter, mnavMove* moveOut);
 
     // A path corridor: the polygons from the agent's to its
     // target's, in a buffer the caller owns, with the agent's position on
@@ -582,7 +578,7 @@ extern "C"
     /// position and its last as the target.
     ///
     /// @param corridor The corridor.
-    /// @param path     A path from mnavFindPath or mnavFinishPath.
+    /// @param path     A path from mnavQuery_FindPath or mnavQuery_FinishPath.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor with no buffer or a capacity below 1, or a path with no
     /// polygon or point; `mnav_errorCapacity` when the path
@@ -598,8 +594,8 @@ extern "C"
     /// than all means the corridor needs trimming there and replanning.
     ///
     /// @param navmesh  The navmesh.
-    /// @param filter   The areas and kinds usable, or NULL for all.
     /// @param corridor The corridor.
+    /// @param filter   The areas and kinds usable, or NULL for all.
     /// @param validOut Receives the count. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor not well formed or a filter not built from
@@ -609,17 +605,17 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may check corridors at
     /// once between commits.
-    MNAV_NODISCARD MNAV_API mnavResult mnavCheckCorridor(const mnavNavmesh* navmesh,
-                                                         const mnavQueryFilter* filter,
-                                                         const mnavCorridor* corridor,
-                                                         int32_t* validOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_CheckCorridor(const mnavNavmesh* navmesh,
+                                                                 const mnavCorridor* corridor,
+                                                                 const mnavQueryFilter* filter,
+                                                                 int32_t* validOut);
 
     /// Finds a corridor's straight path from its position to its target:
     /// the funnel over the portals between its polygons.
     ///
     /// @param query    The context; its memory holds the corners.
-    /// @param navmesh  The navmesh.
     /// @param corridor The corridor.
+    /// @param navmesh  The navmesh.
     /// @param cornersOut Receives the straight path. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor not well formed or polygons not joined; `mnav_errorStale` for a
@@ -630,21 +626,21 @@ extern "C"
     /// allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavCorridorCorners(mnavQuery* query,
-                                                           const mnavNavmesh* navmesh,
-                                                           const mnavCorridor* corridor,
-                                                           mnavCorners* cornersOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_FindCorridorCorners(mnavQuery* query,
+                                                                     const mnavCorridor* corridor,
+                                                                     const mnavNavmesh* navmesh,
+                                                                     mnavCorners* cornersOut);
 
     /// Finds the areas along a corridor's straight path: the corners
-    /// mnavCorridorCorners gives, which replace the context's last ones,
+    /// mnavQuery_FindCorridorCorners gives, which replace the context's last ones,
     /// and a run where the path starts, one wherever it crosses into a
     /// polygon of another area, and one where it lands from each off-mesh
     /// link, in order. Hosts change gait or sound at a run's start; a
     /// path's areas are its corridor's, once loaded with mnavSetCorridor.
     ///
     /// @param query      The context; its memory holds the corners.
-    /// @param navmesh    The navmesh.
     /// @param corridor   The corridor.
+    /// @param navmesh    The navmesh.
     /// @param cornersOut Receives the straight path, or NULL. Zeroed on any
     ///                   failure.
     /// @param runsOut    Receives the runs, in order. May be NULL when
@@ -653,7 +649,7 @@ extern "C"
     /// @param countOut   Receives how many runs there are, also when they do not
     ///                   all fit. Zeroed on any failure but mnav_errorCapacity,
     ///                   which gives the total.
-    /// @return As mnavCorridorCorners; also `mnav_errorInvalid` for a NULL
+    /// @return As mnavQuery_FindCorridorCorners; also `mnav_errorInvalid` for a NULL
     /// countOut, a negative capacity or NULL runs with a positive one, and
     /// `mnav_errorCapacity` when the runs do not fit, the first capacity of
     /// them written. Also `mnav_errorBusy` when called back in from host code a
@@ -661,8 +657,8 @@ extern "C"
     /// hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavCorridorAreas(
-        mnavQuery* query, const mnavNavmesh* navmesh, const mnavCorridor* corridor,
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_FindCorridorAreas(
+        mnavQuery* query, const mnavCorridor* corridor, const mnavNavmesh* navmesh,
         mnavCorners* cornersOut, mnavAreaRun* runsOut, int32_t capacity, int32_t* countOut);
 
     // The fastest mnavSteer may steer, and the longest distance it slows
@@ -687,7 +683,7 @@ extern "C"
         float arriveDistance;
         // Whether to swing wide of the next corner so as to meet the turn
         // already heading out of it, as Detour's crowd does.
-        bool anticipateTurns;
+        bool enableTurnAnticipation;
     } mnavSteerDef;
 
     // What mnavSteer found.
@@ -737,7 +733,7 @@ extern "C"
         def.maxSpeed = 3.5f;
         def.slowDistance = 1.0f;
         def.arriveDistance = 0.1f;
-        def.anticipateTurns = true;
+        def.enableTurnAnticipation = true;
         return def;
     }
 
@@ -746,7 +742,7 @@ extern "C"
     /// its slowing distance of the target by the distance left along the
     /// corners over it; stopped within the arrival distance of the target
     /// or of the next link's takeoff. Keeps no state: call it each step
-    /// with the corners mnavCorridorCorners gives, feed the velocity to
+    /// with the corners mnavQuery_FindCorridorCorners gives, feed the velocity to
     /// avoidance, and limit acceleration and move the agent yourself.
     ///
     /// @param corners     The corners, the agent's position first.
@@ -767,18 +763,18 @@ extern "C"
                                                  mnavSteering* steeringOut);
 
     /// Moves a corridor's position along the surface toward a wanted point
-    /// (mnavMoveAlongSurface from its first polygon) and merges the
+    /// (mnavQuery_MoveAlongSurface from its first polygon) and merges the
     /// polygons walked into its start: it keeps its polygons from the
     /// farthest one the walk passed, led to by the walk.
     ///
     /// @param query    The context, for the walk.
-    /// @param navmesh  The navmesh.
-    /// @param filter   The areas usable, or NULL for every walkable one.
     /// @param corridor The corridor.
+    /// @param navmesh  The navmesh.
     /// @param wanted   Where the agent would be; only its ground position
     ///                 counts.
+    /// @param filter   The areas usable, or NULL for every walkable one.
     /// @param moveOut  Receives the walk, or NULL. Zeroed on any failure.
-    /// @return As mnavMoveAlongSurface; also `mnav_errorInvalid` for a corridor
+    /// @return As mnavQuery_MoveAlongSurface; also `mnav_errorInvalid` for a corridor
     /// not well formed, and `mnav_errorCapacity` when the merged corridor would
     /// outgrow its buffer, which leaves it unchanged. Also `mnav_errorBusy`
     /// when called back in from host code a call using the context runs (a link
@@ -787,36 +783,32 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// So is the corridor.
-    MNAV_NODISCARD MNAV_API mnavResult mnavMoveCorridor(mnavQuery* query,
-                                                        const mnavNavmesh* navmesh,
-                                                        const mnavQueryFilter* filter,
-                                                        mnavCorridor* corridor, mnavPos3 wanted,
-                                                        mnavMove* moveOut);
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavQuery_MoveCorridor(mnavQuery* query, mnavCorridor* corridor, const mnavNavmesh* navmesh,
+                           mnavPos3 wanted, const mnavQueryFilter* filter, mnavMove* moveOut);
 
     /// Moves a corridor's target along the surface toward a wanted point
-    /// (mnavMoveAlongSurface from its last polygon) and merges the polygons
+    /// (mnavQuery_MoveAlongSurface from its last polygon) and merges the polygons
     /// walked into its end: it keeps its polygons up to the first one the
     /// walk passed, then the rest of the walk.
     ///
     /// @param query    The context, for the walk.
-    /// @param navmesh  The navmesh.
-    /// @param filter   The areas usable, or NULL for every walkable one.
     /// @param corridor The corridor.
+    /// @param navmesh  The navmesh.
     /// @param wanted   Where the target would be; only its ground position
     ///                 counts.
+    /// @param filter   The areas usable, or NULL for every walkable one.
     /// @param moveOut  Receives the walk, or NULL. Zeroed on any failure.
-    /// @return As mnavMoveCorridor. Also `mnav_errorBusy` when called back in
+    /// @return As mnavQuery_MoveCorridor. Also `mnav_errorBusy` when called back in
     /// from host code a call using the context runs (a link generation's
     /// clearance test, a hierarchy's allocator as it builds), one misuse
     /// counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// So is the corridor.
-    MNAV_NODISCARD MNAV_API mnavResult mnavMoveCorridorTarget(mnavQuery* query,
-                                                              const mnavNavmesh* navmesh,
-                                                              const mnavQueryFilter* filter,
-                                                              mnavCorridor* corridor,
-                                                              mnavPos3 wanted, mnavMove* moveOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_MoveCorridorTarget(
+        mnavQuery* query, mnavCorridor* corridor, const mnavNavmesh* navmesh, mnavPos3 wanted,
+        const mnavQueryFilter* filter, mnavMove* moveOut);
 
     /// Shortens a corridor where the agent can see ahead: casts a ray from
     /// its position toward a point, usually a corner a few ahead; when the
@@ -824,13 +816,13 @@ extern "C"
     /// start up to the last corridor polygon it passed, if that is fewer.
     ///
     /// @param query        The context, for the ray.
-    /// @param navmesh      The navmesh.
-    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param corridor     The corridor.
+    /// @param navmesh      The navmesh.
     /// @param toward       The point to look toward.
+    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param shortenedOut Receives whether the corridor changed. Zeroed on any
     ///                     failure.
-    /// @return As mnavRaycast; also `mnav_errorInvalid` for a corridor not well
+    /// @return As mnavQuery_Raycast; also `mnav_errorInvalid` for a corridor not well
     /// formed or a NULL shortenedOut. Also `mnav_errorBusy` when called back in
     /// from host code a call using the context runs (a link generation's
     /// clearance test, a hierarchy's allocator as it builds), one misuse
@@ -838,11 +830,9 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// So is the corridor.
-    MNAV_NODISCARD MNAV_API mnavResult mnavShortcutCorridor(mnavQuery* query,
-                                                            const mnavNavmesh* navmesh,
-                                                            const mnavQueryFilter* filter,
-                                                            mnavCorridor* corridor, mnavPos3 toward,
-                                                            bool* shortenedOut);
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavQuery_ShortcutCorridor(mnavQuery* query, mnavCorridor* corridor, const mnavNavmesh* navmesh,
+                               mnavPos3 toward, const mnavQueryFilter* filter, bool* shortenedOut);
 
     /// Plans a corridor again from its position to its target and loads
     /// the path found: from its first and last polygons while they are
@@ -851,28 +841,26 @@ extern "C"
     /// no polygon is left as it was, the path's end saying why.
     ///
     /// @param query       The context, for the search; it holds the path.
-    /// @param navmesh     The navmesh.
-    /// @param filter      The areas usable and their costs, or NULL.
     /// @param corridor    The corridor.
+    /// @param navmesh     The navmesh.
     /// @param halfExtents The box's half sizes for finding polygons again.
+    /// @param filter      The areas usable and their costs, or NULL.
     /// @param pathOut     Receives the path, or an empty one ended
     ///                    mnav_pathNotLoaded or mnav_pathNone when an end found no
     ///                    polygon. Zeroed on any failure.
     /// @return `mnav_success` whenever the corridor was looked at;
     /// `mnav_errorInvalid` for a NULL argument or a corridor not well formed;
     /// `mnav_errorCapacity` when the path has more polygons than the buffer,
-    /// which leaves the corridor as it was; the errors of mnavFindNearest and
-    /// mnavFindPath otherwise. Also `mnav_errorBusy` when called back in from
+    /// which leaves the corridor as it was; the errors of mnavNavmesh_FindNearest and
+    /// mnavQuery_FindPath otherwise. Also `mnav_errorBusy` when called back in from
     /// host code a call using the context runs (a link generation's clearance
     /// test, a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
     /// So is the corridor.
-    MNAV_NODISCARD MNAV_API mnavResult mnavReplanCorridor(mnavQuery* query,
-                                                          const mnavNavmesh* navmesh,
-                                                          const mnavQueryFilter* filter,
-                                                          mnavCorridor* corridor,
-                                                          mnavVec3 halfExtents, mnavPath* pathOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_ReplanCorridor(
+        mnavQuery* query, mnavCorridor* corridor, const mnavNavmesh* navmesh, mnavVec3 halfExtents,
+        const mnavQueryFilter* filter, mnavPath* pathOut);
 
     // The longest side a grid may have, in cells.
 #define MNAV_MAX_GRID_SIDE 32768
@@ -925,14 +913,14 @@ extern "C"
     /// mean of its two cells' area costs. When every area the filter
     /// includes costs the same, the search is jump point search, else A*;
     /// both keep the context's node limit and path length, and end as
-    /// mnavFindPath does, with the path to the cell nearest the end when
+    /// mnavQuery_FindPath does, with the path to the cell nearest the end when
     /// the end is not reached. A grid search ends any sliced search.
     ///
     /// @param query   The context; its memory holds the path.
     /// @param grid    The grid.
-    /// @param filter  The areas usable and their costs, or NULL.
     /// @param start   The start cell.
     /// @param end     The end cell.
+    /// @param filter  The areas usable and their costs, or NULL.
     /// @param pathOut Receives the path; mnav_pathNone with the start alone when
     ///                the start is blocked. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a grid
@@ -946,10 +934,11 @@ extern "C"
     /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindGridPath(mnavQuery* query, const mnavGrid* grid,
-                                                        const mnavQueryFilter* filter,
-                                                        mnavCell start, mnavCell end,
-                                                        mnavGridPath* pathOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_FindGridPath(mnavQuery* query,
+                                                              const mnavGrid* grid, mnavCell start,
+                                                              mnavCell end,
+                                                              const mnavQueryFilter* filter,
+                                                              mnavGridPath* pathOut);
 
     /// Reads the height of a polygon's detail surface at a point on the
     /// ground.
@@ -967,9 +956,9 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it.
-    MNAV_NODISCARD MNAV_API mnavResult mnavGetHeight(const mnavNavmesh* navmesh,
-                                                     mnavPolygonId polygon, double x, double z,
-                                                     double* heightOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavPolygon_GetHeight(const mnavNavmesh* navmesh,
+                                                             mnavPolygonId polygon, double x,
+                                                             double z, double* heightOut);
 
     // A wall within a radius: an edge no polygon the filter includes lies
     // across.
@@ -1011,10 +1000,10 @@ extern "C"
     ///
     /// @param query      The context; its last search ends.
     /// @param navmesh    The navmesh.
-    /// @param filter     The areas usable, or NULL.
     /// @param polygon    The polygon the center lies in.
     /// @param center     The point.
     /// @param radius     How far to look, in meters, at least 0 and finite.
+    /// @param filter     The areas usable, or NULL.
     /// @param nearestOut Receives whether a wall was found, and the wall. Zeroed
     ///                   on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
@@ -1027,9 +1016,9 @@ extern "C"
     /// a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindWallDistance(
-        mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-        mnavPolygonId polygon, mnavPos3 center, double radius, mnavNearestWall* nearestOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_FindWallDistance(
+        mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId polygon, mnavPos3 center,
+        double radius, const mnavQueryFilter* filter, mnavNearestWall* nearestOut);
 
     // What a search for the walls within a radius found.
     typedef struct mnavWallsFound
@@ -1043,16 +1032,16 @@ extern "C"
 
     /// Lists the walls within a radius of a point on the ground, nearest
     /// first, for avoidance's segment obstacles: the search and the walls
-    /// of mnavFindWallDistance, whose wall is the first listed. Walls at
+    /// of mnavQuery_FindWallDistance, whose wall is the first listed. Walls at
     /// the same distance keep the order the search meets them in, the same
     /// on every platform.
     ///
     /// @param query    The context; its last search ends.
     /// @param navmesh  The navmesh.
-    /// @param filter   The areas usable, or NULL.
     /// @param polygon  The polygon the center lies in.
     /// @param center   The point.
     /// @param radius   How far to look, in meters, at least 0 and finite.
+    /// @param filter   The areas usable, or NULL.
     /// @param wallsOut Receives up to capacity walls, the nearest; NULL when
     ///                 capacity is 0.
     /// @param capacity The room, at least 0.
@@ -1072,11 +1061,10 @@ extern "C"
     /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindWalls(mnavQuery* query, const mnavNavmesh* navmesh,
-                                                     const mnavQueryFilter* filter,
-                                                     mnavPolygonId polygon, mnavPos3 center,
-                                                     double radius, mnavWall* wallsOut,
-                                                     int32_t capacity, mnavWallsFound* foundOut);
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavQuery_FindWalls(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId polygon,
+                        mnavPos3 center, double radius, const mnavQueryFilter* filter,
+                        mnavWall* wallsOut, int32_t capacity, mnavWallsFound* foundOut);
 
     // A random point and the polygon it lies on; slot 0 when there was no
     // polygon to pick.
@@ -1092,8 +1080,8 @@ extern "C"
     /// surface. The call reads every polygon twice.
     ///
     /// @param navmesh  The navmesh.
-    /// @param filter   The areas usable, or NULL.
     /// @param seed     Any value.
+    /// @param filter   The areas usable, or NULL.
     /// @param pointOut Receives the point. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// filter not built from mnavDefaultQueryFilter or with a NaN cost;
@@ -1102,10 +1090,10 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
     /// at once while no commit runs on it.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFindRandomPoint(const mnavNavmesh* navmesh,
-                                                           const mnavQueryFilter* filter,
-                                                           uint64_t seed,
-                                                           mnavRandomPoint* pointOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_FindRandomPoint(const mnavNavmesh* navmesh,
+                                                                   uint64_t seed,
+                                                                   const mnavQueryFilter* filter,
+                                                                   mnavRandomPoint* pointOut);
 
     /// Picks a point reachable from a center: a polygon the walls search
     /// reaches within the radius, by ground area, then a point uniformly
@@ -1113,13 +1101,13 @@ extern "C"
     ///
     /// @param query    The context; its last search ends.
     /// @param navmesh  The navmesh.
-    /// @param filter   The areas usable, or NULL.
     /// @param polygon  The polygon the center lies in.
     /// @param center   The center.
     /// @param radius   How far to search, in meters, at least 0 and finite.
     /// @param seed     Any value.
+    /// @param filter   The areas usable, or NULL.
     /// @param pointOut Receives the point. Zeroed on any failure.
-    /// @return As mnavFindWallDistance; also `mnav_errorLimit` when a polygon
+    /// @return As mnavQuery_FindWallDistance; also `mnav_errorLimit` when a polygon
     /// clipped to the circle, its 32-gon, has more than MNAV_MAX_CLIP_CORNERS
     /// corners, which rounding alone can cause. Also `mnav_errorBusy` when
     /// called back in from host code a call using the context runs (a link
@@ -1127,10 +1115,9 @@ extern "C"
     /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult
-    mnavFindRandomPointAround(mnavQuery* query, const mnavNavmesh* navmesh,
-                              const mnavQueryFilter* filter, mnavPolygonId polygon, mnavPos3 center,
-                              double radius, uint64_t seed, mnavRandomPoint* pointOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_FindRandomPointAround(
+        mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId polygon, mnavPos3 center,
+        double radius, uint64_t seed, const mnavQueryFilter* filter, mnavRandomPoint* pointOut);
 
     /// Tells whether the end can be reached from the start: the path search
     /// with its limits, without a path made. mnav_pathFound when it can,
@@ -1139,23 +1126,20 @@ extern "C"
     ///
     /// @param query        The context; its last search ends.
     /// @param navmesh      The navmesh.
-    /// @param filter       The areas usable and their costs, or NULL.
     /// @param startPolygon The polygon the start lies in.
     /// @param start        The start point.
     /// @param endPolygon   The polygon the end lies in.
     /// @param end          The end point.
+    /// @param filter       The areas usable and their costs, or NULL.
     /// @param endOut       Receives how the search ended. Zeroed on any failure.
-    /// @return As mnavFindPath. Also `mnav_errorBusy` when called back in from
+    /// @return As mnavQuery_FindPath. Also `mnav_errorBusy` when called back in from
     /// host code a call using the context runs (a link generation's clearance
     /// test, a hierarchy's allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavCheckReachable(mnavQuery* query,
-                                                          const mnavNavmesh* navmesh,
-                                                          const mnavQueryFilter* filter,
-                                                          mnavPolygonId startPolygon,
-                                                          mnavPos3 start, mnavPolygonId endPolygon,
-                                                          mnavPos3 end, mnavPathEnd* endOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavQuery_CheckReachable(
+        mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId startPolygon, mnavPos3 start,
+        mnavPolygonId endPolygon, mnavPos3 end, const mnavQueryFilter* filter, mnavPathEnd* endOut);
 
     // How a raycast ended.
     typedef uint8_t mnavRayEnd;
@@ -1200,11 +1184,11 @@ extern "C"
     ///
     /// @param query        The context; its memory holds the polygons.
     /// @param navmesh      The navmesh.
-    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param startPolygon The polygon the start point lies on, as
-    ///                     mnavFindNearest gives it.
+    ///                     mnavNavmesh_FindNearest gives it.
     /// @param start        The start point.
     /// @param end          The end point; only its ground position counts.
+    /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param rayOut       Receives the result. Zeroed on any failure.
     /// @return `mnav_success` whenever the ray was cast, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
@@ -1219,10 +1203,9 @@ extern "C"
     /// Safe from any thread; the context is used by one thread at a time.
     /// Any number of contexts may cast on one navmesh at once between
     /// commits.
-    MNAV_NODISCARD MNAV_API mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh,
-                                                   const mnavQueryFilter* filter,
-                                                   mnavPolygonId startPolygon, mnavPos3 start,
-                                                   mnavPos3 end, mnavRay* rayOut);
+    MNAV_NODISCARD MNAV_API mnavResult
+    mnavQuery_Raycast(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId startPolygon,
+                      mnavPos3 start, mnavPos3 end, const mnavQueryFilter* filter, mnavRay* rayOut);
 
 #ifdef __cplusplus
 }

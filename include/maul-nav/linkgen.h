@@ -25,16 +25,16 @@ extern "C"
 
     // Decides whether the way between two points is free for the agent:
     // the host's collision test. True to keep the link. It is called only
-    // within mnavGenerateLinks, on the thread that called it, before that
+    // within mnavQuery_GenerateLinks, on the thread that called it, before that
     // call returns; never afterward or from another thread. Its answer
     // decides the links, so it runs in the library's floating-point
     // environment: round to nearest, denormals kept. It may call what only
     // reads the navmesh, with a query context of its own, and
-    // mnavStageTile and mnavStageTileRemoval, which change nothing
+    // mnavNavmesh_StageTile and mnavNavmesh_StageTileRemoval, which change nothing
     // generation reads; while it runs, the navmesh's other stage calls,
     // commit and destroy and every call on the generating context are
     // refused with mnav_errorBusy, one misuse counted on that object.
-    typedef bool (*mnavClearanceFn)(void* context, mnavPos3 from, mnavPos3 to);
+    typedef bool mnavClearanceFunction(void* context, mnavPos3 from, mnavPos3 to);
 
     // How links are generated. Build it with mnavDefaultLinkGenDef.
     typedef struct mnavLinkGenDef
@@ -65,11 +65,11 @@ extern "C"
         mnavLinkKind dropKind;
         mnavLinkKind jumpKind;
         // The host's collision test, or NULL for none, and its context.
-        mnavClearanceFn clear;
+        mnavClearanceFunction* clearance;
         void* context;
     } mnavLinkGenDef;
 
-// The cookie mnavDefaultLinkGenDef sets and mnavGenerateLinks checks.
+// The cookie mnavDefaultLinkGenDef sets and mnavQuery_GenerateLinks checks.
 #define MNAV_LINK_GEN_DEF_COOKIE 0x4E41564Cu
 
     /// Returns the default generation def: samples every 1 m, drops up to
@@ -77,7 +77,7 @@ extern "C"
     /// when walking is within 3 times as far or their ends within 1 m of
     /// another's, a snap radius of 0.5 m, costs 2 and 4, kinds
     /// mnav_linkDrop and mnav_linkJump, and no clearance test. It carries
-    /// only a cookie: mnavGenerateLinks also takes a navmesh and a query
+    /// only a cookie: mnavQuery_GenerateLinks also takes a navmesh and a query
     /// context, whose creations checked the version.
     ///
     /// @return The def.
@@ -122,11 +122,11 @@ extern "C"
     /// @param query     A context for the walking searches; its last search
     ///                  ends.
     /// @param navmesh   The navmesh.
-    /// @param filter    The areas links may start and land on, and walk
-    ///                  through, or NULL.
     /// @param def       The def, from mnavDefaultLinkGenDef.
     /// @param tiles     The tile places whose edges are sampled, or NULL for
     ///                  every tile.
+    /// @param filter    The areas links may start and land on, and walk
+    ///                  through, or NULL.
     /// @param linksOut  Receives the links, up to capacity.
     /// @param capacity  The buffer's size in links, at least 0.
     /// @param countOut  Receives the number of links generated, also beyond the
@@ -153,12 +153,12 @@ extern "C"
     /// Safe from any thread; the context is used by one thread at a time,
     /// and no commit runs on the navmesh. The def's clearance test runs on
     /// the calling thread, within the call; while it runs, the navmesh's
-    /// stage calls but mnavStageTile and mnavStageTileRemoval are refused
+    /// stage calls but mnavNavmesh_StageTile and mnavNavmesh_StageTileRemoval are refused
     /// with `mnav_errorBusy` from any thread.
     MNAV_NODISCARD MNAV_API mnavResult
-    mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                      const mnavLinkGenDef* def, const mnavTileRange* tiles, mnavLinkDef* linksOut,
-                      int32_t capacity, int32_t* countOut);
+    mnavQuery_GenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh, const mnavLinkGenDef* def,
+                            const mnavTileRange* tiles, const mnavQueryFilter* filter,
+                            mnavLinkDef* linksOut, int32_t capacity, int32_t* countOut);
 
 #ifdef __cplusplus
 }

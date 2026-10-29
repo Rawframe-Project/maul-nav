@@ -410,9 +410,10 @@ static MNAV_NOINLINE mnavResult FindPolygonsCounted(const mnavNavmesh* navmesh,
     return mnavClearUnlessCapacity(result, foundOut, sizeof(*foundOut));
 }
 
-mnavResult mnavFindPolygons(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                            mnavPos3 center, mnavVec3 halfExtents, mnavPolygonId* polygonsOut,
-                            int32_t capacity, mnavFound* foundOut)
+mnavResult mnavNavmesh_FindPolygons(const mnavNavmesh* navmesh, mnavPos3 center,
+                                    mnavVec3 halfExtents, const mnavQueryFilter* filter,
+                                    mnavPolygonId* polygonsOut, int32_t capacity,
+                                    mnavFound* foundOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
@@ -479,8 +480,8 @@ static MNAV_NOINLINE mnavResult FindNearestCounted(const mnavNavmesh* navmesh,
     return mnavClearOnFailure(result, nearestOut, sizeof(*nearestOut));
 }
 
-mnavResult mnavFindNearest(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                           mnavPos3 point, mnavVec3 halfExtents, mnavNearest* nearestOut)
+mnavResult mnavNavmesh_FindNearest(const mnavNavmesh* navmesh, mnavPos3 point, mnavVec3 halfExtents,
+                                   const mnavQueryFilter* filter, mnavNearest* nearestOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = FindNearestCounted(navmesh, filter, point, halfExtents, nearestOut);

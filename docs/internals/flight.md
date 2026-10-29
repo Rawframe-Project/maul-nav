@@ -12,7 +12,7 @@ Agents that fly or swim need the free space of a volume, not a surface. Stacked 
 
 ## The bake
 
-`mnavBakeFlightTile` (`src/flight_baker.c`, `src/flight.c`) takes the navmesh bake's input and rasterizes it with the same rasterizer at a cell size and height of one voxel. A voxel any triangle touches is solid. With `groundBelow`, each column is also solid from the volume's floor up to its lowest solid voxel, so ground holds no open space beneath it. The flier is a sphere: a voxel within R = ceil(radius / voxel) of a solid voxel, by integer offsets with dx² + dy² + dz² ≤ R², is blocked. Each tile is rasterized with a border of R voxels, so its blocking matches its neighbors'.
+`mnavFlightBaker_BakeTile` (`src/flight_baker.c`, `src/flight.c`) takes the navmesh bake's input and rasterizes it with the same rasterizer at a cell size and height of one voxel. A voxel any triangle touches is solid. With `enableGroundFill`, each column is also solid from the volume's floor up to its lowest solid voxel, so ground holds no open space beneath it. The flier is a sphere: a voxel within R = ceil(radius / voxel) of a solid voxel, by integer offsets with dx² + dy² + dz² ≤ R², is blocked. Each tile is rasterized with a border of R voxels, so its blocking matches its neighbors'.
 
 A tile's side is 4 × 2^k voxels, 16 to 512, and the volume's height range is split into whole cubes of that side, each an octree. Bytes are the same on every platform and at any worker count, and the fingerprint covers the generator, the settings, the place and the input that reaches the tile, as a navmesh tile's does.
 
@@ -44,19 +44,19 @@ The loader reads every byte as hostile: the payload's hash, the fields as the gr
 
 ## The search
 
-`mnavFindFlightPath` (`src/flight_search.c`) runs Lazy Theta* over the open blocks of the committed tiles, of any size, and the open voxels of mixed leaves.
+`mnavQuery_FindFlightPath` (`src/flight_search.c`) runs Lazy Theta* over the open blocks of the committed tiles, of any size, and the open voxels of mixed leaves.
 
 - Blocks are linked through shared faces, found by descending the octrees across cubes and tiles.
 - Each block is entered at the point of the shared face nearest the point the path comes from, 1/1024 voxel inside the block and 4/1024 in from the face's edges, so that it never sits on a voxel's face or edge, where a line of sight would be ambiguous.
 - A point is in sight of another when the segment crosses no blocked voxel; where it passes an edge or a corner, every voxel it touches counts.
 - A node out of sight of its assumed parent takes the node that reached it; if even that is out of sight, the path bends through the center of that node's block, which the block holds either way. Another closed neighbor in sight that is cheaper wins instead.
-- The search runs in an `mnavQuery` context with its node budget and path length. Sliced, it keeps its state in plain data between slices, and `mnavFindFlightPath` itself runs as one slice, so slicing cannot change the path. The volume counts its commits, and a search across a commit is stale.
+- The search runs in an `mnavQuery` context with its node budget and path length. Sliced, it keeps its state in plain data between slices, and `mnavQuery_FindFlightPath` itself runs as one slice, so slicing cannot change the path. The volume counts its commits, and a search across a commit is stale.
 
 On the Warframe 3D benchmark maps, its paths averaged 0.925 to 0.944 of the 26-connected grid's shortest, and it expanded 4 to 7 times fewer nodes than A* through block centers on all maps but the densest, where line of sight dominates.
 
 ## Rays, checks and nearest points
 
-- `mnavFlightRaycast` is the same walk as the line of sight, stopping at the first blocked voxel, the floor or ceiling, or a place with no tile.
-- `mnavCheckFlightPath` walks a path's steps in order with one cursor and names the first step blocked or with no tile. Every point is checked before any step is cast, so a refusal changes nothing. A host checks what is left of a path after a commit and searches again; smoothing, local octree updates and a 3D funnel are left out.
-- `mnavFindNearestFlightPoint` is a branch and bound over the committed octrees within a radius.
-- `mnavDebugFlight` (`src/flight_debug.c`) draws the open blocks in a box, each once, walking the box a row at a time and skipping each open block's width.
+- `mnavFlightVolume_Raycast` is the same walk as the line of sight, stopping at the first blocked voxel, the floor or ceiling, or a place with no tile.
+- `mnavFlightVolume_CheckPath` walks a path's steps in order with one cursor and names the first step blocked or with no tile. Every point is checked before any step is cast, so a refusal changes nothing. A host checks what is left of a path after a commit and searches again; smoothing, local octree updates and a 3D funnel are left out.
+- `mnavFlightVolume_FindNearestPoint` is a branch and bound over the committed octrees within a radius.
+- `mnavFlightVolume_Debug` (`src/flight_debug.c`) draws the open blocks in a box, each once, walking the box a row at a time and skipping each open block's width.

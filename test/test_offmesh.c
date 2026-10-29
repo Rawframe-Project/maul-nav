@@ -24,8 +24,9 @@ static mnavNavmesh* Make(mnavBakeDef def)
 {
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(mnavStageTile(navmesh, s_handApartPair, sizeof(s_handApartPair)).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, s_handApartPair, sizeof(s_handApartPair)).result ==
+                  mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "tile (0, 0)");
     return navmesh;
 }
@@ -45,7 +46,7 @@ static mnavLinkId Stage(mnavNavmesh* navmesh, mnavLinkDef def)
 static mnavLinkState Get(const mnavNavmesh* navmesh, mnavLinkId id)
 {
     mnavLinkState state;
-    CHECK(mnavGetLink(navmesh, id, &state) == mnav_success, "read");
+    CHECK(mnavLink_GetState(navmesh, id, &state) == mnav_success, "read");
     return state;
 }
 
@@ -61,13 +62,15 @@ static mnavPath Across(mnavQuery* query, const mnavNavmesh* navmesh, double x0, 
     mnavNearest a;
     mnavNearest b;
     const mnavVec3 box = {1.0f, 2.0f, 1.0f};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x0, 0.0, z0}, box, &a) == mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){x1, 0.0, z1}, box, &b) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x0, 0.0, z0}, box, nullptr, &a) ==
+                  mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){x1, 0.0, z1}, box, nullptr, &b) ==
+                  mnav_success &&
               a.polygon.slot != 0 && b.polygon.slot != 0,
           "both ends on a square");
     mnavPath path;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-              mnav_success,
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success,
           "searched");
     return path;
 }
@@ -85,9 +88,9 @@ static void TestLinksAttachAtTheCommit(void)
     mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
     mnavLinkState state;
-    CHECK(mnavGetLink(navmesh, id, &state) == mnav_errorState && !state.attached,
+    CHECK(mnavLink_GetState(navmesh, id, &state) == mnav_errorState && !state.attached,
           "not before the commit");
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     state = Get(navmesh, id);
     CHECK(state.attached && state.startPolygon.polygon == 0 && state.endPolygon.polygon == 1 &&
               state.start.x == 7.5 && state.start.z == 7.5 && state.end.x == 17.5 &&
@@ -107,17 +110,17 @@ static void TestLinksAttachAtTheCommit(void)
     mnavLinkDef twoWay = Link(17.5, 9.0, 7.5, 9.0, 0.0f);
     twoWay.twoWay = true;
     mnavLinkId both = Stage(navmesh, twoWay);
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     state = Get(navmesh, near);
     CHECK(state.attached && state.end.x == 15.0 && state.end.z == 7.5, "snapped to the edge");
     CHECK(!Get(navmesh, far).attached, "too far to snap");
     // Off the square's corner (15, 5) by 0.4 m on both axes: within the
     // search box, but 0.57 m away, past the 0.5 m radius.
     mnavLinkId corner = Stage(navmesh, Link(7.5, 7.5, 14.6, 4.6, 0.5f));
-    CHECK(mnavCommit(navmesh) == mnav_success && !Get(navmesh, corner).attached,
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success && !Get(navmesh, corner).attached,
           "the radius is round");
     CHECK(mnavStageLinkRemoval(navmesh, corner) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "removed again");
     // The two-way link starts on the second square: it leaves the second
     // forward, from its start, and the first in reverse, from its end,
@@ -147,21 +150,22 @@ static void TestLinkBackToItsOwnPolygon(void)
     mnavLinkDef loop = Link(5.5, 5.5, 9.5, 9.5, 0.25f);
     loop.cost = 0.0f;
     Stage(navmesh, loop);
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavQueryDef def = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&def, &query) == mnav_success, "a query");
     mnavNearest a;
     mnavNearest b;
     const mnavVec3 box = {1.0f, 2.0f, 1.0f};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){5.5, 0.0, 6.0}, box, &a) == mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){9.5, 0.0, 9.0}, box, &b) ==
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){5.5, 0.0, 6.0}, box, nullptr, &a) ==
+                  mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){9.5, 0.0, 9.0}, box, nullptr, &b) ==
                   mnav_success &&
               a.polygon.polygon == b.polygon.polygon,
           "both ends on the first square");
     mnavPath path;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
               path.end == mnav_pathFound && path.linkCount == 1 && path.pointCount == 4,
           "through the link");
     CHECK(path.polygonCount == 2 && path.polygons[0].polygon == path.polygons[1].polygon,
@@ -171,7 +175,7 @@ static void TestLinkBackToItsOwnPolygon(void)
     mnavCorners corners;
     CHECK(mnavResetCorridor(&corridor, buffer, 8, a.polygon, a.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success &&
-              mnavCorridorCorners(query, navmesh, &corridor, &corners) == mnav_success &&
+              mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &corners) == mnav_success &&
               corners.linkCount == 1,
           "the corridor's corners cross it");
     mnavDestroyQuery(query);
@@ -182,19 +186,19 @@ static void TestLinksFollowTheTiles(void)
 {
     mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 39.5, 7.5, 0.5f));
-    CHECK(mnavCommit(navmesh) == mnav_success && !Get(navmesh, id).attached,
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success && !Get(navmesh, id).attached,
           "detached while tile (1, 0) is not loaded");
-    CHECK(mnavStageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
+    CHECK(mnavNavmesh_StageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
                   mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "tile (1, 0) loaded");
     mnavLinkState state = Get(navmesh, id);
     mnavTileId tile;
-    CHECK(mnavGetTile(navmesh, 1, 0, &tile) == mnav_success && state.attached &&
+    CHECK(mnavNavmesh_GetTile(navmesh, 1, 0, &tile) == mnav_success && state.attached &&
               state.endPolygon.slot == tile.slot,
           "attached to it");
-    CHECK(mnavStageTileRemoval(navmesh, 1, 0) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success && !Get(navmesh, id).attached,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 0) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success && !Get(navmesh, id).attached,
           "detached again when it leaves");
     mnavDestroyNavmesh(navmesh);
 }
@@ -206,9 +210,9 @@ static void TestLinksLeaveTheirOwnPolygon(void)
 {
     mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
     mnavLinkId id = Stage(navmesh, Link(17.5, 7.5, 39.5, 7.5, 0.5f));
-    CHECK(mnavStageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
+    CHECK(mnavNavmesh_StageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
                   mnav_success &&
-              mnavCommit(navmesh) == mnav_success && Get(navmesh, id).attached,
+              mnavNavmesh_Commit(navmesh) == mnav_success && Get(navmesh, id).attached,
           "attached");
     mnavQuery* query = MakeQuery();
     mnavPath from = Across(query, navmesh, 17.5, 7.5, 39.5, 7.5);
@@ -224,13 +228,13 @@ static void TestRemovalAndIds(void)
 {
     mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success && Get(navmesh, id).attached,
           "still there until the commit");
     CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success, "staged twice, once");
     mnavLinkState state;
-    CHECK(mnavCommit(navmesh) == mnav_success &&
-              mnavGetLink(navmesh, id, &state) == mnav_errorStale &&
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavLink_GetState(navmesh, id, &state) == mnav_errorStale &&
               mnavStageLinkRemoval(navmesh, id) == mnav_errorStale,
           "gone, the id stale");
     mnavQuery* query = MakeQuery();
@@ -241,15 +245,16 @@ static void TestRemovalAndIds(void)
     mnavLinkId next = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
     CHECK(next.slot == id.slot && next.generation == id.generation + 1, "the slot reused");
     CHECK(mnavStageLinkRemoval(navmesh, next) == mnav_success &&
-              mnavGetLink(navmesh, next, &state) == mnav_errorStale,
+              mnavLink_GetState(navmesh, next, &state) == mnav_errorStale,
           "unstaged at once");
-    CHECK(mnavCommit(navmesh) == mnav_success, "nothing to commit");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "nothing to commit");
     mnavLinkId bad = {99, 1};
-    CHECK(mnavGetLink(navmesh, bad, &state) == mnav_errorInvalid &&
+    CHECK(mnavLink_GetState(navmesh, bad, &state) == mnav_errorInvalid &&
               mnavStageLinkRemoval(navmesh, bad) == mnav_errorInvalid,
           "no such slot");
     bad = (mnavLinkId){next.slot, next.generation + 1};
-    CHECK(mnavGetLink(navmesh, bad, &state) == mnav_errorInvalid, "a generation not yet given");
+    CHECK(mnavLink_GetState(navmesh, bad, &state) == mnav_errorInvalid,
+          "a generation not yet given");
     // A slot at its last generation is never reused: test_link_slots.c.
     mnavDestroyNavmesh(navmesh);
 }
@@ -307,7 +312,7 @@ static void TestDefsAndLimits(void)
               mnavStageLink(navmesh, nullptr, &id) == mnav_errorInvalid &&
               mnavStageLink(navmesh, &link, nullptr) == mnav_errorInvalid &&
               mnavStageLinkRemoval(nullptr, id) == mnav_errorInvalid &&
-              mnavGetLink(nullptr, id, nullptr) == mnav_errorInvalid,
+              mnavLink_GetState(nullptr, id, nullptr) == mnav_errorInvalid,
           "NULL arguments");
     mnavLinkId a = Stage(navmesh, link);
     (void)Stage(navmesh, link);
@@ -324,14 +329,14 @@ static void TestFailedCommitKeepsLinksStaged(void)
     def.limits.tiles = 1;
     mnavNavmesh* navmesh = Make(def);
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
-    CHECK(mnavStageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
+    CHECK(mnavNavmesh_StageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
                   mnav_success &&
-              mnavCommit(navmesh) == mnav_errorCapacity,
+              mnavNavmesh_Commit(navmesh) == mnav_errorCapacity,
           "past the tiles limit");
     mnavLinkState state;
-    CHECK(mnavGetLink(navmesh, id, &state) == mnav_errorState, "the link still staged");
-    CHECK(mnavStageTileRemoval(navmesh, 1, 0) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success && Get(navmesh, id).attached,
+    CHECK(mnavLink_GetState(navmesh, id, &state) == mnav_errorState, "the link still staged");
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 0) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success && Get(navmesh, id).attached,
           "committed with the tile unstaged");
     mnavDestroyNavmesh(navmesh);
 }
@@ -345,7 +350,7 @@ static void TestDestroyGivesLinksBack(void)
     {
         (void)Stage(navmesh, Link(7.5, 7.5, 17.5, 5.5 + i * 0.5, 0.5f));
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     (void)Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
     mnavDestroyNavmesh(navmesh);
     CHECK(s_held == 0, "all given back");

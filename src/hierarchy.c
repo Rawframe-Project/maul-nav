@@ -185,7 +185,7 @@ mnavResult mnavCreateHierarchy(const mnavHierarchyDef* def, mnavHierarchy** hier
     return result;
 }
 
-uint64_t mnavGetHierarchyMisuse(const mnavHierarchy* hierarchy)
+uint64_t mnavHierarchy_GetMisuse(const mnavHierarchy* hierarchy)
 {
     return hierarchy != nullptr ? mnavHostMisuse(&hierarchy->host) : 0;
 }
@@ -917,9 +917,9 @@ static MNAV_NOINLINE mnavResult BuildHierarchyCounted(mnavHierarchy* hierarchy, 
     return mnavClearOnFailure(result, reportOut, sizeof(*reportOut));
 }
 
-mnavResult mnavBuildHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
-                              const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                              mnavHierarchyReport* reportOut)
+mnavResult mnavHierarchy_Build(mnavHierarchy* hierarchy, mnavQuery* query,
+                               const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                               mnavHierarchyReport* reportOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = BuildHierarchyCounted(hierarchy, query, navmesh, filter, reportOut);
@@ -974,8 +974,8 @@ static MNAV_NOINLINE mnavResult UpdateHierarchyCounted(mnavHierarchy* hierarchy,
     return mnavClearOnFailure(result, reportOut, sizeof(*reportOut));
 }
 
-mnavResult mnavUpdateHierarchy(mnavHierarchy* hierarchy, mnavQuery* query,
-                               const mnavNavmesh* navmesh, mnavHierarchyReport* reportOut)
+mnavResult mnavHierarchy_Update(mnavHierarchy* hierarchy, mnavQuery* query,
+                                const mnavNavmesh* navmesh, mnavHierarchyReport* reportOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = UpdateHierarchyCounted(hierarchy, query, navmesh, reportOut);

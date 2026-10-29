@@ -91,9 +91,10 @@ static float BakeWorld(float shift, int32_t tiles, uint8_t** bytes, size_t* size
         for (int32_t x = 0; x < tiles; ++x)
         {
             int32_t t = z * TILES + x;
-            CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, s_outlineCount, nullptr},
-                                 first + x, first + z, nullptr) == mnav_success &&
-                      mnavCopyBakedTile(baker, buffer, CAPACITY, &sizes[t]) == mnav_success,
+            CHECK(mnavBaker_BakeTile2D(baker,
+                                       &(mnavBake2DInput){s_outlines, s_outlineCount, nullptr},
+                                       first + x, first + z, nullptr) == mnav_success &&
+                      mnavBaker_CopyTile(baker, buffer, CAPACITY, &sizes[t]) == mnav_success,
                   "baked");
             bytes[t] = malloc(sizes[t]);
             memcpy(bytes[t], buffer, sizes[t]);
@@ -117,9 +118,9 @@ static mnavNavmesh* LoadTiles(uint8_t* const* bytes, const size_t* sizes, int32_
     {
         int32_t k = backward ? tiles * tiles - 1 - i : i;
         int32_t t = k / tiles * TILES + k % tiles;
-        CHECK(mnavStageTile(navmesh, bytes[t], sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, bytes[t], sizes[t]).result == mnav_success, "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -159,8 +160,8 @@ static mnavHierarchy* Hierarchy(int32_t clusterTiles)
 static mnavNearest On(const mnavNavmesh* navmesh, double x, double z)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 0.0, z}, (mnavVec3){3.0f, 2.0f, 3.0f},
-                          &n) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 0.0, z}, (mnavVec3){3.0f, 2.0f, 3.0f},
+                                  nullptr, &n) == mnav_success &&
               n.polygon.slot != 0,
           "nearest");
     return n;
@@ -180,7 +181,7 @@ static void TestAgainstPlainPaths(float side)
     mnavQuery* small = Query(1024);
     mnavHierarchy* hierarchy = Hierarchy(2);
     mnavHierarchyReport report;
-    CHECK(mnavBuildHierarchy(hierarchy, small, navmesh, nullptr, &report) == mnav_success &&
+    CHECK(mnavHierarchy_Build(hierarchy, small, navmesh, nullptr, &report) == mnav_success &&
               report.clusters == 16 && report.transitions > 0 && report.edges > 0,
           "built");
     int32_t starved = 0;
@@ -190,20 +191,20 @@ static void TestAgainstPlainPaths(float side)
         mnavNearest b = On(navmesh, s_pairs[p][2], s_pairs[p][3]);
         mnavPath plain;
         mnavPath through;
-        CHECK(mnavFindPath(big, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &plain) ==
-                      mnav_success &&
+        CHECK(mnavQuery_FindPath(big, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &plain) == mnav_success &&
                   plain.end == mnav_pathFound,
               "plain");
-        CHECK(mnavFindHierarchicalPath(small, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                       b.point, &through) == mnav_success &&
+        CHECK(mnavQuery_FindHierarchicalPath(small, hierarchy, navmesh, a.polygon, a.point,
+                                             b.polygon, b.point, &through) == mnav_success &&
                   through.end == mnav_pathFound,
               "through the hierarchy, with 1,024 nodes");
         printf("pair %d: plain %.3f m, hierarchical %.3f m\n", p, plain.length, through.length);
         CHECK(through.length <= plain.length * 1.06 && through.length >= plain.length - 1e-9,
               "within 6% of the plain path");
         mnavPath alone;
-        CHECK(mnavFindPath(small, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &alone) == mnav_success,
+        CHECK(mnavQuery_FindPath(small, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &alone) == mnav_success,
               "plain, with 1,024 nodes");
         starved += alone.end == mnav_pathFound ? 0 : 1;
     }
@@ -222,7 +223,8 @@ static void TestRandomPairs(void)
     mnavQuery* big = Query(32768);
     mnavQuery* small = Query(1024);
     mnavHierarchy* hierarchy = Hierarchy(2);
-    CHECK(mnavBuildHierarchy(hierarchy, small, navmesh, nullptr, nullptr) == mnav_success, "built");
+    CHECK(mnavHierarchy_Build(hierarchy, small, navmesh, nullptr, nullptr) == mnav_success,
+          "built");
     uint32_t seed = 99u;
     int32_t found = 0;
     int32_t worse = 0;
@@ -236,20 +238,20 @@ static void TestRandomPairs(void)
         }
         mnavNearest a;
         mnavNearest b;
-        if (mnavFindNearest(navmesh, nullptr, (mnavPos3){v[0], 0.0, v[1]},
-                            (mnavVec3){3.0f, 2.0f, 3.0f}, &a) != mnav_success ||
-            mnavFindNearest(navmesh, nullptr, (mnavPos3){v[2], 0.0, v[3]},
-                            (mnavVec3){3.0f, 2.0f, 3.0f}, &b) != mnav_success ||
+        if (mnavNavmesh_FindNearest(navmesh, (mnavPos3){v[0], 0.0, v[1]},
+                                    (mnavVec3){3.0f, 2.0f, 3.0f}, nullptr, &a) != mnav_success ||
+            mnavNavmesh_FindNearest(navmesh, (mnavPos3){v[2], 0.0, v[3]},
+                                    (mnavVec3){3.0f, 2.0f, 3.0f}, nullptr, &b) != mnav_success ||
             a.polygon.slot == 0 || b.polygon.slot == 0)
         {
             continue;
         }
         mnavPath plain;
         mnavPath through;
-        CHECK(mnavFindPath(big, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &plain) ==
-                      mnav_success &&
-                  mnavFindHierarchicalPath(small, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                           b.point, &through) == mnav_success,
+        CHECK(mnavQuery_FindPath(big, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &plain) == mnav_success &&
+                  mnavQuery_FindHierarchicalPath(small, hierarchy, navmesh, a.polygon, a.point,
+                                                 b.polygon, b.point, &through) == mnav_success,
               "searched");
         if (plain.end != mnav_pathFound)
         {
@@ -274,13 +276,15 @@ static void TestLinksBetweenClusters(void)
     mnavQuery* query = Query(1024);
     mnavHierarchy* hierarchy = Hierarchy(2);
     mnavHierarchyReport before;
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &before) == mnav_success, "built");
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &before) == mnav_success,
+          "built");
     mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, false, 0.0f};
     mnavLinkId id;
-    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "linked");
     mnavHierarchyReport after;
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &after) == mnav_success &&
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &after) == mnav_success &&
               after.transitions == before.transitions + 1,
           "one transition, one way");
     // A hierarchy with room for the sides' transitions alone refuses the
@@ -290,25 +294,25 @@ static void TestLinksBetweenClusters(void)
     tight.limits.transitions = before.transitions;
     mnavHierarchy* full = nullptr;
     CHECK(mnavCreateHierarchy(&tight, &full) == mnav_success &&
-              mnavBuildHierarchy(full, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
+              mnavHierarchy_Build(full, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
           "no room for the link's transition");
     mnavDestroyHierarchy(full);
     mnavNearest a = On(navmesh, 40.0, 30.0);
     mnavNearest b = On(navmesh, 40.0, 110.0);
     mnavPath path;
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                   b.point, &path) == mnav_success &&
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                         b.point, &path) == mnav_success &&
               path.end == mnav_pathFound && path.linkCount == 1 && path.length < 100.0,
           "over the wall");
     // Back the other way the link does not go: round by the gap.
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, b.polygon, b.point, a.polygon,
-                                   a.point, &path) == mnav_success &&
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, b.polygon, b.point, a.polygon,
+                                         a.point, &path) == mnav_success &&
               path.end == mnav_pathFound && path.linkCount == 0 && path.length > 300.0,
           "round the wall");
     // A filter that does not cross the link's kind leaves it out.
     mnavQueryFilter walkers = mnavDefaultQueryFilter();
     walkers.kinds = 0;
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, &walkers, &after) == mnav_success &&
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, &walkers, &after) == mnav_success &&
               after.transitions == before.transitions,
           "no transition for a kind not crossed");
     mnavDestroyHierarchy(hierarchy);
@@ -326,29 +330,31 @@ static void TestOneWayLinkInTheEndCluster(void)
     mnavHierarchy* hierarchy = Hierarchy(2);
     mnavLinkDef def = {{40.0, 0.0, 63.0}, {40.0, 0.0, 57.0}, 1.0f, 2.0f, 0, false, 0.0f};
     mnavLinkId id;
-    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "linked");
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success, "built");
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success,
+          "built");
     // The start two clusters north, too far for the plain search first.
     mnavNearest a = On(navmesh, 40.0, 170.0);
     mnavNearest b = On(navmesh, 40.0, 50.0);
     mnavPath plain;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &plain) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &plain) == mnav_success &&
               plain.end == mnav_pathFound && plain.linkCount == 1,
           "the plain path takes the link");
     double plainLength = plain.length;
     mnavPath path;
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                   b.point, &path) == mnav_success,
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                         b.point, &path) == mnav_success,
           "searched");
     printf("one-way link in the end cluster: plain %.1f m, hierarchical %.1f m, %d links\n",
            plainLength, path.length, path.linkCount);
     CHECK(path.end == mnav_pathFound && path.linkCount == 1 && path.length < plainLength * 1.1,
           "the hierarchical path takes it too");
     // From the end northward the link does not go.
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, b.polygon, b.point, a.polygon,
-                                   a.point, &path) == mnav_success &&
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, b.polygon, b.point, a.polygon,
+                                         a.point, &path) == mnav_success &&
               path.end == mnav_pathFound && path.linkCount == 0 && path.length > 300.0,
           "never against it");
     // The same link two-way, defined from the south: the way south crosses
@@ -356,10 +362,10 @@ static void TestOneWayLinkInTheEndCluster(void)
     CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success, "removed");
     def = (mnavLinkDef){{40.0, 0.0, 57.0}, {40.0, 0.0, 63.0}, 1.0f, 2.0f, 0, true, 0.0f};
     CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
-              mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                       b.point, &path) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
+              mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point,
+                                             b.polygon, b.point, &path) == mnav_success &&
               path.end == mnav_pathFound && path.linkCount == 1 && path.length < plainLength * 1.1,
           "a two-way link crossed from its end");
     // A link dearer than the way round: the join prices it, and the path
@@ -368,15 +374,15 @@ static void TestOneWayLinkInTheEndCluster(void)
     CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success, "removed");
     def = (mnavLinkDef){{40.0, 0.0, 63.0}, {40.0, 0.0, 57.0}, 1.0f, 900.0f, 0, false, 0.0f};
     CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
-              mnavFindPath(wide, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &plain) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
+              mnavQuery_FindPath(wide, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &plain) == mnav_success &&
               plain.end == mnav_pathFound && plain.linkCount == 0,
           "the plain path, with the nodes to search round, goes round");
     double roundCost = plain.cost;
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                   b.point, &path) == mnav_success &&
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                         b.point, &path) == mnav_success &&
               path.end == mnav_pathFound && path.linkCount == 0 && path.cost < roundCost * 1.1,
           "so does the hierarchical one");
     mnavDestroyQuery(wide);
@@ -401,13 +407,13 @@ static uint64_t PairsHash(const mnavNavmesh* navmesh, mnavQuery* query, mnavHier
         mnavNearest a;
         mnavNearest b;
         mnavPath path;
-        if (mnavFindNearest(navmesh, nullptr, (mnavPos3){v[0], 0.0, v[1]},
-                            (mnavVec3){3.0f, 2.0f, 3.0f}, &a) == mnav_success &&
-            mnavFindNearest(navmesh, nullptr, (mnavPos3){v[2], 0.0, v[3]},
-                            (mnavVec3){3.0f, 2.0f, 3.0f}, &b) == mnav_success &&
+        if (mnavNavmesh_FindNearest(navmesh, (mnavPos3){v[0], 0.0, v[1]},
+                                    (mnavVec3){3.0f, 2.0f, 3.0f}, nullptr, &a) == mnav_success &&
+            mnavNavmesh_FindNearest(navmesh, (mnavPos3){v[2], 0.0, v[3]},
+                                    (mnavVec3){3.0f, 2.0f, 3.0f}, nullptr, &b) == mnav_success &&
             a.polygon.slot != 0 && b.polygon.slot != 0 &&
-            mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                     b.point, &path) == mnav_success)
+            mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                           b.point, &path) == mnav_success)
         {
             hash = mnavHash64(hash, path.points,
                               (int32_t)((size_t)path.pointCount * sizeof(mnavPos3)));
@@ -422,9 +428,9 @@ static void Paint(mnavNavmesh* navmesh, double x0, double x1, double z, mnavArea
     for (double x = x0; x < x1; x += 2.0)
     {
         mnavNearest n = On(navmesh, x, z);
-        CHECK(mnavStageArea(navmesh, n.polygon, area) == mnav_success, "staged");
+        CHECK(mnavPolygon_StageArea(navmesh, n.polygon, area) == mnav_success, "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
 }
 
 // Updates one hierarchy and builds the other; whether they agree, and
@@ -433,8 +439,8 @@ static bool Agree(mnavHierarchy* updated, mnavHierarchy* fresh, mnavQuery* query
                   mnavNavmesh* navmesh, const mnavQueryFilter* filter, mnavHierarchyReport* out)
 {
     mnavHierarchyReport built;
-    bool ok = mnavUpdateHierarchy(updated, query, navmesh, out) == mnav_success &&
-              mnavBuildHierarchy(fresh, query, navmesh, filter, &built) == mnav_success;
+    bool ok = mnavHierarchy_Update(updated, query, navmesh, out) == mnav_success &&
+              mnavHierarchy_Build(fresh, query, navmesh, filter, &built) == mnav_success;
     return ok && out->transitions == built.transitions && out->edges == built.edges &&
            PairsHash(navmesh, query, updated) == PairsHash(navmesh, query, fresh);
 }
@@ -451,10 +457,10 @@ static void TestUpdates(void)
     filter.areas &= ~((uint64_t)1 << 4);
     mnavHierarchyReport built;
     mnavHierarchyReport report;
-    CHECK(mnavBuildHierarchy(updated, query, navmesh, &filter, &built) == mnav_success &&
+    CHECK(mnavHierarchy_Build(updated, query, navmesh, &filter, &built) == mnav_success &&
               built.searches == built.transitions,
           "built, a search per transition");
-    CHECK(mnavUpdateHierarchy(updated, query, navmesh, &report) == mnav_success &&
+    CHECK(mnavHierarchy_Update(updated, query, navmesh, &report) == mnav_success &&
               report.searches == 0,
           "nothing to update");
     // Areas changed in one tile: only its cluster's entries searched.
@@ -467,7 +473,7 @@ static void TestUpdates(void)
     // that saw only that change.
     Paint(navmesh, 150.0, 170.0, 200.0, 3);
     mnavHierarchyReport alone;
-    CHECK(mnavUpdateHierarchy(fresh, query, navmesh, &alone) == mnav_success &&
+    CHECK(mnavHierarchy_Update(fresh, query, navmesh, &alone) == mnav_success &&
               Agree(updated, fresh, query, navmesh, &filter, &report) &&
               report.searches == alone.searches && report.searches > 0,
           "only the new change searched");
@@ -475,7 +481,8 @@ static void TestUpdates(void)
     // A link: built again.
     mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, true, 0.0f};
     mnavLinkId id;
-    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "linked");
     CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
               report.searches == report.transitions && report.transitions == built.transitions + 2,
@@ -488,10 +495,12 @@ static void TestUpdates(void)
           "built again for a landing");
     // The link removed, then another with another cost in its place,
     // with no update between: built again all the same.
-    CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "unlinked");
     def.cost = 40.0f;
-    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "linked again");
     CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
               report.searches == report.transitions,
@@ -503,26 +512,26 @@ static void TestUpdates(void)
     size_t size = 0;
     Box(170.0f, 170.0f, 180.0f, 180.0f, mnav_areaNone);
     CHECK(mnavCreateBaker(&bakeDef, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, s_outlineCount, nullptr}, 5, 5,
-                             nullptr) == mnav_success &&
-              mnavCopyBakedTile(baker, bytes, CAPACITY, &size) == mnav_success &&
-              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){s_outlines, s_outlineCount, nullptr},
+                                   5, 5, nullptr) == mnav_success &&
+              mnavBaker_CopyTile(baker, bytes, CAPACITY, &size) == mnav_success &&
+              mnavNavmesh_StageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "a tile replaced");
     s_outlineCount -= 1;
     CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
               report.searches == report.transitions,
           "built again for a tile");
     // A tile removed: built again.
-    CHECK(mnavStageTileRemoval(navmesh, 7, 7) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 7, 7) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "a tile removed");
     CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
               report.searches == report.transitions,
           "built again without a tile");
     mnavNavmesh* other = Load(false);
-    CHECK(mnavUpdateHierarchy(updated, query, other, &report) == mnav_errorInvalid &&
-              mnavUpdateHierarchy(nullptr, query, navmesh, &report) == mnav_errorInvalid,
+    CHECK(mnavHierarchy_Update(updated, query, other, &report) == mnav_errorInvalid &&
+              mnavHierarchy_Update(nullptr, query, navmesh, &report) == mnav_errorInvalid,
           "another navmesh, or none");
     mnavDestroyNavmesh(other);
     mnavDestroyBaker(baker);
@@ -544,14 +553,14 @@ static void TestNegativePlaces(void)
     mnavQuery* query = Query(2048);
     mnavHierarchy* hierarchy = Hierarchy(2);
     mnavHierarchyReport here;
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &here) == mnav_success &&
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &here) == mnav_success &&
               here.clusters == 4,
           "built");
     mnavDestroyNavmesh(navmesh);
     BakeWorld(-128.0f, 4, back, backSizes);
     navmesh = LoadTiles(back, backSizes, 4, false);
     mnavHierarchyReport moved;
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &moved) == mnav_success &&
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &moved) == mnav_success &&
               memcmp(&here, &moved, sizeof(here)) == 0,
           "the same graph at negative places");
     mnavDestroyHierarchy(hierarchy);
@@ -574,8 +583,8 @@ static void TestLoadOrder(void)
     mnavHierarchy* b = Hierarchy(2);
     mnavHierarchyReport ra;
     mnavHierarchyReport rb;
-    CHECK(mnavBuildHierarchy(a, query, forward, nullptr, &ra) == mnav_success &&
-              mnavBuildHierarchy(b, query, backward, nullptr, &rb) == mnav_success &&
+    CHECK(mnavHierarchy_Build(a, query, forward, nullptr, &ra) == mnav_success &&
+              mnavHierarchy_Build(b, query, backward, nullptr, &rb) == mnav_success &&
               memcmp(&ra, &rb, sizeof(ra)) == 0,
           "the same graph");
     int32_t same = 0;
@@ -586,15 +595,15 @@ static void TestLoadOrder(void)
         mnavNearest ba = On(backward, s_pairs[p][0], s_pairs[p][1]);
         mnavNearest bb = On(backward, s_pairs[p][2], s_pairs[p][3]);
         mnavPath pf;
-        CHECK(mnavFindHierarchicalPath(query, a, forward, fa.polygon, fa.point, fb.polygon,
-                                       fb.point, &pf) == mnav_success,
+        CHECK(mnavQuery_FindHierarchicalPath(query, a, forward, fa.polygon, fa.point, fb.polygon,
+                                             fb.point, &pf) == mnav_success,
               "forward");
         mnavPos3 points[256];
         int32_t count = pf.pointCount < 256 ? pf.pointCount : 256;
         memcpy(points, pf.points, (size_t)count * sizeof(mnavPos3));
         mnavPath pb;
-        CHECK(mnavFindHierarchicalPath(query, b, backward, ba.polygon, ba.point, bb.polygon,
-                                       bb.point, &pb) == mnav_success,
+        CHECK(mnavQuery_FindHierarchicalPath(query, b, backward, ba.polygon, ba.point, bb.polygon,
+                                             bb.point, &pb) == mnav_success,
               "backward");
         same += pb.pointCount == pf.pointCount &&
                         memcmp(points, pb.points, (size_t)count * sizeof(mnavPos3)) == 0
@@ -629,7 +638,7 @@ static void TestChangeAcrossASide(void)
         mnavQuery* query = Query(1024);
         mnavHierarchy* updated = Hierarchy(2);
         mnavHierarchy* fresh = Hierarchy(2);
-        CHECK(mnavBuildHierarchy(updated, query, navmesh, &filter, nullptr) == mnav_success,
+        CHECK(mnavHierarchy_Build(updated, query, navmesh, &filter, nullptr) == mnav_success,
               "built");
         // Clusters of 2 tiles are 64 m wide: x = 64 is a side.
         Paint(navmesh, 64.5, 66.5, z, 4);
@@ -658,18 +667,18 @@ static void TestUpdatePastTheEdgeLimit(void)
     filter.areas &= ~((uint64_t)1 << 3);
     mnavHierarchy* probe = Hierarchy(2);
     mnavHierarchyReport closed;
-    CHECK(mnavBuildHierarchy(probe, query, navmesh, &filter, &closed) == mnav_success, "closed");
+    CHECK(mnavHierarchy_Build(probe, query, navmesh, &filter, &closed) == mnav_success, "closed");
     mnavDestroyHierarchy(probe);
     mnavHierarchyDef def = Small();
     def.clusterTiles = 2;
     def.limits.edges = closed.edges;
     mnavHierarchy* tight = nullptr;
     CHECK(mnavCreateHierarchy(&def, &tight) == mnav_success &&
-              mnavBuildHierarchy(tight, query, navmesh, &filter, nullptr) == mnav_success,
+              mnavHierarchy_Build(tight, query, navmesh, &filter, nullptr) == mnav_success,
           "built at the limit");
     Paint(navmesh, 226.0, 232.0, 60.5, mnav_areaWalkable);
     mnavHierarchyReport opened;
-    mnavResult result = mnavUpdateHierarchy(tight, query, navmesh, &opened);
+    mnavResult result = mnavHierarchy_Update(tight, query, navmesh, &opened);
     printf("edge limit: %d edges closed\n", closed.edges);
     CHECK(result == mnav_errorCapacity, "the opened gap's edges past the limit");
     mnavDestroyHierarchy(tight);
@@ -684,22 +693,23 @@ static void TestSplitWorld(void)
     mnavNavmesh* navmesh = Load(false);
     for (int32_t x = 0; x < TILES; ++x)
     {
-        CHECK(mnavStageTileRemoval(navmesh, x, 2) == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTileRemoval(navmesh, x, 2) == mnav_success, "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "a row removed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "a row removed");
     mnavQuery* query = Query(4096);
     mnavHierarchy* hierarchy = Hierarchy(2);
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success, "built");
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success,
+          "built");
     mnavNearest a = On(navmesh, 40.0, 20.0);
     mnavNearest b = On(navmesh, 40.0, 200.0);
     mnavPath plain;
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &plain) ==
-              mnav_success,
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &plain) == mnav_success,
           "plain");
     mnavPathEnd plainEnd = plain.end;
     mnavPath path;
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                   b.point, &path) == mnav_success &&
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                         b.point, &path) == mnav_success &&
               path.end == plainEnd && path.end != mnav_pathFound,
           "no way through the graph: the plain search's answer");
     // Making a hierarchy refuses a NULL out.
@@ -719,45 +729,46 @@ static void TestStaleAndFallbacks(void)
     mnavNearest a = On(navmesh, 2.0, 2.0);
     mnavNearest b = On(navmesh, 254.0, 254.0);
     mnavPath path;
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                   b.point, &path) == mnav_errorState,
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                         b.point, &path) == mnav_errorState,
           "no graph yet");
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success, "built");
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, other, a.polygon, a.point, b.polygon, b.point,
-                                   &path) == mnav_errorInvalid,
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success,
+          "built");
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, other, a.polygon, a.point, b.polygon,
+                                         b.point, &path) == mnav_errorInvalid,
           "another navmesh");
     // Within one cluster: the plain path, exactly.
     mnavNearest c = On(navmesh, 10.0, 12.0);
     mnavNearest d = On(navmesh, 50.0, 40.0);
     mnavPath plain;
-    CHECK(mnavFindPath(query, navmesh, nullptr, c.polygon, c.point, d.polygon, d.point, &plain) ==
-              mnav_success,
+    CHECK(mnavQuery_FindPath(query, navmesh, c.polygon, c.point, d.polygon, d.point, nullptr,
+                             &plain) == mnav_success,
           "plain");
     double plainLength = plain.length;
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, c.polygon, c.point, d.polygon,
-                                   d.point, &path) == mnav_success &&
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, c.polygon, c.point, d.polygon,
+                                         d.point, &path) == mnav_success &&
               path.length == plainLength,
           "one cluster");
     // An area change commits: stale until built again.
-    CHECK(mnavStageArea(navmesh, a.polygon, 3) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavPolygon_StageArea(navmesh, a.polygon, 3) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "committed");
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                   b.point, &path) == mnav_errorState,
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
+                                         b.point, &path) == mnav_errorState,
           "stale");
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
-              mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                       b.point, &path) == mnav_success &&
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
+              mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point,
+                                             b.polygon, b.point, &path) == mnav_success &&
               path.end == mnav_pathFound,
           "built again");
     // A filter leaving the end's area out: no way through the graph, and
     // the plain search's answer.
     mnavQueryFilter without = mnavDefaultQueryFilter();
     without.areas &= ~((uint64_t)1 << 3);
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, &without, nullptr) == mnav_success,
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, &without, nullptr) == mnav_success,
           "built with a filter");
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, b.polygon, b.point, a.polygon,
-                                   a.point, &path) == mnav_success &&
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, b.polygon, b.point, a.polygon,
+                                         a.point, &path) == mnav_success &&
               path.end != mnav_pathFound,
           "an end the filter leaves out");
     mnavDestroyHierarchy(hierarchy);
@@ -774,43 +785,46 @@ static void TestLimitsAndChecks(void)
     mnavHierarchy* hierarchy = nullptr;
     def.limits.transitions = 4;
     CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
+              mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) ==
+                  mnav_errorCapacity,
           "too many transitions");
     mnavNearest a = On(navmesh, 2.0, 2.0);
     mnavPath path;
-    CHECK(mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, a.polygon,
-                                   a.point, &path) == mnav_errorState,
+    CHECK(mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, a.polygon,
+                                         a.point, &path) == mnav_errorState,
           "no graph after a failed build");
     mnavDestroyHierarchy(hierarchy);
     def = Small();
     def.limits.edges = 4;
     CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
+              mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) ==
+                  mnav_errorCapacity,
           "too many edges");
     mnavDestroyHierarchy(hierarchy);
     def = Small();
     def.limits.tiles = 63;
     CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
+              mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) ==
+                  mnav_errorCapacity,
           "too many tiles");
     mnavDestroyHierarchy(hierarchy);
     mnavQuery* tiny = Query(16);
     hierarchy = Hierarchy(2);
-    CHECK(mnavBuildHierarchy(hierarchy, tiny, navmesh, nullptr, nullptr) == mnav_errorCapacity,
+    CHECK(mnavHierarchy_Build(hierarchy, tiny, navmesh, nullptr, nullptr) == mnav_errorCapacity,
           "a cluster needing more nodes");
     mnavQueryFilter broken = mnavDefaultQueryFilter();
     broken.cookie = 0;
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, &broken, nullptr) == mnav_errorInvalid &&
-              mnavBuildHierarchy(nullptr, query, navmesh, nullptr, nullptr) == mnav_errorInvalid &&
-              mnavBuildHierarchy(hierarchy, nullptr, navmesh, nullptr, nullptr) ==
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, &broken, nullptr) == mnav_errorInvalid &&
+              mnavHierarchy_Build(nullptr, query, navmesh, nullptr, nullptr) == mnav_errorInvalid &&
+              mnavHierarchy_Build(hierarchy, nullptr, navmesh, nullptr, nullptr) ==
                   mnav_errorInvalid,
           "bad arguments");
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
-              mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon,
-                                       (mnavPos3){(double)NAN, 0.0, 0.0}, a.polygon, a.point,
-                                       &path) == mnav_errorInvalid &&
-              mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, a.polygon,
-                                       a.point, nullptr) == mnav_errorInvalid,
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
+              mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon,
+                                             (mnavPos3){(double)NAN, 0.0, 0.0}, a.polygon, a.point,
+                                             &path) == mnav_errorInvalid &&
+              mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point,
+                                             a.polygon, a.point, nullptr) == mnav_errorInvalid,
           "bad query arguments");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(tiny);
@@ -846,13 +860,13 @@ static uint64_t PathsHash(mnavQuery* query, mnavHierarchy* h, const mnavNavmesh*
         mnavNearest b = {0};
         const mnavVec3 box = {2.0f, 4.0f, 2.0f};
         mnavPath path;
-        if (mnavFindNearest(navmesh, nullptr, (mnavPos3){v[0], 0.0, v[1]}, box, &a) ==
+        if (mnavNavmesh_FindNearest(navmesh, (mnavPos3){v[0], 0.0, v[1]}, box, nullptr, &a) ==
                 mnav_success &&
-            mnavFindNearest(navmesh, nullptr, (mnavPos3){v[2], 0.0, v[3]}, box, &b) ==
+            mnavNavmesh_FindNearest(navmesh, (mnavPos3){v[2], 0.0, v[3]}, box, nullptr, &b) ==
                 mnav_success &&
             a.polygon.slot != 0 && b.polygon.slot != 0 &&
-            mnavFindHierarchicalPath(query, h, navmesh, a.polygon, a.point, b.polygon, b.point,
-                                     &path) == mnav_success)
+            mnavQuery_FindHierarchicalPath(query, h, navmesh, a.polygon, a.point, b.polygon,
+                                           b.point, &path) == mnav_success)
         {
             hash = mnavHash64(hash, &path.cost, (int32_t)sizeof(path.cost));
             hash = mnavHash64(hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));
@@ -878,7 +892,7 @@ static void TestUpdatesMatchBuildsUnderAFilter(float side)
     mnavHierarchy* built = nullptr;
     CHECK(mnavCreateHierarchy(&def, &updated) == mnav_success &&
               mnavCreateHierarchy(&def, &built) == mnav_success &&
-              mnavBuildHierarchy(updated, query, navmesh, &filter, nullptr) == mnav_success,
+              mnavHierarchy_Build(updated, query, navmesh, &filter, nullptr) == mnav_success,
           "built");
     uint32_t s = 17u;
     bool same = true;
@@ -893,20 +907,21 @@ static void TestUpdatesMatchBuildsUnderAFilter(float side)
             double z = (double)(s >> 8 & 0xFFFFu) / 65536.0 * (double)side;
             mnavNearest n = {0};
             s = s * 1664525u + 1013904223u;
-            if (mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 0.0, z},
-                                (mnavVec3){2.0f, 4.0f, 2.0f}, &n) == mnav_success &&
+            if (mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 0.0, z},
+                                        (mnavVec3){2.0f, 4.0f, 2.0f}, nullptr,
+                                        &n) == mnav_success &&
                 n.polygon.slot != 0)
             {
-                CHECK(mnavStageArea(navmesh, n.polygon, (mnavAreaType)(1 + (s >> 8) % 5)) ==
+                CHECK(mnavPolygon_StageArea(navmesh, n.polygon, (mnavAreaType)(1 + (s >> 8) % 5)) ==
                           mnav_success,
                       "staged");
             }
         }
         mnavHierarchyReport a;
         mnavHierarchyReport b;
-        CHECK(mnavCommit(navmesh) == mnav_success &&
-                  mnavUpdateHierarchy(updated, query, navmesh, &a) == mnav_success &&
-                  mnavBuildHierarchy(built, query, navmesh, &filter, &b) == mnav_success,
+        CHECK(mnavNavmesh_Commit(navmesh) == mnav_success &&
+                  mnavHierarchy_Update(updated, query, navmesh, &a) == mnav_success &&
+                  mnavHierarchy_Build(built, query, navmesh, &filter, &b) == mnav_success,
               "brought up to date");
         same = same && a.transitions == b.transitions && a.edges == b.edges &&
                PathsHash(query, updated, navmesh, side) == PathsHash(query, built, navmesh, side);
@@ -929,22 +944,23 @@ static void TestUpdatePastTheTileLimit(void)
     CHECK(mnavCreateNavmesh(&bake, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 8; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_bytes[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_bytes[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavQuery* query = Query(4096);
     mnavHierarchyDef def = Small();
     def.limits.tiles = 8;
     mnavHierarchy* hierarchy = nullptr;
     CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success,
+              mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success,
           "built over eight tiles");
-    CHECK(mnavStageTile(navmesh, s_bytes[8], s_sizes[8]).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, s_bytes[8], s_sizes[8]).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "a ninth tile");
-    CHECK(mnavUpdateHierarchy(hierarchy, query, navmesh, nullptr) == mnav_errorCapacity,
+    CHECK(mnavHierarchy_Update(hierarchy, query, navmesh, nullptr) == mnav_errorCapacity,
           "an update past the tile limit refused");
-    CHECK(mnavUpdateHierarchy(hierarchy, query, navmesh, nullptr) == mnav_errorState,
+    CHECK(mnavHierarchy_Update(hierarchy, query, navmesh, nullptr) == mnav_errorState,
           "no graph after it to bring up to date");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(query);
@@ -963,13 +979,13 @@ static void TestStoredWorld(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, tiles[t], sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, tiles[t], sizes[t]).result == mnav_success, "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavQuery* query = Query(4096);
     mnavHierarchy* hierarchy = Hierarchy(1);
     mnavHierarchyReport report;
-    CHECK(mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, &report) == mnav_success &&
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &report) == mnav_success &&
               report.clusters == 4 && report.transitions > 0 && report.edges > 0,
           "built");
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, &report, (int32_t)sizeof(report));
@@ -981,11 +997,11 @@ static void TestStoredWorld(void)
         mnavNearest b = On(navmesh, pairs[p][2], pairs[p][3]);
         mnavPath plain;
         mnavPath through;
-        CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &plain) == mnav_success &&
+        CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &plain) == mnav_success &&
                   plain.end == mnav_pathFound &&
-                  mnavFindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point, b.polygon,
-                                           b.point, &through) == mnav_success &&
+                  mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point,
+                                                 b.polygon, b.point, &through) == mnav_success &&
                   through.end == mnav_pathFound,
               "both ways found");
         CHECK(through.length <= plain.length * 1.06 && through.length >= plain.length - 1e-9,

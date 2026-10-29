@@ -162,14 +162,14 @@ static void ExpectTaut(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQ
         double saved = Flat(a, path->points[i]) + Flat(path->points[i], c) - Flat(a, c);
         mnavNearest from;
         if (AtLink(path, i - 1) || AtLink(path, i) || AtLink(path, i + 1) || saved < 1e-6 ||
-            mnavFindNearest(navmesh, filter, a, (mnavVec3){0.01f, 1.0f, 0.01f}, &from) !=
+            mnavNavmesh_FindNearest(navmesh, a, (mnavVec3){0.01f, 1.0f, 0.01f}, filter, &from) !=
                 mnav_success ||
             from.polygon.slot == 0)
         {
             continue;
         }
         mnavRay ray;
-        Expect(mnavRaycast(query, navmesh, filter, from.polygon, from.point, c, &ray) ==
+        Expect(mnavQuery_Raycast(query, navmesh, from.polygon, from.point, c, filter, &ray) ==
                mnav_success);
         Expect(ray.end != mnav_rayReached);
     }
@@ -181,20 +181,20 @@ static void Compare(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQuer
     mnavNearest a;
     mnavNearest b;
     mnavVec3 box = {0.1f, 1.0f, 0.1f};
-    if (mnavFindNearest(navmesh, filter, p, box, &a) != mnav_success ||
-        mnavFindNearest(navmesh, filter, q, box, &b) != mnav_success || a.polygon.slot == 0 ||
-        b.polygon.slot == 0)
+    if (mnavNavmesh_FindNearest(navmesh, p, box, filter, &a) != mnav_success ||
+        mnavNavmesh_FindNearest(navmesh, q, box, filter, &b) != mnav_success ||
+        a.polygon.slot == 0 || b.polygon.slot == 0)
     {
         return;
     }
     mnavPath plain;
-    Expect(mnavFindPath(query, navmesh, filter, a.polygon, a.point, b.polygon, b.point, &plain) ==
-           mnav_success);
+    Expect(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, filter,
+                              &plain) == mnav_success);
     mnavPathEnd plainEnd = plain.end;
     double plainCost = plainEnd == mnav_pathFound ? Walked(&plain, layout) : 0.0;
     mnavPath exact;
-    Expect(mnavFindShortestPath(query, navmesh, filter, a.polygon, a.point, b.polygon, b.point,
-                                &exact) == mnav_success);
+    Expect(mnavQuery_FindShortestPath(query, navmesh, a.polygon, a.point, b.polygon, b.point,
+                                      filter, &exact) == mnav_success);
     Expect(exact.end == plainEnd);
     for (int32_t i = 0; i < exact.pointCount; ++i)
     {
@@ -231,12 +231,12 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         {
             size_t bytes =
                 HandTileBytes(s_bytes[place], place, layout.squares[place], layout.counts[place]);
-            Expect(mnavStageTile(navmesh, s_bytes[place], bytes).result == mnav_success);
+            Expect(mnavNavmesh_StageTile(navmesh, s_bytes[place], bytes).result == mnav_success);
         }
     }
-    Expect(mnavCommit(navmesh) == mnav_success);
+    Expect(mnavNavmesh_Commit(navmesh) == mnav_success);
     Links(&r, navmesh, &layout);
-    Expect(mnavCommit(navmesh) == mnav_success);
+    Expect(mnavNavmesh_Commit(navmesh) == mnav_success);
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     queryDef.allocator = CountingAllocator();
     queryDef.limits.nodes = NODES;

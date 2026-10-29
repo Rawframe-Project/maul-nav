@@ -5,11 +5,11 @@
 // 32 m by 32 m split by two blocks around a corridor 4 m wide is baked
 // into one tile, and two groups of eight agents cross it from opposite
 // walls, meeting head on in the corridor. Each step, every agent's
-// corridor gives its corners, mnavSteer the velocity it wants, mnavAvoid
+// corridor gives its corners, mnavSteer the velocity it wants, mnavAvoidance_Avoid
 // a velocity clear of the others and of the walls near them, which
-// mnavFindWalls finds on the navmesh, the host limits the change by an
+// mnavQuery_FindWalls finds on the navmesh, the host limits the change by an
 // acceleration and moves the agent along the surface with
-// mnavMoveCorridor. Prints how close any two came and how far the moves
+// mnavQuery_MoveCorridor. Prints how close any two came and how far the moves
 // fell short of where agents meant to go, pressed against walls; returns
 // 0 when every agent arrives, no two overlapping by more than 5 cm (in a
 // packed corridor avoidance keeps clear of the walls first and gives way
@@ -52,7 +52,7 @@ static void Check(mnavResult result, const char* what)
 {
     if (result != mnav_success)
     {
-        fprintf(stderr, "%s: %s\n", what, mnavResultName(result));
+        fprintf(stderr, "%s: %s\n", what, mnavGetResultName(result));
         exit(1);
     }
 }
@@ -101,11 +101,11 @@ static mnavNavmesh* Load(void)
     mnavTriangleMesh room = Room();
     uint8_t* bytes = malloc(TILE_ROOM);
     size_t size = 0;
-    Check(mnavBakeTile(baker, &(mnavBakeInput){&room, 1, NULL, 0, NULL, 0, NULL}, 0, 0, NULL),
+    Check(mnavBaker_BakeTile(baker, &(mnavBakeInput){&room, 1, NULL, 0, NULL, 0, NULL}, 0, 0, NULL),
           "bake");
-    Check(mnavCopyBakedTile(baker, bytes, TILE_ROOM, &size), "copy");
-    Check(mnavStageTile(navmesh, bytes, size).result, "stage");
-    Check(mnavCommit(navmesh), "commit");
+    Check(mnavBaker_CopyTile(baker, bytes, TILE_ROOM, &size), "copy");
+    Check(mnavNavmesh_StageTile(navmesh, bytes, size).result, "stage");
+    Check(mnavNavmesh_Commit(navmesh), "commit");
     free(bytes);
     mnavDestroyBaker(baker);
     return navmesh;
@@ -135,12 +135,13 @@ static void Start(mnavQuery* query, const mnavNavmesh* navmesh)
         double x = i < 8 ? 2.0 : 30.0;
         mnavNearest start;
         mnavNearest end;
-        Check(mnavFindNearest(navmesh, NULL, (mnavPos3){x, 0.0, z}, box, &start), "start");
-        Check(mnavFindNearest(navmesh, NULL, (mnavPos3){32.0 - x, 0.0, z}, box, &end), "end");
+        Check(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 0.0, z}, box, NULL, &start), "start");
+        Check(mnavNavmesh_FindNearest(navmesh, (mnavPos3){32.0 - x, 0.0, z}, box, NULL, &end),
+              "end");
         Walker* w = &s_walkers[i];
         mnavPath path;
-        Check(mnavFindPath(query, navmesh, NULL, start.polygon, start.point, end.polygon, end.point,
-                           &path),
+        Check(mnavQuery_FindPath(query, navmesh, start.polygon, start.point, end.polygon, end.point,
+                                 NULL, &path),
               "path");
         Check(mnavResetCorridor(&w->corridor, w->buffer, CORRIDOR, start.polygon, start.point),
               "reset");
@@ -166,7 +167,8 @@ static int32_t Steer(mnavQuery* query, const mnavNavmesh* navmesh)
     {
         mnavCorners corners;
         mnavSteering steering;
-        Check(mnavCorridorCorners(query, navmesh, &s_walkers[i].corridor, &corners), "corners");
+        Check(mnavQuery_FindCorridorCorners(query, &s_walkers[i].corridor, navmesh, &corners),
+              "corners");
         Check(mnavSteer(&corners, &def, &steering), "steer");
         s_walkers[i].arrived = steering.state == mnav_steerArrived;
         arrived += s_walkers[i].arrived ? 1 : 0;
@@ -192,8 +194,8 @@ static void FindWalls(mnavQuery* query, const mnavNavmesh* navmesh)
         }
         mnavWallsFound found;
         mnavResult result =
-            mnavFindWalls(query, navmesh, NULL, w->corridor.polygons[0], w->corridor.position,
-                          WALL_RANGE, w->walls, WALLS, &found);
+            mnavQuery_FindWalls(query, navmesh, w->corridor.polygons[0], w->corridor.position,
+                                WALL_RANGE, NULL, w->walls, WALLS, &found);
         Check(result == mnav_errorCapacity ? mnav_success : result, "walls");
         w->wallCount = found.count < WALLS ? found.count : WALLS;
         w->wallsAt = w->corridor.position;
@@ -263,7 +265,7 @@ static double Move(mnavQuery* query, const mnavNavmesh* navmesh, const mnavVec2*
         mnavCorridor* c = &s_walkers[i].corridor;
         mnavPos3 wanted = {c->position.x + (double)a->velocity.x * STEP, c->position.y,
                            c->position.z + (double)a->velocity.y * STEP};
-        Check(mnavMoveCorridor(query, navmesh, NULL, c, wanted, NULL), "move");
+        Check(mnavQuery_MoveCorridor(query, c, navmesh, wanted, NULL, NULL), "move");
         pressed += hypot(wanted.x - c->position.x, wanted.z - c->position.z);
         a->position = (mnavPos2){c->position.x, c->position.z};
     }
@@ -315,7 +317,8 @@ int main(void)
         int32_t wallCount = GatherWalls(walls, ends);
         mostWalls = wallCount > mostWalls ? wallCount : mostWalls;
         static mnavVec2 velocities[AGENTS];
-        Check(mnavAvoid(avoidance, s_agents, AGENTS, walls, wallCount, STEP, velocities), "avoid");
+        Check(mnavAvoidance_Avoid(avoidance, s_agents, AGENTS, walls, wallCount, STEP, velocities),
+              "avoid");
         pressed += Move(query, navmesh, velocities);
         double gap = Closest();
         closest = gap < closest ? gap : closest;

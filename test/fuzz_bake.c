@@ -161,9 +161,9 @@ static size_t BakeTwice(mnavBaker* baker, const Input* in, bool flat, int32_t ou
 {
     mnavBakeReport report;
     mnavResult result =
-        flat ? mnavBakeTile2D(baker, &(mnavBake2DInput){in->outlines, outlines, nullptr}, tileX,
-                              tileZ, &report)
-             : mnavBakeTile(baker, input, tileX, tileZ, &report);
+        flat ? mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){in->outlines, outlines, nullptr},
+                                    tileX, tileZ, &report)
+             : mnavBaker_BakeTile(baker, input, tileX, tileZ, &report);
     Expect(result == report.result);
     if (result != mnav_success)
     {
@@ -172,16 +172,16 @@ static size_t BakeTwice(mnavBaker* baker, const Input* in, bool flat, int32_t ou
         return 0;
     }
     size_t size = 0;
-    Expect(mnavCopyBakedTile(baker, tile, TILE_ROOM, &size) == mnav_success && size > 0);
+    Expect(mnavBaker_CopyTile(baker, tile, TILE_ROOM, &size) == mnav_success && size > 0);
     mnavBakeReport again;
     mnavResult second =
-        flat ? mnavBakeTile2D(baker, &(mnavBake2DInput){in->outlines, outlines, nullptr}, tileX,
-                              tileZ, &again)
-             : mnavBakeTile(baker, input, tileX, tileZ, &again);
+        flat ? mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){in->outlines, outlines, nullptr},
+                                    tileX, tileZ, &again)
+             : mnavBaker_BakeTile(baker, input, tileX, tileZ, &again);
     static uint8_t copy[TILE_ROOM];
     size_t copySize = 0;
     Expect(second == mnav_success && again.fingerprint == report.fingerprint &&
-           mnavCopyBakedTile(baker, copy, TILE_ROOM, &copySize) == mnav_success &&
+           mnavBaker_CopyTile(baker, copy, TILE_ROOM, &copySize) == mnav_success &&
            copySize == size && memcmp(copy, tile, size) == 0);
     return size;
 }
@@ -198,17 +198,17 @@ static void Rebuild(mnavBaker* baker, const mnavBakeInput* input, int32_t obstac
     Expect(mnavCreateTileCache(&def, &cache) == mnav_success);
     mnavBakeInput part = *input;
     part.volumeCount -= obstacleCount;
-    mnavResult cached = mnavBakeTileCached(baker, cache, &part, tileX, tileZ, nullptr);
+    mnavResult cached = mnavBaker_BakeTileCached(baker, cache, &part, tileX, tileZ, nullptr);
     if (cached == mnav_success)
     {
         mnavBakeReport report;
-        mnavResult result = mnavRebuildTile(
+        mnavResult result = mnavBaker_RebuildTile(
             baker, cache, tileX, tileZ, &input->volumes[part.volumeCount], obstacleCount, &report);
         static uint8_t copy[TILE_ROOM];
         size_t copySize = 0;
         Expect(result == report.result && (result == mnav_success) == (tileSize > 0));
         Expect(result != mnav_success ||
-               (mnavCopyBakedTile(baker, copy, TILE_ROOM, &copySize) == mnav_success &&
+               (mnavBaker_CopyTile(baker, copy, TILE_ROOM, &copySize) == mnav_success &&
                 copySize == tileSize && memcmp(copy, tile, tileSize) == 0));
     }
     else
@@ -272,13 +272,13 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         indexed.index = index;
         const mnavBake2DInput flatIndexed = {in.outlines, outlines, index};
         mnavBakeReport report;
-        mnavResult result = flat ? mnavBakeTile2D(baker, &flatIndexed, tileX, tileZ, &report)
-                                 : mnavBakeTile(baker, &indexed, tileX, tileZ, &report);
+        mnavResult result = flat ? mnavBaker_BakeTile2D(baker, &flatIndexed, tileX, tileZ, &report)
+                                 : mnavBaker_BakeTile(baker, &indexed, tileX, tileZ, &report);
         static uint8_t copy[TILE_ROOM];
         size_t copySize = 0;
         Expect((result == mnav_success) == (tileSize > 0));
         Expect(result != mnav_success ||
-               (mnavCopyBakedTile(baker, copy, TILE_ROOM, &copySize) == mnav_success &&
+               (mnavBaker_CopyTile(baker, copy, TILE_ROOM, &copySize) == mnav_success &&
                 copySize == tileSize && memcmp(copy, tile, tileSize) == 0));
         mnavDestroyTileIndex(index);
     }
@@ -291,8 +291,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     {
         mnavNavmesh* navmesh = nullptr;
         Expect(mnavCreateNavmesh(&def, &navmesh).result == mnav_success);
-        Expect(mnavStageTile(navmesh, tile, tileSize).result == mnav_success &&
-               mnavCommit(navmesh) == mnav_success);
+        Expect(mnavNavmesh_StageTile(navmesh, tile, tileSize).result == mnav_success &&
+               mnavNavmesh_Commit(navmesh) == mnav_success);
         mnavDestroyNavmesh(navmesh);
     }
     Expect(s_held == 0);

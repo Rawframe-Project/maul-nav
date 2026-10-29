@@ -52,17 +52,18 @@ static mnavNavmesh* Load(int32_t tiles)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < tiles; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_bytes[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_bytes[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
 static mnavNearest On(const mnavNavmesh* navmesh, double x, double y, float box)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 0.0, y}, (mnavVec3){box, 1.0f, box},
-                          &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 0.0, y}, (mnavVec3){box, 1.0f, box},
+                                  nullptr, &n) == mnav_success,
           "nearest");
     return n;
 }
@@ -75,9 +76,9 @@ static uint64_t RoomHash(void)
     static uint8_t bytes[CAPACITY];
     size_t size = 0;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0, nullptr) ==
-                  mnav_success &&
-              mnavCopyBakedTile(baker, bytes, CAPACITY, &size) == mnav_success,
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0,
+                                   nullptr) == mnav_success &&
+              mnavBaker_CopyTile(baker, bytes, CAPACITY, &size) == mnav_success,
           "the room baked");
     mnavDestroyBaker(baker);
     return mnavHash64(MNAV_HASH_INIT, bytes, (int32_t)size);
@@ -89,10 +90,10 @@ static void TestTheRoom(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0, &report) ==
-                  mnav_success &&
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0,
+                                   &report) == mnav_success &&
               report.triangles == 4 && report.polygons > 0 &&
-              mnavCopyBakedTile(baker, s_bytes[0], CAPACITY, &s_sizes[0]) == mnav_success,
+              mnavBaker_CopyTile(baker, s_bytes[0], CAPACITY, &s_sizes[0]) == mnav_success,
           "baked, four outlines reaching the tile");
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_bytes[0], (int32_t)s_sizes[0]);
     printf("ROOM_HASH=%016llx polygons=%d bytes=%zu\n", (unsigned long long)hash, report.polygons,
@@ -112,13 +113,16 @@ static void TestTheRoom(void)
     CHECK(fabs(wall.point.y) <= (double)def.cellHeight, "a flat floor at height 0");
     // Areas: the highest outline holding a cell wins.
     mnavAreaType area = 0;
-    CHECK(mnavGetArea(navmesh, On(navmesh, 5.0, 5.0, 0.1f).polygon, &area) == mnav_success &&
+    CHECK(mnavPolygon_GetArea(navmesh, On(navmesh, 5.0, 5.0, 0.1f).polygon, &area) ==
+                  mnav_success &&
               area == 5,
           "the rug");
-    CHECK(mnavGetArea(navmesh, On(navmesh, 5.0, 15.0, 0.1f).polygon, &area) == mnav_success &&
+    CHECK(mnavPolygon_GetArea(navmesh, On(navmesh, 5.0, 15.0, 0.1f).polygon, &area) ==
+                  mnav_success &&
               area == 3,
           "the carpet");
-    CHECK(mnavGetArea(navmesh, On(navmesh, 18.0, 5.0, 0.1f).polygon, &area) == mnav_success &&
+    CHECK(mnavPolygon_GetArea(navmesh, On(navmesh, 18.0, 5.0, 0.1f).polygon, &area) ==
+                  mnav_success &&
               area == mnav_areaWalkable,
           "the bare floor");
     // Across the pillar: a straight ray stops, a path goes round.
@@ -129,11 +133,12 @@ static void TestTheRoom(void)
     mnavNearest b = On(navmesh, 12.0, 20.0, 0.1f);
     mnavRay ray;
     mnavPath path;
-    CHECK(mnavRaycast(query, navmesh, nullptr, a.polygon, a.point, b.point, &ray) == mnav_success &&
+    CHECK(mnavQuery_Raycast(query, navmesh, a.polygon, a.point, b.point, nullptr, &ray) ==
+                  mnav_success &&
               ray.end == mnav_rayWall,
           "the pillar stops a ray");
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
               path.end == mnav_pathFound && path.pointCount >= 4 && path.length > 16.5,
           "a path round it");
     mnavDestroyQuery(query);
@@ -152,9 +157,9 @@ static void TestAcrossTiles(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     for (int32_t t = 0; t < 2; ++t)
     {
-        CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, t, 0, nullptr) ==
-                      mnav_success &&
-                  mnavCopyBakedTile(baker, s_bytes[t], CAPACITY, &s_sizes[t]) == mnav_success,
+        CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, t, 0,
+                                   nullptr) == mnav_success &&
+                  mnavBaker_CopyTile(baker, s_bytes[t], CAPACITY, &s_sizes[t]) == mnav_success,
               "baked");
     }
     mnavNavmesh* navmesh = Load(2);
@@ -164,8 +169,8 @@ static void TestAcrossTiles(void)
     mnavNearest b = On(navmesh, 43.0, 11.5, 0.1f);
     mnavPath path;
     CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success &&
-              mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &path) == mnav_success &&
+              mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                                 &path) == mnav_success &&
               path.end == mnav_pathFound && path.pointCount == 2 &&
               a.polygon.slot != b.polygon.slot,
           "straight along the hall, over the tile side");
@@ -189,16 +194,16 @@ static void TestFillRules(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){&outlines[0], 1, nullptr}, 0, 0, &report) ==
-                  mnav_success &&
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outlines[0], 1, nullptr}, 0, 0,
+                                   &report) == mnav_success &&
               report.polygons == 0,
           "twice round: empty");
-    CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){&outlines[1], 1, nullptr}, 0, 0, &report) ==
-                  mnav_success &&
+    CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outlines[1], 1, nullptr}, 0, 0,
+                               &report) == mnav_success &&
               report.polygons > 0 && report.spans == 80 * 80,
           "once round: every cell, 20 m by 20 m");
-    CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){&outlines[2], 1, nullptr}, 0, 0, &report) ==
-                  mnav_success &&
+    CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outlines[2], 1, nullptr}, 0, 0,
+                               &report) == mnav_success &&
               report.spans == 0,
           "a sliver between centers: no cell");
     // A strip whose bottom edge lies on a row of centers (they sit at
@@ -206,7 +211,7 @@ static void TestFillRules(void)
     // line counts as below it.
     const mnavVec2 strip[4] = {{2, 2.125f}, {22, 2.125f}, {22, 2.3f}, {2, 2.3f}};
     const mnavOutline onLine = {strip, 4, 1};
-    CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){&onLine, 1, nullptr}, 0, 0, &report) ==
+    CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&onLine, 1, nullptr}, 0, 0, &report) ==
                   mnav_success &&
               report.spans == 80,
           "a bottom edge on the centers' line holds its row");
@@ -216,12 +221,12 @@ static void TestFillRules(void)
     const mnavOutline all = {huge, 4, 1};
     mnavBakeCells cells;
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){&all, 1, nullptr}, 0, 0, &report) ==
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&all, 1, nullptr}, 0, 0, &report) ==
                   mnav_success &&
               report.spans ==
                   (def.tileCells + 2 * cells.border) * (def.tileCells + 2 * cells.border),
           "every cell of the tile and its border");
-    CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){nullptr, 0, nullptr}, 0, 0, &report) ==
+    CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){nullptr, 0, nullptr}, 0, 0, &report) ==
                   mnav_success &&
               report.polygons == 0 && report.triangles == 0,
           "nothing: an empty tile");
@@ -260,30 +265,30 @@ static void TestChecks(void)
     mnavBakeReport report;
     outline.points = bad;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0, &report) ==
-                  mnav_errorInvalid &&
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0,
+                                   &report) == mnav_errorInvalid &&
               report.mesh == 0 && report.input.index == 1,
           "the bake names the outline and point");
     mnavDestroyBaker(baker);
     // Four outlines reach the room's tile: past a limit of three.
     def.limits.tileTriangles = 3;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0, &report) ==
-                  mnav_errorCapacity &&
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0,
+                                   &report) == mnav_errorCapacity &&
               report.stage == mnav_stageRasterize,
           "more outlines on the tile than the limit");
     def.limits.tileTriangles = 4;
     mnavDestroyBaker(baker);
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0, &report) ==
-                  mnav_success,
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0,
+                                   &report) == mnav_success,
           "as many as the limit");
-    CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){nullptr, 1, nullptr}, 0, 0, &report) ==
+    CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){nullptr, 1, nullptr}, 0, 0, &report) ==
                   mnav_errorInvalid &&
-              mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, -1, nullptr}, 0, 0, &report) ==
-                  mnav_errorInvalid &&
-              mnavBakeTile2D(nullptr, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0, &report) ==
-                  mnav_errorInvalid,
+              mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outline, -1, nullptr}, 0, 0,
+                                   &report) == mnav_errorInvalid &&
+              mnavBaker_BakeTile2D(nullptr, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0,
+                                   &report) == mnav_errorInvalid,
           "bad arguments");
     mnavDestroyBaker(baker);
 }
@@ -305,8 +310,8 @@ static void TestIslands(void)
         const mnavOutline outlines[2] = {{floor, 4, mnav_areaWalkable},
                                          {patch, 4, mnav_areaWalkable}};
         mnavBakeReport report;
-        CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){outlines, 2, nullptr}, 0, 0, &report) ==
-                  mnav_success,
+        CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){outlines, 2, nullptr}, 0, 0,
+                                   &report) == mnav_success,
               "baked");
         CHECK(report.regions == 1 + k && report.droppedRegions == 1 - k,
               "a small island dropped and counted, a larger one kept");

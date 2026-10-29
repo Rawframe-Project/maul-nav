@@ -82,15 +82,15 @@ static mnavResult Load(const mnavBakeDef* def, const Shape* shapes, int32_t coun
     size_t size = 0;
     CHECK(mnavCreateBaker(def, &baker).result == mnav_success, "baker");
     mnavResult result =
-        mnavBakeTile2D(baker, &(mnavBake2DInput){outlines, count, nullptr}, 0, 0, &s_report);
+        mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){outlines, count, nullptr}, 0, 0, &s_report);
     if (result == mnav_success)
     {
-        CHECK(mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success, "copied");
+        CHECK(mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success, "copied");
         mnavDestroyNavmesh(s_navmesh);
         s_navmesh = nullptr;
         CHECK(mnavCreateNavmesh(def, &s_navmesh).result == mnav_success &&
-                  mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-                  mnavCommit(s_navmesh) == mnav_success,
+                  mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+                  mnavNavmesh_Commit(s_navmesh) == mnav_success,
               "loaded");
     }
     mnavDestroyBaker(baker);
@@ -101,9 +101,9 @@ static mnavResult Load(const mnavBakeDef* def, const Shape* shapes, int32_t coun
 static mnavNearest Over(int32_t x, int32_t z)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(s_navmesh, nullptr,
-                          (mnavPos3){(double)Meters(x) + 0.125, 0.0, (double)Meters(z) + 0.125},
-                          (mnavVec3){0.01f, 1.0f, 0.01f}, &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(
+              s_navmesh, (mnavPos3){(double)Meters(x) + 0.125, 0.0, (double)Meters(z) + 0.125},
+              (mnavVec3){0.01f, 1.0f, 0.01f}, nullptr, &n) == mnav_success,
           "nearest");
     if (!n.over)
     {
@@ -119,8 +119,8 @@ static bool Reaches(int32_t x0, int32_t z0, int32_t x1, int32_t z1)
     mnavNearest b = Over(x1, z1);
     mnavPath path;
     CHECK(a.polygon.slot != 0 && b.polygon.slot != 0 &&
-              mnavFindPath(s_query, s_navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                           &path) == mnav_success,
+              mnavQuery_FindPath(s_query, s_navmesh, a.polygon, a.point, b.polygon, b.point,
+                                 nullptr, &path) == mnav_success,
           "searched");
     return path.end == mnav_pathFound;
 }
@@ -131,7 +131,7 @@ static int64_t TwiceArea(void)
     mnavDebugBuffer b = {
         {0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, s_drawIndices, DRAW_ROOM, 0, nullptr, 0, 0};
     // The edges go uncounted into a buffer with no line room.
-    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
+    (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the polygons fit");
     int64_t area = 0;
     for (int32_t t = 0; t < b.triangleCount / 3; ++t)
@@ -163,7 +163,7 @@ static bool CornersMeet(void)
     mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
                          s_drawIndices,   DRAW_ROOM,      0};
     // Polygon fills go uncounted into a buffer with no triangle room.
-    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
+    (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     bool meet = true;
     for (int32_t l = 0; l < b.lineCount / 2; ++l)
     {
@@ -196,7 +196,7 @@ static int32_t Sides(void)
     mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
                          s_drawIndices,   DRAW_ROOM,      0};
     // Polygon fills go uncounted into a buffer with no triangle room.
-    (void)mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
+    (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     int32_t count = 0;
     for (int32_t l = 0; l < b.lineCount / 2; ++l)
     {
@@ -267,8 +267,8 @@ static void TestRingsWeldAndLinkAcrossRegions(void)
     CHECK(Reaches(1, 2, 8, 2) && Reaches(8, 2, 1, 2), "linked both ways across the regions");
     mnavAreaType left = 0;
     mnavAreaType right = 0;
-    CHECK(mnavGetArea(s_navmesh, Over(1, 2).polygon, &left) == mnav_success &&
-              mnavGetArea(s_navmesh, Over(8, 2).polygon, &right) == mnav_success &&
+    CHECK(mnavPolygon_GetArea(s_navmesh, Over(1, 2).polygon, &left) == mnav_success &&
+              mnavPolygon_GetArea(s_navmesh, Over(8, 2).polygon, &right) == mnav_success &&
               left == mnav_areaWalkable && right == 7,
           "each quad its ring's area");
 }
@@ -287,7 +287,7 @@ static void TestStackedFloorsKeepTheirCorners(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success,
+              mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
     CHECK(report.regions == 2 && report.polygons == 2 && report.vertices == 8,
           "two quads of four corners each");
@@ -421,7 +421,7 @@ static void TestLevelRingsAreComplete(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success,
+              mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
     CHECK(report.partialRings == 0 && report.polygons > 0, "every ring complete");
     mnavDestroyBaker(baker);

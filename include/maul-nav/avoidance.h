@@ -85,7 +85,7 @@ extern "C"
         uint32_t layers;
     } mnavObstacle;
 
-    // An agent in space, for mnavAvoid3D, its values in the ranges above.
+    // An agent in space, for mnavAvoidance_Avoid3D, its values in the ranges above.
     typedef struct mnavAgent3D
     {
         mnavPos3 position;
@@ -230,7 +230,7 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. It may be read at any time, also while host
     /// code the object runs calls back in.
-    MNAV_API uint64_t mnavGetAvoidanceMisuse(const mnavAvoidance* avoidance);
+    MNAV_API uint64_t mnavAvoidance_GetMisuse(const mnavAvoidance* avoidance);
 
     /// Finds each agent's new velocity: the one nearest its preferred
     /// velocity, no faster than its maximum speed, that avoids the
@@ -274,12 +274,11 @@ extern "C"
     /// one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the set is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavAvoid(mnavAvoidance* avoidance, const mnavAgent* agents,
-                                                 int32_t agentCount, const mnavObstacle* obstacles,
-                                                 int32_t obstacleCount, double step,
-                                                 mnavVec2* velocitiesOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavAvoidance_Avoid(
+        mnavAvoidance* avoidance, const mnavAgent* agents, int32_t agentCount,
+        const mnavObstacle* obstacles, int32_t obstacleCount, double step, mnavVec2* velocitiesOut);
 
-    /// Finds each flier's new velocity, as mnavAvoid does on the ground:
+    /// Finds each flier's new velocity, as mnavAvoidance_Avoid does on the ground:
     /// the one nearest its preferred velocity, no faster than its maximum
     /// speed, that avoids the spheres within the obstacle horizon and
     /// colliding with its neighbours within the time horizon if they do
@@ -318,13 +317,12 @@ extern "C"
     /// set's allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the set is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavAvoid3D(mnavAvoidance* avoidance,
-                                                   const mnavAgent3D* agents, int32_t agentCount,
-                                                   const mnavSphere* spheres, int32_t sphereCount,
-                                                   double step, mnavVec3* velocitiesOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavAvoidance_Avoid3D(
+        mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
+        const mnavSphere* spheres, int32_t sphereCount, double step, mnavVec3* velocitiesOut);
 
     /// Appends each agent's outline, a 16-gon (mnav_debugAgent), and a line
-    /// to each neighbour mnavAvoid would give it (mnav_debugNeighbor), at a
+    /// to each neighbour mnavAvoidance_Avoid would give it (mnav_debugNeighbor), at a
     /// height, agent X and Y lying at ground X and Z.
     ///
     /// @param avoidance  The set; its scratch is used.
@@ -334,7 +332,7 @@ extern "C"
     /// @param buffer     The buffer appended to.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents, a height not finite, or a buffer with a count out of range, an
-    /// array missing or an origin not finite; for an agent mnavAvoid refuses,
+    /// array missing or an origin not finite; for an agent mnavAvoidance_Avoid refuses,
     /// the status it gives; `mnav_errorCapacity` for more agents than the set's
     /// limit, or when the buffer filled, its counts saying what the whole
     /// needs. Also `mnav_errorBusy` when called back in from the avoidance
@@ -342,14 +340,14 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread; the set and the buffer are used by one thread
     /// at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavDebugAvoidance(mnavAvoidance* avoidance,
-                                                          const mnavAgent* agents,
-                                                          int32_t agentCount, double height,
-                                                          mnavDebugBuffer* buffer);
+    MNAV_NODISCARD MNAV_API mnavResult mnavAvoidance_Debug(mnavAvoidance* avoidance,
+                                                           const mnavAgent* agents,
+                                                           int32_t agentCount, double height,
+                                                           mnavDebugBuffer* buffer);
 
     /// Appends each flier's outline, three 16-gons on its radius, one in
     /// each axis plane (mnav_debugAgent), a line to each neighbour
-    /// mnavAvoid3D would give it (mnav_debugNeighbor), and each sphere's
+    /// mnavAvoidance_Avoid3D would give it (mnav_debugNeighbor), and each sphere's
     /// three rings (mnav_debugObstacle).
     ///
     /// @param avoidance   The set; its scratch is used.
@@ -361,7 +359,7 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents or spheres, a negative count, or a buffer with a count out of
     /// range, an array missing or an origin not finite; for an agent or sphere
-    /// mnavAvoid3D refuses, or more of them than it takes, the status it gives;
+    /// mnavAvoidance_Avoid3D refuses, or more of them than it takes, the status it gives;
     /// `mnav_errorCapacity` when the buffer filled, its counts saying what the
     /// whole needs. Also `mnav_errorBusy` when called back in from the
     /// avoidance set's allocator, one misuse counted.
@@ -369,8 +367,8 @@ extern "C"
     /// Safe from any thread; the set and the buffer are used by one thread
     /// at a time.
     MNAV_NODISCARD MNAV_API mnavResult
-    mnavDebugAvoidance3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
-                         const mnavSphere* spheres, int32_t sphereCount, mnavDebugBuffer* buffer);
+    mnavAvoidance_Debug3D(mnavAvoidance* avoidance, const mnavAgent3D* agents, int32_t agentCount,
+                          const mnavSphere* spheres, int32_t sphereCount, mnavDebugBuffer* buffer);
 
 #ifdef __cplusplus
 }

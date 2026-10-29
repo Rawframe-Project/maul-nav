@@ -102,8 +102,8 @@ static void TestBakes(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "a baker");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavBakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
-                  mnavCopyBakedTile(baker, s_expected[t], TILE_CAPACITY, &s_expectedSizes[t]) ==
+        CHECK(mnavBaker_BakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
+                  mnavBaker_CopyTile(baker, s_expected[t], TILE_CAPACITY, &s_expectedSizes[t]) ==
                       mnav_success,
               "the tiles, with every allocation granted");
     }
@@ -117,14 +117,14 @@ static void TestBakes(void)
     for (int32_t t = 0; t < 1; ++t)
     {
         FailAfter(-1);
-        CHECK(mnavBakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success, "counted");
+        CHECK(mnavBaker_BakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success, "counted");
         int32_t calls = s_calls;
         failed += calls;
         for (int32_t k = 0; k < calls; ++k)
         {
             FailAfter(k);
             mnavBakeReport report;
-            mnavResult result = mnavBakeTile(baker, &input, t % 2, t / 2, &report);
+            mnavResult result = mnavBaker_BakeTile(baker, &input, t % 2, t / 2, &report);
             refused += result == mnav_errorCapacity ? 1 : 0;
             reported = reported && result == mnav_errorCapacity && report.result == result;
             // The baker holds no more than its own scratch afterwards, and
@@ -132,8 +132,8 @@ static void TestBakes(void)
             FailAfter(-1);
             size_t size = 0;
             restored = restored &&
-                       mnavBakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
-                       mnavCopyBakedTile(baker, s_bytes, TILE_CAPACITY, &size) == mnav_success &&
+                       mnavBaker_BakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
+                       mnavBaker_CopyTile(baker, s_bytes, TILE_CAPACITY, &size) == mnav_success &&
                        size == s_expectedSizes[t] && memcmp(s_bytes, s_expected[t], size) == 0;
         }
     }
@@ -145,7 +145,7 @@ static void TestBakes(void)
     const mnavVec2 square[4] = {{1, 1}, {31, 1}, {31, 31}, {1, 31}};
     const mnavOutline outline = {square, 4, mnav_areaWalkable};
     FailAfter(-1);
-    CHECK(mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0, nullptr) ==
+    CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0, nullptr) ==
               mnav_success,
           "a 2D tile");
     int32_t calls = s_calls;
@@ -153,8 +153,8 @@ static void TestBakes(void)
     for (int32_t k = 0; k < calls; ++k)
     {
         FailAfter(k);
-        flat = flat && mnavBakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0,
-                                      nullptr) == mnav_errorCapacity;
+        flat = flat && mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0,
+                                            nullptr) == mnav_errorCapacity;
     }
     CHECK(flat, "2D bakes refused alike");
     FailAfter(-1);
@@ -191,40 +191,41 @@ static void TestCache(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavCreateTileCache(&cacheDef, &cache) == mnav_success,
           "a baker and a cache");
-    uint64_t empty = mnavGetTileCacheBytes(cache);
+    uint64_t empty = mnavTileCache_GetBytes(cache);
     FailAfter(-1);
-    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success, "counted");
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success, "counted");
     int32_t calls = s_calls;
     bool cached = true;
     for (int32_t k = 0; k < calls; ++k)
     {
         FailAfter(k);
-        cached = cached &&
-                 mnavBakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_errorCapacity &&
-                 mnavGetTileCacheBytes(cache) == empty;
+        cached =
+            cached &&
+            mnavBaker_BakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_errorCapacity &&
+            mnavTileCache_GetBytes(cache) == empty;
     }
     CHECK(cached, "cached bakes refused, nothing kept");
     FailAfter(-1);
     const mnavBakeVolume crate = {s_strip, 4, -1.0f, 1.0f, mnav_volumeExclude, 0};
     size_t size = 0;
-    CHECK(mnavBakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success, "cached");
+    CHECK(mnavBaker_BakeTileCached(baker, cache, &input, 0, 0, nullptr) == mnav_success, "cached");
     FailAfter(-1);
-    CHECK(mnavRebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_success &&
-              mnavCopyBakedTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_success,
+    CHECK(mnavBaker_RebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_rebuilt, TILE_CAPACITY, &size) == mnav_success,
           "a rebuild, counted");
     calls = s_calls;
-    uint64_t held = mnavGetTileCacheBytes(cache);
+    uint64_t held = mnavTileCache_GetBytes(cache);
     bool rebuilt = true;
     for (int32_t k = 0; k < calls; ++k)
     {
         FailAfter(k);
-        rebuilt = rebuilt &&
-                  mnavRebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_errorCapacity;
+        rebuilt = rebuilt && mnavBaker_RebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) ==
+                                 mnav_errorCapacity;
         FailAfter(-1);
         size_t again = 0;
-        rebuilt = rebuilt && mnavGetTileCacheBytes(cache) == held &&
-                  mnavRebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_success &&
-                  mnavCopyBakedTile(baker, s_bytes, TILE_CAPACITY, &again) == mnav_success &&
+        rebuilt = rebuilt && mnavTileCache_GetBytes(cache) == held &&
+                  mnavBaker_RebuildTile(baker, cache, 0, 0, &crate, 1, nullptr) == mnav_success &&
+                  mnavBaker_CopyTile(baker, s_bytes, TILE_CAPACITY, &again) == mnav_success &&
                   again == size && memcmp(s_bytes, s_rebuilt, size) == 0;
     }
     printf("cache: %d rebuild allocations each refused\n", calls);
@@ -261,23 +262,23 @@ static void TestHoles(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                           &report) == mnav_success &&
+              mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                                 0, 0, &report) == mnav_success &&
               report.polygons > 4,
           "a floor round a pillar");
     // Counted on a baker that has baked before, as every bake below is.
     FailAfter(-1);
-    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                       nullptr) == mnav_success,
+    CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
+                             0, nullptr) == mnav_success,
           "again");
     int32_t calls = s_calls;
     bool refused = true;
     for (int32_t k = 0; k < calls; ++k)
     {
         FailAfter(k);
-        refused = refused &&
-                  mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
-                               0, 0, nullptr) == mnav_errorCapacity;
+        refused = refused && mnavBaker_BakeTile(
+                                 baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                                 0, 0, nullptr) == mnav_errorCapacity;
     }
     CHECK(refused, "every failure round the hole refused");
     FailAfter(-1);
@@ -298,23 +299,23 @@ static void TestBorderVertices(void)
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                           &report) == mnav_success &&
+              mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                                 0, 0, &report) == mnav_success &&
               report.regions == 2,
           "the floor and the ramp");
     // Counted on a baker that has baked before, as every bake below is.
     FailAfter(-1);
-    CHECK(mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
-                       nullptr) == mnav_success,
+    CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
+                             0, nullptr) == mnav_success,
           "again");
     int32_t calls = s_calls;
     bool refused = true;
     for (int32_t k = 0; k < calls; ++k)
     {
         FailAfter(k);
-        refused = refused &&
-                  mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
-                               0, 0, nullptr) == mnav_errorCapacity;
+        refused = refused && mnavBaker_BakeTile(
+                                 baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
+                                 0, 0, nullptr) == mnav_errorCapacity;
     }
     CHECK(refused, "every failure round the removal refused");
     FailAfter(-1);
@@ -329,7 +330,8 @@ static mnavResult Load(mnavNavmesh* navmesh, bool* committing)
     *committing = false;
     for (int32_t t = 0; t < 4; ++t)
     {
-        mnavResult result = mnavStageTile(navmesh, s_expected[t], s_expectedSizes[t]).result;
+        mnavResult result =
+            mnavNavmesh_StageTile(navmesh, s_expected[t], s_expectedSizes[t]).result;
         if (result != mnav_success)
         {
             return result;
@@ -339,7 +341,7 @@ static mnavResult Load(mnavNavmesh* navmesh, bool* committing)
     mnavLinkId id;
     mnavResult result = mnavStageLink(navmesh, &link, &id);
     *committing = result == mnav_success;
-    return result == mnav_success ? mnavCommit(navmesh) : result;
+    return result == mnav_success ? mnavNavmesh_Commit(navmesh) : result;
 }
 
 static void TestCommits(void)
@@ -374,9 +376,9 @@ static void TestCommits(void)
         if (navmesh != nullptr && committing)
         {
             inCommit += 1;
-            clean = clean && mnavGetTile(navmesh, 0, 0, &tile) != mnav_success &&
-                    mnavCommit(navmesh) == mnav_success &&
-                    mnavGetTile(navmesh, 1, 1, &tile) == mnav_success;
+            clean = clean && mnavNavmesh_GetTile(navmesh, 0, 0, &tile) != mnav_success &&
+                    mnavNavmesh_Commit(navmesh) == mnav_success &&
+                    mnavNavmesh_GetTile(navmesh, 1, 1, &tile) == mnav_success;
         }
         mnavDestroyNavmesh(navmesh);
         clean = clean && s_held == 0;

@@ -128,14 +128,14 @@ static inline void Put(int32_t n, Square s, int32_t sides)
 // Bakes the input and loads its tile in a fresh navmesh.
 static inline void LoadInput(const mnavBakeInput* input)
 {
-    CHECK(mnavBakeTile(s_baker, input, 0, 0, &s_report) == mnav_success &&
-              mnavCopyBakedTile(s_baker, s_tile, TILE_ROOM, &s_tileSize) == mnav_success,
+    CHECK(mnavBaker_BakeTile(s_baker, input, 0, 0, &s_report) == mnav_success &&
+              mnavBaker_CopyTile(s_baker, s_tile, TILE_ROOM, &s_tileSize) == mnav_success,
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, s_tileSize).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, s_tileSize).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
 }
 
@@ -175,12 +175,12 @@ static inline mnavAreaType At(int32_t x, int32_t z, int32_t level)
     mnavPos3 center = {(AT + x + 0.5) * 0.25, level * 0.125, (AT + z + 0.5) * 0.25};
     mnavNearest n;
     mnavAreaType area = NO_POLYGON;
-    CHECK(mnavFindNearest(s_navmesh, nullptr, center, (mnavVec3){0.01f, 1.0f, 0.01f}, &n) ==
+    CHECK(mnavNavmesh_FindNearest(s_navmesh, center, (mnavVec3){0.01f, 1.0f, 0.01f}, nullptr, &n) ==
               mnav_success,
           "nearest");
     if (n.polygon.slot != 0 && n.over)
     {
-        CHECK(mnavGetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
+        CHECK(mnavPolygon_GetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
     }
     return area;
 }

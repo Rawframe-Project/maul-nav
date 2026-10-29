@@ -28,7 +28,7 @@ static bool SnappedNow(const mnavNavmesh* navmesh, const mnavLinkDef* def, mnavL
     {
         mnavNearest n;
         float r = def->radius;
-        attached = mnavFindNearest(navmesh, nullptr, ends[k], (mnavVec3){r, step, r}, &n) ==
+        attached = mnavNavmesh_FindNearest(navmesh, ends[k], (mnavVec3){r, step, r}, nullptr, &n) ==
                        mnav_success &&
                    n.polygon.slot != 0;
         double dx = n.point.x - ends[k].x;
@@ -38,7 +38,7 @@ static bool SnappedNow(const mnavNavmesh* navmesh, const mnavLinkDef* def, mnavL
         points[k] = n.point;
     }
     mnavLinkState state;
-    CHECK(mnavGetLink(navmesh, id, &state) == mnav_success, "read");
+    CHECK(mnavLink_GetState(navmesh, id, &state) == mnav_success, "read");
     const mnavLinkState* s = &state;
     if (!attached)
     {
@@ -54,12 +54,12 @@ static bool SnappedNow(const mnavNavmesh* navmesh, const mnavLinkDef* def, mnavL
 static bool Enabled(const mnavNavmesh* navmesh, mnavLinkId id)
 {
     mnavLinkState state;
-    CHECK(mnavGetLink(navmesh, id, &state) == mnav_success, "read");
+    CHECK(mnavLink_GetState(navmesh, id, &state) == mnav_success, "read");
     return state.enabled;
 }
 
 // How many polygons a committed tile has: the first index whose id names
-// none, as mnavCheckCorridor counts a corridor of that one polygon, under
+// none, as mnavNavmesh_CheckCorridor counts a corridor of that one polygon, under
 // a filter that includes every area, mnav_areaNone too. Tiles hold fewer
 // than 65,536 polygons, so the count ends there at the latest.
 static uint32_t PolygonCount(const mnavNavmesh* navmesh, mnavTileId tile)
@@ -74,7 +74,7 @@ static uint32_t PolygonCount(const mnavNavmesh* navmesh, mnavTileId tile)
         CHECK(mnavResetCorridor(&corridor, buffer, 1,
                                 (mnavPolygonId){tile.slot, tile.generation, count},
                                 (mnavPos3){0.0, 0.0, 0.0}) == mnav_success &&
-                  mnavCheckCorridor(navmesh, &filter, &corridor, &valid) == mnav_success,
+                  mnavNavmesh_CheckCorridor(navmesh, &corridor, &filter, &valid) == mnav_success,
               "checked");
         if (valid != 1)
         {
@@ -128,33 +128,34 @@ static void TestOnlyChangedPlacesResnap(void)
         mnavTileId tile;
         if (what < 3)
         {
-            CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "tile in");
+            CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+                  "tile in");
             loaded[t] = true;
         }
         else if (what < 5 && loaded[t])
         {
-            CHECK(mnavStageTileRemoval(navmesh, t & 1, t >> 1) == mnav_success, "tile out");
+            CHECK(mnavNavmesh_StageTileRemoval(navmesh, t & 1, t >> 1) == mnav_success, "tile out");
             loaded[t] = false;
         }
-        else if (what < 7 && mnavGetTile(navmesh, t & 1, t >> 1, &tile) == mnav_success)
+        else if (what < 7 && mnavNavmesh_GetTile(navmesh, t & 1, t >> 1, &tile) == mnav_success)
         {
             uint32_t count = PolygonCount(navmesh, tile);
             mnavPolygonId polygon = {tile.slot, tile.generation, (state >> 16) % count};
             mnavAreaType area = (state >> 20 & 1u) != 0 ? mnav_areaNone : mnav_areaWalkable;
-            CHECK(mnavStageArea(navmesh, polygon, area) == mnav_success, "area");
+            CHECK(mnavPolygon_StageArea(navmesh, polygon, area) == mnav_success, "area");
         }
         else
         {
             enabled[state >> 16 & 63u] = (state >> 22 & 1u) != 0;
-            CHECK(mnavStageLinkEnabled(navmesh, ids[state >> 16 & 63u], (state >> 22 & 1u) != 0) ==
+            CHECK(mnavLink_StageEnable(navmesh, ids[state >> 16 & 63u], (state >> 22 & 1u) != 0) ==
                       mnav_success,
                   "toggled");
         }
-        CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+        CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
         for (int32_t l = 0; l < 120; ++l)
         {
             mnavLinkState link;
-            CHECK(mnavGetLink(navmesh, ids[l], &link) == mnav_success, "read");
+            CHECK(mnavLink_GetState(navmesh, ids[l], &link) == mnav_success, "read");
             matched = matched && SnappedNow(navmesh, &defs[l], ids[l], stepHeight) &&
                       Enabled(navmesh, ids[l]) == enabled[l];
             attachedSeen += link.attached ? 1 : 0;

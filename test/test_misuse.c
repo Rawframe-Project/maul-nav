@@ -42,9 +42,9 @@ static mnavNavmesh* Trench2(void)
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
-              mnavStageTile(navmesh, s_trench1, sizeof(s_trench1)).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
+              mnavNavmesh_StageTile(navmesh, s_trench1, sizeof(s_trench1)).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "the trench");
     return navmesh;
 }
@@ -60,8 +60,8 @@ static mnavQuery* Query(void)
 static mnavNearest Nearest(const mnavNavmesh* navmesh, double x, double z)
 {
     mnavNearest nearest;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 0.0, z}, (mnavVec3){2.0f, 4.0f, 2.0f},
-                          &nearest) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 0.0, z}, (mnavVec3){2.0f, 4.0f, 2.0f},
+                                  nullptr, &nearest) == mnav_success &&
               nearest.polygon.slot != 0,
           "a polygon");
     return nearest;
@@ -78,19 +78,20 @@ static void TestNavmeshAndQuery(void)
     const mnavPos3 p = a.point;
     mnavTileId tile;
     mnavPath path;
-    CHECK(mnavGetTile(navmesh, 0, 0, nullptr) == mnav_errorInvalid &&
-              mnavStageArea(navmesh, s_never, mnav_areaWalkable) == mnav_errorInvalid &&
-              mnavGetNavmeshMisuse(navmesh) == 2,
+    CHECK(mnavNavmesh_GetTile(navmesh, 0, 0, nullptr) == mnav_errorInvalid &&
+              mnavPolygon_StageArea(navmesh, s_never, mnav_areaWalkable) == mnav_errorInvalid &&
+              mnavNavmesh_GetMisuse(navmesh) == 2,
           "two on the navmesh");
-    CHECK(mnavFindPath(query, navmesh, nullptr, s_never, p, a.polygon, p, &path) ==
+    CHECK(mnavQuery_FindPath(query, navmesh, s_never, p, a.polygon, p, nullptr, &path) ==
                   mnav_errorInvalid &&
-              mnavGetQueryMisuse(query) == 1 && mnavGetNavmeshMisuse(navmesh) == 2,
+              mnavQuery_GetMisuse(query) == 1 && mnavNavmesh_GetMisuse(navmesh) == 2,
           "a path search counts once, on the context");
-    CHECK(mnavFindPath(nullptr, navmesh, nullptr, a.polygon, p, a.polygon, p, &path) ==
+    CHECK(mnavQuery_FindPath(nullptr, navmesh, a.polygon, p, a.polygon, p, nullptr, &path) ==
                   mnav_errorInvalid &&
-              mnavGetNavmeshMisuse(navmesh) == 3,
+              mnavNavmesh_GetMisuse(navmesh) == 3,
           "with no context, on the navmesh");
-    CHECK(mnavGetTile(navmesh, 0, 0, &tile) == mnav_success && mnavGetNavmeshMisuse(navmesh) == 3,
+    CHECK(mnavNavmesh_GetTile(navmesh, 0, 0, &tile) == mnav_success &&
+              mnavNavmesh_GetMisuse(navmesh) == 3,
           "a good call counts none");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -108,16 +109,17 @@ static void TestNotMisuse(void)
     bad[0] ^= 0xFF;
     mnavQueryFilter costly = mnavDefaultQueryFilter();
     costly.costs[mnav_areaWalkable] = 2.0f * MNAV_MAX_AREA_COST;
-    CHECK(mnavGetHeight(navmesh, a.polygon, 500.0, 5.0, &height) == mnav_errorOutside &&
-              mnavFindNearest(navmesh, &costly, a.point, (mnavVec3){1.0f, 1.0f, 1.0f}, &nearest) ==
-                  mnav_errorLimit &&
-              mnavStageTile(navmesh, bad, sizeof(bad)).result != mnav_success,
+    CHECK(mnavPolygon_GetHeight(navmesh, a.polygon, 500.0, 5.0, &height) == mnav_errorOutside &&
+              mnavNavmesh_FindNearest(navmesh, a.point, (mnavVec3){1.0f, 1.0f, 1.0f}, &costly,
+                                      &nearest) == mnav_errorLimit &&
+              mnavNavmesh_StageTile(navmesh, bad, sizeof(bad)).result != mnav_success,
           "outside, past a published bound, bad bytes");
-    CHECK(mnavStageTileRemoval(navmesh, 0, 0) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavGetHeight(navmesh, a.polygon, a.point.x, a.point.z, &height) == mnav_errorStale,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 0, 0) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavPolygon_GetHeight(navmesh, a.polygon, a.point.x, a.point.z, &height) ==
+                  mnav_errorStale,
           "a stale id");
-    CHECK(mnavGetNavmeshMisuse(navmesh) == 0, "none counted");
+    CHECK(mnavNavmesh_GetMisuse(navmesh) == 0, "none counted");
     mnavDestroyNavmesh(navmesh);
 }
 
@@ -135,18 +137,19 @@ static void TestBakers(void)
     mesh.vertices = vertices;
     const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &input, 0, 0, &report) == mnav_errorInvalid &&
-              report.input.result != mnav_success && mnavGetBakerMisuse(baker) == 0,
+    CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_errorInvalid &&
+              report.input.result != mnav_success && mnavBaker_GetMisuse(baker) == 0,
           "refused geometry counts none");
-    CHECK(mnavBakeTile(baker, nullptr, 0, 0, nullptr) == mnav_errorInvalid &&
-              mnavGetBakerMisuse(baker) == 1,
+    CHECK(mnavBaker_BakeTile(baker, nullptr, 0, 0, nullptr) == mnav_errorInvalid &&
+              mnavBaker_GetMisuse(baker) == 1,
           "no input counts one");
     mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();
     cacheDef.limits.tiles = 4;
     mnavTileCache* cache = nullptr;
     CHECK(mnavCreateTileCache(&cacheDef, &cache) == mnav_success &&
-              mnavBakeTileCached(nullptr, cache, &input, 0, 0, nullptr) == mnav_errorInvalid &&
-              mnavGetTileCacheMisuse(cache) == 1 && mnavGetBakerMisuse(baker) == 1,
+              mnavBaker_BakeTileCached(nullptr, cache, &input, 0, 0, nullptr) ==
+                  mnav_errorInvalid &&
+              mnavTileCache_GetMisuse(cache) == 1 && mnavBaker_GetMisuse(baker) == 1,
           "no baker counts on the cache");
     mnavDestroyTileCache(cache);
     mnavDestroyBaker(baker);
@@ -155,15 +158,15 @@ static void TestBakers(void)
     mnavFlightVolume* volume = nullptr;
     bool open = false;
     CHECK(mnavCreateFlightBaker(&flight, &flightBaker).result == mnav_success &&
-              mnavBakeFlightTile(flightBaker, &input, 0, 0, nullptr) == mnav_errorInvalid &&
-              mnavGetFlightBakerMisuse(flightBaker) == 0 &&
-              mnavBakeFlightTile(flightBaker, nullptr, 0, 0, nullptr) == mnav_errorInvalid &&
-              mnavGetFlightBakerMisuse(flightBaker) == 1,
+              mnavFlightBaker_BakeTile(flightBaker, &input, 0, 0, nullptr) == mnav_errorInvalid &&
+              mnavFlightBaker_GetMisuse(flightBaker) == 0 &&
+              mnavFlightBaker_BakeTile(flightBaker, nullptr, 0, 0, nullptr) == mnav_errorInvalid &&
+              mnavFlightBaker_GetMisuse(flightBaker) == 1,
           "a flight baker: geometry none, no input one");
     CHECK(mnavCreateFlightVolume(&flight, &volume).result == mnav_success &&
-              mnavIsFlightOpen(volume, (mnavPos3){(double)NAN, 0.0, 0.0}, &open) ==
+              mnavFlightVolume_IsOpen(volume, (mnavPos3){(double)NAN, 0.0, 0.0}, &open) ==
                   mnav_errorInvalid &&
-              mnavGetFlightVolumeMisuse(volume) == 1,
+              mnavFlightVolume_GetMisuse(volume) == 1,
           "a flight volume");
     mnavDestroyFlightVolume(volume);
     mnavDestroyFlightBaker(flightBaker);
@@ -181,12 +184,12 @@ static void TestOthers(void)
     const mnavCell goal = {0, 0};
     mnavFlow way;
     CHECK(mnavCreateFlowField(&flowDef, &flow) == mnav_success &&
-              mnavBuildFlowField(flow, nullptr, nullptr, &goal, 1) == mnav_errorInvalid &&
-              mnavGetFlowFieldMisuse(flow) == 1,
+              mnavFlowField_Build(flow, nullptr, &goal, 1, nullptr) == mnav_errorInvalid &&
+              mnavFlowField_GetMisuse(flow) == 1,
           "a flow build counts once");
-    CHECK(mnavBuildFlowField(flow, &grid, nullptr, &goal, 1) == mnav_success &&
-              mnavFlowAt(flow, (mnavCell){9, 9}, &way) == mnav_errorOutside &&
-              mnavGetFlowFieldMisuse(flow) == 1,
+    CHECK(mnavFlowField_Build(flow, &grid, &goal, 1, nullptr) == mnav_success &&
+              mnavFlowField_GetFlow(flow, (mnavCell){9, 9}, &way) == mnav_errorOutside &&
+              mnavFlowField_GetMisuse(flow) == 1,
           "outside the region counts none");
     mnavDestroyFlowField(flow);
     mnavNavmesh* navmesh = Trench2();
@@ -196,8 +199,8 @@ static void TestOthers(void)
     navDef.limits.links = 16;
     mnavNavFlow* field = nullptr;
     CHECK(mnavCreateNavFlow(&navDef, &field) == mnav_success &&
-              mnavContinueNavFlow(field, navmesh, 0, nullptr) == mnav_errorInvalid &&
-              mnavGetNavFlowMisuse(field) == 1 && mnavGetNavmeshMisuse(navmesh) == 0,
+              mnavNavFlow_Continue(field, navmesh, 0, nullptr) == mnav_errorInvalid &&
+              mnavNavFlow_GetMisuse(field) == 1 && mnavNavmesh_GetMisuse(navmesh) == 0,
           "a nav flow, on the field");
     mnavDestroyNavFlow(field);
     mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
@@ -206,9 +209,9 @@ static void TestOthers(void)
     hierarchyDef.limits.edges = 256;
     mnavHierarchy* hierarchy = nullptr;
     CHECK(mnavCreateHierarchy(&hierarchyDef, &hierarchy) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, nullptr, navmesh, nullptr, nullptr) ==
+              mnavHierarchy_Build(hierarchy, nullptr, navmesh, nullptr, nullptr) ==
                   mnav_errorInvalid &&
-              mnavGetHierarchyMisuse(hierarchy) == 1,
+              mnavHierarchy_GetMisuse(hierarchy) == 1,
           "a hierarchy");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyNavmesh(navmesh);
@@ -217,8 +220,9 @@ static void TestOthers(void)
     avoidDef.limits.obstacleVertices = 4;
     mnavAvoidance* avoidance = nullptr;
     CHECK(mnavCreateAvoidance(&avoidDef, &avoidance) == mnav_success &&
-              mnavAvoid(avoidance, nullptr, 1, nullptr, 0, 1.0, nullptr) == mnav_errorInvalid &&
-              mnavGetAvoidanceMisuse(avoidance) == 1,
+              mnavAvoidance_Avoid(avoidance, nullptr, 1, nullptr, 0, 1.0, nullptr) ==
+                  mnav_errorInvalid &&
+              mnavAvoidance_GetMisuse(avoidance) == 1,
           "an avoidance set");
     mnavDestroyAvoidance(avoidance);
 }
@@ -232,8 +236,8 @@ static void TestGoodInput(void)
     mnavLinkGenDef def = mnavDefaultLinkGenDef();
     def.jumpMax = 3.0f;
     int32_t count = 0;
-    CHECK(mnavGenerateLinks(query, navmesh, nullptr, &def, &(mnavTileRange){0, 0, 1, 0}, s_links,
-                            LINKS, &count) == mnav_success &&
+    CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
+                                  s_links, LINKS, &count) == mnav_success &&
               count > 0,
           "links");
     mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
@@ -242,11 +246,11 @@ static void TestGoodInput(void)
     hierarchyDef.limits.edges = 256;
     mnavHierarchy* hierarchy = nullptr;
     CHECK(mnavCreateHierarchy(&hierarchyDef, &hierarchy) == mnav_success &&
-              mnavBuildHierarchy(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
-              mnavUpdateHierarchy(hierarchy, query, navmesh, nullptr) == mnav_success,
+              mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
+              mnavHierarchy_Update(hierarchy, query, navmesh, nullptr) == mnav_success,
           "a hierarchy");
-    CHECK(mnavGetNavmeshMisuse(navmesh) == 0 && mnavGetQueryMisuse(query) == 0 &&
-              mnavGetHierarchyMisuse(hierarchy) == 0,
+    CHECK(mnavNavmesh_GetMisuse(navmesh) == 0 && mnavQuery_GetMisuse(query) == 0 &&
+              mnavHierarchy_GetMisuse(hierarchy) == 0,
           "no misuse");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(query);

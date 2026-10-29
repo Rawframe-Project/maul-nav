@@ -359,9 +359,9 @@ static MNAV_NOINLINE mnavResult MoveAlongSurfaceCounted(mnavQuery* query,
     return mnavClearOnFailure(result, moveOut, sizeof(*moveOut));
 }
 
-mnavResult mnavMoveAlongSurface(mnavQuery* query, const mnavNavmesh* navmesh,
-                                const mnavQueryFilter* filter, mnavPolygonId startPolygon,
-                                mnavPos3 start, mnavPos3 end, mnavMove* moveOut)
+mnavResult mnavQuery_MoveAlongSurface(mnavQuery* query, const mnavNavmesh* navmesh,
+                                      mnavPolygonId startPolygon, mnavPos3 start, mnavPos3 end,
+                                      const mnavQueryFilter* filter, mnavMove* moveOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =

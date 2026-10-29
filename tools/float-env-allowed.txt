@@ -4,26 +4,26 @@
 
 reads or copies stored integers and bytes:
     mnavGetVersion
-    mnavResultName
+    mnavGetResultName
     mnavHash64
-    mnavCopyBakedTile
-    mnavCopyFlightTile
-    mnavGetTile
-    mnavGetFlightTile
-    mnavGetArea
-    mnavGetTier
-    mnavGetTileCacheBytes
-    mnavGetNavmeshMisuse
-    mnavGetQueryMisuse
-    mnavGetBakerMisuse
-    mnavGetTileIndexMisuse
-    mnavGetTileCacheMisuse
-    mnavGetHierarchyMisuse
-    mnavGetFlowFieldMisuse
-    mnavGetNavFlowMisuse
-    mnavGetAvoidanceMisuse
-    mnavGetFlightBakerMisuse
-    mnavGetFlightVolumeMisuse
+    mnavBaker_CopyTile
+    mnavFlightBaker_CopyTile
+    mnavNavmesh_GetTile
+    mnavFlightVolume_GetTile
+    mnavPolygon_GetArea
+    mnavNavmesh_GetTier
+    mnavTileCache_GetBytes
+    mnavNavmesh_GetMisuse
+    mnavQuery_GetMisuse
+    mnavBaker_GetMisuse
+    mnavTileIndex_GetMisuse
+    mnavTileCache_GetMisuse
+    mnavHierarchy_GetMisuse
+    mnavFlowField_GetMisuse
+    mnavNavFlow_GetMisuse
+    mnavAvoidance_GetMisuse
+    mnavFlightBaker_GetMisuse
+    mnavFlightVolume_GetMisuse
 
 gives memory back, which the allocator does in the host's environment:
     mnavDestroyAvoidance
@@ -37,8 +37,8 @@ gives memory back, which the allocator does in the host's environment:
     mnavDestroyQuery
     mnavDestroyTileCache
     mnavDestroyTileIndex
-    mnavDropCachedTile
+    mnavTileCache_DropTile
 
 stages a removal, by its place alone:
-    mnavStageTileRemoval
-    mnavStageFlightTileRemoval
+    mnavNavmesh_StageTileRemoval
+    mnavFlightVolume_StageTileRemoval

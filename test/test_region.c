@@ -79,15 +79,15 @@ static void Bake(const mnavBakeDef* def, const Quad* quads, int32_t count)
     mnavBaker* baker = nullptr;
     size_t size = 0;
     CHECK(mnavCreateBaker(def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &input, 0, 0, &s_report) == mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+              mnavBaker_BakeTile(baker, &input, 0, 0, &s_report) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
 }
 
@@ -95,8 +95,8 @@ static void Bake(const mnavBakeDef* def, const Quad* quads, int32_t count)
 static mnavNearest Over(double x, double y, double z)
 {
     mnavNearest n;
-    CHECK(mnavFindNearest(s_navmesh, nullptr, (mnavPos3){x, y, z}, (mnavVec3){0.01f, 0.5f, 0.01f},
-                          &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(s_navmesh, (mnavPos3){x, y, z}, (mnavVec3){0.01f, 0.5f, 0.01f},
+                                  nullptr, &n) == mnav_success,
           "nearest");
     if (!n.over)
     {
@@ -112,7 +112,7 @@ static mnavAreaType AreaAt(double x, double y, double z)
     mnavAreaType area = NO_POLYGON;
     if (n.polygon.slot != 0)
     {
-        CHECK(mnavGetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
+        CHECK(mnavPolygon_GetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
     }
     return area;
 }
@@ -124,8 +124,8 @@ static bool Reaches(mnavPos3 from, mnavPos3 to)
     mnavNearest b = Over(to.x, to.y, to.z);
     CHECK(a.polygon.slot != 0 && b.polygon.slot != 0, "both on polygons");
     mnavPath path;
-    CHECK(mnavFindPath(s_query, s_navmesh, nullptr, a.polygon, a.point, b.polygon, b.point,
-                       &path) == mnav_success,
+    CHECK(mnavQuery_FindPath(s_query, s_navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success,
           "searched");
     return path.end == mnav_pathFound;
 }
@@ -280,15 +280,15 @@ static void TestLevelRegionsAreOneLayer(void)
     mnavBaker* baker = nullptr;
     size_t size = 0;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &input, 0, 0, &s_report) == mnav_success &&
-              mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+              mnavBaker_BakeTile(baker, &input, 0, 0, &s_report) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success &&
-              mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-              mnavCommit(s_navmesh) == mnav_success,
+              mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+              mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
     // The floor, the ramp and the platform are linked.
     CHECK(Reaches((mnavPos3){31.125, 0.125, 10.125}, (mnavPos3){24.125, 0.625, 18.125}),

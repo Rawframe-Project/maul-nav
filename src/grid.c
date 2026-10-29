@@ -543,8 +543,9 @@ static MNAV_NOINLINE mnavResult FindGridPathCounted(mnavQuery* query, const mnav
     return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
 }
 
-mnavResult mnavFindGridPath(mnavQuery* query, const mnavGrid* grid, const mnavQueryFilter* filter,
-                            mnavCell start, mnavCell end, mnavGridPath* pathOut)
+mnavResult mnavQuery_FindGridPath(mnavQuery* query, const mnavGrid* grid, mnavCell start,
+                                  mnavCell end, const mnavQueryFilter* filter,
+                                  mnavGridPath* pathOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = FindGridPathCounted(query, grid, filter, start, end, pathOut);

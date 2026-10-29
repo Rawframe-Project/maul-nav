@@ -65,11 +65,12 @@ static bool Same(mnavBaker* baker, const mnavTerrain* terrain, mnavBakeReport* r
     mnavBakeReport other;
     size_t first = 0;
     size_t second = 0;
-    bool baked = mnavBakeTile(baker, &input, 0, 0, report) == mnav_success &&
-                 mnavCopyBakedTile(baker, s_first, TILE_ROOM, &first) == mnav_success &&
-                 mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
-                              0, &other) == mnav_success &&
-                 mnavCopyBakedTile(baker, s_second, TILE_ROOM, &second) == mnav_success;
+    bool baked =
+        mnavBaker_BakeTile(baker, &input, 0, 0, report) == mnav_success &&
+        mnavBaker_CopyTile(baker, s_first, TILE_ROOM, &first) == mnav_success &&
+        mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
+                           &other) == mnav_success &&
+        mnavBaker_CopyTile(baker, s_second, TILE_ROOM, &second) == mnav_success;
     return baked && report->triangles == other.triangles && first == second &&
            memcmp(s_first, s_second, first) == 0;
 }
@@ -78,8 +79,8 @@ static size_t Bake(mnavBaker* baker, const mnavBakeInput* input, uint8_t* out,
                    mnavBakeReport* report)
 {
     size_t size = 0;
-    CHECK(mnavBakeTile(baker, input, 0, 0, report) == mnav_success &&
-              mnavCopyBakedTile(baker, out, TILE_ROOM, &size) == mnav_success,
+    CHECK(mnavBaker_BakeTile(baker, input, 0, 0, report) == mnav_success &&
+              mnavBaker_CopyTile(baker, out, TILE_ROOM, &size) == mnav_success,
           "baked");
     return size;
 }
@@ -90,7 +91,7 @@ static void TestLikeItsMesh(mnavBaker* baker)
     mnavBakeReport a;
     CHECK(Same(baker, &terrain, &a), "the same bytes as the mesh of its cells");
     size_t first = 0;
-    CHECK(mnavCopyBakedTile(baker, s_first, TILE_ROOM, &first) == mnav_success, "copied");
+    CHECK(mnavBaker_CopyTile(baker, s_first, TILE_ROOM, &first) == mnav_success, "copied");
     printf("terrain: %d triangles, %d polygons, %zu bytes\n", a.triangles, a.polygons, first);
     CHECK(a.polygons > 0 && a.triangles < CELLS * 2, "only the cells near the tile");
     // Cells whose edges fall on the tile's bounds, border included (1.25
@@ -129,8 +130,8 @@ static void TestLikeItsMesh(mnavBaker* baker)
           "a hole has no ground");
     // Far from the terrain, a tile has nothing of it.
     mnavBakeReport far;
-    CHECK(mnavBakeTile(baker, &fromTerrain, 4, 4, &far) == mnav_success && far.triangles == 0 &&
-              far.polygons == 0,
+    CHECK(mnavBaker_BakeTile(baker, &fromTerrain, 4, 4, &far) == mnav_success &&
+              far.triangles == 0 && far.polygons == 0,
           "a tile it misses");
 }
 
@@ -140,7 +141,7 @@ static int32_t Refused(mnavBaker* baker, const mnavTerrain* terrain, mnavResult 
     const mnavTriangleMesh none = {nullptr, 0, nullptr, 0, nullptr};
     const mnavBakeInput input = {&none, 1, terrain, 1, nullptr, 0, nullptr};
     mnavBakeReport report;
-    bool refused = mnavBakeTile(baker, &input, 0, 0, &report) == result &&
+    bool refused = mnavBaker_BakeTile(baker, &input, 0, 0, &report) == result &&
                    report.stage == mnav_stageInput && report.mesh == 1 &&
                    report.input.element == element;
     return refused ? report.input.index : -2;
@@ -182,8 +183,8 @@ static void TestChecks(mnavBaker* baker)
     t.areas = s_areas;
     CHECK(Refused(baker, &t, mnav_errorInvalid, mnav_elementCell) == 5, "an area out of range");
     const mnavBakeInput missing = {nullptr, 0, nullptr, 1, nullptr, 0, nullptr};
-    CHECK(mnavBakeTile(baker, &missing, 0, 0, nullptr) == mnav_errorInvalid &&
-              mnavBakeTile(baker, nullptr, 0, 0, nullptr) == mnav_errorInvalid,
+    CHECK(mnavBaker_BakeTile(baker, &missing, 0, 0, nullptr) == mnav_errorInvalid &&
+              mnavBaker_BakeTile(baker, nullptr, 0, 0, nullptr) == mnav_errorInvalid,
           "terrains missing; no input");
 }
 
@@ -196,7 +197,8 @@ static void TestLimits(void)
     mnavTerrain terrain = Terrain();
     const mnavBakeInput input = {nullptr, 0, &terrain, 1, nullptr, 0, nullptr};
     mnavBakeReport report;
-    CHECK(mnavBakeTile(baker, &input, 0, 0, &report) == mnav_errorCapacity && report.mesh == 0,
+    CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_errorCapacity &&
+              report.mesh == 0,
           "one triangle over the input limit");
     // A mesh's triangles and a terrain's count together.
     mnavTriangleMesh mesh = Mesh(&terrain);
@@ -205,14 +207,14 @@ static void TestLimits(void)
     def.limits.inputTriangles = CELLS * 2;
     mnavDestroyBaker(baker);
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success &&
-              mnavBakeTile(baker, &both, 0, 0, &report) == mnav_errorCapacity,
+              mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success &&
+              mnavBaker_BakeTile(baker, &both, 0, 0, &report) == mnav_errorCapacity,
           "a mesh's and a terrain's triangles together over the input limit");
     mnavDestroyBaker(baker);
     def = mnavDefaultBakeDef();
     def.limits.tileTriangles = 100;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
-    CHECK(mnavBakeTile(baker, &input, 0, 0, &report) == mnav_errorCapacity &&
+    CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_errorCapacity &&
               report.stage == mnav_stageRasterize,
           "over the tile's triangle limit");
     mnavDestroyBaker(baker);

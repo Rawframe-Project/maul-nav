@@ -49,9 +49,10 @@ static mnavNavmesh* Load(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -69,7 +70,7 @@ static int32_t Count(const mnavDebugBuffer* b, mnavDebugKind kind, int32_t value
 static void TestNavmesh(const mnavNavmesh* navmesh)
 {
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &b) == mnav_success, "drawn");
+    CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &b) == mnav_success, "drawn");
     printf("navmesh: %d vertices, %d triangle and %d line indices\n", b.vertexCount,
            b.triangleCount, b.lineCount);
     CHECK(b.triangleCount > 0 && b.triangleCount % 3 == 0 && b.lineCount % 2 == 0 &&
@@ -95,44 +96,44 @@ static void TestNavmesh(const mnavNavmesh* navmesh)
     CHECK(hash == NAVMESH_HASH, "the pinned hash");
     // An empty buffer counts what the whole needs.
     mnavDebugBuffer none = {{0.0, 0.0, 0.0}, nullptr, 0, 0, nullptr, 0, 0, nullptr, 0, 0};
-    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &none) == mnav_errorCapacity &&
+    CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &none) == mnav_errorCapacity &&
               none.vertexCount == b.vertexCount && none.triangleCount == b.triangleCount &&
               none.lineCount == b.lineCount,
           "counted without room");
     // Relative to another origin, every position moves by it.
     mnavDebugBuffer moved = Buffer((mnavPos3){100.0, 2.0, -50.0});
     mnavDebugVertex first = b.vertices[0];
-    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &moved) == mnav_success &&
+    CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &moved) == mnav_success &&
               fabsf(moved.vertices[0].x - (first.x - 100.0f)) < 1e-3f &&
               fabsf(moved.vertices[0].y - (first.y - 2.0f)) < 1e-3f &&
               fabsf(moved.vertices[0].z - (first.z + 50.0f)) < 1e-3f,
           "relative to the origin");
     // One tile only, at either end of the range.
     mnavDebugBuffer one = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){1, 1, 1, 1}, &one) == mnav_success &&
+    CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){1, 1, 1, 1}, &one) == mnav_success &&
               Count(&one, mnav_debugTileBounds, -1) == 8 && one.vertexCount < b.vertexCount,
           "one tile");
     one = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 0, 0}, &one) == mnav_success &&
+    CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 0, 0}, &one) == mnav_success &&
               Count(&one, mnav_debugTileBounds, -1) == 8,
           "the first tile");
     // Room for every index but not every vertex: still too small.
     mnavDebugBuffer tight = Buffer((mnavPos3){0.0, 0.0, 0.0});
     tight.vertexCapacity = b.vertexCount - 1;
-    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &tight) == mnav_errorCapacity &&
+    CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &tight) == mnav_errorCapacity &&
               tight.vertexCount == b.vertexCount,
           "one vertex short");
     mnavDebugBuffer bad = Buffer((mnavPos3){0.0, 0.0, 0.0});
     bad.lineCount = -1;
-    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &bad) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &bad) == mnav_errorInvalid,
           "a bad count");
     bad = Buffer((mnavPos3){(double)NAN, 0.0, 0.0});
-    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &bad) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &bad) == mnav_errorInvalid,
           "a bad origin");
     bad = Buffer((mnavPos3){0.0, 0.0, 0.0});
     bad.vertices = nullptr;
-    CHECK(mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 1, 1}, &bad) == mnav_errorInvalid &&
-              mnavDebugNavmesh(navmesh, &(mnavTileRange){1, 0, 0, 1}, &one) == mnav_errorInvalid,
+    CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &bad) == mnav_errorInvalid &&
+              mnavNavmesh_Debug(navmesh, &(mnavTileRange){1, 0, 0, 1}, &one) == mnav_errorInvalid,
           "no vertex array; a range backward");
 }
 
@@ -145,10 +146,10 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
     mnavLinkId c;
     CHECK(mnavStageLink(navmesh, &both, &a) == mnav_success &&
               mnavStageLink(navmesh, &away, &c) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "linked");
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugLinks(navmesh, &b) == mnav_success && b.lineCount == 2 * 2 * 8 &&
+    CHECK(mnavNavmesh_DebugLinks(navmesh, &b) == mnav_success && b.lineCount == 2 * 2 * 8 &&
               Count(&b, mnav_debugLinkBothWays, mnav_linkJump) == 16 &&
               Count(&b, mnav_debugLink, mnav_linkDrop + 256) == 16,
           "an arc each, the detached one marked");
@@ -162,28 +163,28 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
     }
     CHECK(top > 0.9f && top < 1.2f, "the arc's rise");
     mnavLinkState state;
-    CHECK(mnavGetLink(navmesh, a, &state) == mnav_success && state.attached &&
+    CHECK(mnavLink_GetState(navmesh, a, &state) == mnav_success && state.attached &&
               b.vertices[0].y == (float)state.start.y && state.start.y < 0.4,
           "from the snapped start");
     // A removal staged and not committed: still drawn.
     CHECK(mnavStageLinkRemoval(navmesh, c) == mnav_success, "removal staged");
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugLinks(navmesh, &b) == mnav_success && b.lineCount == 2 * 2 * 8,
+    CHECK(mnavNavmesh_DebugLinks(navmesh, &b) == mnav_success && b.lineCount == 2 * 2 * 8,
           "a link going at the next commit");
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success, "query");
     mnavNearest s;
     mnavNearest e;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){2.0, 0.0, 2.0}, (mnavVec3){1, 1, 1}, &s) ==
-                  mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){60.0, 0.0, 60.0}, (mnavVec3){1, 1, 1},
-                              &e) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){2.0, 0.0, 2.0}, (mnavVec3){1, 1, 1}, nullptr,
+                                  &s) == mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){60.0, 0.0, 60.0}, (mnavVec3){1, 1, 1},
+                                      nullptr, &e) == mnav_success,
           "ends");
     mnavPath path;
-    CHECK(mnavFindPath(query, navmesh, nullptr, s.polygon, s.point, e.polygon, e.point, &path) ==
-                  mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, s.polygon, s.point, e.polygon, e.point, nullptr,
+                             &path) == mnav_success &&
               path.pointCount >= 2,
           "a path");
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
@@ -191,21 +192,24 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
               Count(&b, mnav_debugPath, -1) == b.vertexCount,
           "the path's lines");
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugCorridor(navmesh, path.polygons, path.polygonCount, &b) == mnav_success &&
+    CHECK(mnavNavmesh_DebugCorridor(navmesh, path.polygons, path.polygonCount, &b) ==
+                  mnav_success &&
               b.triangleCount >= 3 * path.polygonCount &&
               Count(&b, mnav_debugCorridor, path.polygonCount - 1) > 0,
           "the corridor's fills, tagged by place");
     // With a tile of the corridor removed, its polygons are skipped.
     int32_t whole = b.triangleCount;
-    CHECK(mnavStageTileRemoval(navmesh, 1, 1) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 1) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "a tile removed");
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugCorridor(navmesh, path.polygons, path.polygonCount, &b) == mnav_success &&
+    CHECK(mnavNavmesh_DebugCorridor(navmesh, path.polygons, path.polygonCount, &b) ==
+                  mnav_success &&
               b.triangleCount > 0 && b.triangleCount < whole,
           "the gone tile's polygons skipped");
     mnavPolygonId never = {9999, 1, 0};
-    CHECK(mnavDebugCorridor(navmesh, &never, 1, &b) == mnav_errorInvalid, "an id never handed out");
+    CHECK(mnavNavmesh_DebugCorridor(navmesh, &never, 1, &b) == mnav_errorInvalid,
+          "an id never handed out");
     mnavDestroyQuery(query);
 }
 
@@ -221,17 +225,17 @@ static void TestFlowAndAvoidance(void)
     mnavFlowField* field = nullptr;
     const mnavCell goal = {0, 0};
     CHECK(mnavCreateFlowField(&def, &field) == mnav_success &&
-              mnavBuildFlowField(field, &grid, nullptr, &goal, 1) == mnav_success,
+              mnavFlowField_Build(field, &grid, &goal, 1, nullptr) == mnav_success,
           "a field");
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugFlowField(field, 0.5, &b) == mnav_success && b.lineCount == 11 * 3 * 2 &&
+    CHECK(mnavFlowField_Debug(field, 0.5, &b) == mnav_success && b.lineCount == 11 * 3 * 2 &&
               Count(&b, mnav_debugFlow, -1) == b.vertexCount,
           "eleven arrows");
     // The arrow of cell (1, 0) points along -X at its center, height 0.5.
     CHECK(b.vertices[0].x == 3.8f && b.vertices[1].x == 2.2f && b.vertices[0].y == 0.5f &&
               b.vertices[0].z == 1.0f,
           "from (1, 0) toward the goal");
-    CHECK(mnavDebugFlowField(field, (double)NAN, &b) == mnav_errorInvalid, "no height");
+    CHECK(mnavFlowField_Debug(field, (double)NAN, &b) == mnav_errorInvalid, "no height");
     mnavDestroyFlowField(field);
     // Three agents, two near: the near pair sees each other.
     mnavAvoidanceDef avoidDef = mnavDefaultAvoidanceDef();
@@ -243,7 +247,7 @@ static void TestFlowAndAvoidance(void)
                            {{2.0, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 2, 0, 0},
                            {{20.0, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 3, 0, 0}};
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugAvoidance(avoidance, agents, 3, 0.1, &b) == mnav_success &&
+    CHECK(mnavAvoidance_Debug(avoidance, agents, 3, 0.1, &b) == mnav_success &&
               Count(&b, mnav_debugAgent, -1) == 3 * 16 * 2 &&
               Count(&b, mnav_debugNeighbor, -1) == 2 * 2,
           "outlines and the near pair's lines");
@@ -251,12 +255,12 @@ static void TestFlowAndAvoidance(void)
     agents[1].layers = 2;
     agents[0].ignores = 2;
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugAvoidance(avoidance, agents, 3, 0.1, &b) == mnav_success &&
+    CHECK(mnavAvoidance_Debug(avoidance, agents, 3, 0.1, &b) == mnav_success &&
               Count(&b, mnav_debugNeighbor, -1) == 2,
           "one line, the one that sees");
     agents[0].ignores = 0;
-    CHECK(mnavDebugAvoidance(avoidance, agents, 9, 0.1, &b) == mnav_errorCapacity &&
-              mnavDebugAvoidance(avoidance, agents, 3, (double)INFINITY, &b) == mnav_errorInvalid,
+    CHECK(mnavAvoidance_Debug(avoidance, agents, 9, 0.1, &b) == mnav_errorCapacity &&
+              mnavAvoidance_Debug(avoidance, agents, 3, (double)INFINITY, &b) == mnav_errorInvalid,
           "the limit; a bad height");
     mnavDestroyAvoidance(avoidance);
 }
@@ -276,7 +280,7 @@ static void TestFliers(void)
                              {{0.0, 20.0, 0.0}, {0, 0, 0}, {0, 0, 0}, 0.5, 1.0, 1.0, 3, 0, 0}};
     mnavSphere sphere = {{5.0, 0.0, 0.0}, 2.0, {0.0, 0.0, 0.0}, 9, 0};
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 1, &b) == mnav_success &&
+    CHECK(mnavAvoidance_Debug3D(avoidance, agents, 3, &sphere, 1, &b) == mnav_success &&
               Count(&b, mnav_debugAgent, -1) == 3 * 48 * 2 &&
               Count(&b, mnav_debugNeighbor, -1) == 2 * 2 &&
               Count(&b, mnav_debugObstacle, -1) == 48 * 2 && b.lineCount == b.vertexCount,
@@ -288,30 +292,30 @@ static void TestFliers(void)
     int32_t first = b.vertexCount - 48 * 2;
     CHECK(b.vertices[first].x == 7.0f && b.vertices[first].kind == mnav_debugObstacle,
           "the sphere's ring on its radius");
-    CHECK(mnavDebugAvoidance3D(avoidance, agents, 9, nullptr, 0, &b) == mnav_errorCapacity &&
-              mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 2, &b) == mnav_errorCapacity,
+    CHECK(mnavAvoidance_Debug3D(avoidance, agents, 9, nullptr, 0, &b) == mnav_errorCapacity &&
+              mnavAvoidance_Debug3D(avoidance, agents, 3, &sphere, 2, &b) == mnav_errorCapacity,
           "the limits");
     mnavAgent3D bad = agents[0];
     bad.radius = 0.0;
     mnavSphere wrong = sphere;
     wrong.center.z = (double)NAN;
-    CHECK(mnavDebugAvoidance3D(avoidance, &bad, 1, nullptr, 0, &b) == mnav_errorInvalid &&
-              mnavDebugAvoidance3D(avoidance, agents, 3, &wrong, 1, &b) == mnav_errorInvalid &&
-              mnavDebugAvoidance3D(avoidance, agents, 3, nullptr, 1, &b) == mnav_errorInvalid &&
-              mnavDebugAvoidance3D(avoidance, agents, 3, nullptr, 0, nullptr) ==
+    CHECK(mnavAvoidance_Debug3D(avoidance, &bad, 1, nullptr, 0, &b) == mnav_errorInvalid &&
+              mnavAvoidance_Debug3D(avoidance, agents, 3, &wrong, 1, &b) == mnav_errorInvalid &&
+              mnavAvoidance_Debug3D(avoidance, agents, 3, nullptr, 1, &b) == mnav_errorInvalid &&
+              mnavAvoidance_Debug3D(avoidance, agents, 3, nullptr, 0, nullptr) ==
                   mnav_errorInvalid &&
-              mnavDebugAvoidance3D(nullptr, agents, 3, nullptr, 0, &b) == mnav_errorInvalid,
-          "refused as mnavAvoid3D refuses");
+              mnavAvoidance_Debug3D(nullptr, agents, 3, nullptr, 0, &b) == mnav_errorInvalid,
+          "refused as mnavAvoidance_Avoid3D refuses");
     mnavDebugBuffer small = Buffer((mnavPos3){0.0, 0.0, 0.0});
     small.lineCapacity = 10;
-    CHECK(mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 1, &small) == mnav_errorCapacity &&
+    CHECK(mnavAvoidance_Debug3D(avoidance, agents, 3, &sphere, 1, &small) == mnav_errorCapacity &&
               small.lineCount == b.lineCount,
           "a full buffer counts what the whole needs");
     // The first ignoring the second's layer: only the second sees it.
     agents[1].layers = 2;
     agents[0].ignores = 2;
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugAvoidance3D(avoidance, agents, 3, &sphere, 1, &b) == mnav_success &&
+    CHECK(mnavAvoidance_Debug3D(avoidance, agents, 3, &sphere, 1, &b) == mnav_success &&
               Count(&b, mnav_debugNeighbor, -1) == 2,
           "one line, the one that sees");
     mnavDestroyAvoidance(avoidance);

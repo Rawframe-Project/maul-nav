@@ -274,8 +274,8 @@ static MNAV_NOINLINE mnavResult UpdateFlowFieldCounted(mnavFlowField* field, con
                                                                       changed, changedCount));
 }
 
-mnavResult mnavUpdateFlowField(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
-                               int32_t goalCount, const mnavCell* changed, int32_t changedCount)
+mnavResult mnavFlowField_Update(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
+                                int32_t goalCount, const mnavCell* changed, int32_t changedCount)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =

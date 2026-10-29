@@ -236,8 +236,9 @@ static MNAV_NOINLINE mnavResult RaycastCounted(mnavQuery* query, const mnavNavme
     return mnavClearOnFailure(result, rayOut, sizeof(*rayOut));
 }
 
-mnavResult mnavRaycast(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
-                       mnavPolygonId startPolygon, mnavPos3 start, mnavPos3 end, mnavRay* rayOut)
+mnavResult mnavQuery_Raycast(mnavQuery* query, const mnavNavmesh* navmesh,
+                             mnavPolygonId startPolygon, mnavPos3 start, mnavPos3 end,
+                             const mnavQueryFilter* filter, mnavRay* rayOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = RaycastCounted(query, navmesh, filter, startPolygon, start, end, rayOut);

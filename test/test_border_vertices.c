@@ -67,14 +67,14 @@ static void TestFloorAndRampMeetOnEachSide(void)
         mnavBakeReport report;
         size_t size = 0;
         CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-                  mnavBakeTile(baker, &input, 0, 0, &report) == mnav_success &&
-                  mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
+                  mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success &&
+                  mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
               "baked");
         mnavDestroyBaker(baker);
         mnavNavmesh* navmesh = nullptr;
         CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-                  mnavStageTile(navmesh, s_tile, size).result == mnav_success &&
-                  mnavCommit(navmesh) == mnav_success,
+                  mnavNavmesh_StageTile(navmesh, s_tile, size).result == mnav_success &&
+                  mnavNavmesh_Commit(navmesh) == mnav_success,
               "loaded");
         CHECK(report.regions == 2, "the floor and the ramp");
         // Along the side, the detail surface of the polygons that replace
@@ -88,8 +88,9 @@ static void TestFloorAndRampMeetOnEachSide(void)
             float y = z < 10.0f ? 0.0f : (z > 22.0f ? 3.0f : (z - 10.0f) * 0.25f);
             TurnOnTile(&x, &z, turns);
             mnavNearest n;
-            CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){(double)x, (double)y, (double)z},
-                                  (mnavVec3){0.01f, 0.4f, 0.01f}, &n) == mnav_success,
+            CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){(double)x, (double)y, (double)z},
+                                          (mnavVec3){0.01f, 0.4f, 0.01f}, nullptr,
+                                          &n) == mnav_success,
                   "nearest");
             double off = n.point.y - (double)y;
             follows = follows && n.over && off >= 0.0 && off <= 0.15;
@@ -98,7 +99,7 @@ static void TestFloorAndRampMeetOnEachSide(void)
         mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
                              s_drawLines,     DRAW_ROOM,      0};
         // Polygon fills go uncounted into a buffer with no triangle room.
-        (void)mnavDebugNavmesh(navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
+        (void)mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
         CHECK(b.vertexCount <= DRAW_ROOM && b.lineCount <= DRAW_ROOM, "the edges fit");
         Side sides[16];
         int32_t count = 0;

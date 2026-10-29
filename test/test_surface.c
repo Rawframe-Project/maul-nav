@@ -29,12 +29,12 @@ static mnavNavmesh* Make(const uint8_t* first, size_t firstSize, const uint8_t* 
     def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(mnavStageTile(navmesh, first, firstSize).result == mnav_success, "first");
+    CHECK(mnavNavmesh_StageTile(navmesh, first, firstSize).result == mnav_success, "first");
     if (second != nullptr)
     {
-        CHECK(mnavStageTile(navmesh, second, secondSize).result == mnav_success, "second");
+        CHECK(mnavNavmesh_StageTile(navmesh, second, secondSize).result == mnav_success, "second");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -51,13 +51,13 @@ static mnavMove Move(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQue
                      double x0, double z0, double x1, double z1)
 {
     mnavNearest a;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x0, 0.0, z0}, (mnavVec3){0.1f, 2.0f, 0.1f},
-                          &a) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x0, 0.0, z0}, (mnavVec3){0.1f, 2.0f, 0.1f},
+                                  nullptr, &a) == mnav_success &&
               a.over,
           "the start on a polygon");
     mnavMove move = {0};
-    CHECK(mnavMoveAlongSurface(query, navmesh, filter, a.polygon, a.point, (mnavPos3){x1, 0.0, z1},
-                               &move) == mnav_success,
+    CHECK(mnavQuery_MoveAlongSurface(query, navmesh, a.polygon, a.point, (mnavPos3){x1, 0.0, z1},
+                                     filter, &move) == mnav_success,
           "moved");
     return move;
 }
@@ -149,28 +149,28 @@ static void TestArguments(void)
     mnavNavmesh* navmesh = Make(ROW, nullptr, 0);
     mnavQuery* query = MakeQuery(64);
     mnavNearest a;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){6.0, 0.0, 7.5}, (mnavVec3){0.1f, 1, 0.1f},
-                          &a) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){6.0, 0.0, 7.5}, (mnavVec3){0.1f, 1, 0.1f},
+                                  nullptr, &a) == mnav_success,
           "start");
     mnavMove move;
     mnavPos3 nan = {(double)NAN, 0.0, 0.0};
-    CHECK(mnavMoveAlongSurface(query, navmesh, nullptr, a.polygon, a.point, nan, &move) ==
+    CHECK(mnavQuery_MoveAlongSurface(query, navmesh, a.polygon, a.point, nan, nullptr, &move) ==
                   mnav_errorInvalid &&
-              mnavMoveAlongSurface(query, navmesh, nullptr, a.polygon, nan, a.point, &move) ==
+              mnavQuery_MoveAlongSurface(query, navmesh, a.polygon, nan, a.point, nullptr, &move) ==
                   mnav_errorInvalid &&
-              mnavMoveAlongSurface(nullptr, navmesh, nullptr, a.polygon, a.point, a.point, &move) ==
-                  mnav_errorInvalid &&
-              mnavMoveAlongSurface(query, navmesh, nullptr, a.polygon, a.point, a.point, nullptr) ==
-                  mnav_errorInvalid,
+              mnavQuery_MoveAlongSurface(nullptr, navmesh, a.polygon, a.point, a.point, nullptr,
+                                         &move) == mnav_errorInvalid &&
+              mnavQuery_MoveAlongSurface(query, navmesh, a.polygon, a.point, a.point, nullptr,
+                                         nullptr) == mnav_errorInvalid,
           "bad arguments");
     mnavQueryFilter filter = {0};
-    CHECK(mnavMoveAlongSurface(query, navmesh, &filter, a.polygon, a.point, a.point, &move) ==
+    CHECK(mnavQuery_MoveAlongSurface(query, navmesh, a.polygon, a.point, a.point, &filter, &move) ==
               mnav_errorInvalid,
           "a filter not from the default");
-    CHECK(mnavStageTile(navmesh, ROW).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success &&
-              mnavMoveAlongSurface(query, navmesh, nullptr, a.polygon, a.point, a.point, &move) ==
-                  mnav_errorStale,
+    CHECK(mnavNavmesh_StageTile(navmesh, ROW).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavQuery_MoveAlongSurface(query, navmesh, a.polygon, a.point, a.point, nullptr,
+                                         &move) == mnav_errorStale,
           "stale");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -190,9 +190,10 @@ static mnavNavmesh* WorldNavmesh(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -208,24 +209,24 @@ static void TestWorldMoves(void)
     for (int32_t i = 0; i < 64; ++i)
     {
         mnavNearest a;
-        CHECK(mnavFindNearest(navmesh, nullptr,
-                              (mnavPos3){4.0 + (i % 8) * 7.5, 0.0, 4.0 + (i / 8) * 7.5},
-                              (mnavVec3){3.0f, 2.0f, 3.0f}, &a) == mnav_success,
+        CHECK(mnavNavmesh_FindNearest(navmesh,
+                                      (mnavPos3){4.0 + (i % 8) * 7.5, 0.0, 4.0 + (i / 8) * 7.5},
+                                      (mnavVec3){3.0f, 2.0f, 3.0f}, nullptr, &a) == mnav_success,
               "start");
         for (int32_t k = 0; k < 16 && a.polygon.slot != 0; ++k)
         {
             mnavPos3 wanted = {a.point.x + s_fan[k][0], 0.0, a.point.z + s_fan[k][1]};
             mnavMove move = {0};
-            CHECK(mnavMoveAlongSurface(query, navmesh, nullptr, a.polygon, a.point, wanted,
-                                       &move) == mnav_success,
+            CHECK(mnavQuery_MoveAlongSurface(query, navmesh, a.polygon, a.point, wanted, nullptr,
+                                             &move) == mnav_success,
                   "moved");
             ends[move.end] += 1;
             mnavNearest n;
             double before = hypot(wanted.x - a.point.x, wanted.z - a.point.z);
             double after = hypot(wanted.x - move.point.x, wanted.z - move.point.z);
             sound = sound && after <= before &&
-                    mnavFindNearest(navmesh, nullptr, move.point, (mnavVec3){0.5f, 2.0f, 0.5f},
-                                    &n) == mnav_success &&
+                    mnavNavmesh_FindNearest(navmesh, move.point, (mnavVec3){0.5f, 2.0f, 0.5f},
+                                            nullptr, &n) == mnav_success &&
                     n.polygon.slot != 0 &&
                     hypot(n.point.x - move.point.x, n.point.z - move.point.z) < 1.0e-9;
             hash = mnavHash64(hash, &move.end, (int32_t)sizeof(move.end));
@@ -251,20 +252,21 @@ static void TestSlicedSearchEnded(void)
     mnavQuery* query = MakeQuery(64);
     mnavNearest a;
     mnavNearest b;
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){6.0, 0.0, 7.5}, (mnavVec3){0.1f, 2.0f, 0.1f},
-                          &a) == mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){29.0, 0.0, 7.5},
-                              (mnavVec3){0.1f, 2.0f, 0.1f}, &b) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){6.0, 0.0, 7.5}, (mnavVec3){0.1f, 2.0f, 0.1f},
+                                  nullptr, &a) == mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){29.0, 0.0, 7.5},
+                                      (mnavVec3){0.1f, 2.0f, 0.1f}, nullptr, &b) == mnav_success,
           "the ends");
-    CHECK(mnavBeginPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point) ==
+    CHECK(mnavQuery_BeginPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr) ==
               mnav_success,
           "begun");
     bool ended = false;
-    CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_success, "a slice");
+    CHECK(mnavQuery_ContinuePath(query, navmesh, 1, &ended) == mnav_success, "a slice");
     Move(query, navmesh, nullptr, 6.0, 7.5, 9.0, 7.5);
-    CHECK(mnavContinuePath(query, navmesh, 1, &ended) == mnav_errorState, "ended by the move");
+    CHECK(mnavQuery_ContinuePath(query, navmesh, 1, &ended) == mnav_errorState,
+          "ended by the move");
     mnavPath path;
-    CHECK(mnavFinishPath(query, navmesh, &path) == mnav_errorState, "nothing to finish");
+    CHECK(mnavQuery_FinishPath(query, navmesh, &path) == mnav_errorState, "nothing to finish");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }

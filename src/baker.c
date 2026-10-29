@@ -117,7 +117,7 @@ static void DropTile(mnavBaker* baker)
     baker->tileSize = 0;
 }
 
-uint64_t mnavGetBakerMisuse(const mnavBaker* baker)
+uint64_t mnavBaker_GetMisuse(const mnavBaker* baker)
 {
     return baker != nullptr ? mnavHostMisuse(&baker->host) : 0;
 }
@@ -666,8 +666,8 @@ static MNAV_NOINLINE mnavResult BakeTileWork(mnavBaker* baker, const mnavBakeInp
     return Bake(baker, &in, tileX, tileZ, nullptr, reportOut);
 }
 
-mnavResult mnavBakeTile(mnavBaker* baker, const mnavBakeInput* input, int32_t tileX, int32_t tileZ,
-                        mnavBakeReport* reportOut)
+mnavResult mnavBaker_BakeTile(mnavBaker* baker, const mnavBakeInput* input, int32_t tileX,
+                              int32_t tileZ, mnavBakeReport* reportOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = BakeTileWork(baker, input, tileX, tileZ, reportOut);
@@ -693,8 +693,8 @@ static MNAV_NOINLINE mnavResult BakeTile2DWork(mnavBaker* baker, const mnavBake2
     return Bake(baker, &in, tileX, tileZ, nullptr, reportOut);
 }
 
-mnavResult mnavBakeTile2D(mnavBaker* baker, const mnavBake2DInput* input, int32_t tileX,
-                          int32_t tileZ, mnavBakeReport* reportOut)
+mnavResult mnavBaker_BakeTile2D(mnavBaker* baker, const mnavBake2DInput* input, int32_t tileX,
+                                int32_t tileZ, mnavBakeReport* reportOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = BakeTile2DWork(baker, input, tileX, tileZ, reportOut);
@@ -720,8 +720,9 @@ static MNAV_NOINLINE mnavResult BakeTileCachedWork(mnavBaker* baker, mnavTileCac
     return Bake(baker, &in, tileX, tileZ, cache, reportOut);
 }
 
-mnavResult mnavBakeTileCached(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput* input,
-                              int32_t tileX, int32_t tileZ, mnavBakeReport* reportOut)
+mnavResult mnavBaker_BakeTileCached(mnavBaker* baker, mnavTileCache* cache,
+                                    const mnavBakeInput* input, int32_t tileX, int32_t tileZ,
+                                    mnavBakeReport* reportOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result = BakeTileCachedWork(baker, cache, input, tileX, tileZ, reportOut);
@@ -833,9 +834,9 @@ static MNAV_NOINLINE mnavResult RebuildTileWork(mnavBaker* baker, mnavTileCache*
     return Counted(baker, cache, &report, reportOut, result);
 }
 
-mnavResult mnavRebuildTile(mnavBaker* baker, mnavTileCache* cache, int32_t tileX, int32_t tileZ,
-                           const mnavBakeVolume* obstacles, int32_t obstacleCount,
-                           mnavBakeReport* reportOut)
+mnavResult mnavBaker_RebuildTile(mnavBaker* baker, mnavTileCache* cache, int32_t tileX,
+                                 int32_t tileZ, const mnavBakeVolume* obstacles,
+                                 int32_t obstacleCount, mnavBakeReport* reportOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
@@ -870,8 +871,8 @@ static mnavResult CopyBakedTileWork(const mnavBaker* baker, uint8_t* bufferOut, 
     return mnav_success;
 }
 
-mnavResult mnavCopyBakedTile(const mnavBaker* baker, uint8_t* bufferOut, size_t capacity,
-                             size_t* sizeOut)
+mnavResult mnavBaker_CopyTile(const mnavBaker* baker, uint8_t* bufferOut, size_t capacity,
+                              size_t* sizeOut)
 {
     mnavClearOutput(sizeOut, sizeof(*sizeOut));
     mnavResult result = mnavHostCountInvalid(

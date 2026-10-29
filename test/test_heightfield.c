@@ -57,17 +57,17 @@ static mnavResult Bake(const mnavBakeDef* def, const mnavTriangleMesh* meshes, i
         return result;
     }
     const mnavBakeInput input = {meshes, count, nullptr, 0, nullptr, 0, nullptr};
-    result = mnavBakeTile(baker, &input, tileX, tileZ, report);
+    result = mnavBaker_BakeTile(baker, &input, tileX, tileZ, report);
     if (result == mnav_success)
     {
         // The navmesh takes the default allocator, which never refuses.
         mnavBakeDef navmeshDef = *def;
         navmeshDef.allocator = mnavDefaultBakeDef().allocator;
         size_t size = 0;
-        CHECK(mnavCopyBakedTile(baker, s_tile, TILE_ROOM, &size) == mnav_success &&
+        CHECK(mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success &&
                   mnavCreateNavmesh(&navmeshDef, &s_navmesh).result == mnav_success &&
-                  mnavStageTile(s_navmesh, s_tile, size).result == mnav_success &&
-                  mnavCommit(s_navmesh) == mnav_success,
+                  mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
+                  mnavNavmesh_Commit(s_navmesh) == mnav_success,
               "loaded");
     }
     mnavDestroyBaker(baker);
@@ -80,7 +80,7 @@ static mnavNearest Over(int32_t x, int32_t z, double y)
 {
     mnavPos3 center = {(x + 0.5) * 0.25, y, (z + 0.5) * 0.25};
     mnavNearest n;
-    CHECK(mnavFindNearest(s_navmesh, nullptr, center, (mnavVec3){0.01f, 1.0f, 0.01f}, &n) ==
+    CHECK(mnavNavmesh_FindNearest(s_navmesh, center, (mnavVec3){0.01f, 1.0f, 0.01f}, nullptr, &n) ==
               mnav_success,
           "nearest");
     if (!n.over)
@@ -97,7 +97,7 @@ static mnavAreaType At(int32_t x, int32_t z, double y)
     mnavAreaType area = NO_POLYGON;
     if (n.polygon.slot != 0)
     {
-        CHECK(mnavGetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
+        CHECK(mnavPolygon_GetArea(s_navmesh, n.polygon, &area) == mnav_success, "area");
     }
     return area;
 }
@@ -121,13 +121,13 @@ static mnavDebugVertex s_drawVertices[DRAW_ROOM];
 static uint32_t s_drawTriangles[3 * DRAW_ROOM];
 static uint32_t s_drawLines[2 * DRAW_ROOM];
 
-// The hash of the loaded tile as mnavDebugNavmesh draws it: its polygons,
+// The hash of the loaded tile as mnavNavmesh_Debug draws it: its polygons,
 // detail triangles and edges, but not the fingerprint of its input.
 static uint64_t DrawHash(void)
 {
     mnavDebugBuffer buffer = {{0, 0, 0}, s_drawVertices, DRAW_ROOM, 0, s_drawTriangles, DRAW_ROOM,
                               0,         s_drawLines,    DRAW_ROOM, 0};
-    CHECK(mnavDebugNavmesh(s_navmesh, &(mnavTileRange){0, 0, 1, 1}, &buffer) == mnav_success,
+    CHECK(mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 1, 1}, &buffer) == mnav_success,
           "drawn");
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t i = 0; i < buffer.vertexCount; ++i)

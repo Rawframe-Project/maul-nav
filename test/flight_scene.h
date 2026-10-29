@@ -77,13 +77,13 @@ static inline mnavFlightDef Def(void)
 static inline uint64_t BakeOne(mnavFlightBaker* baker, const mnavBakeInput* input, int32_t t)
 {
     mnavFlightBakeReport report;
-    CHECK(mnavBakeFlightTile(baker, input, t % 2, t / 2, &report) == mnav_success, "baked");
+    CHECK(mnavFlightBaker_BakeTile(baker, input, t % 2, t / 2, &report) == mnav_success, "baked");
     CHECK(report.result == mnav_success && report.mesh == -1 && report.triangles > 0 &&
               report.spans > 0 && report.cubes == 1 && report.nodes > 0 && report.leaves > 0 &&
               report.memoryPeak > 0,
           "the report");
     size_t size = 0;
-    CHECK(mnavCopyFlightTile(baker, s_bytes[t], TILE_MOST, &size) == mnav_success, "copied");
+    CHECK(mnavFlightBaker_CopyTile(baker, s_bytes[t], TILE_MOST, &size) == mnav_success, "copied");
     CHECK(size == report.tileBytes, "the size reported");
     s_sizes[t] = size;
     s_fingerprints[t] = report.fingerprint;
@@ -104,7 +104,7 @@ static inline mnavTileResult StageBad(size_t size)
 {
     mnavFlightDef def = Def();
     mnavFlightVolume* volume = Volume(&def);
-    mnavTileResult result = mnavStageFlightTile(volume, s_bad, size);
+    mnavTileResult result = mnavFlightVolume_StageTile(volume, s_bad, size);
     mnavDestroyFlightVolume(volume);
     return result;
 }

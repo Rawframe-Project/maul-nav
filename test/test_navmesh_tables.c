@@ -5,7 +5,7 @@
 // neighboring tiles, by polygon, edge, side, the part of the side they
 // cover and their target; tile slots at their last generations; and
 // mnavPolygonOf's refusal of a stale id. White-box: the API joins
-// polygons across a tile side (mnavCheckCorridor) but names no link's
+// polygons across a tile side (mnavNavmesh_CheckCorridor) but names no link's
 // span, reaches a slot's last generation only after 2^32 commits to it,
 // and checks every id before it looks a polygon up.
 
@@ -34,7 +34,7 @@ static mnavNavmesh* Make(void)
 
 static mnavResult StageAt(mnavNavmesh* navmesh, int32_t t)
 {
-    return mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result;
+    return mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result;
 }
 
 // Every link answered by one back over the same part of the side, every
@@ -111,7 +111,7 @@ static void TestNeighborsLinkBothWays(void)
     {
         CHECK(StageAt(navmesh, t) == mnav_success, "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     CHECK(Links(navmesh, 0, 0) > 0 && Links(navmesh, 1, 1) > 0, "links on every tile");
     CHECK(Symmetric(navmesh), "every link answered");
     uint64_t hash = HashLinks(navmesh);
@@ -124,13 +124,15 @@ static void TestNeighborsLinkBothWays(void)
     {
         CHECK(StageAt(other, t) == mnav_success, "staged");
     }
-    CHECK(mnavCommit(other) == mnav_success && HashLinks(other) == hash, "order does not matter");
+    CHECK(mnavNavmesh_Commit(other) == mnav_success && HashLinks(other) == hash,
+          "order does not matter");
     mnavDestroyNavmesh(other);
     // One tile at a time, the same links.
     other = Make();
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(StageAt(other, t) == mnav_success && mnavCommit(other) == mnav_success, "one");
+        CHECK(StageAt(other, t) == mnav_success && mnavNavmesh_Commit(other) == mnav_success,
+              "one");
     }
     CHECK(HashLinks(other) == hash && Symmetric(other), "one by one, the same links");
     mnavDestroyNavmesh(other);
@@ -140,17 +142,17 @@ static void TestNeighborsLinkBothWays(void)
 static void TestLinksFollowTheirNeighbors(void)
 {
     mnavNavmesh* navmesh = Make();
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success &&
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success &&
               Links(navmesh, 0, 0) == 0,
           "no neighbor, no links");
-    CHECK(StageAt(navmesh, 1) == mnav_success && mnavCommit(navmesh) == mnav_success &&
+    CHECK(StageAt(navmesh, 1) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success &&
               Links(navmesh, 0, 0) > 0,
           "a neighbor, links");
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success &&
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success &&
               Symmetric(navmesh),
           "replaced, the neighbor's links follow");
-    CHECK(mnavStageTileRemoval(navmesh, 1, 0) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success && Links(navmesh, 0, 0) == 0,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 0) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success && Links(navmesh, 0, 0) == 0,
           "removed, its neighbor's links went with it");
     mnavDestroyNavmesh(navmesh);
 }
@@ -163,8 +165,9 @@ static void TestFailedCommitLinksNothing(void)
     def.limits.tileLinks = 1;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "one tile");
-    CHECK(StageAt(navmesh, 1) == mnav_success && mnavCommit(navmesh) == mnav_errorCapacity,
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
+          "one tile");
+    CHECK(StageAt(navmesh, 1) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_errorCapacity,
           "past the links limit");
     CHECK(Links(navmesh, 0, 0) == 0, "nothing linked");
     mnavDestroyNavmesh(navmesh);
@@ -175,10 +178,10 @@ static void TestStaleIdsFindNoPolygon(void)
     mnavNavmesh* navmesh = Make();
     mnavPolygonId old = {1, 1, 0};
     const mnavTile* tile = nullptr;
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success &&
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success &&
               mnavPolygonOf(navmesh, old, &tile) != nullptr && tile != nullptr,
           "a current id");
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success &&
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success &&
               mnavPolygonOf(navmesh, old, &tile) == nullptr && tile == nullptr,
           "replaced, the old id finds nothing");
     mnavDestroyNavmesh(navmesh);
@@ -187,19 +190,23 @@ static void TestStaleIdsFindNoPolygon(void)
 static void TestSlotAboutToWrapIsRetired(void)
 {
     mnavNavmesh* navmesh = Make();
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "one");
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
+          "one");
     navmesh->slots[0].generation = UINT32_MAX;
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "again");
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
+          "again");
     mnavTileId id;
-    CHECK(mnavGetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 2 && id.generation == 1,
+    CHECK(mnavNavmesh_GetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 2 &&
+              id.generation == 1,
           "a new slot");
     CHECK(navmesh->slots[0].retired && navmesh->slots[0].tile == nullptr, "the old one retired");
-    CHECK(mnavStageTileRemoval(navmesh, 0, 0) == mnav_success &&
-              StageAt(navmesh, 1) == mnav_success && mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 0, 0) == mnav_success &&
+              StageAt(navmesh, 1) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
           "slot 2 freed, another tile");
     // Slot 2 freed by the removal goes to the new tile two generations on,
     // so the removed tile's ids stay stale; slot 1 stays retired.
-    CHECK(mnavGetTile(navmesh, 1, 0, &id) == mnav_success && id.slot == 2 && id.generation == 3,
+    CHECK(mnavNavmesh_GetTile(navmesh, 1, 0, &id) == mnav_success && id.slot == 2 &&
+              id.generation == 3,
           "the lowest free slot, never the retired one");
     mnavDestroyNavmesh(navmesh);
 }
@@ -207,22 +214,24 @@ static void TestSlotAboutToWrapIsRetired(void)
 static void TestSlotFreedAtTheLastGenerationIsRetired(void)
 {
     mnavNavmesh* navmesh = Make();
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success, "one");
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
+          "one");
     navmesh->slots[0].generation = UINT32_MAX - 2;
     mnavTileId id;
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success &&
-              mnavGetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 1 &&
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavNavmesh_GetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 1 &&
               id.generation == UINT32_MAX - 1,
           "replaced in its slot");
-    CHECK(mnavStageTileRemoval(navmesh, 0, 0) == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTileRemoval(navmesh, 0, 0) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "removed");
     // Freed at the last generation, the slot has no next one to be taken
     // at: it is retired, not reused at a generation that wrapped to 0.
     CHECK(navmesh->slots[0].retired && navmesh->slots[0].generation == UINT32_MAX,
           "the slot retired");
-    CHECK(StageAt(navmesh, 0) == mnav_success && mnavCommit(navmesh) == mnav_success &&
-              mnavGetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 2 && id.generation == 1,
+    CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavNavmesh_GetTile(navmesh, 0, 0, &id) == mnav_success && id.slot == 2 &&
+              id.generation == 1,
           "the tile again, in a new slot");
     CHECK(mnavCheckPolygon(navmesh, (mnavPolygonId){id.slot, id.generation, 0}) == mnav_success,
           "its ids current");

@@ -88,9 +88,10 @@ static void Bake(const mnavBakeDef* def, const Quads* q, int32_t x0, int32_t z0,
     {
         for (int32_t x = x0; x <= x1; ++x, ++n)
         {
-            CHECK(mnavBakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
-                               x, z, nullptr) == mnav_success &&
-                      mnavCopyBakedTile(baker, s_tiles[n], TILE_ROOM, &s_sizes[n]) == mnav_success,
+            CHECK(mnavBaker_BakeTile(baker,
+                                     &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, x,
+                                     z, nullptr) == mnav_success &&
+                      mnavBaker_CopyTile(baker, s_tiles[n], TILE_ROOM, &s_sizes[n]) == mnav_success,
                   "baked");
         }
     }
@@ -100,8 +101,8 @@ static void Bake(const mnavBakeDef* def, const Quads* q, int32_t x0, int32_t z0,
 static mnavNearest Nearest(const mnavNavmesh* navmesh, double x, double y, double z)
 {
     mnavNearest n = {0};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, y, z}, (mnavVec3){0.5f, 1.0f, 0.5f},
-                          &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, y, z}, (mnavVec3){0.5f, 1.0f, 0.5f},
+                                  nullptr, &n) == mnav_success,
           "looked");
     return n;
 }
@@ -109,8 +110,8 @@ static mnavNearest Nearest(const mnavNavmesh* navmesh, double x, double y, doubl
 static mnavPath Path(mnavQuery* query, const mnavNavmesh* navmesh, mnavNearest a, mnavNearest b)
 {
     mnavPath path = {0};
-    CHECK(mnavFindPath(query, navmesh, nullptr, a.polygon, a.point, b.polygon, b.point, &path) ==
-              mnav_success,
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success,
           "searched");
     return path;
 }
@@ -168,8 +169,8 @@ static mnavNavmesh* LoadOne(const mnavBakeDef* def)
 {
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
     return navmesh;
 }
@@ -242,9 +243,10 @@ static void TestCollapsingBridge(mnavQuery* query)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 16; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavNearest a = Nearest(navmesh, 2, 5, 5);
     mnavNearest b = Nearest(navmesh, 30, 5, 5);
     mnavPath path = Path(query, navmesh, a, b);
@@ -262,22 +264,22 @@ static void TestCollapsingBridge(mnavQuery* query)
     size_t keepSizes[2] = {s_sizes[1], s_sizes[2]};
     Plateaus(&q, false);
     Bake(&def, &q, 1, 0, 2, 0);
-    CHECK(mnavStageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
-              mnavStageTile(navmesh, s_tiles[1], s_sizes[1]).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
+              mnavNavmesh_StageTile(navmesh, s_tiles[1], s_sizes[1]).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "the bridge's tiles replaced");
     int32_t valid = 0;
-    CHECK(mnavCheckCorridor(navmesh, nullptr, &corridor, &valid) == mnav_success &&
+    CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
               valid < corridor.count,
           "the corridor broken where the bridge was");
     mnavNearest middle = {0};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){16, 5, 5}, (mnavVec3){0.5f, 1.0f, 0.5f},
-                          &middle) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){16, 5, 5}, (mnavVec3){0.5f, 1.0f, 0.5f},
+                                  nullptr, &middle) == mnav_success &&
               middle.polygon.slot == 0,
           "nothing where the bridge stood");
     mnavPath replanned = {0};
-    CHECK(mnavReplanCorridor(query, navmesh, nullptr, &corridor, (mnavVec3){1, 1, 1}, &replanned) ==
-                  mnav_success &&
+    CHECK(mnavQuery_ReplanCorridor(query, &corridor, navmesh, (mnavVec3){1, 1, 1}, nullptr,
+                                   &replanned) == mnav_success &&
               replanned.end == mnav_pathFound,
           "replanned");
     double around = replanned.length;
@@ -286,9 +288,9 @@ static void TestCollapsingBridge(mnavQuery* query)
               Passes(&path, 11, 25.5, 21, 28.5),
           "around by the far bridge, as a new search finds");
     // Built again, the bridge carries the way once more.
-    CHECK(mnavStageTile(navmesh, keep[0], keepSizes[0]).result == mnav_success &&
-              mnavStageTile(navmesh, keep[1], keepSizes[1]).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavNavmesh_StageTile(navmesh, keep[0], keepSizes[0]).result == mnav_success &&
+              mnavNavmesh_StageTile(navmesh, keep[1], keepSizes[1]).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "the bridge's tiles back");
     path = Path(query, navmesh, a, b);
     CHECK(path.end == mnav_pathFound && path.length < 30.0, "over the bridge again");
@@ -339,27 +341,28 @@ static int32_t Stream(mnavNavmesh* navmesh, bool loaded[4][4], double ax, double
             bool want = Wanted(x, z, ax, az);
             if (loaded[z][x] && !want)
             {
-                CHECK(mnavStageTileRemoval(navmesh, x, z) == mnav_success, "streamed out");
+                CHECK(mnavNavmesh_StageTileRemoval(navmesh, x, z) == mnav_success, "streamed out");
             }
             else if (!loaded[z][x] && want)
             {
-                CHECK(mnavStageTile(navmesh, s_tiles[z * 4 + x], s_sizes[z * 4 + x]).result ==
-                          mnav_success,
-                      "streamed in");
+                CHECK(
+                    mnavNavmesh_StageTile(navmesh, s_tiles[z * 4 + x], s_sizes[z * 4 + x]).result ==
+                        mnav_success,
+                    "streamed in");
             }
             loaded[z][x] = want;
             count += want ? 1 : 0;
         }
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return count;
 }
 
 static mnavNearest Ground(const mnavNavmesh* navmesh, double x, double z)
 {
     mnavNearest n = {0};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x, 2.0, z}, (mnavVec3){0.5f, 6.0f, 0.5f},
-                          &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x, 2.0, z}, (mnavVec3){0.5f, 6.0f, 0.5f},
+                                  nullptr, &n) == mnav_success,
           "looked");
     return n;
 }
@@ -377,8 +380,8 @@ static uint64_t TerrainHash(void)
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t t = 0; t < 16; ++t)
     {
-        CHECK(mnavBakeTile(baker, &input, t % 4, t / 4, nullptr) == mnav_success &&
-                  mnavCopyBakedTile(baker, s_tiles[t], TILE_ROOM, &s_sizes[t]) == mnav_success,
+        CHECK(mnavBaker_BakeTile(baker, &input, t % 4, t / 4, nullptr) == mnav_success &&
+                  mnavBaker_CopyTile(baker, s_tiles[t], TILE_ROOM, &s_sizes[t]) == mnav_success,
               "baked");
         hash = mnavHash64(hash, s_tiles[t], (int32_t)s_sizes[t]);
     }
@@ -415,8 +418,8 @@ static void TestStreamedTerrain(mnavQuery* query)
         mnavNearest corner = Ground(navmesh, 124.0, 124.0);
         mnavPath path = {0};
         CHECK(here.polygon.slot != 0 && next.polygon.slot != 0, "ground around the agent");
-        CHECK(mnavFindPath(query, navmesh, nullptr, here.polygon, here.point, next.polygon,
-                           next.point, &path) == mnav_success,
+        CHECK(mnavQuery_FindPath(query, navmesh, here.polygon, here.point, next.polygon, next.point,
+                                 nullptr, &path) == mnav_success,
               "searched ahead");
         ahead += path.end == mnav_pathFound ? 1 : 0;
         if (corner.polygon.slot == 0)
@@ -425,7 +428,7 @@ static void TestStreamedTerrain(mnavQuery* query)
             // window's edge, not at a wall.
             mnavRay ray;
             mnavPos3 far = {124.0, here.point.y, 124.0};
-            CHECK(mnavRaycast(query, navmesh, nullptr, here.polygon, here.point, far, &ray) ==
+            CHECK(mnavQuery_Raycast(query, navmesh, here.polygon, here.point, far, nullptr, &ray) ==
                           mnav_success &&
                       ray.end == mnav_rayNotLoaded,
                   "a ray stops where tiles are out");
@@ -433,8 +436,8 @@ static void TestStreamedTerrain(mnavQuery* query)
         }
         else
         {
-            CHECK(mnavFindPath(query, navmesh, nullptr, here.polygon, here.point, corner.polygon,
-                               corner.point, &path) == mnav_success &&
+            CHECK(mnavQuery_FindPath(query, navmesh, here.polygon, here.point, corner.polygon,
+                                     corner.point, nullptr, &path) == mnav_success &&
                       path.end == mnav_pathFound,
                   "the corner reached once loaded");
         }
@@ -449,8 +452,8 @@ static void TestStreamedTerrain(mnavQuery* query)
     mnavNearest start = Ground(navmesh, 16.0, 16.0);
     mnavNearest edge = Ground(navmesh, 60.0, 60.0);
     mnavPath path = {0};
-    CHECK(mnavFindPath(query, navmesh, nullptr, start.polygon, start.point, edge.polygon,
-                       edge.point, &path) == mnav_success &&
+    CHECK(mnavQuery_FindPath(query, navmesh, start.polygon, start.point, edge.polygon, edge.point,
+                             nullptr, &path) == mnav_success &&
               path.end == mnav_pathFound,
           "within the window");
     mnavDestroyNavmesh(navmesh);
@@ -476,7 +479,7 @@ static mnavVec2 Preferred(const mnavFlowField* field, const mnavAgent* a)
 {
     mnavCell cell = {(int32_t)floor(a->position.x), (int32_t)floor(a->position.y)};
     mnavFlow flow = {0};
-    if (mnavFlowAt(field, cell, &flow) != mnav_success || !isfinite(flow.cost))
+    if (mnavFlowField_GetFlow(field, cell, &flow) != mnav_success || !isfinite(flow.cost))
     {
         return (mnavVec2){0.0f, 0.0f};
     }
@@ -512,7 +515,7 @@ static void TestGroup(void)
     fieldDef.cells = FIELD * FIELD;
     mnavFlowField* field = nullptr;
     CHECK(mnavCreateFlowField(&fieldDef, &field) == mnav_success &&
-              mnavBuildFlowField(field, &grid, nullptr, goals, 25) == mnav_success,
+              mnavFlowField_Build(field, &grid, goals, 25, nullptr) == mnav_success,
           "a field to the goal");
     static const mnavPos2 lower[4] = {{32, 0}, {33, 0}, {33, 28}, {32, 28}};
     static const mnavPos2 upper[4] = {{32, 36}, {33, 36}, {33, 64}, {32, 64}};
@@ -545,7 +548,8 @@ static void TestGroup(void)
         {
             agents[i].preferred = Preferred(field, &agents[i]);
         }
-        CHECK(mnavAvoid(avoidance, agents, GROUP, walls, 2, step, velocities) == mnav_success,
+        CHECK(mnavAvoidance_Avoid(avoidance, agents, GROUP, walls, 2, step, velocities) ==
+                  mnav_success,
               "avoided");
         for (int32_t i = 0; i < GROUP; ++i)
         {
@@ -630,8 +634,8 @@ static int32_t GatherWalls(mnavQuery* query, const mnavNavmesh* navmesh)
         }
         mnavWallsFound found;
         mnavResult result =
-            mnavFindWalls(query, navmesh, nullptr, w->corridor.polygons[0], w->corridor.position,
-                          WALL_RANGE, w->walls, CROWD_WALLS, &found);
+            mnavQuery_FindWalls(query, navmesh, w->corridor.polygons[0], w->corridor.position,
+                                WALL_RANGE, nullptr, w->walls, CROWD_WALLS, &found);
         CHECK(result == mnav_success || result == mnav_errorCapacity, "walls");
         w->wallCount = found.count < CROWD_WALLS ? found.count : CROWD_WALLS;
         w->wallsAt = w->corridor.position;
@@ -700,11 +704,12 @@ static void TestDoorway(mnavQuery* query)
     mnavBakeDef def = DoorwayDef();
     CHECK(def.agent.radius == (float)CROWD_RADIUS, "the tiles baked for the crowd's agents");
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, s_doorway0, sizeof(s_doorway0)).result == mnav_success &&
-              mnavStageTile(navmesh, s_doorway1, sizeof(s_doorway1)).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
-          "loaded");
+    CHECK(
+        mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+            mnavNavmesh_StageTile(navmesh, s_doorway0, sizeof(s_doorway0)).result == mnav_success &&
+            mnavNavmesh_StageTile(navmesh, s_doorway1, sizeof(s_doorway1)).result == mnav_success &&
+            mnavNavmesh_Commit(navmesh) == mnav_success,
+        "loaded");
     for (int32_t i = 0; i < CROWD; ++i)
     {
         double x = 2.0 + 0.75 * (double)(i % 25);
@@ -745,7 +750,7 @@ static void TestDoorway(mnavQuery* query)
         {
             mnavCorners corners;
             mnavSteering steering;
-            CHECK(mnavCorridorCorners(query, navmesh, &s_walkers[i].corridor, &corners) ==
+            CHECK(mnavQuery_FindCorridorCorners(query, &s_walkers[i].corridor, navmesh, &corners) ==
                           mnav_success &&
                       mnavSteer(&corners, &steer, &steering) == mnav_success,
                   "steered");
@@ -755,15 +760,16 @@ static void TestDoorway(mnavQuery* query)
         }
         int32_t walls = GatherWalls(query, navmesh);
         mostWalls = walls > mostWalls ? walls : mostWalls;
-        CHECK(mnavAvoid(avoidance, s_crowd, CROWD, s_wallObstacles, walls, 0.1, velocities) ==
-                  mnav_success,
+        CHECK(mnavAvoidance_Avoid(avoidance, s_crowd, CROWD, s_wallObstacles, walls, 0.1,
+                                  velocities) == mnav_success,
               "avoided");
         for (int32_t i = 0; i < CROWD; ++i)
         {
             mnavCorridor* c = &s_walkers[i].corridor;
             mnavPos3 wanted = {c->position.x + (double)velocities[i].x * 0.1, c->position.y,
                                c->position.z + (double)velocities[i].y * 0.1};
-            CHECK(mnavMoveCorridor(query, navmesh, nullptr, c, wanted, nullptr) == mnav_success,
+            CHECK(mnavQuery_MoveCorridor(query, c, navmesh, wanted, nullptr, nullptr) ==
+                      mnav_success,
                   "moved");
             pressed += hypot(wanted.x - c->position.x, wanted.z - c->position.z);
             s_crowd[i].position = (mnavPos2){c->position.x, c->position.z};

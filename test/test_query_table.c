@@ -42,9 +42,10 @@ static mnavNavmesh* WorldNavmesh(void)
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
-        CHECK(mnavStageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success, "staged");
+        CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
+              "staged");
     }
-    CHECK(mnavCommit(navmesh) == mnav_success, "committed");
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     return navmesh;
 }
 
@@ -61,16 +62,16 @@ static void TestTableLeftEmpty(void)
     for (int32_t i = 0; i < 64; ++i)
     {
         mnavNearest a;
-        CHECK(mnavFindNearest(navmesh, nullptr,
-                              (mnavPos3){4.0 + (i % 8) * 7.5, 0.0, 4.0 + (i / 8) * 7.5},
-                              (mnavVec3){3.0f, 2.0f, 3.0f}, &a) == mnav_success,
+        CHECK(mnavNavmesh_FindNearest(navmesh,
+                                      (mnavPos3){4.0 + (i % 8) * 7.5, 0.0, 4.0 + (i / 8) * 7.5},
+                                      (mnavVec3){3.0f, 2.0f, 3.0f}, nullptr, &a) == mnav_success,
               "start");
         for (int32_t k = 0; k < 16 && a.polygon.slot != 0; ++k)
         {
             mnavPos3 wanted = {a.point.x + s_fan[k][0], 0.0, a.point.z + s_fan[k][1]};
             mnavMove move = {0};
-            CHECK(mnavMoveAlongSurface(query, navmesh, nullptr, a.polygon, a.point, wanted,
-                                       &move) == mnav_success,
+            CHECK(mnavQuery_MoveAlongSurface(query, navmesh, a.polygon, a.point, wanted, nullptr,
+                                             &move) == mnav_success,
                   "moved");
             if (!query->tableClean)
             {

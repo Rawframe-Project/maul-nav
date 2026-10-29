@@ -179,14 +179,14 @@ static bool Near(const Gen* g, mnavPos3 start, mnavPos3 end)
 static bool Clear(const Gen* g, mnavPos3 from, mnavPos3 to)
 {
     const mnavLinkGenDef* d = g->def;
-    if (d->clear == nullptr)
+    if (d->clearance == nullptr)
     {
         return true;
     }
     mnavHostCode* navmesh = (mnavHostCode*)&g->navmesh->host;
     mnavHostEnterReader(navmesh);
     mnavHostEnterReader(&g->query->host);
-    bool clear = d->clear(d->context, from, to);
+    bool clear = d->clearance(d->context, from, to);
     mnavHostLeaveReader(&g->query->host);
     mnavHostLeaveReader(navmesh);
     return clear;
@@ -419,10 +419,10 @@ static MNAV_NOINLINE mnavResult GenerateLinksCounted(mnavQuery* query, const mna
                                      : mnavClearUnlessCapacity(result, countOut, sizeof(*countOut));
 }
 
-mnavResult mnavGenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,
-                             const mnavQueryFilter* filter, const mnavLinkGenDef* def,
-                             const mnavTileRange* tiles, mnavLinkDef* linksOut, int32_t capacity,
-                             int32_t* countOut)
+mnavResult mnavQuery_GenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,
+                                   const mnavLinkGenDef* def, const mnavTileRange* tiles,
+                                   const mnavQueryFilter* filter, mnavLinkDef* linksOut,
+                                   int32_t capacity, int32_t* countOut)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =

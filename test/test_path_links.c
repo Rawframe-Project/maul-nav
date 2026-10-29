@@ -20,8 +20,8 @@ static mnavNavmesh* Make(const uint8_t* bytes, size_t size)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-              mnavStageTile(navmesh, bytes, size).result == mnav_success &&
-              mnavCommit(navmesh) == mnav_success,
+              mnavNavmesh_StageTile(navmesh, bytes, size).result == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
     return navmesh;
 }
@@ -31,7 +31,8 @@ static mnavLinkId AddLink(mnavNavmesh* navmesh, double x0, double x1, float cost
 {
     mnavLinkDef def = {{x0, 0.0, 7.5}, {x1, 0.0, 7.5}, 0.5f, cost, kind, twoWay, 0.0f};
     mnavLinkId id = {0, 0};
-    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "link added");
     return id;
 }
@@ -42,13 +43,15 @@ static mnavPath Walk(mnavQuery* query, const mnavNavmesh* navmesh, const mnavQue
     mnavNearest a;
     mnavNearest b;
     mnavVec3 box = {0.1f, 1.0f, 0.1f};
-    CHECK(mnavFindNearest(navmesh, nullptr, (mnavPos3){x0, 0.0, z0}, box, &a) == mnav_success &&
-              mnavFindNearest(navmesh, nullptr, (mnavPos3){x1, 0.0, z1}, box, &b) == mnav_success &&
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){x0, 0.0, z0}, box, nullptr, &a) ==
+                  mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){x1, 0.0, z1}, box, nullptr, &b) ==
+                  mnav_success &&
               a.over && b.over,
           "ends on the navmesh");
     mnavPath path = {0};
-    CHECK(mnavFindPath(query, navmesh, filter, a.polygon, a.point, b.polygon, b.point, &path) ==
-              mnav_success,
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, filter,
+                             &path) == mnav_success,
           "searched");
     return path;
 }
@@ -195,7 +198,8 @@ static void TestLeftOutKindsDoNotWeakenTheSearch(void)
     mnavLinkDef def = {
         {24.0, 0.0, 6.0}, {6.0, 0.0, 24.0}, 0.5f, 0.01f, mnav_linkTeleport, false, 0.0f};
     mnavLinkId id;
-    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success && mnavCommit(navmesh) == mnav_success,
+    CHECK(mnavStageLink(navmesh, &def, &id) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
           "teleport added");
     int32_t beside = FewestNodes(navmesh, &walker, 6.0, 6.0, 24.0, 24.0);
     printf("FEWEST without=%d beside=%d\n", without, beside);

@@ -36,20 +36,23 @@ int main(void)
     size_t size = 0;
     unsigned char* bytes = malloc(room);
     int ok = bytes != NULL && mnavCreateBaker(&def, &baker).result == mnav_success &&
-             mnavBakeTile(baker, &(mnavBakeInput){&floor, 1, NULL, 0, NULL, 0, NULL}, 0, 0, NULL) ==
-                 mnav_success &&
-             mnavCopyBakedTile(baker, bytes, room, &size) == mnav_success &&
+             mnavBaker_BakeTile(baker, &(mnavBakeInput){&floor, 1, NULL, 0, NULL, 0, NULL}, 0, 0,
+                                NULL) == mnav_success &&
+             mnavBaker_CopyTile(baker, bytes, room, &size) == mnav_success &&
              mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
-             mnavStageTile(navmesh, bytes, size).result == mnav_success &&
-             mnavCommit(navmesh) == mnav_success &&
+             mnavNavmesh_StageTile(navmesh, bytes, size).result == mnav_success &&
+             mnavNavmesh_Commit(navmesh) == mnav_success &&
              mnavCreateQuery(&queryDef, &query) == mnav_success;
     mnavNearest a;
     mnavNearest b;
     mnavPath path;
     const mnavVec3 box = {1.0f, 2.0f, 1.0f};
-    ok = ok && mnavFindNearest(navmesh, NULL, (mnavPos3){2.0, 0.0, 2.0}, box, &a) == mnav_success &&
-         mnavFindNearest(navmesh, NULL, (mnavPos3){30.0, 0.0, 30.0}, box, &b) == mnav_success &&
-         mnavFindPath(query, navmesh, NULL, a.polygon, a.point, b.polygon, b.point, &path) ==
+    ok = ok &&
+         mnavNavmesh_FindNearest(navmesh, (mnavPos3){2.0, 0.0, 2.0}, box, NULL, &a) ==
+             mnav_success &&
+         mnavNavmesh_FindNearest(navmesh, (mnavPos3){30.0, 0.0, 30.0}, box, NULL, &b) ==
+             mnav_success &&
+         mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, NULL, &path) ==
              mnav_success &&
          path.end == mnav_pathFound;
     printf("maul-nav %u.%u.%u: %s, %.1f m\n", version.major, version.minor, version.patch,

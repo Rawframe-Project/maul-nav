@@ -379,7 +379,7 @@ mnavHostCode* mnavTileIndexHost(const mnavTileIndex* index)
     return index != nullptr ? (mnavHostCode*)&index->host : nullptr;
 }
 
-uint64_t mnavGetTileIndexMisuse(const mnavTileIndex* index)
+uint64_t mnavTileIndex_GetMisuse(const mnavTileIndex* index)
 {
     return index != nullptr ? mnavHostMisuse(&index->host) : 0;
 }
