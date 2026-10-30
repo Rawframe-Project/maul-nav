@@ -611,10 +611,13 @@ void mnavApplyAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
     }
     navmesh->linksHeld = held;
     navmesh->linksPending = 0;
-    mnavRelease(&navmesh->memory, navmesh->attachments, (size_t)navmesh->attachmentCapacity,
-                sizeof(uint64_t), alignof(uint64_t));
-    mnavRelease(&navmesh->memory, navmesh->arrivals, (size_t)navmesh->arrivalCapacity,
-                sizeof(uint64_t), alignof(uint64_t));
+    // The new arrays go in, and the old ones are freed only once the
+    // navmesh is whole again, so a free hook never finds it holding a
+    // released block.
+    uint64_t* attachments = navmesh->attachments;
+    int32_t attachmentCapacity = navmesh->attachmentCapacity;
+    uint64_t* arrivals = navmesh->arrivals;
+    int32_t arrivalCapacity = navmesh->arrivalCapacity;
     navmesh->attachments = plan->keys;
     navmesh->attachmentCapacity = plan->capacity;
     navmesh->arrivals = plan->arrivals;
@@ -635,7 +638,6 @@ void mnavApplyAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
             count = Attach(navmesh, s, navmesh->attachments, count);
         }
     }
-    mnavDropAttachmentPlan(navmesh, plan);
     for (int32_t k = 0; k < MNAV_LINK_KINDS; ++k)
     {
         navmesh->costPerMeter[k] = (double)INFINITY;
@@ -661,6 +663,11 @@ void mnavApplyAttachments(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
                                             (size_t)count)
                   : 0;
     Arrive(navmesh, half);
+    mnavDropAttachmentPlan(navmesh, plan);
+    mnavRelease(&navmesh->memory, attachments, (size_t)attachmentCapacity, sizeof(uint64_t),
+                alignof(uint64_t));
+    mnavRelease(&navmesh->memory, arrivals, (size_t)arrivalCapacity, sizeof(uint64_t),
+                alignof(uint64_t));
 }
 
 // The keys of one polygon in a sorted key array: first receives the index

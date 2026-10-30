@@ -165,27 +165,42 @@ void mnavDestroyNavmesh(mnavNavmesh* navmesh)
     {
         return;
     }
+    // Each tile leaves its slot before it is freed, so a free hook given
+    // one of its ids finds it stale; each array is emptied before it is
+    // freed, so a later read finds nothing there rather than released
+    // memory.
     mnavMemory* memory = &navmesh->memory;
     for (int32_t s = 0; s < navmesh->stagedCount; ++s)
     {
-        FreeTile(memory, navmesh->staged[s].tile);
+        mnavTile* tile = navmesh->staged[s].tile;
+        navmesh->staged[s].tile = nullptr;
+        FreeTile(memory, tile);
     }
     for (int32_t s = 0; s < navmesh->slotCount; ++s)
     {
-        FreeTile(memory, navmesh->slots[s].tile);
+        mnavTile* tile = navmesh->slots[s].tile;
+        navmesh->slots[s].tile = nullptr;
+        FreeTile(memory, tile);
     }
+    navmesh->stagedCount = 0;
     mnavRelease(memory, navmesh->staged, (size_t)navmesh->stagedCapacity, sizeof(mnavStaged),
                 alignof(mnavStaged));
+    navmesh->linkSlots = 0;
     mnavRelease(memory, navmesh->links, (size_t)navmesh->linkCapacity, sizeof(mnavOffLink),
                 alignof(mnavOffLink));
+    navmesh->areaChangeCount = 0;
     mnavRelease(memory, navmesh->areaChanges, (size_t)navmesh->areaChangeCapacity,
                 sizeof(mnavAreaChange), alignof(mnavAreaChange));
+    navmesh->arrivalCount = 0;
     mnavRelease(memory, navmesh->arrivals, (size_t)navmesh->arrivalCapacity, sizeof(uint64_t),
                 alignof(uint64_t));
+    navmesh->attachmentCount = 0;
     mnavRelease(memory, navmesh->attachments, (size_t)navmesh->attachmentCapacity, sizeof(uint64_t),
                 alignof(uint64_t));
+    navmesh->placeCount = 0;
     mnavRelease(memory, navmesh->places, (size_t)navmesh->placeCapacity, sizeof(mnavPlace),
                 alignof(mnavPlace));
+    navmesh->slotCount = 0;
     mnavRelease(memory, navmesh->slots, (size_t)navmesh->slotCapacity, sizeof(mnavSlot),
                 alignof(mnavSlot));
     // The mark lives in the block being freed: it is set for good, so that
@@ -783,33 +798,36 @@ static mnavResult MakePlan(mnavNavmesh* navmesh, mnavTilePlan* plan)
     return result;
 }
 
-// Swaps the plan in: frees the tiles it replaced or removed and the links
-// it rebuilt, and takes its slots, places and links.
+// Swaps the plan in, then frees what it replaced: the old tiles, the
+// links of each rebuilt tile, and the old slots and places. Every free runs
+// with the plan in place, so a free hook that reads the navmesh back finds
+// a removed or replaced tile's ids stale and each rebuilt tile with its new
+// links.
 static void Apply(mnavNavmesh* navmesh, mnavTilePlan* plan)
 {
     mnavMemory* memory = &navmesh->memory;
-    for (int32_t s = 0; s < navmesh->slotCount; ++s)
-    {
-        if (navmesh->slots[s].tile != plan->slots[s].tile)
-        {
-            FreeTile(memory, navmesh->slots[s].tile);
-        }
-    }
+    // Each relink takes the links its tile gives up.
     for (int32_t r = 0; r < plan->relinkCount; ++r)
     {
         mnavRelink* relink = &plan->relinks[r];
         mnavTile* tile = plan->slots[relink->slot].tile;
-        ReleaseLinks(memory, tile);
+        mnavRelink old = {relink->slot, tile->links, tile->linkCount, tile->firstLink};
         tile->links = relink->links;
         tile->linkCount = relink->linkCount;
         tile->firstLink = relink->firstLink;
+        *relink = old;
     }
-    mnavRelease(memory, plan->relinks, (size_t)plan->relinkCapacity, sizeof(mnavRelink),
-                alignof(mnavRelink));
-    mnavRelease(memory, navmesh->slots, (size_t)navmesh->slotCapacity, sizeof(mnavSlot),
-                alignof(mnavSlot));
-    mnavRelease(memory, navmesh->places, (size_t)navmesh->placeCapacity, sizeof(mnavPlace),
-                alignof(mnavPlace));
+    const mnavTilePlan old = {
+        .slots = navmesh->slots,
+        .slotCount = navmesh->slotCount,
+        .slotCapacity = navmesh->slotCapacity,
+        .places = navmesh->places,
+        .placeCount = navmesh->placeCount,
+        .placeCapacity = navmesh->placeCapacity,
+        .relinks = plan->relinks,
+        .relinkCount = plan->relinkCount,
+        .relinkCapacity = plan->relinkCapacity,
+    };
     navmesh->slots = plan->slots;
     navmesh->slotCount = plan->slotCount;
     navmesh->slotCapacity = plan->slotCapacity;
@@ -818,6 +836,27 @@ static void Apply(mnavNavmesh* navmesh, mnavTilePlan* plan)
     navmesh->placeCapacity = plan->placeCapacity;
     navmesh->stagedCount = 0;
     *plan = (mnavTilePlan){0};
+    for (int32_t s = 0; s < old.slotCount; ++s)
+    {
+        if (old.slots[s].tile != navmesh->slots[s].tile)
+        {
+            FreeTile(memory, old.slots[s].tile);
+        }
+    }
+    for (int32_t r = 0; r < old.relinkCount; ++r)
+    {
+        const mnavRelink* relink = &old.relinks[r];
+        int32_t polygons = navmesh->slots[relink->slot].tile->mesh.polygonCount;
+        mnavRelease(memory, relink->links, (size_t)relink->linkCount, sizeof(mnavLink),
+                    alignof(mnavLink));
+        mnavRelease(memory, relink->firstLink, (size_t)polygons + 1, sizeof(int32_t),
+                    alignof(int32_t));
+    }
+    mnavRelease(memory, old.relinks, (size_t)old.relinkCapacity, sizeof(mnavRelink),
+                alignof(mnavRelink));
+    mnavRelease(memory, old.slots, (size_t)old.slotCapacity, sizeof(mnavSlot), alignof(mnavSlot));
+    mnavRelease(memory, old.places, (size_t)old.placeCapacity, sizeof(mnavPlace),
+                alignof(mnavPlace));
 }
 
 mnavResult mnavPlanTiles(mnavNavmesh* navmesh, mnavTilePlan* plan)
