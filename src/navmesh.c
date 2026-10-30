@@ -24,7 +24,7 @@
 
 static mnavNavmeshDefResult Refuse(mnavResult result, mnavNavmeshSetting setting)
 {
-    return (mnavNavmeshDefResult){result, setting, mnav_settingNone};
+    return (mnavNavmeshDefResult){result, setting, mnav_bakeSettingNone};
 }
 
 static mnavNavmeshDefResult CheckLimits(const mnavNavmeshLimits* limits)

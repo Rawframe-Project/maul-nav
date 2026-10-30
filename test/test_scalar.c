@@ -106,17 +106,17 @@ static void TestCellsRefuseTooMany(void)
     // Heights up to MNAV_MAX_HEIGHT_CELLS cell heights of 0.125 m.
     mnavBakeCells cells;
     mnavBakeDefResult result = Cells(0.25f, 0.125f, 0.5f, 4096.0f, 0.75f, &cells);
-    CHECK(result.result == mnav_errorLimit && result.setting == mnav_settingAgentHeight,
+    CHECK(result.result == mnav_errorLimit && result.setting == mnav_bakeSettingAgentHeight,
           "32768 cell heights past the limit");
     CHECK(Cells(0.25f, 0.125f, 0.5f, 4095.875f, 0.75f, &cells).result == mnav_success &&
               cells.agentHeight == MNAV_MAX_HEIGHT_CELLS,
           "32767 fit");
     // 32767.25 cell heights, rounded up, are 32768.
     result = Cells(0.25f, 0.125f, 0.5f, 4095.90625f, 0.75f, &cells);
-    CHECK(result.result == mnav_errorLimit && result.setting == mnav_settingAgentHeight,
+    CHECK(result.result == mnav_errorLimit && result.setting == mnav_bakeSettingAgentHeight,
           "a quarter past the limit, rounded up, past it");
     result = Cells(0.25f, 0.001f, 0.5f, 2.0f, 3.0e38f, &cells);
-    CHECK(result.result == mnav_errorLimit && result.setting == mnav_settingAgentStepHeight,
+    CHECK(result.result == mnav_errorLimit && result.setting == mnav_bakeSettingAgentStepHeight,
           "an infinite quotient refused");
 }
 
