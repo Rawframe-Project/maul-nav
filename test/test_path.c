@@ -385,7 +385,9 @@ static void TestSearchesArePinned(void)
         CHECK(Walkable(navmesh, &path) && Walkable(navmesh, &cut), "on the navmesh");
         hash = mnavHash64(hash, path.points, path.pointCount * (int64_t)sizeof(mnavPos3));
         hash = mnavHash64(hash, cut.points, cut.pointCount * (int64_t)sizeof(mnavPos3));
-        hash = mnavHash64(hash, &path.end, (int64_t)sizeof(path.end));
+        // The end as one byte, whatever the width of its type.
+        const uint8_t endByte = (uint8_t)path.end;
+        hash = mnavHash64(hash, &endByte, (int64_t)sizeof(endByte));
         hash = mnavHash64(hash, &path.cost, (int64_t)sizeof(path.cost));
         hash = mnavHash64(hash, path.polygons, path.polygonCount * (int64_t)sizeof(mnavPolygonId));
     }

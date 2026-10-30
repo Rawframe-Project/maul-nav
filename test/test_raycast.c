@@ -238,7 +238,9 @@ static void TestWorldRays(void)
                                                  &n) == mnav_success &&
                          n.polygon.slot != 0 && hypot(p.x - n.point.x, p.z - n.point.z) < 1.0e-9;
             }
-            hash = mnavHash64(hash, &ray.end, (int64_t)sizeof(ray.end));
+            // The end as one byte, whatever the width of its type.
+            const uint8_t endByte = (uint8_t)ray.end;
+            hash = mnavHash64(hash, &endByte, (int64_t)sizeof(endByte));
             hash = mnavHash64(hash, &ray.t, (int64_t)sizeof(ray.t));
             hash =
                 mnavHash64(hash, ray.polygons, ray.polygonCount * (int64_t)sizeof(mnavPolygonId));

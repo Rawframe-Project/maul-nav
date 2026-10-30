@@ -18,13 +18,13 @@
 bool mnavGoodBuffer(const mnavDebugBuffer* buffer);
 
 // Appends a vertex and returns its index.
-uint32_t mnavDrawVertex(mnavDebugBuffer* buffer, mnavPos3 p, mnavDebugKind kind, uint16_t value);
+uint32_t mnavDrawVertex(mnavDebugBuffer* buffer, mnavPos3 p, mnavDebugKind kind, uint32_t value);
 
 // Appends a line, and a triangle, with vertices of their own.
 void mnavDrawLine(mnavDebugBuffer* buffer, mnavPos3 a, mnavPos3 b, mnavDebugKind kind,
-                  uint16_t value);
+                  uint32_t value);
 void mnavDrawTriangle(mnavDebugBuffer* buffer, mnavPos3 a, mnavPos3 b, mnavPos3 c,
-                      mnavDebugKind kind, uint16_t value);
+                      mnavDebugKind kind, uint32_t value);
 
 // mnav_errorCapacity when any count went past its capacity.
 mnavResult mnavDrawResult(const mnavDebugBuffer* buffer);

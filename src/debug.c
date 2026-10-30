@@ -27,7 +27,7 @@
 
 // A polygon's detail triangles, of a kind and value.
 static void Fill(mnavDebugBuffer* buffer, const mnavNavmesh* navmesh, int32_t slot, int32_t p,
-                 mnavDebugKind kind, uint16_t value)
+                 mnavDebugKind kind, uint32_t value)
 {
     const mnavTile* tile = navmesh->slots[slot].tile;
     const mnavDetailPart* part = &tile->detail.parts[p];
@@ -175,8 +175,8 @@ static MNAV_NOINLINE mnavResult DebugLinksWork(const mnavNavmesh* navmesh, mnavD
         double dz = b.z - a.z;
         double rise = sqrt(dx * dx + dy * dy + dz * dz) * 0.25;
         mnavDebugKind kind = link->def.twoWay ? mnav_debugLinkBothWays : mnav_debugLink;
-        uint16_t value =
-            (uint16_t)(link->def.kind + (state->attached && state->enabled ? 0 : LINK_OFF));
+        uint32_t value =
+            (uint32_t)link->def.kind + (state->attached && state->enabled ? 0u : LINK_OFF);
         mnavPos3 last = a;
         for (int32_t k = 1; k <= ARC_LINES; ++k)
         {
@@ -248,7 +248,7 @@ static MNAV_NOINLINE mnavResult DebugCorridorWork(const mnavNavmesh* navmesh,
         if (mnavCheckPolygon(navmesh, polygons[i]) == mnav_success)
         {
             Fill(buffer, navmesh, (int32_t)polygons[i].slot - 1, (int32_t)polygons[i].polygon,
-                 mnav_debugCorridor, (uint16_t)(i & 0xFFFF));
+                 mnav_debugCorridor, (uint32_t)i);
         }
     }
     return mnavDrawResult(buffer);

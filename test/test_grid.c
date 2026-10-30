@@ -277,7 +277,9 @@ static void TestJumpsMatchAStar(void)
         mnavGridPath jumps;
         mnavGridPath plain;
         CHECK(mnavQuery_FindGridPath(query, &grid, a, b, nullptr, &jumps) == mnav_success, "jumps");
-        hash = mnavHash64(hash, &jumps.end, (int64_t)sizeof(jumps.end));
+        // The end as one byte, whatever the width of its type.
+        const uint8_t endByte = (uint8_t)jumps.end;
+        hash = mnavHash64(hash, &endByte, (int64_t)sizeof(endByte));
         hash = mnavHash64(hash, &jumps.cost, (int64_t)sizeof(jumps.cost));
         hash = mnavHash64(hash, jumps.cells, (int64_t)((size_t)jumps.cellCount * sizeof(mnavCell)));
         double cost = jumps.cost;

@@ -20,6 +20,7 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 // The hash of the navmesh's debug data, the same on every platform.
@@ -64,7 +65,9 @@ static int32_t Count(const mnavDebugBuffer* b, mnavDebugKind kind, int32_t value
     int32_t n = 0;
     for (int32_t i = 0; i < b->vertexCount; ++i)
     {
-        n += b->vertices[i].kind == kind && (value < 0 || b->vertices[i].value == value) ? 1 : 0;
+        n += b->vertices[i].kind == kind && (value < 0 || b->vertices[i].value == (uint32_t)value)
+                 ? 1
+                 : 0;
     }
     return n;
 }
@@ -90,8 +93,19 @@ static void TestNavmesh(const mnavNavmesh* navmesh)
         outside += v->x < -1.5f || v->x > 65.5f || v->z < -1.5f || v->z > 65.5f ? 1 : 0;
     }
     CHECK(outside == 0, "within the world");
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, b.vertices,
-                               (int64_t)((size_t)b.vertexCount * sizeof(mnavDebugVertex)));
+    // Each vertex as 16 bytes, field by field: its place, then its kind
+    // and value as 16 bits each, whatever the widths of their types.
+    uint8_t* packed = malloc((size_t)b.vertexCount * 16);
+    CHECK(packed != nullptr, "room for the packed vertices");
+    for (int32_t i = 0; packed != nullptr && i < b.vertexCount; ++i)
+    {
+        const mnavDebugVertex* v = &b.vertices[i];
+        const uint16_t kindValue[2] = {(uint16_t)v->kind, (uint16_t)v->value};
+        memcpy(packed + (size_t)i * 16, &v->x, 3 * sizeof(float));
+        memcpy(packed + (size_t)i * 16 + 12, kindValue, sizeof(kindValue));
+    }
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, packed, (int64_t)b.vertexCount * 16);
+    free(packed);
     hash = mnavHash64(hash, b.triangles, (int64_t)((size_t)b.triangleCount * sizeof(uint32_t)));
     hash = mnavHash64(hash, b.lines, (int64_t)((size_t)b.lineCount * sizeof(uint32_t)));
     printf("NAVMESH_HASH=%016llx\n", (unsigned long long)hash);
