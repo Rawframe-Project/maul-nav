@@ -268,8 +268,7 @@ static mnavBakeReport* Begin(mnavBakeReport* reportOut, mnavBakeReport* ignored)
     mnavBakeReport* report = reportOut != nullptr ? reportOut : ignored;
     *report = (mnavBakeReport){0};
     report->stage = mnav_stageInput;
-    report->mesh = -1;
-    report->input = (mnavInputResult){mnav_success, mnav_elementNone, -1};
+    report->input = mnavInputElementResult(mnav_success, mnav_elementNone, -1);
     return report;
 }
 
@@ -300,8 +299,7 @@ static MNAV_NOINLINE mnavResult CreateTileIndexWork(const mnavBakeDef* def,
         mnavInputResult input = mnavCheckTriangleMesh(def, &meshes[m]);
         if (input.result != mnav_success)
         {
-            report->mesh = m;
-            report->input = input;
+            report->input = mnavInputNamed(input, mnav_inputMesh, m);
             return report->result = input.result;
         }
     }
@@ -347,8 +345,7 @@ static MNAV_NOINLINE mnavResult CreateTileIndex2DWork(const mnavBakeDef* def,
         mnavInputResult input = mnavCheckOutline(def, &outlines[o]);
         if (input.result != mnav_success)
         {
-            report->mesh = o;
-            report->input = input;
+            report->input = mnavInputNamed(input, mnav_inputOutline, o);
             return report->result = input.result;
         }
     }

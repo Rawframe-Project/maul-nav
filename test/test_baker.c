@@ -74,7 +74,8 @@ static void TestLevelBakesAndCopies(void)
     CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
                              0, &report) == mnav_success,
           "baked");
-    CHECK(report.result == mnav_success && report.stage == mnav_stageDone && report.mesh == -1,
+    CHECK(report.result == mnav_success && report.stage == mnav_stageDone &&
+              report.input.kind == mnav_inputNone,
           "done");
     CHECK(report.triangles > 0 && report.spans > 0 && report.regions == 3 &&
               report.polygons == 54 && report.vertices > 0 && report.detailTriangles > 0,
@@ -236,8 +237,9 @@ static void TestBadInputIsNamed(void)
     CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){meshes, 2, nullptr, 0, nullptr, 0, nullptr}, 0,
                              0, &report) == mnav_errorInvalid,
           "refused");
-    CHECK(report.stage == mnav_stageInput && report.mesh == 1 &&
-              report.input.element == mnav_elementVertex && report.input.index == 1,
+    CHECK(report.stage == mnav_stageInput && report.input.kind == mnav_inputMesh &&
+              report.input.index == 1 && report.input.element == mnav_elementVertex &&
+              report.input.elementIndex == 1,
           "the second mesh's second vertex");
     size_t size = 0;
     uint64_t misuse = mnavBaker_GetMisuse(baker);

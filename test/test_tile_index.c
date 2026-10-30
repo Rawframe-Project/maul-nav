@@ -323,6 +323,14 @@ static void TestSameBytes2D(const mnavBakeDef* def, Place place, const char* whe
     mnavDestroyBaker(baker);
 }
 
+// Whether a whole input's check refuses it with errorInvalid, naming no
+// one input.
+static bool RefusedWhole(mnavInputResult checked)
+{
+    return checked.result == mnav_errorInvalid && checked.kind == mnav_inputNone &&
+           checked.index == -1;
+}
+
 static void TestRefusals2D(void)
 {
     mnavBakeDef def = Def();
@@ -338,11 +346,13 @@ static void TestRefusals2D(void)
               mnavCreateBaker(&def, &baker).result == mnav_success,
           "made");
     mnavBake2DInput flat = {s_outlines, OUTLINES, triangles};
-    CHECK(mnavBaker_BakeTile2D(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
-          "an index of meshes refused by a 2D bake");
+    CHECK(mnavBaker_BakeTile2D(baker, &flat, 1, 1, &report) == mnav_errorInvalid &&
+              RefusedWhole(mnavValidateBake2DInput(&def, &flat)),
+          "an index of meshes refused by a 2D bake and its check");
     const mnavBakeInput solid = {meshes, MESHES, nullptr, 0, nullptr, 0, outlines};
-    CHECK(mnavBaker_BakeTile(baker, &solid, 1, 1, &report) == mnav_errorInvalid,
-          "an index of outlines refused by a 3D bake");
+    CHECK(mnavBaker_BakeTile(baker, &solid, 1, 1, &report) == mnav_errorInvalid &&
+              RefusedWhole(mnavValidateBakeInput(&def, &solid)),
+          "an index of outlines refused by a 3D bake and its check");
     // The kind is checked even where the counts agree: one outline of 4
     // points, one mesh of 4 triangles.
     mnavTileIndex* square = nullptr;
@@ -356,7 +366,8 @@ static void TestRefusals2D(void)
     mnavDestroyTileIndex(square);
     flat.index = outlines;
     flat.outlineCount = OUTLINES - 1;
-    CHECK(mnavBaker_BakeTile2D(baker, &flat, 1, 1, &report) == mnav_errorInvalid,
+    CHECK(mnavBaker_BakeTile2D(baker, &flat, 1, 1, &report) == mnav_errorInvalid &&
+              RefusedWhole(mnavValidateBake2DInput(&def, &flat)),
           "another number of outlines refused");
     flat.outlineCount = OUTLINES;
     s_outlines[3].pointCount -= 1;
@@ -364,24 +375,25 @@ static void TestRefusals2D(void)
           "another number of points refused");
     s_outlines[3].pointCount += 1;
     CHECK(mnavBaker_BakeTile2D(baker, &flat, 1, 1, &report) == mnav_success &&
+              mnavValidateBake2DInput(&def, &flat).result == mnav_success &&
               mnavBaker_BakeTile2D(baker, nullptr, 1, 1, &report) == mnav_errorInvalid,
           "fits again; a NULL input refused");
     // An outline changed since is checked as it is read.
     s_points[0][1].x = NAN;
     CHECK(mnavBaker_BakeTile2D(baker, &flat, 1, 1, &report) == mnav_errorInvalid &&
-              report.mesh == 0,
+              report.input.kind == mnav_inputOutline && report.input.index == 0,
           "a point not finite, refused as read");
     mnavTileIndex* none = nullptr;
     mnavBakeDef tight = def;
     tight.limits.memoryBytes = 256;
     CHECK(mnavCreateTileIndex2D(&tight, s_outlines, OUTLINES, &none, &report) ==
                   mnav_errorInvalid &&
-              report.mesh == 0 && none == nullptr,
+              report.input.kind == mnav_inputOutline && report.input.index == 0 && none == nullptr,
           "an outline its check refuses, named");
     MakeOutlines(&def, (Place){0, 0, 3, 3});
     s_points[2][1].x = -1e30f;
     CHECK(mnavCreateTileIndex2D(&def, s_outlines, OUTLINES, &none, &report) == mnav_errorLimit &&
-              report.mesh == 2 && none == nullptr,
+              report.input.kind == mnav_inputOutline && report.input.index == 2 && none == nullptr,
           "a point past the extent, named");
     MakeOutlines(&def, (Place){0, 0, 3, 3});
     CHECK(mnavCreateTileIndex2D(&tight, s_outlines, OUTLINES, &none, &report) ==
@@ -411,12 +423,14 @@ static void TestRefusals(void)
     int32_t wrong[3] = {0, 1, TRIANGLES * 3};
     bad[2] = (mnavTriangleMesh){s_vertices[2], TRIANGLES * 3, wrong, 1, nullptr};
     CHECK(mnavCreateTileIndex(&def, bad, MESHES, &index, &report) == mnav_errorInvalid &&
-              report.mesh == 2 && report.input.element == mnav_elementTriangle && index == nullptr,
+              report.input.kind == mnav_inputMesh && report.input.index == 2 &&
+              report.input.element == mnav_elementTriangle && index == nullptr,
           "a mesh its check refuses, named");
     mnavVec3 corner = s_vertices[2][5];
     s_vertices[2][5].z = 1e30f;
     CHECK(mnavCreateTileIndex(&def, meshes, MESHES, &index, &report) == mnav_errorLimit &&
-              report.mesh == 2 && report.input.element == mnav_elementVertex && index == nullptr,
+              report.input.kind == mnav_inputMesh && report.input.index == 2 &&
+              report.input.element == mnav_elementVertex && index == nullptr,
           "a vertex past the extent, named");
     s_vertices[2][5] = corner;
     mnavBakeDef tight = def;
@@ -455,15 +469,18 @@ static void TestRefusals(void)
     for (int32_t k = 0; k < 3; ++k)
     {
         CHECK(mnavCreateBaker(others[k], &baker).result == mnav_success &&
-                  mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid,
+                  mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid &&
+                  RefusedWhole(mnavValidateBakeInput(others[k], &input)),
               "another grid refused");
         mnavDestroyBaker(baker);
     }
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     input.meshCount = MESHES - 1;
-    CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid,
+    CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid &&
+              RefusedWhole(mnavValidateBakeInput(&def, &input)),
           "another number of meshes refused");
     input.meshCount = MESHES;
+    CHECK(mnavValidateBakeInput(&def, &input).result == mnav_success, "the index fits");
     meshes[1].triangleCount -= 1;
     CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid,
           "another number of triangles refused");
@@ -477,8 +494,8 @@ static void TestRefusals(void)
         s_indices[0][t * 3] = -1;
     }
     mnavResult result = mnavBaker_BakeTile(baker, &input, 1, 1, &report);
-    CHECK(result == mnav_errorInvalid && report.mesh == 0 &&
-              report.input.element == mnav_elementTriangle,
+    CHECK(result == mnav_errorInvalid && report.input.kind == mnav_inputMesh &&
+              report.input.index == 0 && report.input.element == mnav_elementTriangle,
           "a corner out of range, refused as read");
     for (int32_t t = 0; t < TRIANGLES; ++t)
     {
@@ -491,7 +508,8 @@ static void TestRefusals(void)
         s_vertices[2][v].y = NAN;
     }
     CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid &&
-              report.mesh == 2 && report.input.element == mnav_elementVertex,
+              report.input.kind == mnav_inputMesh && report.input.index == 2 &&
+              report.input.element == mnav_elementVertex,
           "a vertex not finite, refused as read");
     memcpy(s_vertices[2], kept, sizeof(kept));
     // Only each triangle's third vertex past the extent: every corner is
@@ -500,7 +518,8 @@ static void TestRefusals(void)
     {
         s_vertices[2][v].x = 1e30f;
     }
-    CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorLimit && report.mesh == 2 &&
+    CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorLimit &&
+              report.input.kind == mnav_inputMesh && report.input.index == 2 &&
               report.input.element == mnav_elementVertex,
           "a third corner past the extent, refused as read");
     memcpy(s_vertices[2], kept, sizeof(kept));

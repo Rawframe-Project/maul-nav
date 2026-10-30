@@ -8,11 +8,11 @@ fields: bytes invariant
 base:
 scalar:
 bake_def: fpenv scalar
-input: bake_def fpenv
+input:
 tile_index: allocator bake_def fpenv host_code input
 raster: allocator
-terrain: raster
-volume: allocator compact outline raster
+terrain: input raster
+volume: allocator compact input outline raster
 heightfield: allocator invariant outline raster terrain tile_index
 outline: allocator raster tile_index
 filter: heightfield
@@ -38,7 +38,7 @@ tile: allocator bytes detail fields invariant polymesh
 flight_def: bake_def fpenv scalar
 flight: allocator bake_def flight_def heightfield invariant raster
 flight_tile: allocator bytes fields flight flight_def invariant
-flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def flight_tile fpenv host_code outputs raster tile_index
+flight_baker: allocator bake_def bake_input bytes fingerprint flight flight_def flight_tile fpenv host_code input outputs raster tile_index
 flight_volume: allocator flight flight_def flight_tile fpenv host_code outputs
 flight_space: flight flight_volume invariant
 flight_frame: flight_volume
@@ -46,7 +46,7 @@ flight_debug: draw flight_frame flight_space flight_volume fpenv
 flight_search: flight_frame flight_space flight_volume fpenv invariant outputs query
 flight_probe: flight flight_frame flight_space flight_volume fpenv outputs
 fingerprint: bytes outline raster terrain tile_index
-bake_input: input terrain volume
+bake_input: bake_def fpenv input terrain tile_index volume
 baker: allocator bake_def bake_input border_vertices bytes compact contour detail erode field_pack filter fingerprint fpenv heightfield holes host_code input invariant outline outputs polymesh raster region terrain tile tile_cache tile_index volume
 tile_cache: allocator compact field_pack fpenv host_code outline raster
 field_pack: allocator compact invariant lz raster

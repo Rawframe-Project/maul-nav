@@ -233,6 +233,11 @@ static void TestFillRules(void)
     mnavDestroyBaker(baker);
 }
 
+static mnavInputResult Validate(const mnavBakeDef* def, const mnavOutline* outline)
+{
+    return mnavValidateBake2DInput(def, &(mnavBake2DInput){outline, 1, nullptr});
+}
+
 static void TestChecks(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
@@ -240,26 +245,42 @@ static void TestChecks(void)
     const mnavVec2 far[3] = {{0, 0}, {1, 0}, {1e9f, 1}};
     const mnavVec2 fine[3] = {{0, 0}, {1, 0}, {1, 1}};
     mnavOutline outline = {bad, 3, 1};
-    mnavInputResult checked = mnavValidateOutline(&def, &outline);
-    CHECK(checked.result == mnav_errorInvalid && checked.element == mnav_elementPoint &&
-              checked.index == 1,
+    mnavInputResult checked = Validate(&def, &outline);
+    CHECK(checked.result == mnav_errorInvalid && checked.kind == mnav_inputOutline &&
+              checked.index == 0 && checked.element == mnav_elementPoint &&
+              checked.elementIndex == 1,
           "a point that is not finite");
     outline.points = far;
-    checked = mnavValidateOutline(&def, &outline);
-    CHECK(checked.result == mnav_errorLimit && checked.index == 2, "a point past the extent");
+    checked = Validate(&def, &outline);
+    CHECK(checked.result == mnav_errorLimit && checked.elementIndex == 2,
+          "a point past the extent");
     outline.points = fine;
     outline.pointCount = 2;
-    CHECK(mnavValidateOutline(&def, &outline).result == mnav_errorInvalid, "two points");
+    CHECK(Validate(&def, &outline).result == mnav_errorInvalid, "two points");
     outline.pointCount = 3;
     outline.area = MNAV_AREA_TYPES;
-    CHECK(mnavValidateOutline(&def, &outline).result == mnav_errorInvalid, "an area past range");
+    CHECK(Validate(&def, &outline).result == mnav_errorInvalid, "an area past range");
     outline.area = 1;
-    CHECK(mnavValidateOutline(&def, &outline).result == mnav_success &&
-              mnavValidateOutline(nullptr, &outline).result == mnav_errorInvalid &&
-              mnavValidateOutline(&def, nullptr).result == mnav_errorInvalid,
+    CHECK(Validate(&def, &outline).result == mnav_success &&
+              Validate(nullptr, &outline).result == mnav_errorInvalid &&
+              mnavValidateBake2DInput(&def, nullptr).result == mnav_errorInvalid &&
+              mnavValidateBake2DInput(&def, &(mnavBake2DInput){nullptr, 1, nullptr}).result ==
+                  mnav_errorInvalid,
           "fine, and NULL arguments");
+    // An outline is named by its index; points too many in all name none.
+    const mnavOutline two[2] = {outline, {bad, 3, 1}};
+    checked = mnavValidateBake2DInput(&def, &(mnavBake2DInput){two, 2, nullptr});
+    CHECK(checked.result == mnav_errorInvalid && checked.kind == mnav_inputOutline &&
+              checked.index == 1,
+          "the second outline named");
+    def.limits.inputTriangles = 5;
+    checked = mnavValidateBake2DInput(
+        &def, &(mnavBake2DInput){(mnavOutline[]){outline, outline}, 2, nullptr});
+    CHECK(checked.result == mnav_errorCapacity && checked.kind == mnav_inputNone &&
+              checked.index == -1,
+          "past the limit in all");
     def.limits.inputTriangles = 2;
-    CHECK(mnavValidateOutline(&def, &outline).result == mnav_errorCapacity, "past the limit");
+    CHECK(Validate(&def, &outline).result == mnav_errorCapacity, "past the limit");
     def = mnavDefaultBakeDef();
     mnavBaker* baker = nullptr;
     mnavBakeReport report;
@@ -267,7 +288,8 @@ static void TestChecks(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outline, 1, nullptr}, 0, 0,
                                    &report) == mnav_errorInvalid &&
-              report.mesh == 0 && report.input.index == 1,
+              report.input.kind == mnav_inputOutline && report.input.index == 0 &&
+              report.input.elementIndex == 1,
           "the bake names the outline and point");
     mnavDestroyBaker(baker);
     // Four outlines reach the room's tile: past a limit of three.

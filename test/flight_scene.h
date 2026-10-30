@@ -78,9 +78,9 @@ static inline uint64_t BakeOne(mnavFlightBaker* baker, const mnavBakeInput* inpu
 {
     mnavFlightBakeReport report;
     CHECK(mnavFlightBaker_BakeTile(baker, input, t % 2, t / 2, &report) == mnav_success, "baked");
-    CHECK(report.result == mnav_success && report.mesh == -1 && report.triangles > 0 &&
-              report.spans > 0 && report.cubes == 1 && report.nodes > 0 && report.leaves > 0 &&
-              report.memoryPeak > 0,
+    CHECK(report.result == mnav_success && report.input.kind == mnav_inputNone &&
+              report.triangles > 0 && report.spans > 0 && report.cubes == 1 && report.nodes > 0 &&
+              report.leaves > 0 && report.memoryPeak > 0,
           "the report");
     size_t size = 0;
     CHECK(mnavFlightBaker_CopyTile(baker, s_bytes[t], TILE_MOST, &size) == mnav_success, "copied");

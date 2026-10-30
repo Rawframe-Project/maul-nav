@@ -79,7 +79,7 @@ static void TestMaking(void)
     mnavDestroyBaker(baker);
 }
 
-// A mesh checked on its own: the first vertex not finite or out of range,
+// A mesh checked in a whole input: the first vertex not finite or out of range,
 // the first triangle naming a vertex past the last; a 2D tile past the
 // extent.
 static void TestInput(void)
@@ -88,19 +88,21 @@ static void TestInput(void)
     mnavVec3 v[3] = {{0, 0, 0}, {1, 0, 0}, {0, 0, 1}};
     int32_t indices[3] = {0, 1, 2};
     mnavTriangleMesh mesh = {v, 3, indices, 1, nullptr};
-    CHECK(mnavValidateTriangleMesh(&def, &mesh).result == mnav_success, "a good mesh");
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    CHECK(mnavValidateBakeInput(&def, &input).result == mnav_success, "a good mesh");
     v[2].y = (float)NAN;
-    mnavInputResult r = mnavValidateTriangleMesh(&def, &mesh);
-    CHECK(r.result == mnav_errorInvalid && r.element == mnav_elementVertex && r.index == 2,
+    mnavInputResult r = mnavValidateBakeInput(&def, &input);
+    CHECK(r.result == mnav_errorInvalid && r.kind == mnav_inputMesh && r.index == 0 &&
+              r.element == mnav_elementVertex && r.elementIndex == 2,
           "a vertex not finite");
     v[2].y = 1.0e9f;
-    r = mnavValidateTriangleMesh(&def, &mesh);
-    CHECK(r.result == mnav_errorLimit && r.element == mnav_elementVertex && r.index == 2,
+    r = mnavValidateBakeInput(&def, &input);
+    CHECK(r.result == mnav_errorLimit && r.element == mnav_elementVertex && r.elementIndex == 2,
           "a vertex out of range");
     v[2].y = 0.0f;
     indices[1] = 3;
-    r = mnavValidateTriangleMesh(&def, &mesh);
-    CHECK(r.result == mnav_errorInvalid && r.element == mnav_elementTriangle && r.index == 0,
+    r = mnavValidateBakeInput(&def, &input);
+    CHECK(r.result == mnav_errorInvalid && r.element == mnav_elementTriangle && r.elementIndex == 0,
           "a triangle past the vertices");
     const mnavVec2 square[4] = {{1, 1}, {31, 1}, {31, 31}, {1, 31}};
     const mnavOutline outline = {square, 4, mnav_areaWalkable};

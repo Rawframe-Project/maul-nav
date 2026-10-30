@@ -98,14 +98,16 @@ static void TestBake(uint32_t other)
     mnavVec3 v[3] = {{0, 0, 0}, {1, 0, 0}, {0, 0, 1}};
     int32_t indices[3] = {0, 1, 2};
     mnavTriangleMesh mesh = {v, 3, indices, 1, nullptr};
-    r = (Refusals){mnavValidateTriangleMesh(&stale, &mesh).result,
-                   mnavValidateTriangleMesh(&wrong, &mesh).result};
-    CHECK(Refused(r), "a mesh checked");
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    r = (Refusals){mnavValidateBakeInput(&stale, &input).result,
+                   mnavValidateBakeInput(&wrong, &input).result};
+    CHECK(Refused(r), "an input checked");
     const mnavVec2 square[4] = {{1, 1}, {31, 1}, {31, 31}, {1, 31}};
     const mnavOutline outline = {square, 4, mnav_areaWalkable};
-    r = (Refusals){mnavValidateOutline(&stale, &outline).result,
-                   mnavValidateOutline(&wrong, &outline).result};
-    CHECK(Refused(r), "an outline checked");
+    const mnavBake2DInput flat = {&outline, 1, nullptr};
+    r = (Refusals){mnavValidateBake2DInput(&stale, &flat).result,
+                   mnavValidateBake2DInput(&wrong, &flat).result};
+    CHECK(Refused(r), "a 2D input checked");
 
     mnavTileCacheDef cacheStale = mnavDefaultTileCacheDef();
     cacheStale.version = other;

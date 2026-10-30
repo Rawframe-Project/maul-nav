@@ -198,12 +198,21 @@ static mnavTriangleMesh Square(void)
     return (mnavTriangleMesh){s_square, 4, s_squareIndices, 2, nullptr};
 }
 
+static mnavInputResult ValidateMesh(const mnavBakeDef* def, const mnavTriangleMesh* mesh)
+{
+    return mnavValidateBakeInput(def, &(mnavBakeInput){mesh, 1, nullptr, 0, nullptr, 0, nullptr});
+}
+
+// Whether the mesh's check gives the result and element; a refusal names
+// the mesh too.
 static int MeshFails(const mnavTriangleMesh* mesh, mnavResult result, mnavInputElement element,
                      int32_t index)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    mnavInputResult got = mnavValidateTriangleMesh(&def, mesh);
-    return got.result == result && got.element == element && got.index == index;
+    mnavInputResult got = ValidateMesh(&def, mesh);
+    bool named = result == mnav_success ? got.kind == mnav_inputNone && got.index == -1
+                                        : got.kind == mnav_inputMesh && got.index == 0;
+    return got.result == result && named && got.element == element && got.elementIndex == index;
 }
 
 static void TestValidMeshPasses(void)
@@ -222,11 +231,13 @@ static void TestMeshArgumentsAreChecked(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavTriangleMesh mesh = Square();
-    CHECK(mnavValidateTriangleMesh(nullptr, &mesh).result == mnav_errorInvalid, "NULL def");
-    CHECK(mnavValidateTriangleMesh(&def, nullptr).result == mnav_errorInvalid, "NULL mesh");
+    CHECK(ValidateMesh(nullptr, &mesh).result == mnav_errorInvalid, "NULL def");
+    mnavInputResult none = mnavValidateBakeInput(&def, nullptr);
+    CHECK(none.result == mnav_errorInvalid && none.kind == mnav_inputNone && none.index == -1,
+          "NULL input");
     mnavBakeDef broken = def;
     broken.cookie = 0;
-    CHECK(mnavValidateTriangleMesh(&broken, &mesh).result == mnav_errorInvalid, "invalid def");
+    CHECK(ValidateMesh(&broken, &mesh).result == mnav_errorInvalid, "invalid def");
     mnavTriangleMesh bad = mesh;
     bad.vertexCount = -1;
     CHECK(MeshFails(&bad, mnav_errorInvalid, mnav_elementNone, -1), "negative vertices");
@@ -283,10 +294,12 @@ static void TestTriangleLimitIsTyped(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.limits.inputTriangles = 1;
     mnavTriangleMesh mesh = Square();
-    mnavInputResult result = mnavValidateTriangleMesh(&def, &mesh);
-    CHECK(result.result == mnav_errorCapacity && result.element == mnav_elementNone, "limit hit");
+    mnavInputResult result = ValidateMesh(&def, &mesh);
+    CHECK(result.result == mnav_errorCapacity && result.kind == mnav_inputMesh &&
+              result.element == mnav_elementNone,
+          "limit hit");
     def.limits.inputTriangles = 2;
-    CHECK(mnavValidateTriangleMesh(&def, &mesh).result == mnav_success, "limit met");
+    CHECK(ValidateMesh(&def, &mesh).result == mnav_success, "limit met");
 }
 
 int main(void)

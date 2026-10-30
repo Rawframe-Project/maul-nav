@@ -281,13 +281,30 @@ static void TestErosion(mnavBaker* cells)
           "erosion from cells too low to pass between");
 }
 
+// Whether two input checks' outcomes are the same.
+static bool SameInput(mnavInputResult a, mnavInputResult b)
+{
+    return a.result == b.result && a.kind == b.kind && a.index == b.index &&
+           a.element == b.element && a.elementIndex == b.elementIndex;
+}
+
+// Bakes the mesh with two copies of a volume the bake refuses; the
+// whole-input check refuses it the same way.
 static mnavBakeReport Refused(mnavBaker* baker, mnavBakeVolume volume, mnavResult result)
 {
     const mnavBakeVolume volumes[2] = {volume, volume};
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, volumes, 2, nullptr};
     mnavBakeReport report;
     CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, &report) == result, "refused");
+    mnavBakeDef def = mnavDefaultBakeDef();
+    CHECK(SameInput(mnavValidateBakeInput(&def, &input), report.input), "checked alike");
     return report;
+}
+
+// Whether a report names the first volume.
+static bool FirstVolume(mnavBakeReport report)
+{
+    return report.input.kind == mnav_inputVolume && report.input.index == 0;
 }
 
 static void TestChecks(mnavBaker* baker)
@@ -297,44 +314,45 @@ static void TestChecks(mnavBaker* baker)
     mnavBakeVolume v = good;
     v.pointCount = 2;
     mnavBakeReport r = Refused(baker, v, mnav_errorInvalid);
-    CHECK(r.mesh == 1 && r.input.element == mnav_elementNone, "two points: after the mesh");
+    CHECK(FirstVolume(r) && r.input.element == mnav_elementNone, "two points, the volume named");
     v = good;
     v.kind = 3;
-    CHECK(Refused(baker, v, mnav_errorInvalid).mesh == 1, "a kind out of range");
+    CHECK(FirstVolume(Refused(baker, v, mnav_errorInvalid)), "a kind out of range");
     v = good;
     v.area = mnav_areaNone;
-    CHECK(Refused(baker, v, mnav_errorInvalid).mesh == 1, "an area volume of no area");
+    CHECK(FirstVolume(Refused(baker, v, mnav_errorInvalid)), "an area volume of no area");
     v = good;
     v.area = MNAV_AREA_TYPES;
-    CHECK(Refused(baker, v, mnav_errorInvalid).mesh == 1, "an area out of range");
+    CHECK(FirstVolume(Refused(baker, v, mnav_errorInvalid)), "an area out of range");
     v = good;
     v.minY = 2.0f;
-    CHECK(Refused(baker, v, mnav_errorInvalid).mesh == 1, "heights backward");
+    CHECK(FirstVolume(Refused(baker, v, mnav_errorInvalid)), "heights backward");
     v = good;
     v.maxY = (float)INFINITY;
-    CHECK(Refused(baker, v, mnav_errorInvalid).mesh == 1, "an endless height");
+    CHECK(FirstVolume(Refused(baker, v, mnav_errorInvalid)), "an endless height");
     v = good;
     v.points = nullptr;
-    CHECK(Refused(baker, v, mnav_errorInvalid).mesh == 1, "no points");
+    CHECK(FirstVolume(Refused(baker, v, mnav_errorInvalid)), "no points");
     mnavVec2 points[4] = {{0, 0}, {4, 0}, {(float)NAN, 4}, {0, 4}};
     v = good;
     v.points = points;
     r = Refused(baker, v, mnav_errorInvalid);
-    CHECK(r.input.element == mnav_elementPoint && r.input.index == 2, "a NaN point");
+    CHECK(r.input.element == mnav_elementPoint && r.input.elementIndex == 2, "a NaN point");
     points[2] = (mnavVec2){1e9f, 4};
     r = Refused(baker, v, mnav_errorLimit);
-    CHECK(r.input.element == mnav_elementPoint && r.input.index == 2, "a point too far");
+    CHECK(r.input.element == mnav_elementPoint && r.input.elementIndex == 2, "a point too far");
     points[2] = (mnavVec2){4, -1e9f};
     r = Refused(baker, v, mnav_errorLimit);
-    CHECK(r.input.element == mnav_elementPoint && r.input.index == 2, "a point too far along Z");
+    CHECK(r.input.element == mnav_elementPoint && r.input.elementIndex == 2,
+          "a point too far along Z");
     // After a terrain too.
     const float heights[4] = {0, 0, 0, 0};
     const mnavTerrain terrain = {{0, 0, 0}, 1, 1, 2, 2, heights, nullptr};
     v = good;
     v.pointCount = 2;
     const mnavBakeInput withTerrain = {&s_mesh, 1, &terrain, 1, &v, 1, nullptr};
-    CHECK(mnavBaker_BakeTile(baker, &withTerrain, 0, 0, &r) == mnav_errorInvalid && r.mesh == 2,
-          "a volume named after the meshes and terrains");
+    CHECK(mnavBaker_BakeTile(baker, &withTerrain, 0, 0, &r) == mnav_errorInvalid && FirstVolume(r),
+          "a volume named by its own index, after a mesh and a terrain");
     // An exclude or include volume's area is unused.
     v = good;
     v.kind = mnav_volumeExclude;
@@ -401,7 +419,7 @@ static void TestBake(mnavBaker* baker)
     CHECK(mnavCreateBaker(&def, &small).result == mnav_success, "baker");
     const mnavBakeInput input = {&s_mesh, 1, nullptr, 0, all, 3, nullptr};
     CHECK(mnavBaker_BakeTile(small, &input, 0, 0, &report) == mnav_errorCapacity &&
-              report.mesh == -1,
+              report.input.kind == mnav_inputNone,
           "points over the input limit");
     mnavVec2 many[16];
     for (int32_t k = 0; k < 16; ++k)
@@ -411,7 +429,7 @@ static void TestBake(mnavBaker* baker)
     const mnavBakeVolume big = {many, 16, -1, 1, mnav_volumeExclude, 0};
     const mnavBakeInput alone = {nullptr, 0, nullptr, 0, &big, 1, nullptr};
     CHECK(mnavBaker_BakeTile(small, &alone, 0, 0, &report) == mnav_errorCapacity &&
-              report.mesh == 0,
+              report.input.kind == mnav_inputVolume && report.input.index == 0,
           "one volume over the input limit, named");
     mnavDestroyBaker(small);
     def.limits.inputTriangles += 1;

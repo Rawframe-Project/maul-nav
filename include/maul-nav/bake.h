@@ -398,30 +398,36 @@ extern "C"
         mnav_elementCell = 5,
     };
 
-    // An input check's outcome: the status, and the first element it
-    // refused, vertices before triangles, each in ascending index order.
+    // The kind of input a check refused.
+    typedef uint8_t mnavInputKind;
+
+    enum
+    {
+        // The input as a whole, or none.
+        mnav_inputNone = 0,
+        mnav_inputMesh = 1,
+        mnav_inputTerrain = 2,
+        mnav_inputVolume = 3,
+        mnav_inputOutline = 4,
+        // An obstacle of mnavBaker_RebuildTile.
+        mnav_inputObstacle = 5,
+    };
+
+    // An input check's outcome: the status, the input it refused, by its
+    // kind and its index in that kind's array, and the first element of
+    // that input it refused, vertices before triangles, each in ascending
+    // index order.
     typedef struct mnavInputResult
     {
         mnavResult result;
-        mnavInputElement element;
-        // The element's index, or -1 for mnav_elementNone.
+        // mnav_inputNone and -1 when no one input is refused: none is, or
+        // the arrays, the tile index or the total size are.
+        mnavInputKind kind;
         int32_t index;
+        // mnav_elementNone and -1 when the input is refused as a whole.
+        mnavInputElement element;
+        int32_t elementIndex;
     } mnavInputResult;
-
-    /// Checks a 2D outline as hostile input to a bake with a def.
-    ///
-    /// @param def     The bake def the outline is for.
-    /// @param outline The outline.
-    /// @return `mnav_success`; for a def mnavValidateBakeDef refuses, the
-    /// status it gives; `mnav_errorInvalid` for a NULL argument, fewer than 3
-    /// points, an area of MNAV_AREA_TYPES or more, or a point with a NaN
-    /// coordinate (the point); `mnav_errorLimit` for a point past the extent
-    /// input may have, an infinity included (the point); `mnav_errorCapacity`
-    /// for more points than the inputTriangles limit.
-    /// @par Thread safety
-    /// Safe from any thread.
-    MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateOutline(const mnavBakeDef* def,
-                                                                const mnavOutline* outline);
 
 // The cookie mnavDefaultBakeDef sets and every function that takes a
 // bake def checks.
@@ -491,23 +497,56 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavValidateBakeDef(const mnavBakeDef* def,
                                                                   mnavBakeCells* cellsOut);
 
-    /// Checks a triangle mesh as hostile input to a bake with a def.
+    /// Checks a 3D bake's whole input as hostile input to a bake with a
+    /// def, as mnavBaker_BakeTile checks it, without baking: every mesh,
+    /// all of its triangles even with a tile index, every terrain and
+    /// volume, their size against the def's inputTriangles limit, and that
+    /// the tile index fits them, for an import step that wants to catch bad
+    /// input early. Input it accepts, every bake with the def accepts at its
+    /// input stage; a bake may still refuse later, for a tile past the
+    /// extent, a piece past MNAV_MAX_PIECE_CORNERS or a limit reached, as
+    /// mnavBaker_BakeTile's return value says.
     ///
-    /// @param def   The bake def the mesh is for.
-    /// @param mesh  The mesh.
+    /// @param def   The bake def the input is for.
+    /// @param input The meshes, terrains, volumes and index.
     /// @return `mnav_success`; for a def mnavValidateBakeDef refuses, the
     /// status it gives; `mnav_errorInvalid` for a NULL argument, a negative
-    /// count, a NULL array its count needs, a NaN vertex coordinate, a vertex
-    /// index outside the vertices or an area type of MNAV_AREA_TYPES or more;
-    /// `mnav_errorCapacity` for more triangles than the def's inputTriangles
-    /// limit; `mnav_errorLimit` for a vertex more than MNAV_MAX_EXTENT_CELLS
-    /// cells from the origin on the ground or MNAV_MAX_HEIGHT_CELLS cell
-    /// heights above or below it, an infinity included. The element and index
-    /// name the first offending vertex or triangle.
+    /// count or a NULL array with a positive count, or a tile index that
+    /// mnavBaker_BakeTile refuses; for a mesh, a terrain or a volume, the
+    /// status mnavBaker_BakeTile gives it, the input and its element named;
+    /// `mnav_errorCapacity` for more input triangles in all than the
+    /// inputTriangles limit, a terrain's triangles and a volume's points
+    /// counted.
     /// @par Thread safety
-    /// Safe from any thread.
-    MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateTriangleMesh(const mnavBakeDef* def,
-                                                                     const mnavTriangleMesh* mesh);
+    /// Safe from any thread. A tile index may be read by any number of
+    /// checks and bakes at once.
+    MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateBakeInput(const mnavBakeDef* def,
+                                                                  const mnavBakeInput* input);
+
+    /// Checks a 2D bake's whole input as hostile input to a bake with a
+    /// def, as mnavBaker_BakeTile2D checks it, without baking: every
+    /// outline, their points against the def's inputTriangles limit, and
+    /// that the tile index fits them. Input it accepts, every 2D bake with
+    /// the def accepts at its input stage; a bake may still refuse later,
+    /// as mnavBaker_BakeTile2D's return value says.
+    ///
+    /// @param def   The bake def the input is for.
+    /// @param input The outlines and index.
+    /// @return `mnav_success`; for a def mnavValidateBakeDef refuses, the
+    /// status it gives; `mnav_errorInvalid` for a NULL argument, a negative
+    /// count or NULL outlines with a positive count, or a tile index that
+    /// mnavBaker_BakeTile2D refuses; for an outline, the status
+    /// mnavBaker_BakeTile2D gives it, the outline and its point named:
+    /// `mnav_errorInvalid` for fewer than 3 points, an area of
+    /// MNAV_AREA_TYPES or more, or a point with a NaN coordinate,
+    /// `mnav_errorLimit` for a point past the extent input may have, an
+    /// infinity included; `mnav_errorCapacity` for more points in all than
+    /// the inputTriangles limit.
+    /// @par Thread safety
+    /// Safe from any thread. A tile index may be read by any number of
+    /// checks and bakes at once.
+    MNAV_NODISCARD MNAV_API mnavInputResult mnavValidateBake2DInput(const mnavBakeDef* def,
+                                                                    const mnavBake2DInput* input);
 
 // The tile format version this library writes and reads.
 #define MNAV_TILE_FORMAT 3
@@ -554,8 +593,8 @@ extern "C"
     {
         mnavResult result;
         mnavBakeStage stage;
-        // The first mesh refused, or -1, and what its check found.
-        int32_t mesh;
+        // The first input refused, by its kind and index, and what its
+        // check found.
         mnavInputResult input;
         // The hash of everything that shaped the tile: the generator's
         // version, the def's settings, the tile's place and the input
@@ -634,12 +673,11 @@ extern "C"
     /// tile baked before. The same input and def give the same bytes on
     /// every platform. A terrain's triangles count as input triangles,
     /// after the meshes', toward the limits and the fingerprint, and a
-    /// volume's points count as input triangles too. A refused terrain is
-    /// reported as the mesh at its index after the meshes, a refused
-    /// volume as the one at its index after the terrains. Given a tile
-    /// index, the bake checks each mesh's counts and pointers and then
-    /// only the triangles the index lists for the tile, with their
-    /// vertices, before reading them.
+    /// volume's points count as input triangles too. The report names a
+    /// refused mesh, terrain or volume by its kind and its index in that
+    /// kind's array. Given a tile index, the bake checks each mesh's counts
+    /// and pointers and then only the triangles the index lists for the
+    /// tile, with their vertices, before reading them.
     ///
     /// @param baker     The baker; the tile it held before is dropped.
     /// @param input     The meshes, terrains, volumes and index, in the
@@ -650,8 +688,8 @@ extern "C"
     ///                  too, naming it.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or input, a
     /// negative count, NULL meshes, terrains or volumes with a positive count,
-    /// or a mesh its check refuses (the report names it); a terrain with fewer
-    /// than 2 samples on a side, a spacing not more than 0 or not finite, a NaN
+    /// or a mesh mnavValidateBakeInput refuses (the report names it); a
+    /// terrain with fewer than 2 samples on a side, a spacing not more than 0 or not finite, a NaN
     /// height (the sample) or an area of MNAV_AREA_TYPES or more (the cell) is
     /// `mnav_errorInvalid`, a side past MNAV_MAX_TERRAIN_SIDE or a sample past
     /// the extent input may have `mnav_errorLimit`; a volume with fewer than 3
@@ -692,7 +730,7 @@ extern "C"
     ///                  what its check found, and the memory peak; the
     ///                  other fields are 0. May be NULL.
     /// @return `mnav_success`; for a def mnavValidateBakeDef refuses, the
-    /// status it gives; for a mesh mnavValidateTriangleMesh refuses, the
+    /// status it gives; for a mesh mnavValidateBakeInput refuses, the
     /// status it gives; `mnav_errorInvalid` for a NULL indexOut, a negative
     /// count or NULL meshes with a positive count; `mnav_errorLimit` past
     /// MNAV_MAX_INDEX_ENTRIES listed triangles or tiles of the grid;
@@ -721,9 +759,8 @@ extern "C"
     /// @param outlineCount The number of outlines, at least 0.
     /// @param indexOut     Receives the index, or NULL on failure.
     /// @param reportOut    Receives the result, the first outline refused
-    ///                     (in the report's mesh) and what its check found,
-    ///                     and the memory peak; the other fields are 0. May
-    ///                     be NULL.
+    ///                     and what its check found, and the memory peak;
+    ///                     the other fields are 0. May be NULL.
     /// @return As mnavCreateTileIndex, for outlines.
     /// @par Thread safety
     /// Safe from any thread. An index is never changed after it is made,
@@ -761,8 +798,8 @@ extern "C"
     /// obstruction does as a flat floor at height 0, with the highest
     /// area among the outlines holding them, then erodes, partitions,
     /// traces and triangulates as mnavBaker_BakeTile does; the walkable filters,
-    /// which judge heights, do not run. The report's mesh names a refused
-    /// outline and its triangles count the outlines reaching the tile.
+    /// which judge heights, do not run. The report names a refused outline,
+    /// and its triangles count the outlines reaching the tile.
     /// Given a tile index of the outlines, the bake checks only the
     /// outlines it lists for the tile, which hold every outline reaching
     /// it, and makes the same tile to the byte; the total of the points

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// A 3D bake's whole input, meshes, terrains and volumes, checked as
-// hostile input, for the navmesh and flight bakers.
+// A bake's whole input, meshes, terrains and volumes, or outlines,
+// checked as hostile input, for the navmesh and flight bakers.
 
 #ifndef MAUL_NAV_SRC_BAKE_INPUT_H
 #define MAUL_NAV_SRC_BAKE_INPUT_H
@@ -19,10 +19,9 @@ bool mnavCheckInputArrays(const mnavBakeInput* input);
 // Checks input whose arrays are checked against a def that is already
 // valid: each mesh unless meshesChecked, each terrain, each volume, and
 // their triangles, terrains' and volumes' points counted, against the
-// def's input triangles limit. A refused element's index (terrains after
-// the meshes, volumes after the terrains) goes to meshOut and its check's
-// outcome to inputOut.
+// def's input triangles limit. A refused input's outcome, with its kind
+// and index, goes to inputOut.
 mnavResult mnavCheckSolidInput(const mnavBakeDef* def, const mnavBakeInput* input,
-                               bool meshesChecked, int32_t* meshOut, mnavInputResult* inputOut);
+                               bool meshesChecked, mnavInputResult* inputOut);
 
 #endif // MAUL_NAV_SRC_BAKE_INPUT_H
