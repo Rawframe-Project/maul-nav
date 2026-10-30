@@ -20,7 +20,7 @@
 #include <stdio.h>
 
 // The bridge floors' tile bytes, the same on every platform.
-#define BRIDGES_HASH 0x1c1ed59ba8f7749bull
+#define BRIDGES_HASH 0x5555c9f1b01ef88aull
 
 enum
 {

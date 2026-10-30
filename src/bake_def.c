@@ -130,8 +130,8 @@ static mnavBakeDefResult CheckGrid(const mnavBakeDef* def)
 }
 
 // Converts the agent; the grid settings are already valid. Bounds the def
-// sets for itself (the radius within a tile) and the unnamed 2^30 cells are
-// mnav_errorInvalid; MNAV_MAX_ ones are mnav_errorLimit.
+// sets for itself (the radius within a tile) are mnav_errorInvalid;
+// MNAV_MAX_ ones are mnav_errorLimit.
 static mnavBakeDefResult ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cells)
 {
     const mnavAgentProfile* agent = &def->agent;
@@ -166,17 +166,28 @@ static mnavBakeDefResult ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cel
     {
         cells->agentHeight = 1;
     }
+    cells->border = cells->agentRadius + BORDER_MARGIN_CELLS;
+    cells->cosMaxSlope = mnavCosDegrees(agent->maxSlopeDegrees);
+    cells->tileSize = (float)def->tileCells * def->cellSize;
+    return s_accept;
+}
+
+// Converts the regions', walls' and detail's settings; the grid settings
+// are already valid. The unnamed 2^30 cells are mnav_errorInvalid;
+// MNAV_MAX_EDGE_ERROR is mnav_errorLimit.
+static mnavBakeDefResult ConvertSurface(const mnavBakeDef* def, mnavBakeCells* cells)
+{
     // A cell's area rounds once; every platform rounds it the same. An
     // area larger than any tile is valid (it drops every island) up to
     // 2^30 cells, past which it can only be a mistake.
     float cellArea = def->cellSize * def->cellSize;
-    r = Cells(def->minRegionArea, cellArea, true, 1 << 30, mnav_errorInvalid, false,
-              mnav_bakeSettingMinRegionArea, &cells->minRegion);
+    mnavBakeDefResult r = Cells(def->minRegionArea, cellArea, true, 1 << 30, mnav_errorInvalid,
+                                false, mnav_bakeSettingMinRegionArea, &cells->minRegion);
     if (r.result == mnav_success && !InRange(def->maxEdgeError, 0.0f, INFINITY))
     {
         r = Refuse(mnav_errorInvalid, mnav_bakeSettingMaxEdgeError);
     }
-    if (r.result == mnav_success && def->maxEdgeError > MNAV_MAX_CELL_SIZE * MNAV_MAX_TILE_CELLS)
+    if (r.result == mnav_success && def->maxEdgeError > MNAV_MAX_EDGE_ERROR)
     {
         r = Refuse(mnav_errorLimit, mnav_bakeSettingMaxEdgeError);
     }
@@ -205,13 +216,17 @@ static mnavBakeDefResult ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cel
         return r;
     }
     // Heights come one per cell; sampling closer than a cell adds nothing.
-    if (cells->detailSample > 0 && cells->detailSample < 16)
+    // Any distance above 0 samples, and any length above 0 limits walls,
+    // however few sixteenths or cells it rounds down to: 0 in cells means
+    // none.
+    if (def->detailSampleDistance > 0.0f && cells->detailSample < 16)
     {
         cells->detailSample = 16;
     }
-    cells->border = cells->agentRadius + BORDER_MARGIN_CELLS;
-    cells->cosMaxSlope = mnavCosDegrees(agent->maxSlopeDegrees);
-    cells->tileSize = (float)def->tileCells * def->cellSize;
+    if (def->maxEdgeLength > 0.0f && cells->edgeLength < 1)
+    {
+        cells->edgeLength = 1;
+    }
     return s_accept;
 }
 
@@ -236,6 +251,10 @@ mnavBakeDefResult mnavCheckBakeDef(const mnavBakeDef* def, mnavBakeCells* cells)
     }
     mnavBakeCells converted = {0};
     r = ConvertAgent(def, &converted);
+    if (r.result == mnav_success)
+    {
+        r = ConvertSurface(def, &converted);
+    }
     if (r.result == mnav_success)
     {
         r = CheckLimits(&def->limits);
