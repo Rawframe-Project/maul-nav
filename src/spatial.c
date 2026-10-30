@@ -642,11 +642,13 @@ static MNAV_NOINLINE mnavResult FindWallDistanceCounted(mnavQuery* query,
                                                         mnavPolygonId polygon, mnavPos3 center,
                                                         double radius, mnavNearestWall* nearestOut)
 {
-    mnavClearOutput(nearestOut, sizeof(*nearestOut));
-    mnavResult result = mnavHostCountInvalid(
-        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        FindWallDistanceWork(query, navmesh, filter, polygon, center, radius, nearestOut));
-    return mnavClearOnFailure(result, nearestOut, sizeof(*nearestOut));
+    mnavNearestWall nearestMade = {0};
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                             FindWallDistanceWork(query, navmesh, filter, polygon, center, radius,
+                                                  nearestOut != nullptr ? &nearestMade : nullptr));
+    mnavGiveOutput(result, false, nearestOut, &nearestMade, sizeof(nearestMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindWallDistance(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -694,11 +696,13 @@ static MNAV_NOINLINE mnavResult FindWallsCounted(mnavQuery* query, const mnavNav
                                                  double radius, mnavWall* wallsOut,
                                                  int32_t capacity, mnavWallsFound* foundOut)
 {
-    mnavClearOutput(foundOut, sizeof(*foundOut));
-    mnavResult result = mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                                             FindWallsWork(query, navmesh, filter, polygon, center,
-                                                           radius, wallsOut, capacity, foundOut));
-    return mnavClearUnlessCapacity(result, foundOut, sizeof(*foundOut));
+    mnavWallsFound foundMade = {0};
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        FindWallsWork(query, navmesh, filter, polygon, center, radius, wallsOut, capacity,
+                      foundOut != nullptr ? &foundMade : nullptr));
+    mnavGiveOutput(result, result == mnav_errorCapacity, foundOut, &foundMade, sizeof(foundMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindWalls(mnavQuery* query, const mnavNavmesh* navmesh, mnavPolygonId polygon,
@@ -782,11 +786,13 @@ static MNAV_NOINLINE mnavResult FindRandomPointAroundCounted(
     mnavQuery* query, const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
     mnavPolygonId polygon, mnavPos3 center, double radius, uint64_t seed, mnavRandomPoint* pointOut)
 {
-    mnavClearOutput(pointOut, sizeof(*pointOut));
+    mnavRandomPoint pointMade = {0};
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        FindRandomPointAroundWork(query, navmesh, filter, polygon, center, radius, seed, pointOut));
-    return mnavClearOnFailure(result, pointOut, sizeof(*pointOut));
+        FindRandomPointAroundWork(query, navmesh, filter, polygon, center, radius, seed,
+                                  pointOut != nullptr ? &pointMade : nullptr));
+    mnavGiveOutput(result, false, pointOut, &pointMade, sizeof(pointMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindRandomPointAround(mnavQuery* query, const mnavNavmesh* navmesh,
