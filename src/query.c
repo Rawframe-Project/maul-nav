@@ -10,6 +10,7 @@
 #include "fpenv.h"
 
 #include "maul-nav/base.h"
+#include "maul-nav/hierarchy.h"
 #include "maul-nav/query.h"
 
 #include <math.h>
@@ -24,6 +25,12 @@ void mnavDestroyQuery(mnavQuery* query)
     }
     mnavMemory* memory = &query->memory;
     size_t nodes = (size_t)query->limits.nodes;
+    size_t graph = (size_t)query->limits.transitions + 1;
+    mnavRelease(memory, query->graph.heap, graph, sizeof(int32_t), alignof(int32_t));
+    mnavRelease(memory, query->graph.places, graph, sizeof(int32_t), alignof(int32_t));
+    mnavRelease(memory, query->graph.parents, graph, sizeof(int32_t), alignof(int32_t));
+    mnavRelease(memory, query->graph.joins, graph, sizeof(double), alignof(double));
+    mnavRelease(memory, query->graph.costs, graph, sizeof(double), alignof(double));
     mnavRelease(memory, query->links, nodes, sizeof(mnavPathLink), alignof(mnavPathLink));
     mnavRelease(memory, query->points, 2 * nodes + 1, sizeof(mnavPos3), alignof(mnavPos3));
     mnavRelease(memory, query->portals, 2 * nodes + 1, sizeof(mnavPortal), alignof(mnavPortal));
@@ -46,6 +53,50 @@ uint64_t mnavQuery_GetMisuse(const mnavQuery* query)
     return query != nullptr ? mnavHostMisuse(&query->host) : 0;
 }
 
+// The search over a hierarchy's transitions, one entry more for the end.
+static mnavResult AllocateGraph(mnavQuery* query)
+{
+    size_t graph = (size_t)query->limits.transitions + 1;
+    mnavGraphSearch* g = &query->graph;
+    mnavResult result =
+        mnavAllocate(&query->memory, graph, sizeof(double), alignof(double), (void**)&g->costs);
+    if (result == mnav_success)
+    {
+        result =
+            mnavAllocate(&query->memory, graph, sizeof(double), alignof(double), (void**)&g->joins);
+    }
+    if (result == mnav_success)
+    {
+        result = mnavAllocate(&query->memory, graph, sizeof(int32_t), alignof(int32_t),
+                              (void**)&g->parents);
+    }
+    if (result == mnav_success)
+    {
+        result = mnavAllocate(&query->memory, graph, sizeof(int32_t), alignof(int32_t),
+                              (void**)&g->places);
+    }
+    if (result == mnav_success)
+    {
+        result = mnavAllocate(&query->memory, graph, sizeof(int32_t), alignof(int32_t),
+                              (void**)&g->heap);
+    }
+    return result;
+}
+
+static mnavResult CheckLimits(const mnavQueryLimits* limits)
+{
+    if (limits->nodes < 1 || !(limits->pathLength > 0.0f) || limits->transitions < 0)
+    {
+        return mnav_errorInvalid;
+    }
+    if (limits->nodes > MNAV_MAX_QUERY_NODES || limits->pathLength > MNAV_MAX_PATH_LENGTH ||
+        limits->transitions > MNAV_MAX_HIERARCHY_TRANSITIONS)
+    {
+        return mnav_errorLimit;
+    }
+    return mnav_success;
+}
+
 static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQuery** queryOut)
 {
     if (queryOut == nullptr)
@@ -62,13 +113,10 @@ static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQue
         return mnav_errorVersion;
     }
     const mnavQueryLimits* limits = &def->limits;
-    if (limits->nodes < 1 || !(limits->pathLength > 0.0f))
+    mnavResult checked = CheckLimits(limits);
+    if (checked != mnav_success)
     {
-        return mnav_errorInvalid;
-    }
-    if (limits->nodes > MNAV_MAX_QUERY_NODES || limits->pathLength > MNAV_MAX_PATH_LENGTH)
-    {
-        return mnav_errorLimit;
+        return checked;
     }
     mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
     mnavQuery* query = nullptr;
@@ -121,6 +169,7 @@ static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQue
         result = mnavAllocate(&query->memory, nodes, sizeof(mnavPathLink), alignof(mnavPathLink),
                               (void**)&query->links);
     }
+    result = result == mnav_success ? AllocateGraph(query) : result;
     if (result != mnav_success)
     {
         mnavDestroyQuery(query);

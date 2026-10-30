@@ -11,6 +11,7 @@
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/hierarchy.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
@@ -320,6 +321,14 @@ static void TestQueryDefsAreChecked(void)
     CHECK(mnavCreateQuery(&def, &query) == mnav_errorLimit, "too long");
     def.limits.pathLength = INFINITY;
     CHECK(mnavCreateQuery(&def, &query) == mnav_errorLimit, "an infinite length");
+    def = mnavDefaultQueryDef();
+    def.limits.transitions = -1;
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid, "negative transitions");
+    def.limits.transitions = MNAV_MAX_HIERARCHY_TRANSITIONS + 1;
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorLimit, "too many transitions");
+    def.limits.transitions = 0;
+    CHECK(mnavCreateQuery(&def, &query) == mnav_success, "no hierarchy searched");
+    mnavDestroyQuery(query);
     def = (mnavQueryDef){0};
     CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid, "not from the default");
     CHECK(mnavCreateQuery(nullptr, &query) == mnav_errorInvalid &&

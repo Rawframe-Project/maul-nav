@@ -175,6 +175,11 @@ extern "C"
         // MNAV_MAX_PATH_LENGTH: no node is opened whose way from the start
         // and on to the end is longer.
         float pathLength;
+        // The transitions of the largest hierarchy the context searches
+        // (mnavQuery_FindHierarchicalPath), 0 to
+        // MNAV_MAX_HIERARCHY_TRANSITIONS; 0 for a context that searches
+        // none. The context holds the search over them, 28 bytes each.
+        int32_t transitions;
     } mnavQueryLimits;
 
     // How a query context is made. Build it with mnavDefaultQueryDef.
@@ -249,7 +254,8 @@ extern "C"
 #define MNAV_QUERY_DEF_COOKIE 0x4E415651u
 
     /// Returns a query def with 8,192 nodes per search, paths up to
-    /// 1,000 m and the C library's allocator. Built in the program, so
+    /// 1,000 m, room for a hierarchy of 16,384 transitions, as the default
+    /// hierarchy def's, and the C library's allocator. Built in the program, so
     /// that it carries the version of the headers the program includes.
     ///
     /// @return The def.
@@ -266,6 +272,7 @@ extern "C"
         def.version = MNAV_ABI_VERSION;
         def.limits.nodes = 8192;
         def.limits.pathLength = 1000.0f;
+        def.limits.transitions = 16384;
         return def;
     }
 
@@ -276,10 +283,11 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
     /// not from mnavDefaultQueryDef; `mnav_errorVersion` for one built against
     /// another version of the headers; `mnav_errorInvalid` also for fewer than
-    /// 1 node or a path length not more than 0 or NaN; `mnav_errorLimit` for
-    /// more nodes than MNAV_MAX_QUERY_NODES or a path length past
-    /// MNAV_MAX_PATH_LENGTH, an infinity included; `mnav_errorCapacity` when
-    /// the allocator fails.
+    /// 1 node, a path length not more than 0 or NaN, or fewer than 0
+    /// transitions; `mnav_errorLimit` for more nodes than MNAV_MAX_QUERY_NODES,
+    /// a path length past MNAV_MAX_PATH_LENGTH, an infinity included, or more
+    /// transitions than MNAV_MAX_HIERARCHY_TRANSITIONS; `mnav_errorCapacity`
+    /// when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateQuery(const mnavQueryDef* def,

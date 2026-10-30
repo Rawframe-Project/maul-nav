@@ -132,7 +132,7 @@ static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPo
                  double linkCost)
 {
     mnavQuery* query = s->query;
-    if (s->inside != nullptr && s->inside[key->slot] == 0 && !s->beyond)
+    if (s->clusterOf != nullptr && s->clusterOf[key->slot] != s->cluster && !s->beyond)
     {
         return;
     }
@@ -450,6 +450,7 @@ mnavResult mnavBeginPathWork(mnavQuery* query, const mnavNavmesh* navmesh,
                       0,
                       MNAV_NO_NODE,
                       nullptr,
+                      -1,
                       false,
                       false,
                       {-1, -1, -1, -1}};
@@ -494,10 +495,12 @@ mnavResult mnavQuery_BeginPath(mnavQuery* query, const mnavNavmesh* navmesh,
     return result;
 }
 
-void mnavConfineSearch(mnavQuery* query, const uint8_t* inside, bool beyond, bool noEnd)
+void mnavConfineSearch(mnavQuery* query, const int32_t* clusterOf, int32_t cluster, bool beyond,
+                       bool noEnd)
 {
     mnavSearch* s = &query->search;
-    s->inside = inside;
+    s->clusterOf = clusterOf;
+    s->cluster = cluster;
     s->beyond = beyond;
     if (noEnd)
     {
@@ -641,7 +644,7 @@ mnavResult mnavContinuePathWork(mnavQuery* query, const mnavNavmesh* navmesh, in
             continue;
         }
         s->best = Nearer(query, n, s->best) ? n : s->best;
-        if (s->inside == nullptr || s->inside[node->slot] != 0)
+        if (s->clusterOf == nullptr || s->clusterOf[node->slot] == s->cluster)
         {
             Expand(s, n);
         }
