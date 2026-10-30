@@ -15,6 +15,22 @@ Releases are made by release-please from the conventional commit titles on `main
 5. Mark the pull request ready and merge it. release-please tags the merge commit and publishes the GitHub release with the body's notes. The Pages workflow publishes the documentation from `main`.
 6. The `assets` job of `.github/workflows/release.yml` then attaches the source archive `maul-nav-X.Y.Z.tar.gz` (the tagged tree), its `SHA256SUMS`, an SPDX SBOM and a build provenance attestation. Check that they are on the release; a user verifies a download with `sha256sum -c SHA256SUMS` and `gh attestation verify maul-nav-X.Y.Z.tar.gz -R Rawframe-Project/maul-nav`.
 
+## A release made by hand
+
+The Release app cannot create a release on a commit whose workflows differ from the head of `main`. When release-please fails to publish for that reason, a maintainer finishes the release by hand:
+
+1. Create the tag `vX.Y.Z` on the release pull request's merge commit, and the GitHub release on it with the curated notes.
+2. Move the release pull request's label from `autorelease: pending` to `autorelease: tagged`, so that release-please does not try again.
+3. Run the `release` workflow from `main` with the input `tag` set to `vX.Y.Z` (`gh workflow run release.yml --ref main -f tag=vX.Y.Z`). Its `assets` job builds, attests and attaches the files as after an ordinary release. Check them as in step 6.
+
+The `assets` job refuses, before it builds anything:
+- a tag that is not `vX.Y.Z`;
+- a run that release-please gave a release other than the tag;
+- a tag on a commit that `main` does not hold, since the attestation names this workflow on `main`;
+- a release that already has files.
+
+It builds from the commit it resolved the tag to and checks that the checkout is that commit, so a tag moved during the run changes nothing it attaches. It never replaces a published file: a run that failed after attaching some files is re-run only after a maintainer has deleted those files from the release by hand.
+
 ## Notes
 
 - A change of results is never a patch release. A pull request that gives existing inputs a different result, or breaks the API or ABI, carries `!` in its title and a `BREAKING CHANGE:` footer naming what a host sees, whatever its type.
