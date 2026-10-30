@@ -5,6 +5,114 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.4.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.3.0...v0.4.0) (2026-10-30)
+
+This release settles the last API changes planned before 1.0.0.
+- Navmeshes and flight volumes are made from defs of their own.
+- Any number of query contexts can search one hierarchy at once.
+- A refused bake input is named by its kind and index.
+- The grid flow field is `mnavGridFlow`.
+- A call refused as busy from host code writes none of its outputs.
+
+Tile bytes, fingerprints, paths, flow fields and velocities do not
+change, and no tile format rises: tiles baked by 0.3.0 load as they are.
+
+### Changed
+
+- **Breaking:** a navmesh is made from an `mnavNavmeshDef`, from
+  `mnavDefaultNavmeshDef()`, and a flight volume from an
+  `mnavFlightVolumeDef`, from `mnavDefaultFlightVolumeDef()`. Before,
+  each used its baker's def, whose allocator, memory budget, tier and
+  limits it shared with the bakes.
+  ([#191](https://github.com/Rawframe-Project/maul-nav/pull/191))
+  - The navmesh def holds:
+    - its own allocator;
+    - `bake`, the def its tiles are baked with;
+    - `tier`;
+    - `limits` (`tiles`, `tileLinks`, `links` and `memoryBytes`).
+  - Move these fields there:
+    - `mnavBakeDef.tier`;
+    - `tiles`, `tileLinks` and `links` from `mnavBakeLimits`.
+  - Give the navmesh its own `memoryBytes`.
+  - The flight volume def holds its own allocator, `flight` (the flight
+    def), and `limits` (`tiles` and `memoryBytes`).
+    `mnavFlightLimits.tiles` moves there.
+  - `mnavCreateNavmesh` returns an `mnavNavmeshDefResult`: the status,
+    the refused `mnav_navmeshSetting*`, and for
+    `mnav_navmeshSettingBake` the bake def's setting.
+    `mnavCreateFlightVolume` returns an `mnavFlightVolumeDefResult` the
+    same way.
+  - `mnavBakeSetting` loses the tier and the three limits, and the
+    settings after them are renumbered. `mnavFlightSetting` loses
+    `mnav_flightSettingTiles`.
+  - `MNAV_MAX_TILES`, `MNAV_MAX_TILE_LINKS`, `MNAV_MAX_LINKS` and
+    `mnavTier` move to `navmesh.h`.
+- **Breaking:** a bake report names the refused input by its kind and
+  its index in that kind's array, not by one index counted across
+  meshes, terrains and volumes.
+  ([#185](https://github.com/Rawframe-Project/maul-nav/pull/185))
+  - `mnavInputResult` gains `kind`, an `mnavInputKind`
+    (`mnav_inputMesh`, `_Terrain`, `_Volume`, `_Outline` or
+    `_Obstacle`).
+  - Its `index` is now the input's index, and the old `index`, the
+    element within the input, is `elementIndex`.
+  - `mnavBakeReport` and `mnavFlightBakeReport` lose `mesh`; read
+    `input.kind` and `input.index`.
+  - `mnavValidateTriangleMesh` and `mnavValidateOutline` are replaced by
+    `mnavValidateBakeInput` and `mnavValidateBake2DInput`, which check a
+    whole bake input as a bake does.
+- **Breaking:** `mnavQuery_FindHierarchicalPath` takes a `const
+  mnavHierarchy*`. Any number of contexts may search one hierarchy at
+  once, as they search a navmesh, while no build or update runs on it
+  and no commit on the navmesh.
+  ([#198](https://github.com/Rawframe-Project/maul-nav/pull/198))
+  - The search keeps its state in the query context, sized by the new
+    `mnavQueryLimits.transitions`: 16,384 by default, 0 to
+    `MNAV_MAX_HIERARCHY_TRANSITIONS`.
+  - The default context grows by about 459 KB, and each hierarchy
+    shrinks by as much.
+  - A hierarchy of more transitions than the context's limit is
+    `mnav_errorCapacity`. A host whose hierarchies have more transitions
+    raises the limit.
+- **Breaking:** the grid flow field is named for its grid, beside the
+  navmesh flow field `mnavNavFlow`.
+  ([#199](https://github.com/Rawframe-Project/maul-nav/pull/199))
+
+| Old | New |
+|---|---|
+| `mnavFlowField` | `mnavGridFlow` |
+| `mnavFlowFieldDef`, `mnavDefaultFlowFieldDef` | `mnavGridFlowDef`, `mnavDefaultGridFlowDef` |
+| `MNAV_FLOW_FIELD_DEF_COOKIE` | `MNAV_GRID_FLOW_DEF_COOKIE` |
+| `mnavCreateFlowField`, `mnavDestroyFlowField` | `mnavCreateGridFlow`, `mnavDestroyGridFlow` |
+| `mnavFlowField_Begin`, `_Continue`, `_Update`, `_Build`, `_GetFlow`, `_Debug`, `_GetMisuse` | `mnavGridFlow_Begin`, `_Continue`, `_Update`, `_Build`, `_GetFlow`, `_Debug`, `_GetMisuse` |
+| `mnavFlow` | `mnavCellFlow` |
+| `MNAV_MAX_FLOW_CELLS` | `MNAV_MAX_GRID_FLOW_CELLS` |
+| `MNAV_MAX_NAVFLOW_POLYGONS`, `_TILES`, `_LINKS` | `MNAV_MAX_NAV_FLOW_POLYGONS`, `_TILES`, `_LINKS` |
+
+- **Breaking:** a call refused with `mnav_errorBusy` writes none of its
+  outputs: they stay as they were, where 0.3.0 zeroed them. Only a call
+  back in from host code the object runs can be refused as busy: an
+  allocator, or a link generation's clearance test. An output may be one
+  the call in progress is filling.
+  ([#197](https://github.com/Rawframe-Project/maul-nav/pull/197),
+  [#196](https://github.com/Rawframe-Project/maul-nav/pull/196))
+  - This holds for:
+    - the path, corridor, surface, wall, random point, ray, grid path
+      and flight path searches of a query context;
+    - `mnavQuery_CheckReachable` and `mnavQuery_GenerateLinks`;
+    - `mnavGridFlow_Continue` and `mnavNavFlow_Continue`;
+    - `mnavHierarchy_Build` and `mnavHierarchy_Update`;
+    - `mnavAvoidance_Avoid` and `mnavAvoidance_Avoid3D`, whose
+      velocities stay as given.
+  - The link id `mnavStageLink` gives is a creation's: the null id on
+    any failure, busy included.
+- **Breaking:** `mnavFlightVolume_FindNearestPoint` zeroes `nearestOut`
+  when no open point lies within the radius, as the other "not found"
+  answers do. Before, it left the query point there.
+  ([#190](https://github.com/Rawframe-Project/maul-nav/pull/190))
+- The user guide (`docs/user/`) uses the new defs, names and report
+  fields.
+
 ## [0.3.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.2.0...v0.3.0) (2026-10-30)
 
 The whole API takes the Maul family's naming rule, so most functions
