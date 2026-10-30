@@ -701,6 +701,7 @@ static MNAV_NOINLINE mnavResult FindWallsCounted(mnavQuery* query, const mnavNav
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
         FindWallsWork(query, navmesh, filter, polygon, center, radius, wallsOut, capacity,
                       foundOut != nullptr ? &foundMade : nullptr));
+    mnavClearArray(result, result == mnav_errorCapacity, wallsOut, capacity, sizeof(*wallsOut));
     mnavGiveOutput(result, result == mnav_errorCapacity, foundOut, &foundMade, sizeof(foundMade));
     return result;
 }

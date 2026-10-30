@@ -460,6 +460,7 @@ static MNAV_NOINLINE mnavResult CorridorAreasCounted(mnavQuery* query, const mna
         CorridorAreasWork(query, navmesh, corridor, cornersOut != nullptr ? &cornersMade : nullptr,
                           runsOut, capacity, countOut != nullptr ? &countMade : nullptr));
     mnavGiveOutput(result, false, cornersOut, &cornersMade, sizeof(cornersMade));
+    mnavClearArray(result, result == mnav_errorCapacity, runsOut, capacity, sizeof(*runsOut));
     mnavGiveOutput(result, result == mnav_errorCapacity, countOut, &countMade, sizeof(countMade));
     return result;
 }
