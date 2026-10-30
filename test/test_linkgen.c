@@ -176,9 +176,9 @@ static void TestClimbAndAreas(mnavNavmesh* navmesh)
     CHECK(mnavNavmesh_FindPolygons(navmesh, (mnavPos3){15.0, 1.5, 16.0},
                                    (mnavVec3){5.0f, 0.3f, 6.0f}, nullptr, top, 64,
                                    &found) == mnav_success &&
-              found.count > 0,
+              found.polygonCount > 0,
           "the platform's polygons");
-    for (int32_t i = 0; i < found.count; ++i)
+    for (int32_t i = 0; i < found.polygonCount; ++i)
     {
         CHECK(mnavPolygon_StageArea(navmesh, top[i], 3) == mnav_success, "painted");
     }
@@ -195,7 +195,7 @@ static void TestClimbAndAreas(mnavNavmesh* navmesh)
         drops += s_links[i].kind == mnav_linkDrop ? 1 : 0;
     }
     CHECK(drops == 0 && count > 0, "no drops from the left-out platform");
-    for (int32_t i = 0; i < found.count; ++i)
+    for (int32_t i = 0; i < found.polygonCount; ++i)
     {
         CHECK(mnavPolygon_StageArea(navmesh, top[i], mnav_areaWalkable) == mnav_success,
               "painted back");

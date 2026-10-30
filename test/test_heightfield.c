@@ -184,12 +184,12 @@ static void TestSlopesAndFacing(void)
     // Facing down, the floor is solid only.
     const int32_t down[6] = {0, 2, 1, 0, 3, 2};
     const mnavTriangleMesh flipped = {s_floor, 4, down, 2, nullptr};
-    CHECK(Bake(&def, &flipped, 1, 0, 0, &report) == mnav_success && report.polygons == 0,
+    CHECK(Bake(&def, &flipped, 1, 0, 0, &report) == mnav_success && report.polygonCount == 0,
           "facing down is solid only");
     // Given no area, it stays unwalkable.
     const mnavAreaType none[2] = {mnav_areaNone, mnav_areaNone};
     const mnavTriangleMesh unwalkable = {s_floor, 4, s_floorIndices, 2, none};
-    CHECK(Bake(&def, &unwalkable, 1, 0, 0, &report) == mnav_success && report.polygons == 0,
+    CHECK(Bake(&def, &unwalkable, 1, 0, 0, &report) == mnav_success && report.polygonCount == 0,
           "unwalkable stays");
     // Ramps 4 m long rising along z: 50 degrees from x = 2 to 6 m against
     // a 45 degree limit, and 40 degrees from x = 12 to 16 m.
@@ -343,7 +343,7 @@ static void TestNeighborTileSeesOnlyItsBorder(void)
     mnavBakeReport empty;
     const mnavTriangleMesh nothing = {s_floor, 4, s_floorIndices, 0, nullptr};
     CHECK(Bake(&def, &nothing, 1, 1, 0, &empty) == mnav_success, "baked");
-    CHECK(Bake(&def, &s_floorMesh, 1, 1, 0, &report) == mnav_success && report.polygons == 0 &&
+    CHECK(Bake(&def, &s_floorMesh, 1, 1, 0, &report) == mnav_success && report.polygonCount == 0 &&
               report.fingerprint == empty.fingerprint,
           "nothing in the neighbor");
     mnavVec3 shifted[4];
@@ -449,7 +449,7 @@ static void TestSoupDependsOnlyOnTheTriangleSet(void)
          backwardAreas + half},
     };
     CHECK(Bake(&def, two, 2, 0, 0, nullptr) == mnav_success, "baked backward");
-    CHECK(report.polygons > 0 && DrawHash() == hash, "the same tile from the same set");
+    CHECK(report.polygonCount > 0 && DrawHash() == hash, "the same tile from the same set");
 }
 
 static void TestFloorToTheFrameEnd(void)
@@ -462,7 +462,7 @@ static void TestFloorToTheFrameEnd(void)
     const mnavTriangleMesh mesh = {vertices, 4, s_floorIndices, 2, nullptr};
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBakeReport report;
-    CHECK(Bake(&def, &mesh, 1, 0, 0, &report) == mnav_success && report.polygons > 0 &&
+    CHECK(Bake(&def, &mesh, 1, 0, 0, &report) == mnav_success && report.polygonCount > 0 &&
               Walkable(0, 0, 127, 127, 0.0) == 128 * 128,
           "a floor to the frame's end");
 }

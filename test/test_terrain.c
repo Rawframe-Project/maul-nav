@@ -71,7 +71,7 @@ static bool Same(mnavBaker* baker, const mnavTerrain* terrain, mnavBakeReport* r
         mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0, 0,
                            &other) == mnav_success &&
         mnavBaker_CopyTile(baker, s_second, TILE_ROOM, &second) == mnav_success;
-    return baked && report->triangles == other.triangles && first == second &&
+    return baked && report->triangleCount == other.triangleCount && first == second &&
            memcmp(s_first, s_second, first) == 0;
 }
 
@@ -92,8 +92,9 @@ static void TestLikeItsMesh(mnavBaker* baker)
     CHECK(Same(baker, &terrain, &a), "the same bytes as the mesh of its cells");
     size_t first = 0;
     CHECK(mnavBaker_CopyTile(baker, s_first, TILE_ROOM, &first) == mnav_success, "copied");
-    printf("terrain: %d triangles, %d polygons, %zu bytes\n", a.triangles, a.polygons, first);
-    CHECK(a.polygons > 0 && a.triangles < CELLS * 2, "only the cells near the tile");
+    printf("terrain: %d triangles, %d polygons, %zu bytes\n", a.triangleCount, a.polygonCount,
+           first);
+    CHECK(a.polygonCount > 0 && a.triangleCount < CELLS * 2, "only the cells near the tile");
     // Cells whose edges fall on the tile's bounds, border included (1.25
     // m outside the tile), on both sides.
     mnavTerrain edged = terrain;
@@ -103,7 +104,7 @@ static void TestLikeItsMesh(mnavBaker* baker)
     mnavTerrain inside = terrain;
     inside.columns = 20;
     inside.rows = 20;
-    CHECK(Same(baker, &inside, &a) && a.triangles == 19 * 19 * 2, "ending inside the tile");
+    CHECK(Same(baker, &inside, &a) && a.triangleCount == 19 * 19 * 2, "ending inside the tile");
     mnavTerrain odd = terrain;
     odd.origin = (mnavVec3){-1.3f, 1.0f, 3.1f};
     odd.spacingX = 0.7f;
@@ -126,12 +127,12 @@ static void TestLikeItsMesh(mnavBaker* baker)
     Bake(baker, &fromTerrain, s_second, &whole);
     terrain.areas = s_areas;
     Bake(baker, &fromTerrain, s_second, &holed);
-    CHECK(holed.triangles == whole.triangles - 72 && holed.spans < whole.spans - 30,
+    CHECK(holed.triangleCount == whole.triangleCount - 72 && holed.spanCount < whole.spanCount - 30,
           "a hole has no ground");
     // Far from the terrain, a tile has nothing of it.
     mnavBakeReport far;
     CHECK(mnavBaker_BakeTile(baker, &fromTerrain, 4, 4, &far) == mnav_success &&
-              far.triangles == 0 && far.polygons == 0,
+              far.triangleCount == 0 && far.polygonCount == 0,
           "a tile it misses");
 }
 

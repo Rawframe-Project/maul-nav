@@ -195,14 +195,14 @@ extern "C"
     /// @param def          The def, from mnavDefaultNavmeshDef.
     /// @param navmeshOut   Receives the navmesh, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` with the setting for a NULL
-    /// def, a def without its cookie, an allocator with one function, a tier
-    /// past mnav_tierDynamic, a limit below 1; `mnav_errorLimit` with the
-    /// setting for a limit past its MNAV_MAX_ value; `mnav_errorVersion` with
-    /// no setting for a def built against another version of the headers; for
-    /// a bake def mnavValidateBakeDef refuses, the status it gives with
-    /// mnav_navmeshSettingBake and its setting; `mnav_errorInvalid` for a NULL
-    /// navmeshOut; `mnav_errorCapacity` when the navmesh does not fit the
-    /// def's memory limit or the allocator fails.
+    /// def, a def without its cookie, an allocator with one function, a
+    /// negative tier or one past mnav_tierDynamic, a limit below 1;
+    /// `mnav_errorLimit` with the setting for a limit past its MNAV_MAX_ value;
+    /// `mnav_errorVersion` with no setting for a def built against another
+    /// version of the headers; for a bake def mnavValidateBakeDef refuses, the
+    /// status it gives with mnav_navmeshSettingBake and its setting;
+    /// `mnav_errorInvalid` for a NULL navmeshOut; `mnav_errorCapacity` when the
+    /// navmesh does not fit the def's memory limit or the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavNavmeshDefResult mnavCreateNavmesh(const mnavNavmeshDef* def,
@@ -438,7 +438,7 @@ extern "C"
         // link; for an edge link, those whose ends both snapped, the
         // polygons and points above being the first of them along the
         // width.
-        int32_t crossings;
+        int32_t crossingCount;
     } mnavLinkState;
 
     /// Stages an off-mesh link; it is added at the next commit. Its ends
@@ -452,18 +452,19 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// with a NaN coordinate, or an edge link whose ends lie at one place on
     /// the ground or so near that the square of their distance rounds to 0, a
-    /// radius, cost or width below 0 or NaN, or a kind of MNAV_LINK_KINDS or
-    /// more; `mnav_errorLimit` for a point farther from the def's origin than
-    /// bake input may lie (MNAV_MAX_EXTENT_CELLS cells on the ground,
-    /// MNAV_MAX_HEIGHT_CELLS cell heights up or down), a radius, cost or width
-    /// past its MNAV_MAX_ bound, an infinity included, or when a crossing would
-    /// need a slot from MNAV_MAX_LINKS on (left only by slots worn out by 2^32
-    /// links each); `mnav_errorCapacity` when the links' crossings, staged and
-    /// committed, would pass the links limit, or memory its limit, or when the
-    /// allocator fails. A refused link is refused whole, none of its crossings
-    /// taken. Also `mnav_errorBusy` when called back in from host code a call
-    /// on the navmesh runs (its allocator, a link generation's clearance test,
-    /// a hierarchy's allocator as it builds on it), one misuse counted.
+    /// radius, cost or width below 0 or NaN, or a negative kind or one of
+    /// MNAV_LINK_KINDS or more; `mnav_errorLimit` for a point farther from the
+    /// def's origin than bake input may lie (MNAV_MAX_EXTENT_CELLS cells on the
+    /// ground, MNAV_MAX_HEIGHT_CELLS cell heights up or down), a radius, cost
+    /// or width past its MNAV_MAX_ bound, an infinity included, or when a
+    /// crossing would need a slot from MNAV_MAX_LINKS on (left only by slots
+    /// worn out by 2^32 links each); `mnav_errorCapacity` when the links'
+    /// crossings, staged and committed, would pass the links limit, or memory
+    /// its limit, or when the allocator fails. A refused link is refused whole,
+    /// none of its crossings taken. Also `mnav_errorBusy` when called back in
+    /// from host code a call on the navmesh runs (its allocator, a link
+    /// generation's clearance test, a hierarchy's allocator as it builds on
+    /// it), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the navmesh is used by one thread at a time,
     /// so no query may run while a link is staged.

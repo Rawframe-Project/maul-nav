@@ -39,7 +39,7 @@ static bool SameId(mnavPolygonId a, mnavPolygonId b)
 static bool WellFormed(const mnavCorridor* corridor)
 {
     return corridor != nullptr && corridor->polygons != nullptr && corridor->capacity >= 1 &&
-           corridor->count >= 1 && corridor->count <= corridor->capacity;
+           corridor->polygonCount >= 1 && corridor->polygonCount <= corridor->capacity;
 }
 
 static MNAV_NOINLINE mnavResult ResetCorridorWork(mnavCorridor* corridor, mnavPolygonId* buffer,
@@ -77,7 +77,7 @@ static MNAV_NOINLINE mnavResult SetCorridorWork(mnavCorridor* corridor, const mn
         return mnav_errorCapacity;
     }
     memcpy(corridor->polygons, path->polygons, (size_t)path->polygonCount * sizeof(mnavPolygonId));
-    corridor->count = path->polygonCount;
+    corridor->polygonCount = path->polygonCount;
     corridor->position = path->points[0];
     corridor->target = path->points[path->pointCount - 1];
     return mnav_success;
@@ -197,7 +197,7 @@ static int32_t Valid(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
 {
     mnavPortal scratch[2];
     *stale = false;
-    for (int32_t i = 0; i < corridor->count; ++i)
+    for (int32_t i = 0; i < corridor->polygonCount; ++i)
     {
         mnavPolygonId id = corridor->polygons[i];
         mnavResult checked = mnavCheckPolygon(navmesh, id);
@@ -215,7 +215,7 @@ static int32_t Valid(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
             return i;
         }
     }
-    return corridor->count;
+    return corridor->polygonCount;
 }
 
 static MNAV_NOINLINE mnavResult CheckCorridorWork(const mnavNavmesh* navmesh,
@@ -270,7 +270,7 @@ static MNAV_NOINLINE mnavResult CorridorCornersWork(mnavQuery* query, const mnav
     {
         return mnav_errorInvalid;
     }
-    if (corridor->count > query->limits.nodes)
+    if (corridor->polygonCount > query->limits.nodes)
     {
         return mnav_errorCapacity;
     }
@@ -278,7 +278,7 @@ static MNAV_NOINLINE mnavResult CorridorCornersWork(mnavQuery* query, const mnav
     const mnavQueryFilter* all = nullptr;
     (void)mnavCheckFilter(nullptr, &all);
     bool stale = false;
-    if (Valid(navmesh, all, corridor, &stale) < corridor->count)
+    if (Valid(navmesh, all, corridor, &stale) < corridor->polygonCount)
     {
         return stale ? mnav_errorStale : mnav_errorInvalid;
     }
@@ -286,7 +286,7 @@ static MNAV_NOINLINE mnavResult CorridorCornersWork(mnavQuery* query, const mnav
     // most twice the node limit and one, the context's room.
     int32_t count = 0;
     query->portals[count++] = (mnavPortal){corridor->position, corridor->position, -1};
-    for (int32_t i = 1; i < corridor->count; ++i)
+    for (int32_t i = 1; i < corridor->polygonCount; ++i)
     {
         count += Join(navmesh, all, corridor->polygons[i - 1], corridor->polygons[i],
                       &query->portals[count]);
@@ -423,7 +423,7 @@ static MNAV_NOINLINE mnavResult CorridorAreasWork(mnavQuery* query, const mnavNa
     int32_t corner = 0;
     mnavAreaType area = AreaOf(navmesh, corridor->polygons[0]);
     Run(runsOut, capacity, &count, (mnavAreaRun){corridor->position, 0, area});
-    for (int32_t i = 1; i < corridor->count; ++i)
+    for (int32_t i = 1; i < corridor->polygonCount; ++i)
     {
         // Validated above: the polygons join, and the portals are written.
         mnavPortal portals[2] = {0};
@@ -499,7 +499,7 @@ static mnavResult MergeStart(mnavCorridor* corridor, const mnavMove* move)
     MNAV_ASSERT(move->polygonCount >= 1 && SameId(walked[0], corridor->polygons[0]));
     int32_t farthest = -1;
     int32_t at = -1;
-    for (int32_t i = corridor->count - 1; i >= 0 && farthest < 0; --i)
+    for (int32_t i = corridor->polygonCount - 1; i >= 0 && farthest < 0; --i)
     {
         int32_t j = IndexOf(walked, move->polygonCount, corridor->polygons[i]);
         farthest = j >= 0 ? i : -1;
@@ -508,7 +508,7 @@ static mnavResult MergeStart(mnavCorridor* corridor, const mnavMove* move)
     // The walk began on the first polygon, so some polygon is shared.
     MNAV_ASSERT(farthest >= 0 && at >= 0);
     int32_t lead = move->polygonCount - at;
-    int32_t rest = corridor->count - farthest - 1;
+    int32_t rest = corridor->polygonCount - farthest - 1;
     if (lead + rest > corridor->capacity)
     {
         return mnav_errorCapacity;
@@ -519,7 +519,7 @@ static mnavResult MergeStart(mnavCorridor* corridor, const mnavMove* move)
     {
         corridor->polygons[i] = walked[move->polygonCount - 1 - i];
     }
-    corridor->count = lead + rest;
+    corridor->polygonCount = lead + rest;
     return mnav_success;
 }
 
@@ -529,10 +529,10 @@ static mnavResult MergeEnd(mnavCorridor* corridor, const mnavMove* move)
 {
     const mnavPolygonId* walked = move->polygons;
     MNAV_ASSERT(move->polygonCount >= 1 &&
-                SameId(walked[0], corridor->polygons[corridor->count - 1]));
+                SameId(walked[0], corridor->polygons[corridor->polygonCount - 1]));
     int32_t first = -1;
     int32_t at = -1;
-    for (int32_t i = 0; i < corridor->count && first < 0; ++i)
+    for (int32_t i = 0; i < corridor->polygonCount && first < 0; ++i)
     {
         at = IndexOf(walked, move->polygonCount, corridor->polygons[i]);
         first = at >= 0 ? i : -1;
@@ -545,7 +545,7 @@ static mnavResult MergeEnd(mnavCorridor* corridor, const mnavMove* move)
         return mnav_errorCapacity;
     }
     memcpy(corridor->polygons + first + 1, walked + at + 1, (size_t)tail * sizeof(mnavPolygonId));
-    corridor->count = first + 1 + tail;
+    corridor->polygonCount = first + 1 + tail;
     return mnav_success;
 }
 
@@ -616,14 +616,14 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetWork(mnavQuery* query, const m
         return mnav_errorInvalid;
     }
     mnavMove move;
-    mnavResult result =
-        mnavMoveAlongSurfaceWork(query, navmesh, filter, corridor->polygons[corridor->count - 1],
-                                 corridor->target, wanted, &move);
+    mnavResult result = mnavMoveAlongSurfaceWork(query, navmesh, filter,
+                                                 corridor->polygons[corridor->polygonCount - 1],
+                                                 corridor->target, wanted, &move);
     result = result == mnav_success ? MergeEnd(corridor, &move) : result;
     if (result == mnav_success)
     {
         corridor->target = move.point;
-        MNAV_ASSERT(SameId(corridor->polygons[corridor->count - 1], move.polygon));
+        MNAV_ASSERT(SameId(corridor->polygons[corridor->polygonCount - 1], move.polygon));
     }
     if (result == mnav_success && moveOut != nullptr)
     {
@@ -682,7 +682,7 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorWork(mnavQuery* query, const mna
     // The last corridor polygon the ray passed, and where it passed it.
     int32_t last = -1;
     int32_t at = -1;
-    for (int32_t i = corridor->count - 1; i >= 0 && last < 0; --i)
+    for (int32_t i = corridor->polygonCount - 1; i >= 0 && last < 0; --i)
     {
         at = IndexOf(ray.polygons, ray.polygonCount, corridor->polygons[i]);
         last = at >= 0 ? i : -1;
@@ -693,11 +693,11 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorWork(mnavQuery* query, const mna
     {
         return mnav_success;
     }
-    int32_t rest = corridor->count - last - 1;
+    int32_t rest = corridor->polygonCount - last - 1;
     memmove(corridor->polygons + at + 1, corridor->polygons + last + 1,
             (size_t)rest * sizeof(mnavPolygonId));
     memcpy(corridor->polygons, ray.polygons, (size_t)(at + 1) * sizeof(mnavPolygonId));
-    corridor->count = at + 1 + rest;
+    corridor->polygonCount = at + 1 + rest;
     *shortenedOut = true;
     return mnav_success;
 }
@@ -765,7 +765,7 @@ static MNAV_NOINLINE mnavResult ReplanCorridorWork(mnavQuery* query, const mnavN
         EndPolygon(navmesh, filter, corridor->polygons[0], &start, halfExtents, &from);
     if (result == mnav_success)
     {
-        result = EndPolygon(navmesh, filter, corridor->polygons[corridor->count - 1], &end,
+        result = EndPolygon(navmesh, filter, corridor->polygons[corridor->polygonCount - 1], &end,
                             halfExtents, &to);
     }
     if (result != mnav_success)

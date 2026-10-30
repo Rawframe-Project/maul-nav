@@ -58,10 +58,10 @@ extern "C"
     // ran.
     typedef struct mnavHierarchyReport
     {
-        int32_t clusters;
-        int32_t transitions;
-        int32_t edges;
-        int32_t searches;
+        int32_t clusterCount;
+        int32_t transitionCount;
+        int32_t edgeCount;
+        int32_t searchCount;
     } mnavHierarchyReport;
 
 // The cookie mnavDefaultHierarchyDef sets and mnavCreateHierarchy checks.

@@ -91,9 +91,10 @@ static bool Alike(mnavBaker* baker, mnavTileCache* cache, const mnavBakeInput* i
         return false;
     }
     return size == expected && memcmp(s_rebuilt, s_expected, size) == 0 &&
-           rebuilt.fingerprint == baked.fingerprint && rebuilt.triangles == baked.triangles &&
-           rebuilt.spans == baked.spans && rebuilt.polygons == baked.polygons &&
-           rebuilt.tileBytes == baked.tileBytes && rebuilt.stage == mnav_stageDone;
+           rebuilt.fingerprint == baked.fingerprint &&
+           rebuilt.triangleCount == baked.triangleCount && rebuilt.spanCount == baked.spanCount &&
+           rebuilt.polygonCount == baked.polygonCount && rebuilt.tileBytes == baked.tileBytes &&
+           rebuilt.stage == mnav_stageDone;
 }
 
 // The obstacle sets each scene is rebuilt with.
@@ -340,7 +341,7 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
         mnavDestroyBaker(other);
     }
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.limits.inputTriangles = cached.triangles + 4;
+    def.limits.inputTriangles = cached.triangleCount + 4;
     CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "a baker of other limits");
     Rebuilt(other, cache, 0, obstacles, 1, mnav_success);
     // The tile's triangles and the obstacles' points count as input.
@@ -352,7 +353,7 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
     const mnavBakeInput shaped = {&world, 1, nullptr, 0, obstacles, 1, nullptr};
     CHECK(mnavBaker_BakeTileCached(baker, cache, &shaped, 0, 0, &cached) == mnav_success,
           "cached with a volume");
-    def.limits.inputTriangles = cached.triangles + 4 + 4;
+    def.limits.inputTriangles = cached.triangleCount + 4 + 4;
     CHECK(mnavCreateBaker(&def, &other).result == mnav_success, "a baker at the limit");
     Rebuilt(other, cache, 0, obstacles, 1, mnav_success);
     def.limits.inputTriangles -= 1;

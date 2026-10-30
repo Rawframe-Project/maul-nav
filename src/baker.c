@@ -479,17 +479,17 @@ static void ReleaseStages(mnavMemory* memory, Stages* s)
 // Writes the stages' counts into the report.
 static void Count(const Stages* s, mnavBakeReport* report)
 {
-    report->spans = s->compact.spanCount;
-    report->regions = (int32_t)s->regions.count;
-    report->droppedRegions = (int32_t)s->regions.dropped;
-    report->polygons = s->mesh.polygonCount;
-    report->vertices = s->mesh.vertexCount;
-    report->detailVertices = s->detail.vertexCount;
-    report->detailTriangles = s->detail.triangleCount;
-    report->droppedHoles = s->set.droppedHoles;
-    report->partialRings = s->mesh.failedRings;
-    report->fallbackHeights = s->detail.fallbackHeights;
-    report->cappedDetail = s->detail.cappedPolygons;
+    report->spanCount = s->compact.spanCount;
+    report->regionCount = (int32_t)s->regions.count;
+    report->regionsDropped = (int32_t)s->regions.dropped;
+    report->polygonCount = s->mesh.polygonCount;
+    report->vertexCount = s->mesh.vertexCount;
+    report->detailVertexCount = s->detail.vertexCount;
+    report->detailTriangleCount = s->detail.triangleCount;
+    report->holesDropped = s->set.droppedHoles;
+    report->partialRingCount = s->mesh.failedRings;
+    report->fallbackHeightCount = s->detail.fallbackHeights;
+    report->cappedDetailCount = s->detail.cappedPolygons;
 }
 
 // Encodes the tile from the stages.
@@ -579,13 +579,14 @@ static mnavResult RunBake(mnavBaker* baker, const Input* in, int32_t tileX, int3
     {
         if (in->flat)
         {
-            report.fingerprint =
-                HashOutlines(&frame, in, tileX, tileZ, HashSettings(&settings), &report.triangles);
+            report.fingerprint = HashOutlines(&frame, in, tileX, tileZ, HashSettings(&settings),
+                                              &report.triangleCount);
         }
         else
         {
-            geometry = mnavFingerprintGeometry(&frame, baker->cells.cosMaxSlope, &in->solid, tileX,
-                                               tileZ, HashSettings(&settings), &report.triangles);
+            geometry =
+                mnavFingerprintGeometry(&frame, baker->cells.cosMaxSlope, &in->solid, tileX, tileZ,
+                                        HashSettings(&settings), &report.triangleCount);
             report.fingerprint =
                 mnavFingerprintVolumes(&frame, in->solid.volumes, in->solid.volumeCount, geometry);
         }
@@ -597,7 +598,7 @@ static mnavResult RunBake(mnavBaker* baker, const Input* in, int32_t tileX, int3
                                      .tileZ = tileZ,
                                      .settings = settings,
                                      .geometry = geometry,
-                                     .triangles = report.triangles};
+                                     .triangles = report.triangleCount};
         result = mnavCacheTile(cache, &baker->memory, &tile, &stages.compact, in->solid.volumes,
                                in->solid.volumeCount);
     }
@@ -791,7 +792,7 @@ static mnavResult Rebuild(mnavBaker* baker, mnavTileCache* cache, int32_t tileX,
             memcpy(&volumes[tile->volumeCount], obstacles,
                    (size_t)obstacleCount * sizeof(mnavBakeVolume));
         }
-        report.triangles = tile->triangles;
+        report.triangleCount = tile->triangles;
         report.fingerprint =
             mnavFingerprintVolumes(&tile->field.frame, volumes, count, tile->geometry);
         Enter(baker, &report, mnav_stageCompact);

@@ -80,16 +80,16 @@ static inline uint64_t BakeOne(mnavFlightBaker* baker, const mnavBakeInput* inpu
     mnavFlightBakeReport report;
     CHECK(mnavFlightBaker_BakeTile(baker, input, t % 2, t / 2, &report) == mnav_success, "baked");
     CHECK(report.result == mnav_success && report.input.kind == mnav_inputNone &&
-              report.triangles > 0 && report.spans > 0 && report.cubes == 1 && report.nodes > 0 &&
-              report.leaves > 0 && report.memoryPeak > 0,
+              report.triangleCount > 0 && report.spanCount > 0 && report.cubeCount == 1 &&
+              report.nodeCount > 0 && report.leafCount > 0 && report.memoryPeak > 0,
           "the report");
     size_t size = 0;
     CHECK(mnavFlightBaker_CopyTile(baker, s_bytes[t], TILE_MOST, &size) == mnav_success, "copied");
     CHECK(size == report.tileBytes, "the size reported");
     s_sizes[t] = size;
     s_fingerprints[t] = report.fingerprint;
-    printf("flight tile %d: %zu bytes, %d nodes, %d leaves\n", t, size, report.nodes,
-           report.leaves);
+    printf("flight tile %d: %zu bytes, %d nodes, %d leaves\n", t, size, report.nodeCount,
+           report.leafCount);
     return mnavHash64(MNAV_HASH_INIT, s_bytes[t], (int64_t)size);
 }
 

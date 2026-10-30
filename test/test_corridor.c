@@ -122,8 +122,8 @@ static void TestChecksAndLimits(void)
     mnavPolygonId buffer[256];
     mnavCorridor corridor;
     CHECK(mnavResetCorridor(&corridor, buffer, 2, a.polygon, a.point) == mnav_success &&
-              corridor.count == 1 && mnavSetCorridor(&corridor, &path) == mnav_errorCapacity &&
-              corridor.count == 1,
+              corridor.polygonCount == 1 &&
+              mnavSetCorridor(&corridor, &path) == mnav_errorCapacity && corridor.polygonCount == 1,
           "too long for two polygons, unchanged");
     mnavCorners out;
     CHECK(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &out) == mnav_success &&
@@ -151,7 +151,7 @@ static void TestChecksAndLimits(void)
     mnavTileId tile;
     CHECK(mnavNavmesh_GetTile(navmesh, 1, 0, &tile) == mnav_success, "tile (1, 0)");
     int32_t onOther = -1;
-    for (int32_t i = 0; i < corridor.count && onOther < 0; ++i)
+    for (int32_t i = 0; i < corridor.polygonCount && onOther < 0; ++i)
     {
         onOther = buffer[i].slot == tile.slot ? i : -1;
     }
@@ -211,8 +211,8 @@ static void TestMalformedCorridors(void)
                 mnav_errorInvalid &&
             mnavQuery_ReplanCorridor(query, &c, navmesh, (mnavVec3){1.0f, 1.0f, 1.0f}, nullptr,
                                      &path) == mnav_errorInvalid;
-        CHECK(refused && c.count == bad[k].count && c.capacity == bad[k].capacity && valid == 0 &&
-                  !shortened,
+        CHECK(refused && c.polygonCount == bad[k].polygonCount && c.capacity == bad[k].capacity &&
+                  valid == 0 && !shortened,
               "a malformed corridor refused by every call, unchanged, the outputs zeroed");
     }
     mnavPath path;
@@ -223,7 +223,7 @@ static void TestMalformedCorridors(void)
     mnavCorridor noRoom = bad[1];
     mnavCorridor stale = {a.point, a.point, buffer, 5, 2};
     CHECK(mnavSetCorridor(&noRoom, &path) == mnav_errorInvalid &&
-              mnavSetCorridor(&stale, &path) == mnav_success && stale.count == 1,
+              mnavSetCorridor(&stale, &path) == mnav_success && stale.polygonCount == 1,
           "loading refuses no room, and replaces any count");
     free(buffer);
     mnavDestroyQuery(query);
@@ -380,7 +380,7 @@ static void TestFiltersAndLinks(void)
                              nullptr, &path) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success &&
               mnavNavmesh_CheckCorridor(navmesh, &corridor, &filter, &valid) == mnav_success &&
-              valid == corridor.count,
+              valid == corridor.polygonCount,
           "starting on a square left out");
     // An id never handed out is invalid, not stale.
     buffer[1].slot = 99;
@@ -394,7 +394,7 @@ static void TestFiltersAndLinks(void)
 static int32_t Indices(const mnavCorridor* corridor)
 {
     int32_t digits = 0;
-    for (int32_t i = 0; i < corridor->count; ++i)
+    for (int32_t i = 0; i < corridor->polygonCount; ++i)
     {
         digits = digits * 10 + (int32_t)corridor->polygons[i].polygon + 1;
     }
@@ -544,7 +544,7 @@ static void TestFollowingCorridors(void)
             valid =
                 valid &&
                 mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &count) == mnav_success &&
-                count == corridor.count;
+                count == corridor.polygonCount;
             hash = mnavHash64(hash, &corridor.position, (int64_t)sizeof(corridor.position));
         }
     }
@@ -582,18 +582,18 @@ static void TestShortcuts(void)
     CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, &round,
                              &path) == mnav_success &&
               mnavResetCorridor(&corridor, buffer, 16, a.polygon, a.point) == mnav_success &&
-              mnavSetCorridor(&corridor, &path) == mnav_success && corridor.count == 5,
+              mnavSetCorridor(&corridor, &path) == mnav_success && corridor.polygonCount == 5,
           "round the centre, five squares");
     bool shortened = true;
     CHECK(mnavQuery_ShortcutCorridor(query, &corridor, navmesh, (mnavPos3){19.0, 0.0, 12.5}, &round,
                                      &shortened) == mnav_success &&
-              !shortened && corridor.count == 5,
+              !shortened && corridor.polygonCount == 5,
           "without the centre the ray meets a wall");
     // Through the centre to the far wall: the ray passes the corridor's
     // last square but meets the wall before the point, so nothing changes.
     CHECK(mnavQuery_ShortcutCorridor(query, &corridor, navmesh, (mnavPos3){25.0, 0.0, 12.5},
                                      nullptr, &shortened) == mnav_success &&
-              !shortened && corridor.count == 5,
+              !shortened && corridor.polygonCount == 5,
           "a ray that meets a wall shortens nothing");
     CHECK(mnavQuery_ShortcutCorridor(query, &corridor, navmesh, (mnavPos3){19.0, 0.0, 12.5},
                                      nullptr, &shortened) == mnav_success &&
@@ -669,17 +669,18 @@ static void TestReplanning(void)
                   mnav_success &&
               path.end == mnav_pathFound &&
               mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
-              valid == corridor.count && corridor.position.x == a.point.x &&
+              valid == corridor.polygonCount && corridor.position.x == a.point.x &&
               corridor.target.x == target.x && corridor.target.z == target.z,
           "planned again between the same points");
     // The target's tile gone: no polygon to plan to, the corridor kept.
-    int32_t count = corridor.count;
+    int32_t count = corridor.polygonCount;
     CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 1) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "tile (1, 1) removed");
     CHECK(mnavQuery_ReplanCorridor(query, &corridor, navmesh, box, nullptr, &path) ==
                   mnav_success &&
-              path.end == mnav_pathNotLoaded && path.polygonCount == 0 && corridor.count == count,
+              path.end == mnav_pathNotLoaded && path.polygonCount == 0 &&
+              corridor.polygonCount == count,
           "nothing loaded at the target");
     CHECK(mnavQuery_ReplanCorridor(query, nullptr, navmesh, box, nullptr, &path) ==
               mnav_errorInvalid,

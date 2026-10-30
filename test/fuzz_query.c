@@ -229,9 +229,9 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
         result = mnavQuery_FindWalls(s_query, s_navmesh, id, a, Length(r), filter, walls, capacity,
                                      &found);
         bool listed = result == mnav_success || result == mnav_errorCapacity;
-        Expect(!listed ||
-               (found.count >= 0 && (result == mnav_errorCapacity) == (found.count > capacity)));
-        for (int32_t k = 0; listed && k < found.count && k < capacity; ++k)
+        Expect(!listed || (found.wallCount >= 0 &&
+                           (result == mnav_errorCapacity) == (found.wallCount > capacity)));
+        for (int32_t k = 0; listed && k < found.wallCount && k < capacity; ++k)
         {
             Expect(Finite(walls[k].start) && Finite(walls[k].end) && isfinite(walls[k].distance) &&
                    (k == 0 || walls[k - 1].distance <= walls[k].distance));
@@ -278,7 +278,7 @@ static void Boxes(Reader* r, const mnavQueryFilter* filter)
     mnavFound found;
     mnavResult result =
         mnavNavmesh_FindPolygons(s_navmesh, center, half, filter, polygons, capacity, &found);
-    Expect(Typed(result) && (result != mnav_success || found.count <= capacity));
+    Expect(Typed(result) && (result != mnav_success || found.polygonCount <= capacity));
 }
 
 // The ground distance from p to the segment from a to b.
@@ -406,7 +406,8 @@ static void Corridor(Reader* r, const mnavQueryFilter* filter)
                                                  filter, &path)
             : op == 6 ? Areas(r, &corridor)
                       : Steer(r, &corridor);
-        Expect(Typed(result) && corridor.count >= 1 && corridor.count <= corridor.capacity);
+        Expect(Typed(result) && corridor.polygonCount >= 1 &&
+               corridor.polygonCount <= corridor.capacity);
     }
 }
 

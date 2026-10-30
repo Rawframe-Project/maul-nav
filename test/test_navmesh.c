@@ -50,7 +50,7 @@ static int32_t Valid(const mnavNavmesh* navmesh, const mnavPolygonId* polygons, 
     {
         buffer[i] = polygons[i];
     }
-    corridor.count = count;
+    corridor.polygonCount = count;
     CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success,
           "checked");
     return valid;

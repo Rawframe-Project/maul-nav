@@ -100,7 +100,7 @@ static void TestCrossings(mnavQuery* query)
           "staged");
     mnavLinkState state;
     CHECK(mnavLink_GetState(navmesh, link, &state) == mnav_success && state.attached &&
-              state.crossings == 33 && fabs(state.start.z - 2.0) < 1e-9,
+              state.crossingCount == 33 && fabs(state.start.z - 2.0) < 1e-9,
           "33 crossings 0.5 m apart, all attached, the first at one side");
     // Each path crosses near its own z, within half a spacing.
     const double places[4] = {3.0, 7.3, 12.6, 17.9};
@@ -119,7 +119,7 @@ static void TestCrossings(mnavQuery* query)
     CHECK(mnavStageLink(navmesh, &def, &wide) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success &&
               mnavLink_GetState(navmesh, wide, &state) == mnav_success && state.attached &&
-              state.crossings > 30 && state.crossings < 61 && state.start.z > 0.0,
+              state.crossingCount > 30 && state.crossingCount < 61 && state.start.z > 0.0,
           "partly attached");
     // A child slot is named by no id.
     mnavLinkId child = {link.slot + 1, link.generation};
@@ -131,7 +131,7 @@ static void TestCrossings(mnavQuery* query)
     def = Ledge(10.0, 16.2f);
     CHECK(mnavStageLink(navmesh, &def, &odd) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success &&
-              mnavLink_GetState(navmesh, odd, &state) == mnav_success && state.crossings == 34,
+              mnavLink_GetState(navmesh, odd, &state) == mnav_success && state.crossingCount == 34,
           "a spacing under the agent's radius");
     // Along z on the ledge itself: the crossings spread along x, the first
     // on the right of the link's direction.
@@ -139,8 +139,9 @@ static void TestCrossings(mnavQuery* query)
     def = (mnavLinkDef){{5, 3, 4}, {5, 3, 16}, 0.5f, 1.0f, mnav_linkJump, false, 4.0f};
     CHECK(mnavStageLink(navmesh, &def, &along) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success &&
-              mnavLink_GetState(navmesh, along, &state) == mnav_success && state.crossings == 9 &&
-              fabs(state.start.x - 7.0) < 1e-9 && fabs(state.start.z - 4.0) < 1e-9,
+              mnavLink_GetState(navmesh, along, &state) == mnav_success &&
+              state.crossingCount == 9 && fabs(state.start.x - 7.0) < 1e-9 &&
+              fabs(state.start.z - 4.0) < 1e-9,
           "a link along z");
     CHECK(mnavStageLinkRemoval(navmesh, odd) == mnav_success &&
               mnavStageLinkRemoval(navmesh, along) == mnav_success,
@@ -208,7 +209,7 @@ static void TestLimitsAndToggles(mnavQuery* query)
               mnavNavmesh_Commit(navmesh) == mnav_success &&
               isnan(Across(query, navmesh, edge, 6.0)) &&
               mnavLink_GetState(navmesh, edge, &state) == mnav_success && !state.enabled &&
-              state.crossings == 33,
+              state.crossingCount == 33,
           "disabled: still snapped, never crossed");
     CHECK(mnavLink_StageEnable(navmesh, edge, true) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success &&

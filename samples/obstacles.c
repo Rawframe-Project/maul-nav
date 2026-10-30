@@ -230,7 +230,7 @@ static int32_t Replan(World* w, mnavQuery* query)
         Agent* agent = &s_agents[a];
         int32_t valid = 0;
         Check(mnavNavmesh_CheckCorridor(w->navmesh, &agent->corridor, NULL, &valid), "check");
-        if (!agent->arrived && valid < agent->corridor.count)
+        if (!agent->arrived && valid < agent->corridor.polygonCount)
         {
             mnavPath path;
             Check(mnavQuery_ReplanCorridor(query, &agent->corridor, w->navmesh, BOX, NULL, &path),

@@ -137,7 +137,7 @@ static void TestOpenFloorIsOneRegion(void)
     const Quad floor = {0, 0, 10, 10, 0, 0, mnav_areaWalkable};
     mnavBakeDef def = Exact();
     Bake(&def, &floor, 1);
-    CHECK(s_report.regions == 1, "one region");
+    CHECK(s_report.regionCount == 1, "one region");
 }
 
 static void TestAreasSplitRegions(void)
@@ -145,7 +145,7 @@ static void TestAreasSplitRegions(void)
     const Quad halves[2] = {{0, 0, 5, 10, 0, 0, mnav_areaWalkable}, {5, 0, 10, 10, 0, 0, 7}};
     mnavBakeDef def = Exact();
     Bake(&def, halves, 2);
-    CHECK(s_report.regions == 2, "two areas, two regions");
+    CHECK(s_report.regionCount == 2, "two areas, two regions");
     CHECK(AreaAt(2.5, 0, 5) == mnav_areaWalkable && AreaAt(7.5, 0, 5) == 7, "split at the area");
     CHECK(Reaches((mnavPos3){2.5, 0, 5}, (mnavPos3){7.5, 0, 5}), "and linked across it");
 }
@@ -164,7 +164,7 @@ static void TestFloorOverTheWholeTile(void)
             walkable += AreaAt(0.25 * x + 0.125, 0, 0.25 * z + 0.125) != NO_POLYGON ? 1 : 0;
         }
     }
-    CHECK(s_report.regions == 1 && walkable == 128 * 128, "every cell");
+    CHECK(s_report.regionCount == 1 && walkable == 128 * 128, "every cell");
 }
 
 static void TestStackedFloorsJoinedByARampAreTwoLayers(void)
@@ -182,7 +182,7 @@ static void TestStackedFloorsJoinedByARampAreTwoLayers(void)
     Bake(&def, quads, 5);
     mnavNearest low = Over(2, 0, 3);
     mnavNearest high = Over(2, 2.5, 3);
-    CHECK(low.polygon.slot != 0 && high.polygon.slot != 0 && s_report.regions >= 2,
+    CHECK(low.polygon.slot != 0 && high.polygon.slot != 0 && s_report.regionCount >= 2,
           "both floors, in different layers");
     CHECK(Reaches((mnavPos3){2, 0, 3}, (mnavPos3){2, 2.5, 3}), "linked by the ramp");
 }
@@ -202,7 +202,7 @@ static void TestSmallIslandsAreDropped(void)
         bool kept = minRegion == 4;
         CHECK((AreaAt(10.5, 0, 10.5) != NO_POLYGON) == kept,
               "an island of 4 cells against the minimum");
-        CHECK(s_report.droppedRegions == (kept ? 0 : 1), "a dropped island counted");
+        CHECK(s_report.regionsDropped == (kept ? 0 : 1), "a dropped island counted");
         CHECK(AreaAt(0.125, 0, 5.375) == mnav_areaWalkable &&
                   AreaAt(0.125, 0, 5.625) == mnav_areaWalkable,
               "a strip on the border is kept");
@@ -231,7 +231,7 @@ static void TestRowWithMoreSweepsThanCells(void)
     mnavBakeDef def = Exact();
     Bake(&def, quads, 45);
     // Each floor of each inside strip is a region: 4 by 7.
-    CHECK(s_report.spans == 28 * 7 && s_report.regions == 28, "twenty-eight strips");
+    CHECK(s_report.spanCount == 28 * 7 && s_report.regionCount == 28, "twenty-eight strips");
 }
 
 static void TestTwoSweepsOverOneRegionStaySeparate(void)
@@ -267,7 +267,7 @@ static void TestTwoSweepsOverOneRegionStaySeparate(void)
     // The surface is linked and covers block 3 twice, so it takes two
     // layers; a region holding both would leave no polygon there.
     CHECK(Over(13.875, 0.125, 12.375).polygon.slot != 0 &&
-              Over(13.875, 2.375, 12.375).polygon.slot != 0 && s_report.regions == 2,
+              Over(13.875, 2.375, 12.375).polygon.slot != 0 && s_report.regionCount == 2,
           "both sweeps, in two layers");
 }
 

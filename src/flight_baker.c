@@ -159,15 +159,15 @@ static mnavResult Bake(mnavFlightBaker* baker, const mnavBakeInput* input, int32
     all.index = nullptr;
     report->fingerprint =
         mnavFingerprintInput(&frame, baker->cells.cosMaxSlope, &all, tileX, tileZ,
-                             HashSettings(&baker->def, tileX, tileZ), &report->triangles);
+                             HashSettings(&baker->def, tileX, tileZ), &report->triangleCount);
     mnavFlightTile tile = {0};
     result = mnavBuildFlightTile(&baker->memory, &baker->def, &baker->shape, input, tileX, tileZ,
-                                 &tile, &report->spans);
+                                 &tile, &report->spanCount);
     if (result == mnav_success)
     {
-        report->cubes = tile.cubeCount;
-        report->nodes = tile.nodeCount;
-        report->leaves = tile.leafCount;
+        report->cubeCount = tile.cubeCount;
+        report->nodeCount = tile.nodeCount;
+        report->leafCount = tile.leafCount;
         result = mnavEncodeFlightTile(&baker->memory, &baker->def, report->fingerprint, &tile,
                                       &baker->tile, &baker->tileSize);
     }

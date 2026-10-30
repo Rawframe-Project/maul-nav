@@ -115,7 +115,7 @@ static bool Landing(Gen* g, double x, double z, double low, double high, double 
         return false;
     }
     bool any = false;
-    for (int32_t i = 0; i < found.count; ++i)
+    for (int32_t i = 0; i < found.polygonCount; ++i)
     {
         double h = 0.0;
         if (mnavGetHeightWork(g->navmesh, ids[i], x, z, &h) != mnav_success || h < low || h > high)

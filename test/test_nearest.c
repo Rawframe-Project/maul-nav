@@ -179,7 +179,7 @@ static void TestPolygonsInBoxes(void)
                       mnavNavmesh_FindNearest(navmesh, c, half, nullptr, &n) == mnav_success,
                   "queried");
             bool held = n.polygon.slot == 0;
-            for (int32_t k = 0; k < found.count; ++k)
+            for (int32_t k = 0; k < found.polygonCount; ++k)
             {
                 held = held ||
                        (list[k].slot == n.polygon.slot && list[k].polygon == n.polygon.polygon);
@@ -188,9 +188,9 @@ static void TestPolygonsInBoxes(void)
             }
             holdsNearest = holdsNearest && held;
             agrees = agrees && found.incomplete == n.incomplete;
-            total += found.count;
-            hash = mnavHash64(hash, &found.count, (int64_t)sizeof(found.count));
-            hash = mnavHash64(hash, list, (int64_t)((size_t)found.count * sizeof(list[0])));
+            total += found.polygonCount;
+            hash = mnavHash64(hash, &found.polygonCount, (int64_t)sizeof(found.polygonCount));
+            hash = mnavHash64(hash, list, (int64_t)((size_t)found.polygonCount * sizeof(list[0])));
         }
     }
     printf("BOXES_HASH=%016llx polygons=%d\n", (unsigned long long)hash, total);
@@ -203,24 +203,24 @@ static void TestPolygonsInBoxes(void)
     mnavFound some;
     mnavPolygonId few[3];
     CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, list, 1024, &all) == mnav_success &&
-              all.count > 3 && all.incomplete,
+              all.polygonCount > 3 && all.incomplete,
           "many, the fourth tile not loaded");
     CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, few, 3, &some) ==
                   mnav_errorCapacity &&
-              some.count == all.count && memcmp(few, list, sizeof(few)) == 0,
+              some.polygonCount == all.polygonCount && memcmp(few, list, sizeof(few)) == 0,
           "the first three, and the count of all");
     CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, nullptr, 0, &some) ==
                   mnav_errorCapacity &&
-              some.count == all.count,
+              some.polygonCount == all.polygonCount,
           "counted without a buffer");
     CHECK(mnavNavmesh_FindPolygons(navmesh, (mnavPos3){500.0, 0.0, 500.0}, half, nullptr, nullptr,
                                    0, &some) == mnav_success &&
-              some.count == 0 && some.incomplete,
+              some.polygonCount == 0 && some.incomplete,
           "nothing loaded there");
     mnavQueryFilter none = mnavDefaultQueryFilter();
     none.areas = 0;
     CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, &none, list, 1024, &some) == mnav_success &&
-              some.count == 0,
+              some.polygonCount == 0,
           "no area wanted");
     CHECK(mnavNavmesh_FindPolygons(navmesh, c, half, nullptr, nullptr, 2, &some) ==
                   mnav_errorInvalid &&

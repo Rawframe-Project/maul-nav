@@ -378,7 +378,7 @@ static MNAV_NOINLINE mnavResult GetLinkWork(const mnavNavmesh* navmesh, mnavLink
     }
     *stateOut = best >= 0 ? navmesh->links[best].state : (mnavLinkState){0};
     stateOut->enabled = navmesh->links[s].state.enabled;
-    stateOut->crossings = attached;
+    stateOut->crossingCount = attached;
     return mnav_success;
 }
 
@@ -552,7 +552,7 @@ static void Resnap(mnavNavmesh* navmesh, mnavOffLink* link)
     state.attached =
         Snap(navmesh, link->def.start, link->def.radius, &state.startPolygon, &state.start) &&
         Snap(navmesh, link->def.end, link->def.radius, &state.endPolygon, &state.end);
-    state.crossings = state.attached ? 1 : 0;
+    state.crossingCount = state.attached ? 1 : 0;
     link->state = state.attached ? state : (mnavLinkState){0};
 }
 

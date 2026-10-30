@@ -199,7 +199,7 @@ static void FindWalls(mnavQuery* query, const mnavNavmesh* navmesh)
             mnavQuery_FindWalls(query, navmesh, w->corridor.polygons[0], w->corridor.position,
                                 WALL_RANGE, NULL, w->walls, WALLS, &found);
         Check(result == mnav_errorCapacity ? mnav_success : result, "walls");
-        w->wallCount = found.count < WALLS ? found.count : WALLS;
+        w->wallCount = found.wallCount < WALLS ? found.wallCount : WALLS;
         w->wallsAt = w->corridor.position;
     }
 }

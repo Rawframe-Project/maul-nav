@@ -53,7 +53,7 @@ static void TestTiesAndTheRadius(void)
     mnavWallsFound found;
     CHECK(mnavQuery_FindWalls(query, navmesh, polygon, (mnavPos3){5.0, 0.0, 5.0}, 5.0, nullptr,
                               walls, 4, &found) == mnav_success &&
-              found.count == 4 && !found.limited,
+              found.wallCount == 4 && !found.limited,
           "the four sides at the radius");
     bool ordered = true;
     for (int32_t k = 0; k < 4; ++k)
@@ -67,7 +67,7 @@ static void TestTiesAndTheRadius(void)
     // z = 0 and z = 10 at 5 m in the order met, then x = 10 at 9 m.
     CHECK(mnavQuery_FindWalls(query, navmesh, polygon, (mnavPos3){1.0, 0.0, 5.0}, 9.0, nullptr,
                               walls, 4, &found) == mnav_success &&
-              found.count == 4 && walls[0].distance == 1.0 && walls[0].start.z == 0.0 &&
+              found.wallCount == 4 && walls[0].distance == 1.0 && walls[0].start.z == 0.0 &&
               walls[1].distance == 5.0 && walls[1].start.x == 0.0 && walls[1].start.z == 10.0 &&
               walls[2].distance == 5.0 && walls[2].start.x == 10.0 && walls[2].start.z == 0.0 &&
               walls[3].distance == 9.0,
@@ -90,7 +90,7 @@ static void TestShortBuffer(void)
     mnavWallsFound found;
     CHECK(mnavQuery_FindWalls(query, navmesh, polygon, (mnavPos3){1.0, 0.0, 2.0}, 10.0, nullptr,
                               walls, 2, &found) == mnav_errorCapacity &&
-              found.count == 4,
+              found.wallCount == 4,
           "all four counted");
     CHECK(walls[0].distance == 1.0 && walls[1].distance == 2.0 && walls[2].distance == -1.0,
           "the two nearest, nothing past them");
@@ -130,7 +130,7 @@ static void TestPartlyLinkedSide(void)
     mnavWallsFound found;
     CHECK(mnavQuery_FindWalls(query, navmesh, n.polygon, (mnavPos3){30.0, 0.0, 8.0}, 2.5, nullptr,
                               walls, 4, &found) == mnav_success &&
-              found.count == 2,
+              found.wallCount == 2,
           "two walls within 2.5 m");
     CHECK(walls[0].distance == 2.0 && walls[0].start.z == 10.0 && walls[0].end.z == 10.0 &&
               walls[1].distance == 2.0 && walls[1].start.x == 32.0 && walls[1].end.x == 32.0 &&
@@ -146,7 +146,7 @@ static void TestPartlyLinkedSide(void)
     // the open part lies over 3.6 m off.
     CHECK(mnavQuery_FindWalls(query, navmesh, n.polygon, (mnavPos3){30.0, 0.0, 2.0}, 2.5, nullptr,
                               walls, 4, &found) == mnav_success &&
-              found.count == 1 && walls[0].start.z == 0.0 && walls[0].end.z == 0.0,
+              found.wallCount == 1 && walls[0].start.z == 0.0 && walls[0].end.z == 0.0,
           "the linked part is no wall");
     mnavDestroyNavmesh(navmesh);
     mnavNavmeshDef meshDef2 = NavmeshDefFor(&def);
@@ -165,7 +165,7 @@ static void TestPartlyLinkedSide(void)
               n.polygon.slot != 0 &&
               mnavQuery_FindWalls(query, navmesh, n.polygon, (mnavPos3){30.0, 0.0, 2.0}, 2.5,
                                   nullptr, walls, 4, &found) == mnav_success &&
-              found.count == 2 && walls[0].start.x == 32.0 && walls[0].start.z == 5.0 &&
+              found.wallCount == 2 && walls[0].start.x == 32.0 && walls[0].start.z == 5.0 &&
               walls[0].end.z == 0.0 && walls[1].start.z == 0.0 && walls[1].end.z == 0.0,
           "the open part after the linked one");
     mnavDestroyQuery(query);

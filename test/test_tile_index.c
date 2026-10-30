@@ -156,7 +156,7 @@ static bool BakesAlike(mnavBaker* baker, const mnavBakeInput* input, int32_t x, 
     {
         return false;
     }
-    return ra == rb && a.triangles == b.triangles && a.fingerprint == b.fingerprint &&
+    return ra == rb && a.triangleCount == b.triangleCount && a.fingerprint == b.fingerprint &&
            first == second && memcmp(s_plain, s_indexed, first) == 0;
 }
 
@@ -207,8 +207,8 @@ static void TestOneTileInside(void)
               mnavCreateTileIndex(&def, &mesh, 1, &index, &report) == mnav_success,
           "made");
     const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, index};
-    CHECK(mnavBaker_BakeTile(baker, &input, 2, 1, &report) == mnav_success && report.polygons > 0 &&
-              BakesAlike(baker, &input, 2, 1),
+    CHECK(mnavBaker_BakeTile(baker, &input, 2, 1, &report) == mnav_success &&
+              report.polygonCount > 0 && BakesAlike(baker, &input, 2, 1),
           "a tile holding all the input, the index's first, bakes alike");
     mnavDestroyTileIndex(index);
     mnavDestroyBaker(baker);
@@ -293,7 +293,7 @@ static bool Bakes2DAlike(mnavBaker* baker, const mnavTileIndex* index, int32_t x
             return false;
         }
     }
-    return results[1] == results[0] && reports[1].triangles == reports[0].triangles &&
+    return results[1] == results[0] && reports[1].triangleCount == reports[0].triangleCount &&
            reports[1].fingerprint == reports[0].fingerprint && sizes[1] == sizes[0] &&
            memcmp(out[1], out[0], sizes[0]) == 0;
 }
@@ -487,7 +487,8 @@ static void TestRefusals(void)
     meshes[1].triangleCount += 1;
 
     // A triangle changed since is checked as it is read.
-    CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_success && report.triangles > 0,
+    CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_success &&
+              report.triangleCount > 0,
           "baked");
     for (int32_t t = 0; t < TRIANGLES; ++t)
     {

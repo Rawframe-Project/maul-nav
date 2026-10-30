@@ -160,7 +160,7 @@ static int64_t TwiceArea(void)
 static bool Merged(const Floor* floor)
 {
     Load(floor);
-    bool covered = s_report.droppedHoles == 0 && s_report.partialRings == 0;
+    bool covered = s_report.holesDropped == 0 && s_report.partialRingCount == 0;
     int32_t cells = 0;
     for (int32_t z = 0; z < floor->side; ++z)
     {
@@ -266,7 +266,7 @@ static void TestLevelMergesEveryHole(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
-    CHECK(report.droppedHoles == 0 && report.partialRings == 0, "every hole joined");
+    CHECK(report.holesDropped == 0 && report.partialRingCount == 0, "every hole joined");
     mnavDestroyBaker(baker);
 }
 

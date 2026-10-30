@@ -237,7 +237,7 @@ static void TestSampleOnADiagonalSplitsBothTriangles(void)
     mnavNearest n;
     CHECK(mnavNavmesh_FindNearest(s_navmesh, (mnavPos3){16.0, 4.0, 16.0},
                                   (mnavVec3){0.01f, 1.0f, 0.01f}, nullptr, &n) == mnav_success &&
-              n.over && report.polygons == 1,
+              n.over && report.polygonCount == 1,
           "one polygon");
     Shape s = Read(n.polygon);
     CHECK(Delaunay(s) && s.triangles == 4 && s.corners == 5 && s.outline == 4, "four faces");
@@ -284,7 +284,7 @@ static void TestBumpyFloorStaysDelaunay(void)
             Load(&def, &input, &report);
             static mnavPolygonId polygons[POLYGON_ROOM];
             int32_t count = Polygons(polygons);
-            bool all = count == report.polygons;
+            bool all = count == report.polygonCount;
             int32_t inner = 0;
             for (int32_t p = 0; p < count; ++p)
             {
