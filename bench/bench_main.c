@@ -313,7 +313,6 @@ static bool Seen(int32_t x, int32_t z, int32_t cx, int32_t cz)
 static void Stream(int32_t links)
 {
     mnavBakeDef def = Def();
-    def.limits.tiles = 64;
     double bestStep = 1e30;
     double worstStep = 0.0;
     double total = 0.0;
@@ -327,7 +326,10 @@ static void Stream(int32_t links)
         size_t before = s_held;
         s_peak = s_held;
         mnavNavmesh* navmesh = NULL;
-        Check(mnavCreateNavmesh(&def, &navmesh).result, "navmesh");
+        mnavNavmeshDef meshDef = mnavDefaultNavmeshDef();
+        meshDef.bake = def;
+        meshDef.limits.tiles = 64;
+        Check(mnavCreateNavmesh(&meshDef, &navmesh).result, "navmesh");
         // Short jumps scattered over the terrain, snapped at each commit.
         uint32_t state = 3;
         for (int32_t l = 0; l < links; ++l)
@@ -517,7 +519,9 @@ static void Paths(void)
 {
     mnavBakeDef def = Def();
     mnavNavmesh* navmesh = NULL;
-    Check(mnavCreateNavmesh(&def, &navmesh).result, "navmesh");
+    mnavNavmeshDef meshDef = mnavDefaultNavmeshDef();
+    meshDef.bake = def;
+    Check(mnavCreateNavmesh(&meshDef, &navmesh).result, "navmesh");
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
         Check(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result, "stage");
@@ -826,7 +830,9 @@ static void Crowd(void)
 {
     mnavBakeDef def = Def();
     mnavNavmesh* navmesh = NULL;
-    Check(mnavCreateNavmesh(&def, &navmesh).result, "navmesh");
+    mnavNavmeshDef meshDef = mnavDefaultNavmeshDef();
+    meshDef.bake = def;
+    Check(mnavCreateNavmesh(&meshDef, &navmesh).result, "navmesh");
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {
         Check(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result, "stage");
@@ -1090,10 +1096,8 @@ static int32_t WorldBox(int32_t n, float x0, float z0, float x1, float z1, mnavA
 static mnavNavmesh* FlatWorld(float* sideOut)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.limits.tiles = WORLD_TILES * WORLD_TILES;
     def.allocator = (mnavAllocator){Alloc, Free, NULL};
     // Areas may change, for the hierarchy update.
-    def.tier = mnav_tierModifiers;
     float side = def.cellSize * (float)def.tileCells * (float)WORLD_TILES;
     int32_t n = WorldBox(0, 0.0f, 0.0f, side, side, mnav_areaWalkable);
     for (float z = 4.0f; z < side; z += 8.0f)
@@ -1113,7 +1117,11 @@ static mnavNavmesh* FlatWorld(float* sideOut)
     mnavBaker* baker = NULL;
     mnavNavmesh* navmesh = NULL;
     Check(mnavCreateBaker(&def, &baker).result, "baker");
-    Check(mnavCreateNavmesh(&def, &navmesh).result, "navmesh");
+    mnavNavmeshDef meshDef = mnavDefaultNavmeshDef();
+    meshDef.bake = def;
+    meshDef.limits.tiles = WORLD_TILES * WORLD_TILES;
+    meshDef.tier = mnav_tierModifiers;
+    Check(mnavCreateNavmesh(&meshDef, &navmesh).result, "navmesh");
     size_t capacity = (size_t)1 << 20;
     uint8_t* buffer = malloc(capacity);
     for (int32_t z = 0; z < WORLD_TILES; ++z)
@@ -1356,7 +1364,9 @@ static mnavFlightVolume* FlightBake(int32_t runs)
     mnavBakeInput input = {meshes, 2, NULL, 0, NULL, 0, NULL};
     static uint8_t buffer[TILE_BYTES];
     mnavFlightVolume* volume = NULL;
-    Check(mnavCreateFlightVolume(&def, &volume).result, "flight volume");
+    mnavFlightVolumeDef volumeDef = mnavDefaultFlightVolumeDef();
+    volumeDef.flight = def;
+    Check(mnavCreateFlightVolume(&volumeDef, &volume).result, "flight volume");
     double best = 1e30;
     size_t bytes = 0;
     int64_t nodes = 0;

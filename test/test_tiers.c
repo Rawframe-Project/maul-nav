@@ -18,7 +18,7 @@
 // fourth beyond a gap, from (25, 5) to (30, 10).
 static mnavNavmesh* Load(mnavTier tier)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmeshDef def = mnavDefaultNavmeshDef();
     def.tier = tier;
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
@@ -61,15 +61,14 @@ static mnavQuery* MakeQuery(void)
 
 static void TestTheDef(void)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmeshDef def = mnavDefaultNavmeshDef();
     CHECK(def.tier == mnav_tierStatic, "static by default");
     def.tier = mnav_tierDynamic + 1;
-    mnavBakeDefResult checked = mnavValidateBakeDef(&def, nullptr);
-    CHECK(checked.result == mnav_errorInvalid && checked.setting == mnav_settingTier,
-          "no fourth tier");
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).setting == mnav_settingTier && navmesh == nullptr,
-          "not created");
+    mnavNavmeshDefResult created = mnavCreateNavmesh(&def, &navmesh);
+    CHECK(created.result == mnav_errorInvalid && created.setting == mnav_navmeshSettingTier &&
+              navmesh == nullptr,
+          "no fourth tier");
     CHECK(mnavNavmesh_GetTier(nullptr) == mnav_tierStatic, "NULL reads static");
     CHECK(mnavGetResultName(mnav_errorUnsupported)[5] == 'e', "named");
 }

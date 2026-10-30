@@ -80,7 +80,7 @@ static mnavResult Find(const mnavNavmesh* navmesh, mnavLinkId id, int32_t* slotO
 // navmesh's origin, so that the arithmetic on links stays finite.
 static bool InExtent(const mnavNavmesh* navmesh, mnavPos3 p)
 {
-    const mnavBakeDef* def = &navmesh->def;
+    const mnavBakeDef* def = &navmesh->def.bake;
     double ground = (double)def->cellSize * (double)MNAV_MAX_EXTENT_CELLS;
     double vertical = (double)def->cellHeight * (double)MNAV_MAX_HEIGHT_CELLS;
     return fabs(p.x - def->origin.x) <= ground && fabs(p.z - def->origin.z) <= ground &&
@@ -125,8 +125,8 @@ static int32_t Crossings(const mnavNavmesh* navmesh, const mnavLinkDef* def)
     {
         return 1;
     }
-    double spacing = navmesh->def.agent.radius > 0.0f ? (double)navmesh->def.agent.radius
-                                                      : (double)navmesh->def.cellSize;
+    double spacing = navmesh->def.bake.agent.radius > 0.0f ? (double)navmesh->def.bake.agent.radius
+                                                           : (double)navmesh->def.bake.cellSize;
     double gaps = ceil((double)def->width / spacing);
     return gaps >= (double)(MNAV_MAX_LINK_CROSSINGS - 1) ? MNAV_MAX_LINK_CROSSINGS
                                                          : 1 + (int32_t)gaps;
@@ -439,7 +439,7 @@ mnavResult mnavLink_IsEnabled(const mnavNavmesh* navmesh, mnavLinkId id, bool* e
 static mnavPos3 SnapHalf(const mnavNavmesh* navmesh, float radius)
 {
     double step =
-        (double)(float)((double)navmesh->cells.agentStep * (double)navmesh->def.cellHeight);
+        (double)(float)((double)navmesh->cells.agentStep * (double)navmesh->def.bake.cellHeight);
     return (mnavPos3){(double)radius, step, (double)radius};
 }
 

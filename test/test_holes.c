@@ -6,6 +6,7 @@
 // tile's polygons cover the floor's cells and no hole's, exactly once.
 // test_holes_rings.c covers dropping a hole, which no bake reaches.
 
+#include "defs_for.h"
 #include "soup.h"
 #include "test_harness.h"
 
@@ -96,7 +97,8 @@ static void Load(const Floor* floor)
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_navmesh, s_tile, s_size).result == mnav_success &&
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");

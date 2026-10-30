@@ -17,6 +17,7 @@
 
 #include "allocator.h"
 #include "bytes.h"
+#include "defs_for.h"
 #include "flight.h"
 #include "flight_def.h"
 #include "flight_tile.h"
@@ -184,7 +185,8 @@ static mnavFlightVolume* Bake(Input* in)
     mnavFlightBaker* baker = nullptr;
     mnavFlightVolume* volume = nullptr;
     Expect(mnavCreateFlightBaker(&def, &baker).result == mnav_success);
-    Expect(mnavCreateFlightVolume(&def, &volume).result == mnav_success);
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
+    Expect(mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success);
     static uint8_t bytes[TILE_BYTES];
     for (int32_t t = 0; t < 4; ++t)
     {

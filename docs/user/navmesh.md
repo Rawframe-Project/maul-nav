@@ -3,14 +3,16 @@
 A navmesh holds the committed tiles and off-mesh links that queries read. Changes are staged, then committed together at a point the host chooses, so a query never sees half of a change.
 
 ```c
+mnavNavmeshDef def = mnavDefaultNavmeshDef();   // tier, limits, allocator
+def.bake = bakeDef;                              // the def the tiles are baked with
 mnavNavmesh* navmesh = NULL;
-mnavBakeDefResult created = mnavCreateNavmesh(&def, &navmesh);   // the bake def
+mnavNavmeshDefResult created = mnavCreateNavmesh(&def, &navmesh);
 mnavTileResult staged = mnavNavmesh_StageTile(navmesh, bytes, size);     // copied
 // staged.result; refused bytes are named by section and element
 mnavResult committed = mnavNavmesh_Commit(navmesh);
 ```
 
-- **The bake's def.** A navmesh is made from the def its tiles were baked with. A tile baked with another cell size, tile size, origin or agent is refused when staged.
+- **Its def.** A navmesh is made from a def of its own: its tier, its allocator and its limits (tiles, links per tile, off-mesh links, memory), and in `bake` the def its tiles are baked with. Of that bake def the navmesh reads only what a tile records, and a tile baked with another cell size, tile size, origin or agent is refused when staged. The bake def's own allocator, limits and clock stay the bakers'.
 - **Loading.** Tile bytes are hostile input: every field is checked before anything is allocated, and a damaged payload, a polygon that is not convex or a neighbor that does not lead back is refused with `mnavTileResult` naming the section and element. Bytes of another tile format version are `mnav_errorVersion`. The navmesh copies the bytes, so the caller's buffer can be reused at once.
 - **Commits.** `mnavNavmesh_Commit` applies everything staged: tiles in and out, links across the changed tiles' sides, off-mesh links added and removed and snapped again. Either all of it applies, or nothing does and the staged changes stay. Stage from a loading thread while queries run, as long as one thread stages at a time; commit when no query runs.
 
@@ -24,7 +26,7 @@ Tiles, polygons and off-mesh links are named by ids that carry a generation. Rep
 
 ## Tiers
 
-The def's `tier` declares what may change once tiles are loaded. Tiles and off-mesh links load and unload in every tier.
+The navmesh def's `tier` declares what may change once tiles are loaded. Tiles and off-mesh links load and unload in every tier.
 
 | Tier | Also allows |
 |---|---|
@@ -42,7 +44,7 @@ An off-mesh link joins two points the ground does not join: a jump, a drop, a cl
 
 - `mnavStageLink` takes an `mnavLinkDef`: the two ends, how far each may snap, a cost, a kind, and whether it goes both ways. The id comes back at once; the link is added at the next commit.
 - At every commit each link's ends snap to the nearest polygon within its radius, so a link attaches when both ends' tiles are loaded and detaches when one leaves. `mnavLink_GetState` says whether it is attached and enabled and where its ends snapped.
-- An edge link (`width` above 0) joins two edges rather than two points, such as a long ledge to the ground below it. It is crossed at points spaced no farther apart than the agent's radius, and each crossing takes one of the def's `limits.links`: a link 16 m wide for agents of 0.5 m takes 33. Size the limit by crossings, not by links.
+- An edge link (`width` above 0) joins two edges rather than two points, such as a long ledge to the ground below it. It is crossed at points spaced no farther apart than the agent's radius, and each crossing takes one of the navmesh def's `limits.links`: a link 16 m wide for agents of 0.5 m takes 33. Size the limit by crossings, not by links.
 - `mnavStageLinkRemoval` removes a link; a link staged and not yet committed goes at once.
 - Paths list the links they cross, with their kinds, so the host can play the traversal and move the agent itself.
 

@@ -5,6 +5,7 @@
 // named limits.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
@@ -26,9 +27,10 @@ static mnavNavmesh* Load(const int32_t* tiles, int32_t count)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < count; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[tiles[t]], s_sizes[tiles[t]]).result ==
@@ -243,8 +245,9 @@ static void TestUnreachableIsNone(void)
     // Two squares inside one tile, apart, touching none of its sides.
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     CHECK(
-        mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+        mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
             mnavNavmesh_StageTile(navmesh, s_handApartSquares, sizeof(s_handApartSquares)).result ==
                 mnav_success &&
             mnavNavmesh_Commit(navmesh) == mnav_success,

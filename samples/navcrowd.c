@@ -97,7 +97,9 @@ static mnavNavmesh* Load(void)
     mnavBaker* baker = NULL;
     mnavNavmesh* navmesh = NULL;
     Check(mnavCreateBaker(&def, &baker).result, "baker");
-    Check(mnavCreateNavmesh(&def, &navmesh).result, "navmesh");
+    mnavNavmeshDef meshDef = mnavDefaultNavmeshDef();
+    meshDef.bake = def;
+    Check(mnavCreateNavmesh(&meshDef, &navmesh).result, "navmesh");
     mnavTriangleMesh room = Room();
     uint8_t* bytes = malloc(TILE_ROOM);
     size_t size = 0;

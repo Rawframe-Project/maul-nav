@@ -22,16 +22,82 @@
 #include <stdint.h>
 #include <string.h>
 
-static MNAV_NOINLINE mnavBakeDefResult CreateNavmeshWork(const mnavBakeDef* def,
-                                                         mnavNavmesh** navmeshOut)
+static mnavNavmeshDefResult Refuse(mnavResult result, mnavNavmeshSetting setting)
+{
+    return (mnavNavmeshDefResult){result, setting, mnav_settingNone};
+}
+
+static mnavNavmeshDefResult CheckLimits(const mnavNavmeshLimits* limits)
+{
+    const struct
+    {
+        int32_t value;
+        int32_t max;
+        mnavNavmeshSetting setting;
+    } counts[] = {
+        {limits->tiles, MNAV_MAX_TILES, mnav_navmeshSettingTiles},
+        {limits->tileLinks, MNAV_MAX_TILE_LINKS, mnav_navmeshSettingTileLinks},
+        {limits->links, MNAV_MAX_LINKS, mnav_navmeshSettingLinks},
+    };
+    for (size_t i = 0; i < sizeof(counts) / sizeof(counts[0]); ++i)
+    {
+        if (counts[i].value < 1)
+        {
+            return Refuse(mnav_errorInvalid, counts[i].setting);
+        }
+        if (counts[i].value > counts[i].max)
+        {
+            return Refuse(mnav_errorLimit, counts[i].setting);
+        }
+    }
+    if (limits->memoryBytes == 0)
+    {
+        return Refuse(mnav_errorInvalid, mnav_navmeshSettingMemoryBytes);
+    }
+    return Refuse(mnav_success, mnav_navmeshSettingNone);
+}
+
+// Checks a navmesh def and converts its bake def's agent to cells.
+static mnavNavmeshDefResult CheckDef(const mnavNavmeshDef* def, mnavBakeCells* cells)
+{
+    if (def == nullptr)
+    {
+        return Refuse(mnav_errorInvalid, mnav_navmeshSettingNone);
+    }
+    if (def->cookie != MNAV_NAVMESH_DEF_COOKIE)
+    {
+        return Refuse(mnav_errorInvalid, mnav_navmeshSettingCookie);
+    }
+    if (def->version != MNAV_ABI_VERSION)
+    {
+        return Refuse(mnav_errorVersion, mnav_navmeshSettingNone);
+    }
+    if ((def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
+    {
+        return Refuse(mnav_errorInvalid, mnav_navmeshSettingAllocator);
+    }
+    mnavBakeDefResult bake = mnavCheckBakeDef(&def->bake, cells);
+    if (bake.result != mnav_success)
+    {
+        return (mnavNavmeshDefResult){bake.result, mnav_navmeshSettingBake, bake.setting};
+    }
+    if (def->tier > mnav_tierDynamic)
+    {
+        return Refuse(mnav_errorInvalid, mnav_navmeshSettingTier);
+    }
+    return CheckLimits(&def->limits);
+}
+
+static MNAV_NOINLINE mnavNavmeshDefResult CreateNavmeshWork(const mnavNavmeshDef* def,
+                                                            mnavNavmesh** navmeshOut)
 {
     if (navmeshOut == nullptr)
     {
-        return (mnavBakeDefResult){mnav_errorInvalid, mnav_settingNone};
+        return Refuse(mnav_errorInvalid, mnav_navmeshSettingNone);
     }
     *navmeshOut = nullptr;
     mnavBakeCells cells = {0};
-    mnavBakeDefResult checked = mnavCheckBakeDef(def, &cells);
+    mnavNavmeshDefResult checked = CheckDef(def, &cells);
     if (checked.result != mnav_success)
     {
         return checked;
@@ -42,7 +108,7 @@ static MNAV_NOINLINE mnavBakeDefResult CreateNavmeshWork(const mnavBakeDef* def,
         mnavAllocate(&memory, 1, sizeof(mnavNavmesh), alignof(mnavNavmesh), (void**)&navmesh);
     if (result != mnav_success)
     {
-        return (mnavBakeDefResult){result, mnav_settingNone};
+        return Refuse(result, mnav_navmeshSettingNone);
     }
     *navmesh = (mnavNavmesh){0};
     for (int32_t k = 0; k < MNAV_LINK_KINDS; ++k)
@@ -55,13 +121,13 @@ static MNAV_NOINLINE mnavBakeDefResult CreateNavmeshWork(const mnavBakeDef* def,
     navmesh->memory = memory;
     navmesh->memory.host = &navmesh->host;
     *navmeshOut = navmesh;
-    return (mnavBakeDefResult){mnav_success, mnav_settingNone};
+    return Refuse(mnav_success, mnav_navmeshSettingNone);
 }
 
-mnavBakeDefResult mnavCreateNavmesh(const mnavBakeDef* def, mnavNavmesh** navmeshOut)
+mnavNavmeshDefResult mnavCreateNavmesh(const mnavNavmeshDef* def, mnavNavmesh** navmeshOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavBakeDefResult result = CreateNavmeshWork(def, navmeshOut);
+    mnavNavmeshDefResult result = CreateNavmeshWork(def, navmeshOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -221,7 +287,7 @@ static uint64_t DoubleBits(double d)
 // Whether a tile was baked with the navmesh's settings, bit for bit.
 static bool Matches(const mnavNavmesh* navmesh, const mnavTileInfo* info)
 {
-    const mnavBakeDef* def = &navmesh->def;
+    const mnavBakeDef* def = &navmesh->def.bake;
     const mnavBakeCells* cells = &navmesh->cells;
     return info->tileCells == def->tileCells &&
            FloatBits(info->cellSize) == FloatBits(def->cellSize) &&
@@ -785,7 +851,7 @@ void mnavApplyTiles(mnavNavmesh* navmesh, mnavTilePlan* plan)
 
 mnavFrame mnavFrameOf(const mnavNavmesh* navmesh, int32_t x, int32_t z)
 {
-    const mnavBakeDef* def = &navmesh->def;
+    const mnavBakeDef* def = &navmesh->def.bake;
     double size = (double)def->tileCells * (double)def->cellSize;
     return (mnavFrame){def->origin.x + (double)x * size, def->origin.z + (double)z * size,
                        def->origin.y, (double)def->cellSize, (double)def->cellHeight};

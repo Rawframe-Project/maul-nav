@@ -7,6 +7,7 @@
 // short buffer holds the nearest without writing past its capacity, and
 // the part of a tile side no polygon across covers is a wall.
 
+#include "defs_for.h"
 #include "hand_tiles.h"
 #include "test_harness.h"
 
@@ -23,7 +24,8 @@ static mnavNavmesh* Square(mnavPolygonId* polygonOut)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     CHECK(mnavNavmesh_StageTile(navmesh, s_handSquare, sizeof(s_handSquare)).result ==
                   mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
@@ -105,7 +107,8 @@ static void TestPartlyLinkedSide(void)
     // wall, to the wall distance and the wall list alike.
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_handSeamWest, sizeof(s_handSeamWest)).result ==
                   mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_handSeamSouth, sizeof(s_handSeamSouth)).result ==
@@ -146,10 +149,11 @@ static void TestPartlyLinkedSide(void)
               found.count == 1 && walls[0].start.z == 0.0 && walls[0].end.z == 0.0,
           "the linked part is no wall");
     mnavDestroyNavmesh(navmesh);
+    mnavNavmeshDef meshDef2 = NavmeshDefFor(&def);
     // The square across from z = 5 to 10 m instead: along the side, from
     // z = 10 to 0 m, the linked part comes first and the open part after
     // it, from z = 5 to 0 m.
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    CHECK(mnavCreateNavmesh(&meshDef2, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_handSeamWest, sizeof(s_handSeamWest)).result ==
                   mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_handSeamNorth, sizeof(s_handSeamNorth)).result ==

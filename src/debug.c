@@ -99,7 +99,7 @@ static void Bounds(mnavDebugBuffer* buffer, const mnavNavmesh* navmesh, int32_t 
     }
     low = isfinite(low) ? low : 0.0;
     mnavFrame f = mnavFrameOf(navmesh, s->x, s->z);
-    double side = (double)navmesh->def.tileCells * f.cell;
+    double side = (double)navmesh->def.bake.tileCells * f.cell;
     mnavPos3 c[4] = {{f.x0, low, f.z0},
                      {f.x0 + side, low, f.z0},
                      {f.x0 + side, low, f.z0 + side},

@@ -58,7 +58,7 @@ static void GuideBake(void)
     uint8_t* bytes = s_bytes;
     size_t capacity = sizeof(s_bytes);
     // clang-format off
-    mnavBakeDef def = mnavDefaultBakeDef();   // agent, cells, limits, tier
+    mnavBakeDef def = mnavDefaultBakeDef();   // agent, cells, limits
     mnavBaker* baker = NULL;
     mnavBakeDefResult made = mnavCreateBaker(&def, &baker);
     // made.result; on a refused def, made.setting names the bad setting.
@@ -81,12 +81,14 @@ static void GuideBake(void)
 
 static void GuideNavmesh(void)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBakeDef bakeDef = mnavDefaultBakeDef();
     const uint8_t* bytes = s_tiles[0];
     size_t size = s_sizes[0];
     // clang-format off
+    mnavNavmeshDef def = mnavDefaultNavmeshDef();   // tier, limits, allocator
+    def.bake = bakeDef;                              // the def the tiles are baked with
     mnavNavmesh* navmesh = NULL;
-    mnavBakeDefResult created = mnavCreateNavmesh(&def, &navmesh);   // the bake def
+    mnavNavmeshDefResult created = mnavCreateNavmesh(&def, &navmesh);
     mnavTileResult staged = mnavNavmesh_StageTile(navmesh, bytes, size);     // copied
     // staged.result; refused bytes are named by section and element
     mnavResult committed = mnavNavmesh_Commit(navmesh);
@@ -100,7 +102,7 @@ static void GuideNavmesh(void)
 // The world's four tiles in one navmesh, for the snippets that query.
 static mnavNavmesh* Loaded(void)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmeshDef def = mnavDefaultNavmeshDef();
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
     for (int32_t t = 0; t < 4; ++t)

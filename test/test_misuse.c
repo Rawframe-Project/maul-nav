@@ -8,6 +8,7 @@
 // outside the object and a value past a published bound count none, and
 // neither does a link generation or a hierarchy build with good input.
 
+#include "defs_for.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
 #include "trench.h"
@@ -39,9 +40,10 @@ static mnavLinkDef s_links[LINKS];
 static mnavNavmesh* Trench2(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_trench1, sizeof(s_trench1)).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
@@ -163,7 +165,8 @@ static void TestBakers(void)
               mnavFlightBaker_BakeTile(flightBaker, nullptr, 0, 0, nullptr) == mnav_errorInvalid &&
               mnavFlightBaker_GetMisuse(flightBaker) == 1,
           "a flight baker: geometry none, no input one");
-    CHECK(mnavCreateFlightVolume(&flight, &volume).result == mnav_success &&
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&flight);
+    CHECK(mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success &&
               mnavFlightVolume_IsOpen(volume, (mnavPos3){(double)NAN, 0.0, 0.0}, &open) ==
                   mnav_errorInvalid &&
               mnavFlightVolume_GetMisuse(volume) == 1,

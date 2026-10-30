@@ -46,11 +46,8 @@ extern "C"
 #define MNAV_MAX_TILE_SPANS      67108864
 #define MNAV_MAX_TILE_POLYGONS   65535
 #define MNAV_MAX_TILE_VERTICES   65535
-#define MNAV_MAX_TILE_LINKS      1048576
-#define MNAV_MAX_TILES           1048576
 // The most tiles a tile cache may hold.
 #define MNAV_MAX_CACHED_TILES 1048576
-#define MNAV_MAX_LINKS        1048576
 
     // An area type, 0 to MNAV_AREA_TYPES - 1.
     typedef uint8_t mnavAreaType;
@@ -98,34 +95,9 @@ extern "C"
         int32_t tilePolygons;
         // Vertices in one tile.
         int32_t tileVertices;
-        // Links in one tile.
-        int32_t tileLinks;
-        // Tiles in one navmesh.
-        int32_t tiles;
-        // Off-mesh links in one navmesh, staged or committed,
-        // counted by crossings: a point link takes 1, an edge link 1 +
-        // ceil(width / spacing) up to MNAV_MAX_LINK_CROSSINGS (see
-        // mnavLinkDef.width).
-        int32_t links;
         // Bytes the bake may hold allocated at once.
         uint64_t memoryBytes;
     } mnavBakeLimits;
-
-    // How a bake runs. Build it with mnavDefaultBakeDef.
-    // A navmesh's runtime tier: what may change once loaded.
-    // Tiles and off-mesh links load and unload in every tier.
-    typedef uint8_t mnavTier;
-
-    enum
-    {
-        // Nothing loaded changes.
-        mnav_tierStatic = 0,
-        // Polygons' areas change, and off-mesh links are enabled and
-        // disabled.
-        mnav_tierModifiers = 1,
-        // Also, a loaded tile is replaced in one commit.
-        mnav_tierDynamic = 2,
-    };
 
     // A clock the host passes in: now returns ticks in a unit of the host's
     // choosing, never going back, and is called from the thread that bakes, in
@@ -139,6 +111,7 @@ extern "C"
         void* context;
     } mnavClock;
 
+    // How a bake runs. Build it with mnavDefaultBakeDef.
     typedef struct mnavBakeDef
     {
         uint32_t cookie;
@@ -179,9 +152,6 @@ extern "C"
         float detailMaxError;
         // The limits on the work.
         mnavBakeLimits limits;
-        // The runtime tier of a navmesh made with this def,
-        // mnav_tierStatic by default; the bake ignores it.
-        mnavTier tier;
         // The clock the bake reads between stages for its report; zeroed
         // for none. It never shapes the tile.
         mnavClock clock;
@@ -208,16 +178,12 @@ extern "C"
         mnav_settingTileSpans = 13,
         mnav_settingTilePolygons = 14,
         mnav_settingTileVertices = 15,
-        mnav_settingTileLinks = 16,
-        mnav_settingTiles = 17,
-        mnav_settingMemoryBytes = 18,
-        mnav_settingMinRegionArea = 19,
-        mnav_settingMaxEdgeError = 20,
-        mnav_settingMaxEdgeLength = 21,
-        mnav_settingDetailSampleDistance = 22,
-        mnav_settingDetailMaxError = 23,
-        mnav_settingLinks = 24,
-        mnav_settingTier = 25,
+        mnav_settingMemoryBytes = 16,
+        mnav_settingMinRegionArea = 17,
+        mnav_settingMaxEdgeError = 18,
+        mnav_settingMaxEdgeLength = 19,
+        mnav_settingDetailSampleDistance = 20,
+        mnav_settingDetailMaxError = 21,
     };
 
     // A def check's outcome: the status, and the first setting it refused.
@@ -472,9 +438,6 @@ extern "C"
         def.limits.tileSpans = 4194304;
         def.limits.tilePolygons = 8192;
         def.limits.tileVertices = 16384;
-        def.limits.tileLinks = 32768;
-        def.limits.tiles = 65536;
-        def.limits.links = 4096;
         def.limits.memoryBytes = 268435456;
         return def;
     }

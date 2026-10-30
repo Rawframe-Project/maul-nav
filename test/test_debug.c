@@ -5,6 +5,7 @@
 // arrows and avoidance neighbours as vertices and indices; counting past
 // a full buffer; positions relative to the origin.
 
+#include "defs_for.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -44,9 +45,10 @@ static mnavNavmesh* Load(void)
 {
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,

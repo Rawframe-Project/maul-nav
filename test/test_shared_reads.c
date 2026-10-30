@@ -9,6 +9,7 @@
 // get what one thread gets, round by round. Run under ThreadSanitizer,
 // the test also shows that these reads write nothing they share.
 
+#include "defs_for.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -403,8 +404,9 @@ static void Share(void)
 {
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierDynamic;
-    CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success, "a navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success, "a navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(s_navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
