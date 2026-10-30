@@ -55,7 +55,8 @@ typedef struct Reentry
     int32_t made;
     int32_t busy;
     int32_t succeeded;
-    // Calls back in that wrote an output they were given.
+    // Calls back in that wrote an output they were given, or that failed
+    // to give the null id of the link they would stage.
     int32_t wrote;
 } Reentry;
 
@@ -136,7 +137,13 @@ static void CallNavmesh(mnavNavmesh* navmesh)
     Count(mnavNavmesh_StageTileRemoval(navmesh, 0, 0));
     Count(mnavNavmesh_Commit(navmesh));
     Count(mnavPolygon_StageArea(navmesh, r->polygon, mnav_areaWalkable));
-    CALL_WITH(link, mnavStageLink(navmesh, &def, &s_out.link));
+    // The id of the link a call stages is a creation's: the null id on any
+    // failure, busy included.
+    Fill(&s_out.link, sizeof(s_out.link));
+    mnavResult staged = mnavStageLink(navmesh, &def, &s_out.link);
+    s_reentry.wrote +=
+        staged != mnav_success && (s_out.link.slot != 0 || s_out.link.generation != 0);
+    Count(staged);
     Count(mnavStageLinkRemoval(navmesh, r->link));
     Count(mnavLink_StageEnable(navmesh, r->link, false));
     mnavDestroyNavmesh(navmesh);
