@@ -5,6 +5,28 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.5.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.4.0...v0.5.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* mnavHash64 takes its byte count as an int64_t, where it took an int32_t; its result for every count that fit in an int32_t is unchanged.
+* the values of mnavBakeSetting are renamed from mnav_setting* to mnav_bakeSetting* (mnav_settingCellSize is mnav_bakeSettingCellSize, and so on for all 22); their numbers do not change.
+* mnavNavmesh_DebugCorridor refuses a run with a malformed polygon id before it appends anything, where it used to append the polygons before that id; mnavNavmesh_CheckCorridor's last parameter is named validCountOut.
+* mnavNavmesh_FindPolygons, mnavQuery_FindWalls, mnavQuery_FindCorridorAreas, mnavQuery_GenerateLinks, mnavBaker_CopyTile and mnavFlightBaker_CopyTile zero the caller's array over its capacity on any failure that defines none of its items. Before, they left it as it was. A buffer too small keeps the first capacity items, link generation stopped at a bound keeps the links found, and a busy refusal leaves the array. A CopyTile buffer too small for the tile is zeroed.
+
+### Fixed
+
+* **build:** run the hand tile check when a change reaches the writer ([#201](https://github.com/Rawframe-Project/maul-nav/issues/201)) ([b7bea4a](https://github.com/Rawframe-Project/maul-nav/commit/b7bea4a297024db4f70049698939e9cffca68585))
+* leave a debug buffer as it was when a call is refused ([#209](https://github.com/Rawframe-Project/maul-nav/issues/209)) ([d8925b1](https://github.com/Rawframe-Project/maul-nav/commit/d8925b1d8f8d5832384a2c1a9e5ee0c081a09126))
+* zero a caller's array on failure ([#208](https://github.com/Rawframe-Project/maul-nav/issues/208)) ([9129b20](https://github.com/Rawframe-Project/maul-nav/commit/9129b201581964054df86b9de8c08c098a59e04c))
+
+
+### Changed
+
+* hash a byte count past INT32_MAX (.github v0.0.39) ([#214](https://github.com/Rawframe-Project/maul-nav/issues/214)) ([fbac9a5](https://github.com/Rawframe-Project/maul-nav/commit/fbac9a563fc72d3cbf8721c0ec3e5c56f1f54d9d)), closes [#213](https://github.com/Rawframe-Project/maul-nav/issues/213)
+* name the bake def's settings for their def ([#211](https://github.com/Rawframe-Project/maul-nav/issues/211)) ([902c163](https://github.com/Rawframe-Project/maul-nav/commit/902c1633b7220ef5d074ad65bbab1c5e21e9bdbc))
+
 ## [0.4.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.3.0...v0.4.0) (2026-10-30)
 
 This release settles the last API changes planned before 1.0.0.
