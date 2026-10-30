@@ -317,6 +317,74 @@ static void TestTheDefIsChecked(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// The navmesh a free hook reads back, the polygon it reads (of the tile a
+// commit removes or replaces, or a destroy frees), and what each read
+// gives.
+static struct
+{
+    const mnavNavmesh* navmesh;
+    mnavPolygonId polygon;
+    int32_t reads;
+    int32_t stale;
+    int32_t invalid;
+} s_readBack;
+
+static void ReadBackFree(void* block, size_t size, size_t alignment, void* context)
+{
+    if (s_readBack.navmesh != nullptr)
+    {
+        mnavAreaType area = 0;
+        mnavResult result = mnavPolygon_GetArea(s_readBack.navmesh, s_readBack.polygon, &area);
+        s_readBack.reads += 1;
+        s_readBack.stale += result == mnav_errorStale;
+        s_readBack.invalid += result == mnav_errorInvalid;
+    }
+    CountingFree(block, size, alignment, context);
+}
+
+// A commit swaps its tiles in before it frees the ones it removes or
+// replaces: a free hook that reads such a tile back finds its ids stale,
+// never memory already given back (AddressSanitizer would see that). A
+// destroy empties each slot before it frees the tile: the ids are stale
+// while the tiles go, and refused once the slots are gone.
+static void TestFreeHookFindsRemovedTilesStale(void)
+{
+    for (int32_t replace = 0; replace < 2; ++replace)
+    {
+        mnavBakeDef def = mnavDefaultBakeDef();
+        def.allocator = (mnavAllocator){CountingAlloc, ReadBackFree, nullptr};
+        mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+        meshDef.tier = mnav_tierDynamic;
+        mnavNavmesh* navmesh = nullptr;
+        mnavTileId tile = {0};
+        CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
+                  StageAt(navmesh, 0) == mnav_success && StageAt(navmesh, 1) == mnav_success &&
+                  mnavNavmesh_Commit(navmesh) == mnav_success &&
+                  mnavNavmesh_GetTile(navmesh, 1, 0, &tile) == mnav_success,
+              "two tiles");
+        CHECK((replace ? StageAt(navmesh, 1) : mnavNavmesh_StageTileRemoval(navmesh, 1, 0)) ==
+                  mnav_success,
+              replace ? "a replacement staged" : "a removal staged");
+        s_readBack.navmesh = navmesh;
+        s_readBack.polygon = (mnavPolygonId){tile.slot, tile.generation, 0};
+        s_readBack.reads = 0;
+        s_readBack.stale = 0;
+        s_readBack.invalid = 0;
+        CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
+        CHECK(s_readBack.reads > 0 && s_readBack.stale == s_readBack.reads,
+              "every read from a free hook finds the tile stale");
+        CHECK(mnavNavmesh_GetTile(navmesh, 0, 0, &tile) == mnav_success, "the tile kept");
+        s_readBack.polygon = (mnavPolygonId){tile.slot, tile.generation, 0};
+        s_readBack.reads = 0;
+        s_readBack.stale = 0;
+        s_readBack.invalid = 0;
+        mnavDestroyNavmesh(navmesh);
+        s_readBack.navmesh = nullptr;
+        CHECK(s_readBack.stale > 0 && s_readBack.stale + s_readBack.invalid == s_readBack.reads,
+              "every read from a free hook in the destroy finds the tile stale, then refused");
+    }
+}
+
 int main(void)
 {
     TestTheDefIsChecked();
@@ -324,6 +392,7 @@ int main(void)
     TestLinksNeedHeightsWithinAStepAtBothEnds();
     TestStagedTilesAppearAtCommit();
     TestReplacingAndRemovingMakeIdsStale();
+    TestFreeHookFindsRemovedTilesStale();
     TestFailedCommitChangesNothing();
     TestTilesMustMatchTheDef();
     TestDestroyGivesEverythingBack();

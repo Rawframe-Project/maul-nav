@@ -358,6 +358,68 @@ static void TestStagingAndRemoval(void)
     mnavDestroyFlightVolume(nullptr);
 }
 
+// The volume a free hook reads back, at a place in the tile a commit
+// removes or replaces, and what each read gives.
+static struct
+{
+    const mnavFlightVolume* volume;
+    int32_t reads;
+    int32_t answered;
+    int32_t notLoaded;
+} s_readBack;
+
+static void ReadBackFree(void* block, size_t size, size_t alignment, void* context)
+{
+    if (s_readBack.volume != nullptr)
+    {
+        bool open = false;
+        mnavResult result =
+            mnavFlightVolume_IsOpen(s_readBack.volume, (mnavPos3){0.25, -1.75, 0.25}, &open);
+        s_readBack.reads += 1;
+        s_readBack.answered += result == mnav_success;
+        s_readBack.notLoaded += result == mnav_errorNotLoaded;
+    }
+    CountingFree(block, size, alignment, context);
+}
+
+// A commit swaps its tiles in before it releases the ones it removes or
+// replaces: a free hook that reads the place back finds no tile there, or
+// the new one, never memory already given back (AddressSanitizer would
+// see that). A destroy empties its lists first: the place reads as empty.
+static void TestFreeHookFindsTheNewTiles(void)
+{
+    for (int32_t replace = 0; replace < 2; ++replace)
+    {
+        mnavFlightDef flight = Def();
+        mnavFlightVolumeDef def = FlightVolumeDefFor(&flight);
+        def.allocator = (mnavAllocator){CountingAlloc, ReadBackFree, nullptr};
+        mnavFlightVolume* volume = nullptr;
+        CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success &&
+                  mnavFlightVolume_StageTile(volume, s_bytes[0], s_sizes[0]).result ==
+                      mnav_success &&
+                  mnavFlightVolume_Commit(volume) == mnav_success,
+              "a tile");
+        CHECK((replace ? mnavFlightVolume_StageTile(volume, s_bytes[0], s_sizes[0]).result
+                       : mnavFlightVolume_StageTileRemoval(volume, 0, 0)) == mnav_success,
+              replace ? "a replacement staged" : "a removal staged");
+        s_readBack.volume = volume;
+        s_readBack.reads = 0;
+        s_readBack.answered = 0;
+        s_readBack.notLoaded = 0;
+        CHECK(mnavFlightVolume_Commit(volume) == mnav_success, "committed");
+        CHECK(s_readBack.reads > 0 &&
+                  (replace ? s_readBack.answered : s_readBack.notLoaded) == s_readBack.reads,
+              replace ? "every read from a free hook finds the new tile"
+                      : "every read from a free hook finds the place empty");
+        s_readBack.reads = 0;
+        s_readBack.notLoaded = 0;
+        mnavDestroyFlightVolume(volume);
+        s_readBack.volume = nullptr;
+        CHECK(s_readBack.reads > 0 && s_readBack.notLoaded == s_readBack.reads,
+              "every read from a free hook in the destroy finds the place empty");
+    }
+}
+
 // A free function no allocator pairs with an alloc.
 static void FreeAlone(void* memory, size_t size, size_t alignment, void* context)
 {
@@ -969,6 +1031,7 @@ int main(void)
     TestEmptyFieldsAreLeftOut();
     TestOtherSettingsAndLimits();
     TestStagingAndRemoval();
+    TestFreeHookFindsTheNewTiles();
     TestRefusedMemory();
     TestBakerRefusals();
     TestPaddingNeverReachesTheTile();

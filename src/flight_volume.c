@@ -123,9 +123,17 @@ void mnavDestroyFlightVolume(mnavFlightVolume* volume)
     {
         return;
     }
-    DropEntries(&volume->memory, volume->tiles, volume->tileCount);
-    DropEntries(&volume->memory, volume->staged, volume->stagedCount);
-    mnavRelease(&volume->memory, volume->tiles, (size_t)volume->tileCount, sizeof(mnavFlightEntry),
+    // The lists are emptied before anything is released, so a free hook
+    // that reads the volume back finds no tile rather than released
+    // memory.
+    mnavFlightEntry* tiles = volume->tiles;
+    int32_t tileCount = volume->tileCount;
+    int32_t stagedCount = volume->stagedCount;
+    volume->tileCount = 0;
+    volume->stagedCount = 0;
+    DropEntries(&volume->memory, tiles, tileCount);
+    DropEntries(&volume->memory, volume->staged, stagedCount);
+    mnavRelease(&volume->memory, tiles, (size_t)tileCount, sizeof(mnavFlightEntry),
                 alignof(mnavFlightEntry));
     mnavRelease(&volume->memory, volume->staged, (size_t)volume->stagedCapacity,
                 sizeof(mnavFlightEntry), alignof(mnavFlightEntry));
@@ -276,7 +284,7 @@ static int64_t CountAfter(const mnavFlightVolume* volume)
 }
 
 // Merges the sorted staged changes into the committed tiles, into next,
-// releasing the tiles replaced or removed.
+// marking the tiles replaced or removed.
 static void Merge(mnavFlightVolume* volume, mnavFlightEntry* next)
 {
     int32_t n = 0;
@@ -292,8 +300,7 @@ static void Merge(mnavFlightVolume* volume, mnavFlightEntry* next)
         if (t < volume->tileCount && volume->tiles[t].x == change->x &&
             volume->tiles[t].z == change->z)
         {
-            mnavReleaseFlightTile(&volume->memory, &volume->tiles[t].tile);
-            ++t;
+            volume->tiles[t++].removal = true;
         }
         if (!change->removal)
         {
@@ -343,14 +350,28 @@ static MNAV_NOINLINE mnavResult CommitFlightWork(mnavFlightVolume* volume)
     {
         // Nothing is left: every tile is removed, and the staged changes
         // are removals, which hold no tile.
-        DropEntries(&volume->memory, volume->tiles, volume->tileCount);
+        for (int32_t t = 0; t < volume->tileCount; ++t)
+        {
+            volume->tiles[t].removal = true;
+        }
     }
-    mnavRelease(&volume->memory, volume->tiles, (size_t)volume->tileCount, sizeof(mnavFlightEntry),
-                alignof(mnavFlightEntry));
+    // The tiles replaced or removed are released only with the new list in
+    // place, so a free hook that reads the volume back finds the new tiles.
+    mnavFlightEntry* old = volume->tiles;
+    int32_t oldCount = volume->tileCount;
     volume->tiles = next;
     volume->tileCount = (int32_t)count;
     volume->stagedCount = 0;
     volume->commits += 1;
+    for (int32_t t = 0; t < oldCount; ++t)
+    {
+        if (old[t].removal)
+        {
+            mnavReleaseFlightTile(&volume->memory, &old[t].tile);
+        }
+    }
+    mnavRelease(&volume->memory, old, (size_t)oldCount, sizeof(mnavFlightEntry),
+                alignof(mnavFlightEntry));
     return mnav_success;
 }
 
