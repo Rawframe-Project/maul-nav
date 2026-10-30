@@ -828,6 +828,28 @@ static void TestLimitsAndChecks(void)
               mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point,
                                              a.polygon, a.point, nullptr) == mnav_errorInvalid,
           "bad query arguments");
+    // A context holds the search over the hierarchy's transitions: one
+    // with room for one fewer is refused, one with room for all searches.
+    mnavHierarchyReport report = {0};
+    CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &report) == mnav_success &&
+              report.transitions > 1,
+          "rebuilt");
+    mnavQueryDef fewDef = mnavDefaultQueryDef();
+    fewDef.limits.pathLength = 1.0e5f;
+    fewDef.limits.transitions = report.transitions - 1;
+    mnavQuery* few = nullptr;
+    CHECK(mnavCreateQuery(&fewDef, &few) == mnav_success &&
+              mnavQuery_FindHierarchicalPath(few, hierarchy, navmesh, a.polygon, a.point, a.polygon,
+                                             a.point, &path) == mnav_errorCapacity &&
+              path.end == 0 && path.polygonCount == 0,
+          "a context with room for too few transitions");
+    mnavDestroyQuery(few);
+    fewDef.limits.transitions = report.transitions;
+    CHECK(mnavCreateQuery(&fewDef, &few) == mnav_success &&
+              mnavQuery_FindHierarchicalPath(few, hierarchy, navmesh, a.polygon, a.point, a.polygon,
+                                             a.point, &path) == mnav_success,
+          "a context with room for every transition");
+    mnavDestroyQuery(few);
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(tiny);
     def = mnavDefaultHierarchyDef();

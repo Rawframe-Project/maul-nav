@@ -12,6 +12,8 @@ Long paths on large worlds need many nodes: on a world of 24 by 24 tiles (768 m,
 
 `mnavQuery_FindHierarchicalPath` joins the end to the transitions entering its cluster by a confined search from the end, run backward. Walks cost the same either way, and off-mesh links are followed from where they land to where they take off, so a one-way link inside the cluster serves only the ways it goes. It joins the start to the transitions leaving its cluster, runs A* over the transitions (the straight distance times the search's heuristic scale, ties to the lower index), then refines step by step with the navmesh search, each step confined to one cluster, aimed at the next transition, and ending on crossing any link of its run. Each step starts from the node the last one reached and keeps only the way so far, so a query holds one cluster's nodes at a time. The result is an ordinary `mnavPath`.
 
+The search writes nothing in the hierarchy. The A* over the transitions keeps its costs, parents and heap in the query context, sized by the query def's `limits.transitions`, and a confined search is told the cluster it may expand and reads each slot's cluster from the graph. Any number of contexts therefore search one hierarchy at once, as they do a navmesh; `test_shared_reads` runs eight under ThreadSanitizer.
+
 - Ends within a cluster's side of each other try the plain search first and take the hierarchy only when it runs out of nodes, since a short way forced through entrances can be much longer.
 - A start and end in one cluster, an end the graph does not reach, or a step that finds no way fall back on the plain search.
 

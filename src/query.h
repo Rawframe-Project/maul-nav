@@ -128,9 +128,11 @@ typedef struct mnavSearch
     // The node nearest the end so far, and the end's node once found.
     int32_t best;
     int32_t found;
-    // A confined search's tiles, a flag per slot, or NULL for all; with
-    // beyond set, nodes outside are opened but never expanded.
-    const uint8_t* inside;
+    // A confined search's cluster: each slot's cluster, or NULL for every
+    // slot, and the one cluster whose slots it expands; with beyond set,
+    // nodes outside are opened but never expanded.
+    const int32_t* clusterOf;
+    int32_t cluster;
     bool beyond;
     // Whether off-mesh links are followed from where they land back to
     // where they take off, so that the costs found are those of walking to
@@ -169,6 +171,19 @@ typedef struct mnavFlightSliced
     bool notLoaded;
     bool active;
 } mnavFlightSliced;
+
+// The search over a hierarchy's transitions, with one entry more for the
+// end: each one's cost and parent, its cost on to the end, and its place in
+// the heap, and the heap.
+typedef struct mnavGraphSearch
+{
+    double* costs;
+    double* joins;
+    int32_t* parents;
+    int32_t* places;
+    int32_t* heap;
+    int32_t heapCount;
+} mnavGraphSearch;
 
 struct mnavQuery
 {
@@ -224,6 +239,7 @@ struct mnavQuery
     mnavSearch search;
     mnavQueryFilter filter;
     mnavFlightSliced flight;
+    mnavGraphSearch graph;
 };
 
 // Empties the node table for a search, unless it is empty already.
@@ -234,11 +250,12 @@ void mnavClearTable(mnavQuery* query);
 uint32_t mnavFindNode(const mnavQuery* query, int32_t slot, int32_t polygon, int32_t tag,
                       int32_t low);
 
-// Confines the search just begun to the slots flagged in inside; with
-// beyond, nodes outside are opened but never expanded; with no end, the
-// search is Dijkstra's and never reaches the end, so that it runs until
-// its open list empties.
-void mnavConfineSearch(mnavQuery* query, const uint8_t* inside, bool beyond, bool noEnd);
+// Confines the search just begun to the slots of one cluster, by each
+// slot's cluster; with beyond, nodes outside are opened but never expanded;
+// with no end, the search is Dijkstra's and never reaches the end, so that
+// it runs until its open list empties.
+void mnavConfineSearch(mnavQuery* query, const int32_t* clusterOf, int32_t cluster, bool beyond,
+                       bool noEnd);
 
 // Turns the search just begun backward: off-mesh links are followed from
 // where they land to where they take off. Walks cost the same either way,
