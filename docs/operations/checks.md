@@ -8,7 +8,7 @@ What verifies a change, locally and in CI, and the time each may take.
 
 | Tier | Runs | Budget |
 |---|---|---|
-| `changed` | The source, module, length, API documentation and snippet rules, test hygiene, the organization's documentation check, `clang-format` on the changed C files, and the `linux-clang-20-asan` preset (assertions on) with the suites the changes reach: a suite's own file reaches its suite, library code reaches every suite. | under 2 minutes |
+| `changed` | The source, module, length, API documentation and snippet rules, test hygiene, the organization's documentation check, `clang-format` on the changed C files, clang-tidy in Release and in Debug on the changed `src/*.c` files, and the `linux-clang-20-asan` preset (assertions on) with the suites the changes reach: a suite's own file reaches its suite, library code reaches every suite. | under 2 minutes |
 | `pr` | Every rule on every file, clang-tidy on a Release and a Debug configure, the `linux-clang-20-asan` and `linux-gcc-14` presets (the Recast differential with the latter), the hand tiles' check, and 10 seconds of fuzzing per target. | under 10 minutes |
 | `full` | Also the other Linux presets (ThreadSanitizer, Clang Release with the package test, the shared library), the large scenes, the dense forms under AddressSanitizer, and 60 seconds per fuzz target. | under 20 minutes |
 
