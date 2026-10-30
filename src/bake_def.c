@@ -82,9 +82,6 @@ static mnavBakeDefResult CheckLimits(const mnavBakeLimits* limits)
         {limits->tileSpans, MNAV_MAX_TILE_SPANS, mnav_settingTileSpans},
         {limits->tilePolygons, MNAV_MAX_TILE_POLYGONS, mnav_settingTilePolygons},
         {limits->tileVertices, MNAV_MAX_TILE_VERTICES, mnav_settingTileVertices},
-        {limits->tileLinks, MNAV_MAX_TILE_LINKS, mnav_settingTileLinks},
-        {limits->tiles, MNAV_MAX_TILES, mnav_settingTiles},
-        {limits->links, MNAV_MAX_LINKS, mnav_settingLinks},
     };
     for (size_t i = 0; i < sizeof(counts) / sizeof(counts[0]); ++i)
     {
@@ -128,10 +125,6 @@ static mnavBakeDefResult CheckGrid(const mnavBakeDef* def)
     if (def->tileCells < MNAV_MIN_TILE_CELLS || def->tileCells > MNAV_MAX_TILE_CELLS)
     {
         return Refuse(mnav_errorLimit, mnav_settingTileCells);
-    }
-    if (def->tier > mnav_tierDynamic)
-    {
-        return Refuse(mnav_errorInvalid, mnav_settingTier);
     }
     return s_accept;
 }

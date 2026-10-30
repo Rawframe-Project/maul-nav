@@ -4,6 +4,7 @@
 // Sliced path searches: any slicing gives the one search's
 // result; a commit makes a search stale; the filter is the search's own.
 
+#include "defs_for.h"
 #include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
@@ -19,9 +20,10 @@ static mnavNavmesh* LoadWorld(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
@@ -209,7 +211,8 @@ static void TestTheFilterIsTheSearchsOwn(void)
     // (s_handBridge).
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_handBridge, sizeof(s_handBridge)).result ==
                   mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,

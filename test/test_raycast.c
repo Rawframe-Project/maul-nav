@@ -4,6 +4,7 @@
 // Raycasts on hand-built tiles and the baked world. Hand cells are
 // 0.25 m.
 
+#include "defs_for.h"
 #include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
@@ -26,9 +27,10 @@ static mnavNavmesh* Make(const uint8_t* first, size_t firstSize, const uint8_t* 
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     CHECK(mnavNavmesh_StageTile(navmesh, first, firstSize).result == mnav_success, "first staged");
     if (second != nullptr)
     {
@@ -193,7 +195,8 @@ static void TestWorldRays(void)
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,

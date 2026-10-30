@@ -5,6 +5,7 @@
 // and erosion, read cell by cell from the baked tile; the checks; the
 // fingerprint; the pinned tile under every host floating-point setting.
 
+#include "defs_for.h"
 #include "float_hosts.h"
 #include "test_harness.h"
 
@@ -96,7 +97,8 @@ static const Map* BakeMesh(mnavBaker* baker, const mnavTriangleMesh* mesh,
           "baked");
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_tile, size).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");

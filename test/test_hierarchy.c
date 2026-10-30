@@ -7,6 +7,7 @@
 // so its results have exact checks only; the paths pinned by hash run on
 // the stored test world.
 
+#include "defs_for.h"
 #include "dense.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
@@ -111,9 +112,10 @@ static mnavNavmesh* LoadTiles(uint8_t* const* bytes, const size_t* sizes, int32_
                               bool backward)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t i = 0; i < tiles * tiles; ++i)
     {
         int32_t k = backward ? tiles * tiles - 1 - i : i;
@@ -939,9 +941,10 @@ static void TestUpdatePastTheTileLimit(void)
     // committed. The update must refuse it as a build would, reading
     // nothing past what the hierarchy holds, and leave no graph.
     mnavBakeDef bake = mnavDefaultBakeDef();
-    bake.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&bake, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&bake);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 8; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_bytes[t], s_sizes[t]).result == mnav_success,
@@ -976,7 +979,8 @@ static void TestStoredWorld(void)
                              sizeof(s_ground3)};
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, tiles[t], sizes[t]).result == mnav_success, "staged");

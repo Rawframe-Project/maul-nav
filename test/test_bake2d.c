@@ -6,6 +6,7 @@
 // an agent 0.5 m in radius. The room's bytes hold under every host
 // floating-point setting.
 
+#include "defs_for.h"
 #include "float_hosts.h"
 #include "test_harness.h"
 
@@ -49,7 +50,8 @@ static mnavNavmesh* Load(int32_t tiles)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < tiles; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_bytes[t], s_sizes[t]).result == mnav_success,

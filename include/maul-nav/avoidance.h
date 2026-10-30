@@ -257,9 +257,10 @@ extern "C"
     /// @param velocitiesOut Receives agentCount velocities, in the agents' order,
     ///                      found in binary64 and rounded to binary32: to
     ///                      nearest, or toward zero where that would pass the
-    ///                      maximum speed. On any failure, the first
-    ///                      agentCount are zeroed when the set's agent limit
-    ///                      holds them; otherwise nothing is written.
+    ///                      maximum speed. On any failure but
+    ///                      mnav_errorBusy, the first agentCount are zeroed
+    ///                      when the set's agent limit holds them; otherwise
+    ///                      nothing is written.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents or obstacles, a negative count, a step that is NaN or plus
     /// infinity, an agent or obstacle with a NaN value, an agent with a radius
@@ -302,9 +303,10 @@ extern "C"
     /// @param velocitiesOut Receives agentCount velocities, in the agents' order,
     ///                      found in binary64 and rounded to binary32: to
     ///                      nearest, or toward zero where that would pass the
-    ///                      maximum speed. On any failure, the first
-    ///                      agentCount are zeroed when the set's agent limit
-    ///                      holds them; otherwise nothing is written.
+    ///                      maximum speed. On any failure but
+    ///                      mnav_errorBusy, the first agentCount are zeroed
+    ///                      when the set's agent limit holds them; otherwise
+    ///                      nothing is written.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents or spheres, a negative count, a step that is NaN or plus
     /// infinity, an agent or sphere with a NaN value or a radius not more than

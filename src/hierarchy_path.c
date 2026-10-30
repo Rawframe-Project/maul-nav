@@ -376,8 +376,8 @@ static mnavResult CheckQuery(const mnavQuery* query, const mnavHierarchy* h,
 // ground.
 static bool Near(const mnavHierarchy* h, const mnavNavmesh* navmesh, mnavPos3 a, mnavPos3 b)
 {
-    double side = (double)h->def.clusterTiles * (double)navmesh->def.cellSize *
-                  (double)navmesh->def.tileCells;
+    double side = (double)h->def.clusterTiles * (double)navmesh->def.bake.cellSize *
+                  (double)navmesh->def.bake.tileCells;
     double dx = a.x - b.x;
     double dz = a.z - b.z;
     return dx * dx + dz * dz <= side * side;

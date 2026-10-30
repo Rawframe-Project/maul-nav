@@ -13,6 +13,7 @@
 // is given back.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "world.h"
 
 #include "maul-nav/bake.h"
@@ -341,9 +342,10 @@ static uint64_t Play(const uint8_t* data, size_t size)
     run.hash = MNAV_HASH_INIT;
     mnavBakeDef def = mnavDefaultBakeDef();
     def.allocator = CountingAllocator();
-    def.tier = mnav_tierDynamic;
-    def.limits.links = 1 + Byte(&r) % 96;
-    Expect(mnavCreateNavmesh(&def, &run.navmesh).result == mnav_success);
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    meshDef.limits.links = 1 + Byte(&r) % 96;
+    Expect(mnavCreateNavmesh(&meshDef, &run.navmesh).result == mnav_success);
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     queryDef.allocator = CountingAllocator();
     queryDef.limits.nodes = 64 + Byte(&r) * 4;

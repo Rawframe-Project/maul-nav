@@ -5,6 +5,7 @@
 // the agent's step over a polygon, the distance beside one; and the detail
 // surface's height where its triangles meet or one is degenerate.
 
+#include "defs_for.h"
 #include "hand_tiles.h"
 #include "test_harness.h"
 
@@ -27,7 +28,8 @@ static mnavNavmesh* TwoFloors(const uint8_t* bytes, size_t size)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     CHECK(mnavNavmesh_StageTile(navmesh, bytes, size).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "committed");
@@ -80,7 +82,8 @@ static mnavNavmesh* OneSquare(const uint8_t* bytes, size_t size, mnavPolygonId* 
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     CHECK(mnavNavmesh_StageTile(navmesh, bytes, size).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "committed");

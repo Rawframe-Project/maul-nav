@@ -109,7 +109,7 @@ typedef struct mnavOffLink
 
 struct mnavNavmesh
 {
-    mnavBakeDef def;
+    mnavNavmeshDef def;
     mnavBakeCells cells;
     mnavMemory memory;
     // Marked while its allocator or a link generation's clearance test

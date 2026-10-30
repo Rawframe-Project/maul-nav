@@ -349,21 +349,21 @@ static mnavResult Generate(mnavQuery* query, const mnavNavmesh* navmesh,
         return result;
     }
     // Samples closer than a cell tell nothing a cell's resolution can.
-    if (def->spacing < navmesh->def.cellSize)
+    if (def->spacing < navmesh->def.bake.cellSize)
     {
         return mnav_errorInvalid;
     }
     // The filter is copied: the searches begun here replace the context's.
     mnavQueryFilter own = *usable;
-    const mnavAgentProfile* agent = &navmesh->def.agent;
+    const mnavAgentProfile* agent = &navmesh->def.bake.agent;
     Gen g = {query,
              navmesh,
              &own,
              def,
              (double)agent->radius,
              (double)agent->stepHeight,
-             (double)navmesh->def.cellSize,
-             (double)navmesh->def.cellHeight,
+             (double)navmesh->def.bake.cellSize,
+             (double)navmesh->def.bake.cellHeight,
              linksOut,
              capacity,
              0,

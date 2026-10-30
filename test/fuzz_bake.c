@@ -13,6 +13,7 @@
 // full bake's result and bytes.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
@@ -290,7 +291,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     if (tileSize > 0)
     {
         mnavNavmesh* navmesh = nullptr;
-        Expect(mnavCreateNavmesh(&def, &navmesh).result == mnav_success);
+        mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+        Expect(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success);
         Expect(mnavNavmesh_StageTile(navmesh, tile, tileSize).result == mnav_success &&
                mnavNavmesh_Commit(navmesh) == mnav_success);
         mnavDestroyNavmesh(navmesh);

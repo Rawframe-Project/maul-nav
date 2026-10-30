@@ -12,6 +12,7 @@
 // must be the same; everything given back when destroyed.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "world.h"
 
 #include "maul-nav/base.h"
@@ -144,10 +145,11 @@ static mnavNavmesh* Navmesh(Reader* r)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     def.allocator = CountingAllocator();
-    def.tier = mnav_tierDynamic;
-    def.limits.links = 1 + Byte(r) % 128;
     mnavNavmesh* navmesh = nullptr;
-    Expect(mnavCreateNavmesh(&def, &navmesh).result == mnav_success);
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    meshDef.limits.links = 1 + Byte(r) % 128;
+    Expect(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success);
     uint8_t tiles = Byte(r);
     for (int32_t t = 0; t < 4; ++t)
     {

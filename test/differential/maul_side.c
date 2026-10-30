@@ -3,6 +3,7 @@
 //
 // Maul Nav's side of the differential harness.
 
+#include "defs_for.h"
 #include "diff.h"
 
 // The query context's insides, for the nodes a search made: the harness
@@ -93,7 +94,8 @@ DiffMaul* DiffMaulBuild(const DiffScene* scene)
     DiffMaul* maul = calloc(1, sizeof(DiffMaul));
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavQueryDef queryDef = mnavDefaultQueryDef();
-    if (maul == nullptr || mnavCreateNavmesh(&def, &maul->navmesh).result != mnav_success ||
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    if (maul == nullptr || mnavCreateNavmesh(&meshDef, &maul->navmesh).result != mnav_success ||
         mnavCreateQuery(&queryDef, &maul->query) != mnav_success ||
         !Load(maul->navmesh, scene, nullptr))
     {

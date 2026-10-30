@@ -3,6 +3,7 @@
 //
 // Path corridors: loading paths, their corners, their checks.
 
+#include "defs_for.h"
 #include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
@@ -24,9 +25,10 @@ static mnavNavmesh* LoadWorld(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
@@ -290,7 +292,8 @@ static void TestAreaRunsRoundAWall(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_handRoundAWall, sizeof(s_handRoundAWall)).result ==
                   mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
@@ -329,7 +332,8 @@ static void TestFiltersAndLinks(void)
     mnavNavmesh* navmesh = nullptr;
     mnavLinkDef jump = {{19.5, 0.0, 7.5}, {25.5, 0.0, 7.5}, 0.5f, 3.0f, mnav_linkJump, false, 0.0f};
     mnavLinkId id;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_handRowWithBridge, sizeof(s_handRowWithBridge))
                       .result == mnav_success &&
               mnavStageLink(navmesh, &jump, &id) == mnav_success &&
@@ -403,7 +407,8 @@ static void TestMovingTheEnds(void)
     // (s_handRowOfFive).
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_handRowOfFive, sizeof(s_handRowOfFive)).result ==
                   mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
@@ -558,9 +563,10 @@ static void TestShortcuts(void)
     // ray across the centre then shortens it.
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_handGridWithCentre, sizeof(s_handGridWithCentre))
                       .result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,

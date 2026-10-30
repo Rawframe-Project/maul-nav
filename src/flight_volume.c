@@ -22,16 +22,61 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-static MNAV_NOINLINE mnavFlightDefResult CreateFlightVolumeWork(const mnavFlightDef* def,
-                                                                mnavFlightVolume** volumeOut)
+static mnavFlightVolumeDefResult Refuse(mnavResult result, mnavFlightVolumeSetting setting)
+{
+    return (mnavFlightVolumeDefResult){result, setting, mnav_flightSettingNone};
+}
+
+// Checks a flight volume def and gives its flight def's shape.
+static mnavFlightVolumeDefResult CheckDef(const mnavFlightVolumeDef* def, mnavFlightShape* shape)
+{
+    if (def == nullptr)
+    {
+        return Refuse(mnav_errorInvalid, mnav_flightVolumeSettingNone);
+    }
+    if (def->cookie != MNAV_FLIGHT_VOLUME_DEF_COOKIE)
+    {
+        return Refuse(mnav_errorInvalid, mnav_flightVolumeSettingCookie);
+    }
+    if (def->version != MNAV_ABI_VERSION)
+    {
+        return Refuse(mnav_errorVersion, mnav_flightVolumeSettingNone);
+    }
+    if ((def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
+    {
+        return Refuse(mnav_errorInvalid, mnav_flightVolumeSettingAllocator);
+    }
+    mnavFlightDefResult flight = mnavCheckFlightDef(&def->flight, shape);
+    if (flight.result != mnav_success)
+    {
+        return (mnavFlightVolumeDefResult){flight.result, mnav_flightVolumeSettingFlight,
+                                           flight.setting};
+    }
+    if (def->limits.tiles < 1)
+    {
+        return Refuse(mnav_errorInvalid, mnav_flightVolumeSettingTiles);
+    }
+    if (def->limits.tiles > MNAV_MAX_TILES)
+    {
+        return Refuse(mnav_errorLimit, mnav_flightVolumeSettingTiles);
+    }
+    if (def->limits.memoryBytes == 0)
+    {
+        return Refuse(mnav_errorInvalid, mnav_flightVolumeSettingMemoryBytes);
+    }
+    return Refuse(mnav_success, mnav_flightVolumeSettingNone);
+}
+
+static MNAV_NOINLINE mnavFlightVolumeDefResult
+CreateFlightVolumeWork(const mnavFlightVolumeDef* def, mnavFlightVolume** volumeOut)
 {
     if (volumeOut == nullptr)
     {
-        return (mnavFlightDefResult){mnav_errorInvalid, mnav_flightSettingNone};
+        return Refuse(mnav_errorInvalid, mnav_flightVolumeSettingNone);
     }
     *volumeOut = nullptr;
     mnavFlightShape shape = {0};
-    mnavFlightDefResult checked = mnavCheckFlightDef(def, &shape);
+    mnavFlightVolumeDefResult checked = CheckDef(def, &shape);
     if (checked.result != mnav_success)
     {
         return checked;
@@ -42,18 +87,19 @@ static MNAV_NOINLINE mnavFlightDefResult CreateFlightVolumeWork(const mnavFlight
                                      alignof(mnavFlightVolume), (void**)&volume);
     if (result != mnav_success)
     {
-        return (mnavFlightDefResult){result, mnav_flightSettingNone};
+        return Refuse(result, mnav_flightVolumeSettingNone);
     }
     *volume = (mnavFlightVolume){.def = *def, .shape = shape, .memory = memory};
     volume->memory.host = &volume->host;
     *volumeOut = volume;
-    return (mnavFlightDefResult){mnav_success, mnav_flightSettingNone};
+    return Refuse(mnav_success, mnav_flightVolumeSettingNone);
 }
 
-mnavFlightDefResult mnavCreateFlightVolume(const mnavFlightDef* def, mnavFlightVolume** volumeOut)
+mnavFlightVolumeDefResult mnavCreateFlightVolume(const mnavFlightVolumeDef* def,
+                                                 mnavFlightVolume** volumeOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavFlightDefResult result = CreateFlightVolumeWork(def, volumeOut);
+    mnavFlightVolumeDefResult result = CreateFlightVolumeWork(def, volumeOut);
     mnavFloatEnvLeave(env);
     return result;
 }
@@ -159,8 +205,9 @@ static MNAV_NOINLINE mnavTileResult StageFlightTileWork(mnavFlightVolume* volume
         return (mnavTileResult){mnav_errorInvalid, mnav_tileHeader, -1};
     }
     mnavFlightEntry change = {0};
-    mnavTileResult loaded = mnavDecodeFlightTile(&volume->memory, &volume->def, &volume->shape,
-                                                 bytes, size, &change.tile, &change.fingerprint);
+    mnavTileResult loaded =
+        mnavDecodeFlightTile(&volume->memory, &volume->def.flight, &volume->shape, bytes, size,
+                             &change.tile, &change.fingerprint);
     if (loaded.result != mnav_success)
     {
         return loaded;
@@ -369,7 +416,7 @@ static MNAV_NOINLINE mnavResult IsFlightOpenWork(const mnavFlightVolume* volume,
         return mnav_errorInvalid;
     }
     *openOut = false;
-    const mnavFlightDef* def = &volume->def;
+    const mnavFlightDef* def = &volume->def.flight;
     double voxel = (double)def->voxelSize;
     int64_t v[3] = {0, 0, 0};
     if (isnan(point.x) || isnan(point.y) || isnan(point.z))

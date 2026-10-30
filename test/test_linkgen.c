@@ -5,6 +5,7 @@
 // none past a pillar one walks round, the clearance test, the buffer, and
 // a path through the links staged.
 
+#include "defs_for.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
 
@@ -35,9 +36,10 @@ static mnavNavmesh* Load(void)
     const uint8_t* const tiles[2] = {s_trench0, s_trench1};
     const size_t sizes[2] = {sizeof(s_trench0), sizeof(s_trench1)};
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierModifiers;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierModifiers;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 2; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, tiles[t], sizes[t]).result == mnav_success, "staged");

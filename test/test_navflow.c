@@ -7,6 +7,7 @@
 // checks; the field pinned.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -37,9 +38,10 @@ static mnavNavmesh* Load(void)
 {
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
@@ -56,8 +58,9 @@ static mnavNavmesh* LoadSmall(void)
     def.tileCells = 32;
     mnavBaker* baker = nullptr;
     mnavNavmesh* navmesh = nullptr;
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavCreateNavmesh(&def, &navmesh).result == mnav_success,
+              mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success,
           "baker and navmesh");
     mnavTriangleMesh world = World();
     for (int32_t t = 0; t < 100; ++t)
@@ -266,8 +269,9 @@ static void TestAreas(mnavNavFlow* field)
     def.tileCells = 32;
     mnavBaker* baker = nullptr;
     mnavNavmesh* navmesh = nullptr;
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavCreateNavmesh(&def, &navmesh).result == mnav_success,
+              mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success,
           "baker and navmesh");
     mnavTriangleMesh world = World();
     const mnavVec2 strip[4] = {{16, -2}, {24, -2}, {24, 70}, {16, 70}};
@@ -386,7 +390,8 @@ static void TestStepsAndRegions(mnavNavFlow* field)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tileCells = 32;
     mnavNavmesh* part = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &part).result == mnav_success, "a part");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &part).result == mnav_success, "a part");
     for (int32_t z = region.z0; z <= region.z1; ++z)
     {
         for (int32_t x = region.x0; x <= region.x1; ++x)

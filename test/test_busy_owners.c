@@ -11,6 +11,7 @@
 // with no call back in.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
 #include "trench.h"
@@ -152,6 +153,16 @@ static void CallAvoidance(void* object)
     Count(mnavAvoidance_Avoid3D(avoidance, nullptr, 0, nullptr, 0, 1.0, nullptr));
     Count(mnavAvoidance_Debug(avoidance, nullptr, 0, 0.0, nullptr));
     Count(mnavAvoidance_Debug3D(avoidance, nullptr, 0, nullptr, 0, nullptr));
+    // Refused as busy from its own allocator, a call leaves the velocities
+    // it was given, which may be the ones the call in progress fills.
+    const mnavAgent agent = {0};
+    const mnavAgent3D flier = {0};
+    mnavVec2 kept = {1.0f, 2.0f};
+    mnavVec3 kept3 = {1.0f, 2.0f, 3.0f};
+    Count(mnavAvoidance_Avoid(avoidance, &agent, 1, nullptr, 0, 1.0, &kept));
+    Count(mnavAvoidance_Avoid3D(avoidance, &flier, 1, nullptr, 0, 1.0, &kept3));
+    CHECK(kept.x == 1.0f && kept.y == 2.0f && kept3.x == 1.0f && kept3.y == 2.0f && kept3.z == 3.0f,
+          "busy avoidance leaves its velocities");
     mnavDestroyAvoidance(avoidance);
     s_made += 1;
 }
@@ -207,7 +218,7 @@ static void (*const s_calls[KINDS])(void*) = {
 
 // How many calls each kind's call back in makes, and how many of them
 // return nothing.
-static const int32_t s_callCounts[KINDS] = {5, 4, 1, 3, 5, 4, 5, 2, 4, 8, 2};
+static const int32_t s_callCounts[KINDS] = {5, 4, 1, 3, 5, 4, 7, 2, 4, 8, 2};
 static const int32_t s_voidCounts[KINDS] = {1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 static uint64_t Misuse(int32_t kind, const void* object)
@@ -389,7 +400,8 @@ static void* MakeVolume(void)
 {
     mnavFlightDef def = FlightDef();
     mnavFlightVolume* volume = nullptr;
-    CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success &&
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
+    CHECK(mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success &&
               mnavFlightVolume_StageTile(volume, s_flight, s_flightSize).result == mnav_success &&
               mnavFlightVolume_Commit(volume) == mnav_success,
           "a flight volume with a tile");
@@ -401,7 +413,8 @@ static void* MakeNavmesh(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.allocator = s_reentrant;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "a navmesh with a tile");
@@ -754,8 +767,9 @@ static void Setup(void)
               mnavCreateTileIndex(&def, &s_trench, 1, &s_heldIndex, nullptr) == mnav_success,
           "a cache with a tile, and an index");
     mnavQueryDef queryDef = mnavDefaultQueryDef();
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     CHECK(mnavCreateQuery(&queryDef, &s_heldQuery) == mnav_success &&
-              mnavCreateNavmesh(&def, &s_heldNavmesh).result == mnav_success &&
+              mnavCreateNavmesh(&meshDef, &s_heldNavmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_heldNavmesh, s_trench0, sizeof(s_trench0)).result ==
                   mnav_success &&
               mnavNavmesh_StageTile(s_heldNavmesh, s_trench1, sizeof(s_trench1)).result ==

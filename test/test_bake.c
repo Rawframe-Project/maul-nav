@@ -177,15 +177,6 @@ static void TestLimitsAreChecked(void)
     broken.limits.tileVertices = MNAV_MAX_TILE_VERTICES + 1;
     CHECK(Bounds(broken, mnav_settingTileVertices), "vertices past the cap");
     broken = def;
-    broken.limits.tiles = -1;
-    CHECK(Refuses(broken, mnav_settingTiles), "negative tiles");
-    broken = def;
-    broken.limits.links = 0;
-    CHECK(Refuses(broken, mnav_settingLinks), "no links");
-    broken = def;
-    broken.limits.links = MNAV_MAX_LINKS + 1;
-    CHECK(Bounds(broken, mnav_settingLinks), "links past the cap");
-    broken = def;
     broken.limits.memoryBytes = 0;
     CHECK(Refuses(broken, mnav_settingMemoryBytes), "zero memory");
 }

@@ -257,12 +257,14 @@ static inline mnavVec3 mnavNarrow3(mnavPos3 v, double maxSpeed)
 
 // Clears the velocities of a call that failed, when the set's agent limit
 // holds them; a count past it, or no set, writes nothing, since the count
-// is all that bounds the caller's array.
+// is all that bounds the caller's array. A call refused as busy, which only
+// the set's own allocator can make, leaves them: they may be the ones the
+// call in progress fills.
 static inline mnavResult mnavAvoidClear(mnavResult result, const mnavAvoidance* avoidance,
                                         int32_t agentCount, void* velocities, size_t size)
 {
-    if (result != mnav_success && avoidance != nullptr && agentCount > 0 &&
-        agentCount <= avoidance->def.limits.agents)
+    if (result != mnav_success && result != mnav_errorBusy && avoidance != nullptr &&
+        agentCount > 0 && agentCount <= avoidance->def.limits.agents)
     {
         mnavClearOutput(velocities, (size_t)agentCount * size);
     }
