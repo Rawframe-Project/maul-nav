@@ -49,7 +49,7 @@ static mnavHierarchyReport s_report;
 
 static uint64_t Mix(uint64_t hash, const void* data, size_t size)
 {
-    return mnavHash64(hash, data, (int32_t)size);
+    return mnavHash64(hash, data, (int64_t)size);
 }
 
 static uint64_t MixResult(uint64_t hash, mnavResult result)

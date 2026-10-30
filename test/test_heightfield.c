@@ -139,10 +139,11 @@ static uint64_t DrawHash(void)
         memcpy(&words[2], &v->z, 4);
         words[3] = (uint32_t)v->kind;
         words[4] = v->value;
-        hash = mnavHash64(hash, words, (int32_t)sizeof(words));
+        hash = mnavHash64(hash, words, (int64_t)sizeof(words));
     }
-    hash = mnavHash64(hash, s_drawTriangles, buffer.triangleCount * 3 * (int32_t)sizeof(uint32_t));
-    return mnavHash64(hash, s_drawLines, buffer.lineCount * 2 * (int32_t)sizeof(uint32_t));
+    hash = mnavHash64(hash, s_drawTriangles,
+                      (int64_t)buffer.triangleCount * 3 * (int64_t)sizeof(uint32_t));
+    return mnavHash64(hash, s_drawLines, (int64_t)buffer.lineCount * 2 * (int64_t)sizeof(uint32_t));
 }
 
 // A floor from (0, 0) to (10, 10) at height 0, counter-clockwise from above.

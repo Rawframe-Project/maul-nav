@@ -145,7 +145,7 @@ static void TestGridIsPinned(void)
             words[3] = n.polygon.polygon;
             words[4] = n.polygon.slot;
             words[5] = (uint64_t)n.over * 2 + (uint64_t)n.incomplete;
-            hash = mnavHash64(hash, words, (int32_t)sizeof(words));
+            hash = mnavHash64(hash, words, (int64_t)sizeof(words));
             found += n.polygon.slot != 0 ? 1 : 0;
         }
     }
@@ -189,8 +189,8 @@ static void TestPolygonsInBoxes(void)
             holdsNearest = holdsNearest && held;
             agrees = agrees && found.incomplete == n.incomplete;
             total += found.count;
-            hash = mnavHash64(hash, &found.count, (int32_t)sizeof(found.count));
-            hash = mnavHash64(hash, list, (int32_t)((size_t)found.count * sizeof(list[0])));
+            hash = mnavHash64(hash, &found.count, (int64_t)sizeof(found.count));
+            hash = mnavHash64(hash, list, (int64_t)((size_t)found.count * sizeof(list[0])));
         }
     }
     printf("BOXES_HASH=%016llx polygons=%d\n", (unsigned long long)hash, total);

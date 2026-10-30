@@ -276,7 +276,7 @@ static void TestWalk(void)
 static void Rehash(size_t size)
 {
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_bad + MNAV_FLIGHT_HEADER_BYTES,
-                               (int32_t)(size - MNAV_FLIGHT_HEADER_BYTES));
+                               (int64_t)(size - MNAV_FLIGHT_HEADER_BYTES));
     mnavByteWriter w = {s_bad + AT_HASH};
     mnavPutU64(&w, hash);
 }

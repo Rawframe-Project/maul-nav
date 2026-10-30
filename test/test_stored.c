@@ -200,7 +200,7 @@ static int Write(void)
 
 static uint64_t HashPoints(uint64_t hash, const mnavPos3* points, int32_t count)
 {
-    return mnavHash64(hash, points, (int32_t)((size_t)count * sizeof(mnavPos3)));
+    return mnavHash64(hash, points, (int64_t)((size_t)count * sizeof(mnavPos3)));
 }
 
 static void TestFormat1(void)
@@ -237,15 +237,15 @@ static void TestBytes(void)
     {
         CHECK(s_grounds[t][4] == MNAV_TILE_FORMAT && s_flights[t][4] == MNAV_FLIGHT_FORMAT,
               "stored in the current formats");
-        hash = mnavHash64(hash, s_grounds[t], (int32_t)s_groundSizes[t]);
-        hash = mnavHash64(hash, s_flights[t], (int32_t)s_flightSizes[t]);
+        hash = mnavHash64(hash, s_grounds[t], (int64_t)s_groundSizes[t]);
+        hash = mnavHash64(hash, s_flights[t], (int64_t)s_flightSizes[t]);
     }
     CHECK(s_terrain[4] == MNAV_TILE_FORMAT, "the terrain tile in the current format");
-    hash = mnavHash64(hash, s_terrain, (int32_t)sizeof(s_terrain));
+    hash = mnavHash64(hash, s_terrain, (int64_t)sizeof(s_terrain));
     CHECK(s_trench0[4] == MNAV_TILE_FORMAT && s_trench1[4] == MNAV_TILE_FORMAT,
           "the trench tiles in the current format");
-    hash = mnavHash64(hash, s_trench0, (int32_t)sizeof(s_trench0));
-    hash = mnavHash64(hash, s_trench1, (int32_t)sizeof(s_trench1));
+    hash = mnavHash64(hash, s_trench0, (int64_t)sizeof(s_trench0));
+    hash = mnavHash64(hash, s_trench1, (int64_t)sizeof(s_trench1));
     printf("STORED_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == STORED_HASH, "the stored bytes");
 }
@@ -269,7 +269,7 @@ static uint64_t Path(const mnavNavmesh* navmesh, mnavPos3 from, mnavPos3 to)
         path.end == mnav_pathFound)
     {
         hash = HashPoints(MNAV_HASH_INIT, path.points, path.pointCount);
-        hash = mnavHash64(hash, &path.length, (int32_t)sizeof(path.length));
+        hash = mnavHash64(hash, &path.length, (int64_t)sizeof(path.length));
         printf("a path of %d polygons and %d points, %.6f m\n", path.polygonCount, path.pointCount,
                path.length);
     }
@@ -322,7 +322,7 @@ static uint64_t TerrainHash(void)
                   mnav_success &&
               mnavPolygon_GetHeight(navmesh, on.polygon, 10.0, 25.0, &height) == mnav_success,
           "a height on the slope");
-    hash = mnavHash64(hash, &height, (int32_t)sizeof(height));
+    hash = mnavHash64(hash, &height, (int64_t)sizeof(height));
     mnavDestroyNavmesh(navmesh);
     return hash;
 }
@@ -361,7 +361,7 @@ static uint64_t FlightHash(void)
         path.end == mnav_pathFound)
     {
         hash = HashPoints(MNAV_HASH_INIT, path.points, path.pointCount);
-        hash = mnavHash64(hash, &path.length, (int32_t)sizeof(path.length));
+        hash = mnavHash64(hash, &path.length, (int64_t)sizeof(path.length));
     }
     bool open = true;
     CHECK(mnavFlightVolume_IsOpen(volume, (mnavPos3){31.0, 0.5, 11.0}, &open) == mnav_success &&

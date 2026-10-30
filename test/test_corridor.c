@@ -545,7 +545,7 @@ static void TestFollowingCorridors(void)
                 valid &&
                 mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &count) == mnav_success &&
                 count == corridor.count;
-            hash = mnavHash64(hash, &corridor.position, (int32_t)sizeof(corridor.position));
+            hash = mnavHash64(hash, &corridor.position, (int64_t)sizeof(corridor.position));
         }
     }
     printf("FOLLOW_HASH=%016llx walks=%d arrived=%d\n", (unsigned long long)hash, walks, arrived);

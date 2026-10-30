@@ -232,10 +232,10 @@ static void TestWorldMoves(void)
                                             nullptr, &n) == mnav_success &&
                     n.polygon.slot != 0 &&
                     hypot(n.point.x - move.point.x, n.point.z - move.point.z) < 1.0e-9;
-            hash = mnavHash64(hash, &move.end, (int32_t)sizeof(move.end));
-            hash = mnavHash64(hash, &move.point, (int32_t)sizeof(move.point));
+            hash = mnavHash64(hash, &move.end, (int64_t)sizeof(move.end));
+            hash = mnavHash64(hash, &move.point, (int64_t)sizeof(move.point));
             hash =
-                mnavHash64(hash, move.polygons, move.polygonCount * (int32_t)sizeof(mnavPolygonId));
+                mnavHash64(hash, move.polygons, move.polygonCount * (int64_t)sizeof(mnavPolygonId));
         }
     }
     printf("WORLD_MOVES_HASH=%016llx reached=%d wall=%d notLoaded=%d\n", (unsigned long long)hash,

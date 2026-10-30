@@ -130,7 +130,7 @@ mnavResult mnavEncodeFlightTile(mnavMemory* memory, const mnavFlightDef* def, ui
         }
     }
     MNAV_ASSERT(w.at == out + total);
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, out + MNAV_FLIGHT_HEADER_BYTES, (int32_t)payload);
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, out + MNAV_FLIGHT_HEADER_BYTES, (int64_t)payload);
     w.at = out;
     for (int32_t k = 0; k < 4; ++k)
     {
@@ -199,7 +199,7 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, const mnavFl
     size_t payload = (size_t)mnavGetU32(&r);
     uint64_t count = mnavGetU32(&r);
     if (payload != size - MNAV_FLIGHT_HEADER_BYTES || payload > INT32_MAX ||
-        mnavHash64(MNAV_HASH_INIT, bytes + MNAV_FLIGHT_HEADER_BYTES, (int32_t)payload) != hash)
+        mnavHash64(MNAV_HASH_INIT, bytes + MNAV_FLIGHT_HEADER_BYTES, (int64_t)payload) != hash)
     {
         return Refuse(mnav_errorFormat, mnav_tilePayload, -1);
     }

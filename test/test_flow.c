@@ -229,7 +229,7 @@ static void TestPinned(void)
         for (int32_t x = 0; x < WIDTH; ++x)
         {
             mnavCellFlow flow = At(field, x, y);
-            hash = mnavHash64(hash, &flow, (int32_t)sizeof(flow));
+            hash = mnavHash64(hash, &flow, (int64_t)sizeof(flow));
         }
     }
     printf("FIELD_HASH=%016llx\n", (unsigned long long)hash);
@@ -320,7 +320,7 @@ static uint64_t RegionHash(const mnavGridFlow* field, Window r)
         for (int32_t x = r.x; x < r.x + r.width; ++x)
         {
             mnavCellFlow flow = At(field, x, y);
-            hash = mnavHash64(hash, &flow, (int32_t)sizeof(flow));
+            hash = mnavHash64(hash, &flow, (int64_t)sizeof(flow));
         }
     }
     return hash;

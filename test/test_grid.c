@@ -277,13 +277,13 @@ static void TestJumpsMatchAStar(void)
         mnavGridPath jumps;
         mnavGridPath plain;
         CHECK(mnavQuery_FindGridPath(query, &grid, a, b, nullptr, &jumps) == mnav_success, "jumps");
-        hash = mnavHash64(hash, &jumps.end, (int32_t)sizeof(jumps.end));
-        hash = mnavHash64(hash, &jumps.cost, (int32_t)sizeof(jumps.cost));
-        hash = mnavHash64(hash, jumps.cells, (int32_t)((size_t)jumps.cellCount * sizeof(mnavCell)));
+        hash = mnavHash64(hash, &jumps.end, (int64_t)sizeof(jumps.end));
+        hash = mnavHash64(hash, &jumps.cost, (int64_t)sizeof(jumps.cost));
+        hash = mnavHash64(hash, jumps.cells, (int64_t)((size_t)jumps.cellCount * sizeof(mnavCell)));
         double cost = jumps.cost;
         mnavPathEnd end = jumps.end;
         CHECK(mnavQuery_FindGridPath(query, &grid, a, b, &weighted, &plain) == mnav_success, "A*");
-        hash = mnavHash64(hash, plain.cells, (int32_t)((size_t)plain.cellCount * sizeof(mnavCell)));
+        hash = mnavHash64(hash, plain.cells, (int64_t)((size_t)plain.cellCount * sizeof(mnavCell)));
         found += end == mnav_pathFound ? 1 : 0;
         agree += end == plain.end &&
                          (end != mnav_pathFound || fabs(cost - plain.cost) <= 1e-9 * plain.cost)

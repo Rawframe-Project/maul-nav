@@ -103,7 +103,7 @@ static uint64_t OneThreadHash(void)
     for (int32_t t = 0; t < TILES; ++t)
     {
         CHECK(BakeOne(baker, t, s_one[t], &s_oneSizes[t]), "baked on one thread");
-        hash = mnavHash64(hash, s_one[t], (int32_t)s_oneSizes[t]);
+        hash = mnavHash64(hash, s_one[t], (int64_t)s_oneSizes[t]);
     }
     mnavDestroyBaker(baker);
     return hash;
@@ -195,9 +195,9 @@ static uint64_t PathHash(mnavQuery* query, const mnavNavmesh* navmesh, int32_t i
         return 2;
     }
     uint64_t hash = MNAV_HASH_INIT;
-    hash = mnavHash64(hash, &path.end, (int32_t)sizeof(path.end));
-    hash = mnavHash64(hash, &path.cost, (int32_t)sizeof(path.cost));
-    return mnavHash64(hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));
+    hash = mnavHash64(hash, &path.end, (int64_t)sizeof(path.end));
+    hash = mnavHash64(hash, &path.cost, (int64_t)sizeof(path.cost));
+    return mnavHash64(hash, path.points, path.pointCount * (int64_t)sizeof(mnavPos3));
 }
 
 typedef struct Querier

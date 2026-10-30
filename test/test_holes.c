@@ -197,7 +197,7 @@ static void TestBridgesTakeTheNearestCorner(void)
     for (int32_t f = 0; f < 3; ++f)
     {
         CHECK(Merged(&floors[f]), "joined");
-        hash = mnavHash64(hash, s_tile, (int32_t)s_size);
+        hash = mnavHash64(hash, s_tile, (int64_t)s_size);
     }
     printf("BRIDGES_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == BRIDGES_HASH, "the pinned bytes");

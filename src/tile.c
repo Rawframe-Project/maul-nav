@@ -198,7 +198,7 @@ mnavResult mnavEncodeTile(mnavMemory* memory, const mnavTileInfo* info, const mn
         }
     }
     MNAV_ASSERT(w.at == out + total);
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, out + MNAV_TILE_HEADER_BYTES, (int32_t)payload);
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, out + MNAV_TILE_HEADER_BYTES, (int64_t)payload);
     w.at = out;
     WriteHeader(&w, info, payload, hash, fields);
     *bytes = out;
@@ -271,7 +271,7 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, mnavTileInfo
     // The payload's hash takes a 32-bit size; no tile within the caps
     // comes near it.
     if (payload != size - MNAV_TILE_HEADER_BYTES || payload > INT32_MAX ||
-        mnavHash64(MNAV_HASH_INIT, bytes + MNAV_TILE_HEADER_BYTES, (int32_t)payload) != hash)
+        mnavHash64(MNAV_HASH_INIT, bytes + MNAV_TILE_HEADER_BYTES, (int64_t)payload) != hash)
     {
         return Refuse(mnav_errorFormat, mnav_tilePayload, -1);
     }

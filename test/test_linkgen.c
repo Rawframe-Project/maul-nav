@@ -115,12 +115,12 @@ static void TestKinds(const mnavNavmesh* navmesh)
     {
         const mnavLinkDef* l = &s_links[i];
         const uint8_t small[2] = {l->kind, l->twoWay ? 1u : 0u};
-        hash = mnavHash64(hash, &l->start, (int32_t)sizeof(l->start));
-        hash = mnavHash64(hash, &l->end, (int32_t)sizeof(l->end));
-        hash = mnavHash64(hash, &l->radius, (int32_t)sizeof(l->radius));
-        hash = mnavHash64(hash, &l->cost, (int32_t)sizeof(l->cost));
+        hash = mnavHash64(hash, &l->start, (int64_t)sizeof(l->start));
+        hash = mnavHash64(hash, &l->end, (int64_t)sizeof(l->end));
+        hash = mnavHash64(hash, &l->radius, (int64_t)sizeof(l->radius));
+        hash = mnavHash64(hash, &l->cost, (int64_t)sizeof(l->cost));
         hash = mnavHash64(hash, small, 2);
-        hash = mnavHash64(hash, &l->width, (int32_t)sizeof(l->width));
+        hash = mnavHash64(hash, &l->width, (int64_t)sizeof(l->width));
     }
     printf("LINKS_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == LINKS_HASH, "the pinned hash");

@@ -100,7 +100,7 @@ static uint64_t HashLinks(const mnavNavmesh* navmesh)
                                 target->x,
                                 target->z,
                                 (int32_t)link->target.polygon};
-            hash = mnavHash64(hash, words, (int32_t)sizeof(words));
+            hash = mnavHash64(hash, words, (int64_t)sizeof(words));
         }
     }
     return hash;

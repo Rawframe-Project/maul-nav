@@ -376,7 +376,7 @@ static bool Clear(void* context, mnavPos3 from, mnavPos3 to)
 {
     uint64_t seed = *(const uint8_t*)context;
     uint64_t hash =
-        mnavHash64(mnavHash64(seed, &from, (int32_t)sizeof(from)), &to, (int32_t)sizeof(to));
+        mnavHash64(mnavHash64(seed, &from, (int64_t)sizeof(from)), &to, (int64_t)sizeof(to));
     return (hash & 3u) != 0;
 }
 

@@ -44,11 +44,11 @@ static mnavQuery* MakeQuery(int32_t nodes)
 
 static uint64_t HashPath(const mnavPath* path)
 {
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, &path->end, (int32_t)sizeof(path->end));
-    hash = mnavHash64(hash, &path->cost, (int32_t)sizeof(path->cost));
-    hash = mnavHash64(hash, &path->length, (int32_t)sizeof(path->length));
-    hash = mnavHash64(hash, path->polygons, path->polygonCount * (int32_t)sizeof(mnavPolygonId));
-    return mnavHash64(hash, path->points, path->pointCount * (int32_t)sizeof(mnavPos3));
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, &path->end, (int64_t)sizeof(path->end));
+    hash = mnavHash64(hash, &path->cost, (int64_t)sizeof(path->cost));
+    hash = mnavHash64(hash, &path->length, (int64_t)sizeof(path->length));
+    hash = mnavHash64(hash, path->polygons, path->polygonCount * (int64_t)sizeof(mnavPolygonId));
+    return mnavHash64(hash, path->points, path->pointCount * (int64_t)sizeof(mnavPos3));
 }
 
 // A search in slices of a number of nodes, with the slices it took.

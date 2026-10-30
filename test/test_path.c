@@ -377,17 +377,17 @@ static void TestSearchesArePinned(void)
         }
         mnavPath cut = Search(small, navmesh, a, b);
         partial += cut.end == mnav_pathOutOfNodes ? 1 : 0;
-        hash = mnavHash64(hash, &cut.cost, (int32_t)sizeof(cut.cost));
-        hash = mnavHash64(hash, cut.polygons, cut.polygonCount * (int32_t)sizeof(mnavPolygonId));
+        hash = mnavHash64(hash, &cut.cost, (int64_t)sizeof(cut.cost));
+        hash = mnavHash64(hash, cut.polygons, cut.polygonCount * (int64_t)sizeof(mnavPolygonId));
         mnavPath path = Search(query, navmesh, a, b);
         found += path.end == mnav_pathFound ? 1 : 0;
         CHECK(Connected(navmesh, &path), "connected");
         CHECK(Walkable(navmesh, &path) && Walkable(navmesh, &cut), "on the navmesh");
-        hash = mnavHash64(hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));
-        hash = mnavHash64(hash, cut.points, cut.pointCount * (int32_t)sizeof(mnavPos3));
-        hash = mnavHash64(hash, &path.end, (int32_t)sizeof(path.end));
-        hash = mnavHash64(hash, &path.cost, (int32_t)sizeof(path.cost));
-        hash = mnavHash64(hash, path.polygons, path.polygonCount * (int32_t)sizeof(mnavPolygonId));
+        hash = mnavHash64(hash, path.points, path.pointCount * (int64_t)sizeof(mnavPos3));
+        hash = mnavHash64(hash, cut.points, cut.pointCount * (int64_t)sizeof(mnavPos3));
+        hash = mnavHash64(hash, &path.end, (int64_t)sizeof(path.end));
+        hash = mnavHash64(hash, &path.cost, (int64_t)sizeof(path.cost));
+        hash = mnavHash64(hash, path.polygons, path.polygonCount * (int64_t)sizeof(mnavPolygonId));
     }
     printf("SEARCH_HASH=%016llx found=%d partial=%d\n", (unsigned long long)hash, found, partial);
     CHECK(hash == SEARCH_HASH, "the pinned hash");

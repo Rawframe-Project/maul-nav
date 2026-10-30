@@ -55,7 +55,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         size_t payload = size - MNAV_TILE_HEADER_BYTES;
         PutLittle(bytes + 24, payload, 4);
         PutLittle(bytes + 16,
-                  mnavHash64(MNAV_HASH_INIT, bytes + MNAV_TILE_HEADER_BYTES, (int32_t)payload), 8);
+                  mnavHash64(MNAV_HASH_INIT, bytes + MNAV_TILE_HEADER_BYTES, (int64_t)payload), 8);
     }
     mnavMemory memory = mnavMakeMemory((mnavAllocator){0}, (uint64_t)1 << 28);
     mnavTileInfo info;

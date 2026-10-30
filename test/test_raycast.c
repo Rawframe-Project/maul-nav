@@ -238,10 +238,10 @@ static void TestWorldRays(void)
                                                  &n) == mnav_success &&
                          n.polygon.slot != 0 && hypot(p.x - n.point.x, p.z - n.point.z) < 1.0e-9;
             }
-            hash = mnavHash64(hash, &ray.end, (int32_t)sizeof(ray.end));
-            hash = mnavHash64(hash, &ray.t, (int32_t)sizeof(ray.t));
+            hash = mnavHash64(hash, &ray.end, (int64_t)sizeof(ray.end));
+            hash = mnavHash64(hash, &ray.t, (int64_t)sizeof(ray.t));
             hash =
-                mnavHash64(hash, ray.polygons, ray.polygonCount * (int32_t)sizeof(mnavPolygonId));
+                mnavHash64(hash, ray.polygons, ray.polygonCount * (int64_t)sizeof(mnavPolygonId));
         }
     }
     printf("WORLD_RAYS_HASH=%016llx reached=%d wall=%d notLoaded=%d\n", (unsigned long long)hash,

@@ -446,7 +446,7 @@ static void TestRandomPoints(const mnavNavmesh* navmesh)
         left += p.point.x < 32.0 ? 1 : 0;
         if (seed < 50)
         {
-            hash = mnavHash64(hash, &p.point, (int32_t)sizeof(p.point));
+            hash = mnavHash64(hash, &p.point, (int64_t)sizeof(p.point));
         }
     }
     printf("POINTS_HASH=%016llx left=%d\n", (unsigned long long)hash, left);
@@ -535,7 +535,7 @@ static void TestAround(const mnavNavmesh* navmesh)
         double d = hypot(p.point.x - center.point.x, p.point.z - center.point.z);
         farthest = d > farthest ? d : farthest;
         inner += d < 8.0 / sqrt(2.0) ? 1 : 0;
-        hash = mnavHash64(hash, &p.point, (int32_t)sizeof(p.point));
+        hash = mnavHash64(hash, &p.point, (int64_t)sizeof(p.point));
     }
     printf("around: farthest %.3f m, %d of 200 in the inner half, AROUND_HASH=%016llx\n", farthest,
            inner, (unsigned long long)hash);
