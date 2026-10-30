@@ -127,12 +127,12 @@ static void CallHierarchy(void* object)
 
 static void CallFlow(void* object)
 {
-    mnavFlowField* field = object;
-    Count(mnavFlowField_Begin(field, nullptr, nullptr, nullptr, 0, nullptr));
-    Count(mnavFlowField_Continue(field, nullptr, 1, nullptr));
-    Count(mnavFlowField_Update(field, nullptr, nullptr, 0, nullptr, 0));
-    Count(mnavFlowField_Build(field, nullptr, nullptr, 0, nullptr));
-    mnavDestroyFlowField(field);
+    mnavGridFlow* field = object;
+    Count(mnavGridFlow_Begin(field, nullptr, nullptr, nullptr, 0, nullptr));
+    Count(mnavGridFlow_Continue(field, nullptr, 1, nullptr));
+    Count(mnavGridFlow_Update(field, nullptr, nullptr, 0, nullptr, 0));
+    Count(mnavGridFlow_Build(field, nullptr, nullptr, 0, nullptr));
+    mnavDestroyGridFlow(field);
     s_made += 1;
 }
 
@@ -224,7 +224,7 @@ static uint64_t Misuse(int32_t kind, const void* object)
     case HIERARCHY:
         return mnavHierarchy_GetMisuse(object);
     case FLOW:
-        return mnavFlowField_GetMisuse(object);
+        return mnavGridFlow_GetMisuse(object);
     case NAVFLOW:
         return mnavNavFlow_GetMisuse(object);
     case AVOIDANCE:
@@ -336,11 +336,11 @@ static void* MakeHierarchy(void)
 
 static void* MakeFlow(void)
 {
-    mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef def = mnavDefaultGridFlowDef();
     def.allocator = s_reentrant;
     def.cells = 1024;
-    mnavFlowField* field = nullptr;
-    CHECK(mnavCreateFlowField(&def, &field) == mnav_success, "a flow field");
+    mnavGridFlow* field = nullptr;
+    CHECK(mnavCreateGridFlow(&def, &field) == mnav_success, "a flow field");
     return field;
 }
 
@@ -441,7 +441,7 @@ static void Destroy(int32_t kind, void* object)
         mnavDestroyHierarchy(object);
         break;
     case FLOW:
-        mnavDestroyFlowField(object);
+        mnavDestroyGridFlow(object);
         break;
     case NAVFLOW:
         mnavDestroyNavFlow(object);

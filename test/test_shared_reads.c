@@ -83,7 +83,7 @@ typedef struct Reader
 {
     mnavQuery* query;
     mnavNavFlow* field;
-    mnavFlowField* flow;
+    mnavGridFlow* flow;
     mnavHierarchy* hierarchy;
     mnavHierarchyReport report;
     mnavDebugVertex* vertices;
@@ -313,9 +313,9 @@ static uint64_t Wide(Reader* reader, int32_t round, uint32_t* state, uint64_t ha
         hash = MixDouble(hash, gridPath.cost);
         hash = Mix(hash, gridPath.cells, (size_t)gridPath.cellCount * sizeof(mnavCell));
     }
-    hash = MixResult(hash, mnavFlowField_Build(reader->flow, &s_grid, &goalCell, 1, nullptr));
-    mnavFlow cell = {0};
-    hash = MixResult(hash, mnavFlowField_GetFlow(reader->flow, start, &cell));
+    hash = MixResult(hash, mnavGridFlow_Build(reader->flow, &s_grid, &goalCell, 1, nullptr));
+    mnavCellFlow cell = {0};
+    hash = MixResult(hash, mnavGridFlow_GetFlow(reader->flow, start, &cell));
     hash = MixDouble(hash, cell.cost);
     hash = Mix(hash, &cell.next, sizeof(cell.next));
     mnavLinkGenDef def = mnavDefaultLinkGenDef();
@@ -358,7 +358,7 @@ static bool Open(Reader* reader)
 {
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     mnavNavFlowDef fieldDef = mnavDefaultNavFlowDef();
-    mnavFlowFieldDef flowDef = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef flowDef = mnavDefaultGridFlowDef();
     flowDef.cells = GRID_SIDE * GRID_SIDE;
     mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
     hierarchyDef.clusterTiles = 1;
@@ -368,7 +368,7 @@ static bool Open(Reader* reader)
     return reader->vertices != nullptr && reader->triangles != nullptr &&
            reader->lines != nullptr && mnavCreateQuery(&queryDef, &reader->query) == mnav_success &&
            mnavCreateNavFlow(&fieldDef, &reader->field) == mnav_success &&
-           mnavCreateFlowField(&flowDef, &reader->flow) == mnav_success &&
+           mnavCreateGridFlow(&flowDef, &reader->flow) == mnav_success &&
            mnavCreateHierarchy(&hierarchyDef, &reader->hierarchy) == mnav_success &&
            mnavHierarchy_Build(reader->hierarchy, reader->query, s_navmesh, nullptr,
                                &reader->report) == mnav_success;
@@ -377,7 +377,7 @@ static bool Open(Reader* reader)
 static void Close(Reader* reader)
 {
     mnavDestroyHierarchy(reader->hierarchy);
-    mnavDestroyFlowField(reader->flow);
+    mnavDestroyGridFlow(reader->flow);
     mnavDestroyNavFlow(reader->field);
     mnavDestroyQuery(reader->query);
     free(reader->lines);

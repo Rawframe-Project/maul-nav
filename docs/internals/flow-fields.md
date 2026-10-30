@@ -4,15 +4,15 @@ A flow field answers every agent's way to a set of goals from one search, for un
 
 ## Grid fields
 
-- **The search.** `mnavFlowField_Build` searches from every goal at once with Dijkstra's algorithm and the grid path's steps: eight neighbors, never across a blocked corner, a step costing its length times the mean of its two cells' area costs. The rule is symmetric, so a cell's cost from the goals is the cost of its way to them.
+- **The search.** `mnavGridFlow_Build` searches from every goal at once with Dijkstra's algorithm and the grid path's steps: eight neighbors, never across a blocked corner, a step costing its length times the mean of its two cells' area costs. The rule is symmetric, so a cell's cost from the goals is the cost of its way to them.
 - **What a cell holds.** Its cost to the nearest goal, infinite where none is reached, and its next cell, itself at a goal. Following next cells walks a cheapest grid path, each step strictly downhill.
 - **Order.** The open list is a heap by cost, then by cell index, so ties go the same way on every platform and in any goal order.
-- **Memory.** A field owns arrays for its `cells` limit (cost, next cell, heap place and entry, a goal list, a repair's touched list and marks, 29 bytes a cell), up to `MNAV_MAX_FLOW_CELLS`. A region of more cells is refused, and a failed begin leaves nothing to read.
-- **Regions and budgets.** A field covers a region of its grid, cells outside counting as blocked; `mnavFlowField_Continue` settles a budget of cells per call, with the same field for any budgets.
+- **Memory.** A field owns arrays for its `cells` limit (cost, next cell, heap place and entry, a goal list, a repair's touched list and marks, 29 bytes a cell), up to `MNAV_MAX_GRID_FLOW_CELLS`. A region of more cells is refused, and a failed begin leaves nothing to read.
+- **Regions and budgets.** A field covers a region of its grid, cells outside counting as blocked; `mnavGridFlow_Continue` settles a budget of cells per call, with the same field for any budgets.
 
 ### Repairs
 
-`mnavFlowField_Update` takes the new goals and the cells whose areas changed. Cells whose next-cell chains ran through a removed goal, a changed cell or a changed corner are reset and searched again; lowered costs spread from new goals and changed cells; and every touched cell and its neighbors take the next cell a build would choose (the neighbor giving the cost exactly, lowest by cost then index). Costs are the fixed point of the neighbors' offers, so the repaired field is the rebuilt one, bit for bit. A test compares them after random changes.
+`mnavGridFlow_Update` takes the new goals and the cells whose areas changed. Cells whose next-cell chains ran through a removed goal, a changed cell or a changed corner are reset and searched again; lowered costs spread from new goals and changed cells; and every touched cell and its neighbors take the next cell a build would choose (the neighbor giving the cost exactly, lowest by cost then index). Costs are the fixed point of the neighbors' offers, so the repaired field is the rebuilt one, bit for bit. A test compares them after random changes.
 
 ## Navmesh fields
 

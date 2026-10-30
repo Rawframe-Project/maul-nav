@@ -428,34 +428,34 @@ static void Grid(Reader* r, const mnavQueryFilter* filter)
     mnavGridPath path;
     mnavResult result = mnavQuery_FindGridPath(s_query, &grid, a, b, filter, &path);
     Expect(Typed(result) && (result != mnav_success || path.cellCount >= 0));
-    mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef def = mnavDefaultGridFlowDef();
     def.allocator = CountingAllocator();
     def.cells = 64;
-    mnavFlowField* field = nullptr;
-    Expect(mnavCreateFlowField(&def, &field) == mnav_success);
+    mnavGridFlow* field = nullptr;
+    Expect(mnavCreateGridFlow(&def, &field) == mnav_success);
     mnavCellRange region = {Byte(r) % 6, Byte(r) % 6, Byte(r) % 10, Byte(r) % 10};
     mnavCell goals[2] = {a, b};
     result =
-        mnavFlowField_Begin(field, &grid, Byte(r) % 2 == 0 ? &region : nullptr, goals, 2, filter);
+        mnavGridFlow_Begin(field, &grid, Byte(r) % 2 == 0 ? &region : nullptr, goals, 2, filter);
     Expect(Typed(result));
     bool ended = false;
     for (int32_t k = 0; k < 200 && result == mnav_success && !ended; ++k)
     {
-        result = mnavFlowField_Continue(field, &grid, 1 + Byte(r) % 16, &ended);
+        result = mnavGridFlow_Continue(field, &grid, 1 + Byte(r) % 16, &ended);
     }
     if (ended)
     {
         mnavCell changed = {Byte(r) % 12, Byte(r) % 12};
         areas[changed.y * 12 + changed.x] = (mnavAreaType)(Byte(r) % 3);
-        result = mnavFlowField_Update(field, &grid, &b, 1, &changed, 1);
+        result = mnavGridFlow_Update(field, &grid, &b, 1, &changed, 1);
         Expect(Typed(result));
         for (int32_t k = 0; k < 400 && result == mnav_success && !ended; ++k)
         {
-            result = mnavFlowField_Continue(field, &grid, 1 + Byte(r) % 16, &ended);
+            result = mnavGridFlow_Continue(field, &grid, 1 + Byte(r) % 16, &ended);
         }
     }
     Expect(Typed(result));
-    mnavDestroyFlowField(field);
+    mnavDestroyGridFlow(field);
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)

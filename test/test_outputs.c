@@ -71,7 +71,7 @@ typedef struct Outputs
     mnavGridPath gridPath;
     mnavFlightPath flightPath;
     mnavFlightHit hit;
-    mnavFlow flow;
+    mnavCellFlow flow;
     mnavPolygonFlow polygonFlow;
     mnavLinkState link;
     mnavLinkId linkId;
@@ -293,13 +293,13 @@ static void TestNoOwner(void)
               CLEARED(hierarchy),
           "mnavHierarchy_Update");
     FillAll();
-    CHECK(mnavFlowField_Continue(nullptr, &grid, 1, &s_out.flag) == mnav_errorInvalid &&
+    CHECK(mnavGridFlow_Continue(nullptr, &grid, 1, &s_out.flag) == mnav_errorInvalid &&
               CLEARED(flag),
-          "mnavFlowField_Continue");
+          "mnavGridFlow_Continue");
     FillAll();
-    CHECK(mnavFlowField_GetFlow(nullptr, (mnavCell){0, 0}, &s_out.flow) == mnav_errorInvalid &&
+    CHECK(mnavGridFlow_GetFlow(nullptr, (mnavCell){0, 0}, &s_out.flow) == mnav_errorInvalid &&
               CLEARED(flow),
-          "mnavFlowField_GetFlow");
+          "mnavGridFlow_GetFlow");
     FillAll();
     CHECK(mnavNavFlow_Continue(nullptr, navmesh, 1, &s_out.flag) == mnav_errorInvalid &&
               CLEARED(flag),
@@ -467,23 +467,23 @@ static void TestPastTheOwner(void)
 // read outside its tiles.
 static void TestFlowOutside(void)
 {
-    mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
-    mnavFlowField* field = nullptr;
-    CHECK(mnavCreateFlowField(&def, &field) == mnav_success, "a field");
+    mnavGridFlowDef def = mnavDefaultGridFlowDef();
+    mnavGridFlow* field = nullptr;
+    CHECK(mnavCreateGridFlow(&def, &field) == mnav_success, "a field");
     mnavAreaType areas[16];
     memset(areas, 1, sizeof(areas));
     mnavGrid grid = {areas, 4, 4, 1.0f};
     mnavCellRange region = {0, 0, 1, 1};
     mnavCell goal = {0, 0};
     bool ended = false;
-    CHECK(mnavFlowField_Begin(field, &grid, &region, &goal, 1, nullptr) == mnav_success &&
-              mnavFlowField_Continue(field, &grid, 64, &ended) == mnav_success && ended,
+    CHECK(mnavGridFlow_Begin(field, &grid, &region, &goal, 1, nullptr) == mnav_success &&
+              mnavGridFlow_Continue(field, &grid, 64, &ended) == mnav_success && ended,
           "built over a corner");
     FillAll();
-    CHECK(mnavFlowField_GetFlow(field, (mnavCell){3, 3}, &s_out.flow) == mnav_errorOutside &&
+    CHECK(mnavGridFlow_GetFlow(field, (mnavCell){3, 3}, &s_out.flow) == mnav_errorOutside &&
               CLEARED(flow),
           "a cell outside the region");
-    mnavDestroyFlowField(field);
+    mnavDestroyGridFlow(field);
 
     mnavNavmesh* navmesh = WorldNavmesh();
     mnavNavFlowDef navDef = mnavDefaultNavFlowDef();

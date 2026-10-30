@@ -485,11 +485,11 @@ static bool InWall(mnavPos2 p)
 
 // The velocity an agent prefers: toward the center of the next cell the
 // field gives its cell, at its speed; slowing into the goal's center.
-static mnavVec2 Preferred(const mnavFlowField* field, const mnavAgent* a)
+static mnavVec2 Preferred(const mnavGridFlow* field, const mnavAgent* a)
 {
     mnavCell cell = {(int32_t)floor(a->position.x), (int32_t)floor(a->position.y)};
-    mnavFlow flow = {0};
-    if (mnavFlowField_GetFlow(field, cell, &flow) != mnav_success || !isfinite(flow.cost))
+    mnavCellFlow flow = {0};
+    if (mnavGridFlow_GetFlow(field, cell, &flow) != mnav_success || !isfinite(flow.cost))
     {
         return (mnavVec2){0.0f, 0.0f};
     }
@@ -521,11 +521,11 @@ static void TestGroup(void)
     {
         goals[i] = (mnavCell){54 + i % 5, 30 + i / 5};
     }
-    mnavFlowFieldDef fieldDef = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef fieldDef = mnavDefaultGridFlowDef();
     fieldDef.cells = FIELD * FIELD;
-    mnavFlowField* field = nullptr;
-    CHECK(mnavCreateFlowField(&fieldDef, &field) == mnav_success &&
-              mnavFlowField_Build(field, &grid, goals, 25, nullptr) == mnav_success,
+    mnavGridFlow* field = nullptr;
+    CHECK(mnavCreateGridFlow(&fieldDef, &field) == mnav_success &&
+              mnavGridFlow_Build(field, &grid, goals, 25, nullptr) == mnav_success,
           "a field to the goal");
     static const mnavPos2 lower[4] = {{32, 0}, {33, 0}, {33, 28}, {32, 28}};
     static const mnavPos2 upper[4] = {{32, 36}, {33, 36}, {33, 64}, {32, 64}};
@@ -595,7 +595,7 @@ static void TestGroup(void)
     CHECK(closest > 0.8 * 0.95 && walled == 0, "no agents overlapping or in the wall");
     CHECK(hash == GROUP_HASH, "the pinned hash");
     mnavDestroyAvoidance(avoidance);
-    mnavDestroyFlowField(field);
+    mnavDestroyGridFlow(field);
 }
 
 // The doorway crowd: 1,000 agents of 0.25 m in rows 0.75 m apart (its

@@ -45,7 +45,7 @@ static void TestStamp(void)
               mnavDefaultQueryDef().version == MNAV_ABI_VERSION &&
               mnavDefaultSteerDef().version == MNAV_ABI_VERSION &&
               mnavDefaultAvoidanceDef().version == MNAV_ABI_VERSION &&
-              mnavDefaultFlowFieldDef().version == MNAV_ABI_VERSION &&
+              mnavDefaultGridFlowDef().version == MNAV_ABI_VERSION &&
               mnavDefaultNavFlowDef().version == MNAV_ABI_VERSION &&
               mnavDefaultHierarchyDef().version == MNAV_ABI_VERSION &&
               mnavDefaultTileCacheDef().version == MNAV_ABI_VERSION &&
@@ -205,12 +205,12 @@ static void TestQuery(uint32_t other)
 
 static void TestFieldsAndAvoidance(uint32_t other)
 {
-    mnavFlowFieldDef flowStale = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef flowStale = mnavDefaultGridFlowDef();
     flowStale.version = other;
-    mnavFlowFieldDef flowWrong = flowStale;
+    mnavGridFlowDef flowWrong = flowStale;
     flowWrong.cookie ^= 1u;
-    mnavFlowField* flow = nullptr;
-    Refusals r = {mnavCreateFlowField(&flowStale, &flow), mnavCreateFlowField(&flowWrong, &flow)};
+    mnavGridFlow* flow = nullptr;
+    Refusals r = {mnavCreateGridFlow(&flowStale, &flow), mnavCreateGridFlow(&flowWrong, &flow)};
     CHECK(Refused(r) && flow == nullptr, "a flow field");
 
     mnavAvoidanceDef avoidanceStale = mnavDefaultAvoidanceDef();

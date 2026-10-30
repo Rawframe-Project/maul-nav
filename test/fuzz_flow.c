@@ -84,27 +84,27 @@ typedef struct Window
 } Window;
 
 // Begins and continues a field in steps of a budget read from the bytes.
-static mnavResult BuildInSteps(mnavFlowField* field, const mnavGrid* grid,
+static mnavResult BuildInSteps(mnavGridFlow* field, const mnavGrid* grid,
                                const mnavQueryFilter* filter, const mnavCellRange* region,
                                const mnavCell* goals, int32_t goalCount, int32_t budget)
 {
-    mnavResult result = mnavFlowField_Begin(field, grid, region, goals, goalCount, filter);
+    mnavResult result = mnavGridFlow_Begin(field, grid, region, goals, goalCount, filter);
     bool ended = false;
     while (result == mnav_success && !ended)
     {
-        result = mnavFlowField_Continue(field, grid, budget, &ended);
+        result = mnavGridFlow_Continue(field, grid, budget, &ended);
     }
     return result;
 }
 
-// Builds a field at once: mnavFlowField_Build for the whole grid, else
+// Builds a field at once: mnavGridFlow_Build for the whole grid, else
 // the work begun and continued with no limit.
-static mnavResult BuildAtOnce(mnavFlowField* field, const mnavGrid* grid,
+static mnavResult BuildAtOnce(mnavGridFlow* field, const mnavGrid* grid,
                               const mnavQueryFilter* filter, const mnavCellRange* region,
                               const mnavCell* goals, int32_t goalCount)
 {
     return region == nullptr
-               ? mnavFlowField_Build(field, grid, goals, goalCount, filter)
+               ? mnavGridFlow_Build(field, grid, goals, goalCount, filter)
                : BuildInSteps(field, grid, filter, region, goals, goalCount, INT32_MAX);
 }
 
@@ -114,16 +114,16 @@ static bool SameBits(double a, double b)
 }
 
 // Whether two fields agree on every cell of the region, cost and next.
-static bool SameFields(const mnavFlowField* a, const mnavFlowField* b, Window r)
+static bool SameFields(const mnavGridFlow* a, const mnavGridFlow* b, Window r)
 {
     for (int32_t y = r.y; y < r.y + r.height; ++y)
     {
         for (int32_t x = r.x; x < r.x + r.width; ++x)
         {
-            mnavFlow fa;
-            mnavFlow fb;
-            Expect(mnavFlowField_GetFlow(a, (mnavCell){x, y}, &fa) == mnav_success &&
-                   mnavFlowField_GetFlow(b, (mnavCell){x, y}, &fb) == mnav_success);
+            mnavCellFlow fa;
+            mnavCellFlow fb;
+            Expect(mnavGridFlow_GetFlow(a, (mnavCell){x, y}, &fa) == mnav_success &&
+                   mnavGridFlow_GetFlow(b, (mnavCell){x, y}, &fb) == mnav_success);
             if (!SameBits(fa.cost, fb.cost) || fa.next.x != fb.next.x || fa.next.y != fb.next.y)
             {
                 return false;
@@ -135,15 +135,15 @@ static bool SameFields(const mnavFlowField* a, const mnavFlowField* b, Window r)
 
 // Each cell's cost is its next cell's plus the step between them, summed
 // as the search sums it; a cell with no way, or a goal, points at itself.
-static void CheckWays(const mnavFlowField* field, const mnavGrid* grid,
+static void CheckWays(const mnavGridFlow* field, const mnavGrid* grid,
                       const mnavQueryFilter* filter, Window r)
 {
     for (int32_t y = r.y; y < r.y + r.height; ++y)
     {
         for (int32_t x = r.x; x < r.x + r.width; ++x)
         {
-            mnavFlow f;
-            Expect(mnavFlowField_GetFlow(field, (mnavCell){x, y}, &f) == mnav_success);
+            mnavCellFlow f;
+            Expect(mnavGridFlow_GetFlow(field, (mnavCell){x, y}, &f) == mnav_success);
             bool home = f.next.x == x && f.next.y == y;
             Expect(f.cost >= 0.0 && (isfinite(f.cost) || home));
             if (home || !isfinite(f.cost))
@@ -154,8 +154,8 @@ static void CheckWays(const mnavFlowField* field, const mnavGrid* grid,
             int32_t dx = f.next.x - x;
             int32_t dy = f.next.y - y;
             Expect(dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1);
-            mnavFlow next;
-            Expect(mnavFlowField_GetFlow(field, f.next, &next) == mnav_success);
+            mnavCellFlow next;
+            Expect(mnavGridFlow_GetFlow(field, f.next, &next) == mnav_success);
             double length = (dx != 0 && dy != 0 ? DIAGONAL : 1.0) * (double)grid->cellSize;
             double here = (double)filter->costs[grid->areas[y * grid->width + x]];
             double there = (double)filter->costs[grid->areas[f.next.y * grid->width + f.next.x]];
@@ -213,13 +213,13 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     }
     int32_t budget = 1 + Byte(&r) % 64;
 
-    mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef def = mnavDefaultGridFlowDef();
     def.allocator = CountingAllocator();
     def.cells = Byte(&r) == 0 ? 8 : SIDE * SIDE;
-    mnavFlowField* stepped = nullptr;
-    mnavFlowField* whole = nullptr;
-    Expect(mnavCreateFlowField(&def, &stepped) == mnav_success &&
-           mnavCreateFlowField(&def, &whole) == mnav_success);
+    mnavGridFlow* stepped = nullptr;
+    mnavGridFlow* whole = nullptr;
+    Expect(mnavCreateGridFlow(&def, &stepped) == mnav_success &&
+           mnavCreateGridFlow(&def, &whole) == mnav_success);
     mnavResult a = BuildInSteps(stepped, &grid, &filter, window, goals, goalCount, budget);
     mnavResult b = BuildAtOnce(whole, &grid, &filter, window, goals, goalCount);
     Expect(Typed(a) && a == b);
@@ -244,12 +244,12 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
             newGoals[g] = (mnavCell){Byte(&r) % (uint32_t)width, Byte(&r) % (uint32_t)height};
         }
         mnavResult u =
-            mnavFlowField_Update(stepped, &grid, newGoals, newGoalCount, changed, changeCount);
+            mnavGridFlow_Update(stepped, &grid, newGoals, newGoalCount, changed, changeCount);
         Expect(Typed(u));
         bool ended = u != mnav_success;
         while (!ended)
         {
-            Expect(mnavFlowField_Continue(stepped, &grid, budget, &ended) == mnav_success);
+            Expect(mnavGridFlow_Continue(stepped, &grid, budget, &ended) == mnav_success);
         }
         Expect(BuildAtOnce(whole, &grid, &filter, window, newGoals, newGoalCount) == mnav_success);
         if (u == mnav_success)
@@ -258,12 +258,12 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
             CheckWays(stepped, &grid, &filter, region);
         }
         // A repair before the work ends is stale.
-        Expect(mnavFlowField_Begin(whole, &grid, window, goals, goalCount, &filter) ==
+        Expect(mnavGridFlow_Begin(whole, &grid, window, goals, goalCount, &filter) ==
                    mnav_success &&
-               mnavFlowField_Update(whole, &grid, goals, goalCount, nullptr, 0) == mnav_errorState);
+               mnavGridFlow_Update(whole, &grid, goals, goalCount, nullptr, 0) == mnav_errorState);
     }
-    mnavDestroyFlowField(stepped);
-    mnavDestroyFlowField(whole);
+    mnavDestroyGridFlow(stepped);
+    mnavDestroyGridFlow(whole);
     Expect(s_held == 0);
     return 0;
 }

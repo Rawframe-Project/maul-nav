@@ -46,11 +46,11 @@ enum
     mnav_flowNewGoal = 4
 };
 
-struct mnavFlowField
+struct mnavGridFlow
 {
     mnavMemory memory;
     mnavHostCode host;
-    mnavFlowFieldDef def;
+    mnavGridFlowDef def;
     // Per cell of the region, row by row: the cost to the goals, the next
     // cell's index, the place in the heap and the repair's marks.
     double* costs;
@@ -80,7 +80,7 @@ struct mnavFlowField
 // A step of work: the field and the grid's areas.
 typedef struct mnavFlowSearch
 {
-    mnavFlowField* field;
+    mnavGridFlow* field;
     const mnavAreaType* areas;
 } mnavFlowSearch;
 
@@ -100,10 +100,10 @@ double mnavFlowStepCost(const mnavFlowSearch* s, int32_t from, int32_t to, doubl
 
 // Gives a cell a lower cost by way of the next cell given, opening it
 // again when it was done; a repair lists it as touched.
-void mnavFlowLower(mnavFlowField* f, int32_t cell, double cost, int32_t next);
+void mnavFlowLower(mnavGridFlow* f, int32_t cell, double cost, int32_t next);
 
 // Whether the grid is the one the work began on.
-bool mnavFlowSameGrid(const mnavFlowField* f, const mnavGrid* grid);
+bool mnavFlowSameGrid(const mnavGridFlow* f, const mnavGrid* grid);
 
 // Chooses the next cell of up to budget touched cells and their
 // neighbours; returns how many it did, and ends the repair after the

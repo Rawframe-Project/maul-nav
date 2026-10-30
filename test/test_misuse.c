@@ -178,23 +178,23 @@ static void TestBakers(void)
 // The fields, the hierarchy and the avoidance set.
 static void TestOthers(void)
 {
-    mnavFlowFieldDef flowDef = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef flowDef = mnavDefaultGridFlowDef();
     flowDef.cells = 64;
-    mnavFlowField* flow = nullptr;
+    mnavGridFlow* flow = nullptr;
     mnavAreaType areas[16];
     memset(areas, mnav_areaWalkable, sizeof(areas));
     const mnavGrid grid = {areas, 4, 4, 1.0f};
     const mnavCell goal = {0, 0};
-    mnavFlow way;
-    CHECK(mnavCreateFlowField(&flowDef, &flow) == mnav_success &&
-              mnavFlowField_Build(flow, nullptr, &goal, 1, nullptr) == mnav_errorInvalid &&
-              mnavFlowField_GetMisuse(flow) == 1,
+    mnavCellFlow way;
+    CHECK(mnavCreateGridFlow(&flowDef, &flow) == mnav_success &&
+              mnavGridFlow_Build(flow, nullptr, &goal, 1, nullptr) == mnav_errorInvalid &&
+              mnavGridFlow_GetMisuse(flow) == 1,
           "a flow build counts once");
-    CHECK(mnavFlowField_Build(flow, &grid, &goal, 1, nullptr) == mnav_success &&
-              mnavFlowField_GetFlow(flow, (mnavCell){9, 9}, &way) == mnav_errorOutside &&
-              mnavFlowField_GetMisuse(flow) == 1,
+    CHECK(mnavGridFlow_Build(flow, &grid, &goal, 1, nullptr) == mnav_success &&
+              mnavGridFlow_GetFlow(flow, (mnavCell){9, 9}, &way) == mnav_errorOutside &&
+              mnavGridFlow_GetMisuse(flow) == 1,
           "outside the region counts none");
-    mnavDestroyFlowField(flow);
+    mnavDestroyGridFlow(flow);
     mnavNavmesh* navmesh = Trench2();
     mnavNavFlowDef navDef = mnavDefaultNavFlowDef();
     navDef.limits.polygons = 256;

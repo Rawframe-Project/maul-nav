@@ -19,7 +19,7 @@ reads or copies stored integers and bytes:
     mnavTileIndex_GetMisuse
     mnavTileCache_GetMisuse
     mnavHierarchy_GetMisuse
-    mnavFlowField_GetMisuse
+    mnavGridFlow_GetMisuse
     mnavNavFlow_GetMisuse
     mnavAvoidance_GetMisuse
     mnavFlightBaker_GetMisuse
@@ -30,7 +30,7 @@ gives memory back, which the allocator does in the host's environment:
     mnavDestroyBaker
     mnavDestroyFlightBaker
     mnavDestroyFlightVolume
-    mnavDestroyFlowField
+    mnavDestroyGridFlow
     mnavDestroyHierarchy
     mnavDestroyNavFlow
     mnavDestroyNavmesh

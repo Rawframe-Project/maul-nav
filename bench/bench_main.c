@@ -971,19 +971,19 @@ static void Gap(void)
 }
 
 // Times one repair of a field.
-static double Repair(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
+static double Repair(mnavGridFlow* field, const mnavGrid* grid, const mnavCell* goals,
                      const mnavCell* changed, int32_t changedCount)
 {
     double start = Seconds();
-    Check(mnavFlowField_Update(field, grid, goals, 4, changed, changedCount), "repair");
-    Check(mnavFlowField_Continue(field, grid, INT32_MAX, NULL), "repaired");
+    Check(mnavGridFlow_Update(field, grid, goals, 4, changed, changedCount), "repair");
+    Check(mnavGridFlow_Continue(field, grid, INT32_MAX, NULL), "repaired");
     return Seconds() - start;
 }
 
 // Repairs of the four-goal field: a cell in the middle blocked and opened
 // again, a corner goal moved a cell and back, and a wall's gap closed and
 // opened again.
-static void FlowRepairs(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals)
+static void FlowRepairs(mnavGridFlow* field, const mnavGrid* grid, const mnavCell* goals)
 {
     mnavAreaType* areas = (mnavAreaType*)grid->areas;
     mnavCell moved[4] = {goals[0], goals[1], goals[2], goals[3]};
@@ -1045,11 +1045,11 @@ static void Flow(void)
     mnavGrid grid = {areas, SIDE, SIDE, 0.5f};
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     filter.costs[2] = 3.0f;
-    mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef def = mnavDefaultGridFlowDef();
     def.allocator = (mnavAllocator){Alloc, Free, NULL};
     def.cells = SIDE * SIDE;
-    mnavFlowField* field = NULL;
-    Check(mnavCreateFlowField(&def, &field), "flow field");
+    mnavGridFlow* field = NULL;
+    Check(mnavCreateGridFlow(&def, &field), "flow field");
     const mnavCell goals[4] = {{0, 0}, {511, 511}, {0, 511}, {511, 0}};
     for (int32_t count = 1; count <= 4; count += 3)
     {
@@ -1057,18 +1057,18 @@ static void Flow(void)
         for (int32_t run = 0; run < RUNS; ++run)
         {
             double start = Seconds();
-            Check(mnavFlowField_Build(field, &grid, goals, count, &filter), "build");
+            Check(mnavGridFlow_Build(field, &grid, goals, count, &filter), "build");
             double took = Seconds() - start;
             best = took < best ? took : best;
         }
-        mnavFlow far;
-        Check(mnavFlowField_GetFlow(field, (mnavCell){256, 256}, &far), "read");
+        mnavCellFlow far;
+        Check(mnavGridFlow_GetFlow(field, (mnavCell){256, 256}, &far), "read");
         printf("# flow: %d by %d cells, %d goal(s), %.0f us per build, middle costs %.1f\n", SIDE,
                SIDE, count, best * 1e6, far.cost);
         Report(count == 1 ? "flow build, 1 goal" : "flow build, 4 goals", best * 1e6, "us");
     }
     FlowRepairs(field, &grid, goals);
-    mnavDestroyFlowField(field);
+    mnavDestroyGridFlow(field);
 }
 
 enum

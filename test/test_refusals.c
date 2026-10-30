@@ -48,11 +48,11 @@ static void TestMaking(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavFlowDef navFlowDef = mnavDefaultNavFlowDef();
-    mnavFlowFieldDef flowDef = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef flowDef = mnavDefaultGridFlowDef();
     mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     CHECK(mnavCreateNavmesh(&meshDef, nullptr).result == mnav_errorInvalid &&
               mnavCreateNavFlow(&navFlowDef, nullptr) == mnav_errorInvalid &&
-              mnavCreateFlowField(&flowDef, nullptr) == mnav_errorInvalid,
+              mnavCreateGridFlow(&flowDef, nullptr) == mnav_errorInvalid,
           "no place for the object");
     // An agent radius of 128.3 cells rounds up past the tile's 128.
     def.agent.radius = 128.3f * def.cellSize;
