@@ -4,7 +4,9 @@
 // What a public call leaves in its outputs. A call whose first parameter is
 // an owner object clears them before it checks anything, and again when it
 // fails, so that a failure never leaves an earlier call's values, or part
-// of its own, for the caller to read. The outputs a failure defines (the
+// of its own, for the caller to read. A call that answers "no" without
+// failing writes nothing past the cleared outputs but the answer. The
+// outputs a failure defines (the
 // size or count a buffer too small needed, a bake's report) are left to the
 // call (docs/internals/overview.md).
 

@@ -140,9 +140,15 @@ typedef struct Route
 static double FindRoute(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 from,
                         mnavPos3 to, Route* route)
 {
-    bool found = false;
-    Check(mnavFlightVolume_FindNearestPoint(volume, from, 2.0f, &from, &found), "nearest");
-    Check(mnavFlightVolume_FindNearestPoint(volume, to, 2.0f, &to, &found), "nearest");
+    bool fromFound = false;
+    bool toFound = false;
+    Check(mnavFlightVolume_FindNearestPoint(volume, from, 2.0f, &from, &fromFound), "nearest");
+    Check(mnavFlightVolume_FindNearestPoint(volume, to, 2.0f, &to, &toFound), "nearest");
+    if (!fromFound || !toFound)
+    {
+        fprintf(stderr, "no open point near an end\n");
+        exit(1);
+    }
     mnavFlightPath path;
     Check(mnavQuery_FindFlightPath(query, volume, from, to, &path), "path");
     if (path.end != mnav_pathFound || path.pointCount > MOST_POINTS)

@@ -403,7 +403,7 @@ static void CheckRaycast(const mnavFlightVolume* volume, mnavPos3 a, mnavPos3 b)
 
 static void CheckNearest(const mnavFlightVolume* volume, mnavPos3 p, float radius)
 {
-    mnavPos3 nearest;
+    mnavPos3 nearest = p;
     bool found = false;
     Expect(mnavFlightVolume_FindNearestPoint(volume, p, radius, &nearest, &found) == mnav_success);
     double best = (double)INFINITY;
@@ -433,6 +433,7 @@ static void CheckNearest(const mnavFlightVolume* volume, mnavPos3 p, float radiu
     else
     {
         Expect(best > (double)radius - 2e-3);
+        Expect(nearest.x == 0.0 && nearest.y == 0.0 && nearest.z == 0.0);
     }
 }
 

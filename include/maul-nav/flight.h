@@ -614,7 +614,8 @@ extern "C"
     /// @param volume      The flight volume.
     /// @param point       The point, in world coordinates.
     /// @param radius      How far to look, in meters, at least 0.
-    /// @param nearestOut  Receives the nearest open point. Zeroed on any failure.
+    /// @param nearestOut  Receives the nearest open point; zeroed when none lies
+    ///                    within the radius, and on any failure.
     /// @param foundOut    Receives whether one lies within the radius. Zeroed on
     ///                    any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
