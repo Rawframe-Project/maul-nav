@@ -7,25 +7,58 @@ may change the API, the ABI and the tile formats.
 
 ## [0.5.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.4.0...v0.5.0) (2026-10-30)
 
+This release finishes the API review for 1.0.0. A call that fills a
+caller's array now zeroes it over its capacity when it fails, and a
+refused debug call leaves its buffer as it was. The bake def's setting
+values carry the def's name, and the family's hash takes a 64-bit byte
+count.
 
-### ⚠ BREAKING CHANGES
-
-* mnavHash64 takes its byte count as an int64_t, where it took an int32_t; its result for every count that fit in an int32_t is unchanged.
-* the values of mnavBakeSetting are renamed from mnav_setting* to mnav_bakeSetting* (mnav_settingCellSize is mnav_bakeSettingCellSize, and so on for all 22); their numbers do not change.
-* mnavNavmesh_DebugCorridor refuses a run with a malformed polygon id before it appends anything, where it used to append the polygons before that id; mnavNavmesh_CheckCorridor's last parameter is named validCountOut.
-* mnavNavmesh_FindPolygons, mnavQuery_FindWalls, mnavQuery_FindCorridorAreas, mnavQuery_GenerateLinks, mnavBaker_CopyTile and mnavFlightBaker_CopyTile zero the caller's array over its capacity on any failure that defines none of its items. Before, they left it as it was. A buffer too small keeps the first capacity items, link generation stopped at a bound keeps the links found, and a busy refusal leaves the array. A CopyTile buffer too small for the tile is zeroed.
-
-### Fixed
-
-* **build:** run the hand tile check when a change reaches the writer ([#201](https://github.com/Rawframe-Project/maul-nav/issues/201)) ([b7bea4a](https://github.com/Rawframe-Project/maul-nav/commit/b7bea4a297024db4f70049698939e9cffca68585))
-* leave a debug buffer as it was when a call is refused ([#209](https://github.com/Rawframe-Project/maul-nav/issues/209)) ([d8925b1](https://github.com/Rawframe-Project/maul-nav/commit/d8925b1d8f8d5832384a2c1a9e5ee0c081a09126))
-* zero a caller's array on failure ([#208](https://github.com/Rawframe-Project/maul-nav/issues/208)) ([9129b20](https://github.com/Rawframe-Project/maul-nav/commit/9129b201581964054df86b9de8c08c098a59e04c))
-
+On success nothing changes: tile bytes, fingerprints, paths, debug
+geometry and velocities are the same, and no tile format rises, so tiles
+baked by 0.4.0 load as they are.
 
 ### Changed
 
-* hash a byte count past INT32_MAX (.github v0.0.39) ([#214](https://github.com/Rawframe-Project/maul-nav/issues/214)) ([fbac9a5](https://github.com/Rawframe-Project/maul-nav/commit/fbac9a563fc72d3cbf8721c0ec3e5c56f1f54d9d)), closes [#213](https://github.com/Rawframe-Project/maul-nav/issues/213)
-* name the bake def's settings for their def ([#211](https://github.com/Rawframe-Project/maul-nav/issues/211)) ([902c163](https://github.com/Rawframe-Project/maul-nav/commit/902c1633b7220ef5d074ad65bbab1c5e21e9bdbc))
+- **Breaking:** a call that fills a caller's array zeroes it over its
+  capacity on any failure that does not define its items. Before, it
+  left the array as it was, so a failure could leave an earlier call's
+  walls, links or tile bytes in it.
+  ([#208](https://github.com/Rawframe-Project/maul-nav/pull/208))
+  - The calls are `mnavNavmesh_FindPolygons`, `mnavQuery_FindWalls`,
+    `mnavQuery_FindCorridorAreas`, `mnavQuery_GenerateLinks`,
+    `mnavBaker_CopyTile` and `mnavFlightBaker_CopyTile`.
+  - A buffer too small still keeps the first capacity items, and link
+    generation that stops at a bound keeps the links found.
+  - A call refused as busy, called back in from host code, still writes
+    nothing.
+  - A tile copy into a buffer too small for the tile now gets zeros, not
+    the bytes that were there.
+  - Each array's documentation says what a failure leaves in it. No
+    output may overlap an input.
+- **Breaking:** a debug call that fails leaves its buffer as it was,
+  except when the buffer fills (`mnav_errorCapacity`), which writes what
+  fits and counts what the whole needs.
+  ([#209](https://github.com/Rawframe-Project/maul-nav/pull/209))
+  - `mnavNavmesh_DebugCorridor` used to append the polygons before a
+    malformed id and then refuse the run. It now checks every id before
+    it draws.
+  - `mnavNavmesh_CheckCorridor`'s count is named `validCountOut`; no
+    call changes.
+- **Breaking:** `mnavBakeSetting`'s values are named for the bake def,
+  beside the navmesh's, flight's and flight volume's settings. Their
+  numbers do not change.
+  ([#211](https://github.com/Rawframe-Project/maul-nav/pull/211))
+  - `mnav_settingCellSize` is `mnav_bakeSettingCellSize`, and so on for
+    all 22: `mnav_bakeSettingNone`, `Cookie`, `Allocator`, `Origin`,
+    `CellSize`, `CellHeight`, `TileCells`, `AgentRadius`, `AgentHeight`,
+    `AgentStepHeight`, `AgentMaxSlope`, `InputTriangles`,
+    `TileTriangles`, `TileSpans`, `TilePolygons`, `TileVertices`,
+    `MemoryBytes`, `MinRegionArea`, `MaxEdgeError`, `MaxEdgeLength`,
+    `DetailSampleDistance` and `DetailMaxError`.
+- **Breaking:** `mnavHash64` takes its byte count as an `int64_t`, where
+  it took an `int32_t`, so it hashes 2 GiB or more in one call. Its
+  result for every count that fit in an `int32_t` is unchanged.
+  ([#214](https://github.com/Rawframe-Project/maul-nav/pull/214))
 
 ## [0.4.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.3.0...v0.4.0) (2026-10-30)
 
