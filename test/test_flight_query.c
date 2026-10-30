@@ -1031,12 +1031,12 @@ static void TestHole(void)
                   mnav_success &&
               hit.stop != mnav_flightClear && hit.point.x <= 16.0 + 1e-9,
           "a raycast into the hole");
-    mnavPos3 nearest;
+    mnavPos3 nearest = At(24.5, 28.5, 24.5);
     bool found = true;
     CHECK(mnavFlightVolume_FindNearestPoint(volume, At(24.5, 28.5, 24.5), 2.0f, &nearest, &found) ==
                   mnav_success &&
-              !found,
-          "nothing near in the hole");
+              !found && nearest.x == 0.0 && nearest.y == 0.0 && nearest.z == 0.0,
+          "nothing near in the hole, the point zeroed");
     mnavDestroyQuery(query);
     mnavDestroyFlightVolume(volume);
 }

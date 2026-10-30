@@ -296,7 +296,6 @@ static MNAV_NOINLINE mnavResult FindNearestFlightPointWork(const mnavFlightVolum
         return mnav_errorInvalid;
     }
     *foundOut = false;
-    *nearestOut = point;
     mnavFlightFrame frame = mnavMakeFlightFrame(volume);
     Nearest n = {{0.0, 0.0, 0.0}, 0.0, {0.0, 0.0, 0.0}, false};
     int32_t at[3];
@@ -313,6 +312,7 @@ static MNAV_NOINLINE mnavResult FindNearestFlightPointWork(const mnavFlightVolum
     if (mnavFlightHolder(&cursor, at[0], at[1], at[2], nullptr) == MNAV_SPACE_OPEN)
     {
         *foundOut = true;
+        *nearestOut = point;
         return mnav_success;
     }
     n.best = (double)radius / frame.voxel;
