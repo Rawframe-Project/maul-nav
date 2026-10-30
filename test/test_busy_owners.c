@@ -152,6 +152,16 @@ static void CallAvoidance(void* object)
     Count(mnavAvoidance_Avoid3D(avoidance, nullptr, 0, nullptr, 0, 1.0, nullptr));
     Count(mnavAvoidance_Debug(avoidance, nullptr, 0, 0.0, nullptr));
     Count(mnavAvoidance_Debug3D(avoidance, nullptr, 0, nullptr, 0, nullptr));
+    // Refused as busy from its own allocator, a call leaves the velocities
+    // it was given, which may be the ones the call in progress fills.
+    const mnavAgent agent = {0};
+    const mnavAgent3D flier = {0};
+    mnavVec2 kept = {1.0f, 2.0f};
+    mnavVec3 kept3 = {1.0f, 2.0f, 3.0f};
+    Count(mnavAvoidance_Avoid(avoidance, &agent, 1, nullptr, 0, 1.0, &kept));
+    Count(mnavAvoidance_Avoid3D(avoidance, &flier, 1, nullptr, 0, 1.0, &kept3));
+    CHECK(kept.x == 1.0f && kept.y == 2.0f && kept3.x == 1.0f && kept3.y == 2.0f && kept3.z == 3.0f,
+          "busy avoidance leaves its velocities");
     mnavDestroyAvoidance(avoidance);
     s_made += 1;
 }
@@ -207,7 +217,7 @@ static void (*const s_calls[KINDS])(void*) = {
 
 // How many calls each kind's call back in makes, and how many of them
 // return nothing.
-static const int32_t s_callCounts[KINDS] = {5, 4, 1, 3, 5, 4, 5, 2, 4, 8, 2};
+static const int32_t s_callCounts[KINDS] = {5, 4, 1, 3, 5, 4, 7, 2, 4, 8, 2};
 static const int32_t s_voidCounts[KINDS] = {1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 static uint64_t Misuse(int32_t kind, const void* object)
