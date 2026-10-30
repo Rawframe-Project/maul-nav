@@ -104,7 +104,8 @@ extern "C"
     /// @param filter      The areas wanted, or NULL for every walkable one;
     ///                    one including mnav_areaNone finds blocked polygons.
     /// @param polygonsOut Receives up to capacity ids; NULL when capacity
-    ///                    is 0.
+    ///                    is 0. Zeroed over the capacity on any failure but
+    ///                    mnav_errorCapacity, which keeps the first capacity.
     /// @param capacity    The room, at least 0.
     /// @param foundOut    Receives the count and whether the box was all loaded.
     ///                    Zeroed on any failure but mnav_errorCapacity, which gives
@@ -657,7 +658,10 @@ extern "C"
     /// @param cornersOut Receives the straight path, or NULL. Zeroed on any
     ///                   failure but mnav_errorBusy, which leaves it as it was.
     /// @param runsOut    Receives the runs, in order. May be NULL when
-    ///                   capacity is 0.
+    ///                   capacity is 0. Zeroed over the capacity on any
+    ///                   failure but mnav_errorCapacity, which keeps the first
+    ///                   capacity, and mnav_errorBusy, which leaves it as it
+    ///                   was.
     /// @param capacity   How many runs fit, at least 0.
     /// @param countOut   Receives how many runs there are, also when they do not
     ///                   all fit. Zeroed on any failure but mnav_errorCapacity,
@@ -1062,7 +1066,9 @@ extern "C"
     /// @param radius   How far to look, in meters, at least 0 and finite.
     /// @param filter   The areas usable, or NULL.
     /// @param wallsOut Receives up to capacity walls, the nearest; NULL when
-    ///                 capacity is 0.
+    ///                 capacity is 0. Zeroed over the capacity on any failure
+    ///                 but mnav_errorCapacity, which keeps the first capacity,
+    ///                 and mnav_errorBusy, which leaves it as it was.
     /// @param capacity The room, at least 0.
     /// @param foundOut Receives the count and whether the node limit cut the
     ///                 search short. Zeroed on any failure but

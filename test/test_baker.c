@@ -87,8 +87,11 @@ static void TestLevelBakesAndCopies(void)
               size == report.tileBytes,
           "a size query");
     static uint8_t small[16];
-    CHECK(mnavBaker_CopyTile(baker, small, sizeof(small), &size) == mnav_errorCapacity,
-          "too small");
+    static const uint8_t none[16] = {0};
+    memset(small, 0xA5, sizeof(small));
+    CHECK(mnavBaker_CopyTile(baker, small, sizeof(small), &size) == mnav_errorCapacity &&
+              memcmp(small, none, sizeof(small)) == 0,
+          "too small: none of the tile");
     CHECK(mnavBaker_CopyTile(baker, nullptr, 4, &size) == mnav_errorInvalid, "no buffer");
     static uint8_t bytes[TILE_CAPACITY];
     CHECK(mnavBaker_CopyTile(baker, bytes, sizeof(bytes), nullptr) == mnav_success, "copied");

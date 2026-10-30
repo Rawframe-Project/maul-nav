@@ -87,6 +87,10 @@ typedef struct Outputs
     mnavRay ray;
     mnavRandomPoint point;
     mnavLinkId link;
+    // Caller arrays, which a busy refusal leaves as filled too.
+    mnavAreaRun runs[2];
+    mnavWall wallItems[2];
+    mnavLinkDef links[2];
 } Outputs;
 
 static Outputs s_out;
@@ -117,6 +121,18 @@ static void Kept(mnavResult result, const void* output, size_t size)
         Fill(&s_out.field, sizeof(s_out.field));                                                   \
         mnavResult made_ = (call);                                                                 \
         Kept(made_, &s_out.field, sizeof(s_out.field));                                            \
+        Count(made_);                                                                              \
+    } while (false)
+
+// As CALL_WITH, for a call that also fills a caller's array.
+#define CALL_WITH_ARRAY(field, array, call)                                                        \
+    do                                                                                             \
+    {                                                                                              \
+        Fill(&s_out.field, sizeof(s_out.field));                                                   \
+        Fill(s_out.array, sizeof(s_out.array));                                                    \
+        mnavResult made_ = (call);                                                                 \
+        Kept(made_, &s_out.field, sizeof(s_out.field));                                            \
+        Kept(made_, s_out.array, sizeof(s_out.array));                                             \
         Count(made_);                                                                              \
     } while (false)
 
@@ -170,8 +186,9 @@ static void CallQuery(mnavQuery* q, const mnavNavmesh* n)
     CALL_WITH(path, mnavQuery_FinishPath(q, n, &s_out.path));
     CALL_WITH(move, mnavQuery_MoveAlongSurface(q, n, p, a, a, nullptr, &s_out.move));
     CALL_WITH(corners, mnavQuery_FindCorridorCorners(q, nullptr, n, &s_out.corners));
-    CALL_WITH(count,
-              mnavQuery_FindCorridorAreas(q, nullptr, n, &s_out.corners, nullptr, 0, &s_out.count));
+    CALL_WITH_ARRAY(
+        count, runs,
+        mnavQuery_FindCorridorAreas(q, nullptr, n, &s_out.corners, s_out.runs, 2, &s_out.count));
     CALL_WITH(move, mnavQuery_MoveCorridor(q, nullptr, n, a, nullptr, &s_out.move));
     CALL_WITH(move, mnavQuery_MoveCorridorTarget(q, nullptr, n, a, nullptr, &s_out.move));
     CALL_WITH(shortened, mnavQuery_ShortcutCorridor(q, nullptr, n, a, nullptr, &s_out.shortened));
@@ -180,13 +197,16 @@ static void CallQuery(mnavQuery* q, const mnavNavmesh* n)
     CALL_WITH(gridPath, mnavQuery_FindGridPath(q, nullptr, (mnavCell){0, 0}, (mnavCell){0, 0},
                                                nullptr, &s_out.gridPath));
     CALL_WITH(wall, mnavQuery_FindWallDistance(q, n, p, a, 1.0, nullptr, &s_out.wall));
-    CALL_WITH(walls, mnavQuery_FindWalls(q, n, p, a, 1.0, nullptr, nullptr, 0, &s_out.walls));
+    CALL_WITH_ARRAY(
+        walls, wallItems,
+        mnavQuery_FindWalls(q, n, p, a, 1.0, nullptr, s_out.wallItems, 2, &s_out.walls));
     CALL_WITH(end, mnavQuery_CheckReachable(q, n, p, a, p, a, nullptr, &s_out.end));
     CALL_WITH(ray, mnavQuery_Raycast(q, n, p, a, a, nullptr, &s_out.ray));
     CALL_WITH(path, mnavQuery_FindShortestPath(q, n, p, a, p, a, nullptr, &s_out.path));
     CALL_WITH(point, mnavQuery_FindRandomPointAround(q, n, p, a, 1.0, 1, nullptr, &s_out.point));
-    CALL_WITH(count, mnavQuery_GenerateLinks(q, n, nullptr, &(mnavTileRange){0, 0, 0, 0}, nullptr,
-                                             nullptr, 0, &s_out.count));
+    CALL_WITH_ARRAY(count, links,
+                    mnavQuery_GenerateLinks(q, n, nullptr, &(mnavTileRange){0, 0, 0, 0}, nullptr,
+                                            s_out.links, 2, &s_out.count));
     mnavDestroyQuery(q);
     s_reentry.made += 1;
 }

@@ -407,6 +407,8 @@ static MNAV_NOINLINE mnavResult FindPolygonsCounted(const mnavNavmesh* navmesh,
     mnavResult result = mnavHostCountInvalid(
         MNAV_HOST(navmesh), mnavFindPolygonsWork(navmesh, filter, center, halfExtents, polygonsOut,
                                                  capacity, foundOut));
+    mnavClearArray(result, result == mnav_errorCapacity, polygonsOut, capacity,
+                   sizeof(*polygonsOut));
     return mnavClearUnlessCapacity(result, foundOut, sizeof(*foundOut));
 }
 

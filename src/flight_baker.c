@@ -249,5 +249,7 @@ mnavResult mnavFlightBaker_CopyTile(const mnavFlightBaker* baker, uint8_t* buffe
     mnavClearOutput(sizeOut, sizeof(*sizeOut));
     mnavResult result = mnavHostCountInvalid(
         MNAV_HOST(baker), CopyFlightTileWork(baker, bufferOut, capacity, sizeOut));
+    // A buffer too small for the tile gets none of it.
+    mnavClearArray(result, false, bufferOut, capacity > INT64_MAX ? -1 : (int64_t)capacity, 1);
     return mnavClearUnlessCapacity(result, sizeOut, sizeof(*sizeOut));
 }

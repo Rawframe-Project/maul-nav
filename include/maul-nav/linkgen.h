@@ -127,7 +127,10 @@ extern "C"
     ///                  every tile.
     /// @param filter    The areas links may start and land on, and walk
     ///                  through, or NULL.
-    /// @param linksOut  Receives the links, up to capacity.
+    /// @param linksOut  Receives the links, up to capacity. Zeroed over the
+    ///                  capacity on any failure but those that keep the links
+    ///                  found, as countOut lists them; mnav_errorBusy leaves it
+    ///                  as it was.
     /// @param capacity  The buffer's size in links, at least 0.
     /// @param countOut  Receives the number of links generated, also beyond the
     ///                  capacity. Zeroed on any failure but those that count the

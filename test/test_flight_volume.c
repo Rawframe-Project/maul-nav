@@ -644,8 +644,11 @@ static void CopyRefusals(mnavFlightBaker* baker, const mnavBakeInput* input)
               size == s_sizes[0],
           "the size asked for");
     uint8_t small[16];
-    CHECK(mnavFlightBaker_CopyTile(baker, small, sizeof(small), nullptr) == mnav_errorCapacity,
-          "too small");
+    static const uint8_t none[16] = {0};
+    memset(small, 0xA5, sizeof(small));
+    CHECK(mnavFlightBaker_CopyTile(baker, small, sizeof(small), nullptr) == mnav_errorCapacity &&
+              memcmp(small, none, sizeof(small)) == 0,
+          "too small: none of the tile");
     CHECK(mnavFlightBaker_CopyTile(baker, nullptr, 4, &size) == mnav_errorInvalid &&
               mnavFlightBaker_CopyTile(nullptr, small, 4, &size) == mnav_errorInvalid,
           "NULL arguments");

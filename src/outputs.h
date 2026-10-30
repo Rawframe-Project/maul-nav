@@ -8,9 +8,11 @@
 // call back in from host code the object runs, fills copies of its outputs
 // instead and gives them only when it was not (mnavGiveOutput): a busy
 // refusal writes none of them. A call that answers "no" without failing
-// writes nothing past the cleared outputs but the answer. The outputs a
-// failure defines (the size or count a buffer too small needed, a bake's
-// report) are left to the call (docs/internals/overview.md).
+// writes nothing past the cleared outputs but the answer. A caller's array
+// is zeroed over its capacity on failure (mnavClearArray). The outputs a
+// failure defines (the size or count a buffer too small needed with the
+// first capacity items, a bake's report) are left to the call
+// (docs/internals/overview.md).
 
 #ifndef MAUL_NAV_SRC_OUTPUTS_H
 #define MAUL_NAV_SRC_OUTPUTS_H
@@ -19,6 +21,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 // Sets an output's bytes to 0; NULL is no output.
@@ -71,6 +74,24 @@ static inline void mnavGiveOutput(mnavResult result, bool defined, void* output,
     {
         memset(output, 0, size);
     }
+}
+
+// Zeroes a caller's array over its capacity when the call failed and the
+// failure defines none of it, so that no earlier call's items are left in
+// it. The array is left when the call succeeded, when its failure defines
+// the items written (a buffer too small keeps the first capacity), when it
+// was refused as busy, as mnavGiveOutput leaves an output, and when the
+// span itself is refused (no array, a capacity below 1, or more bytes than
+// memory holds).
+static inline void mnavClearArray(mnavResult result, bool defined, void* array, int64_t capacity,
+                                  size_t itemSize)
+{
+    if (result == mnav_success || defined || result == mnav_errorBusy || array == nullptr ||
+        capacity < 1 || (uint64_t)capacity > SIZE_MAX / itemSize)
+    {
+        return;
+    }
+    memset(array, 0, (size_t)capacity * itemSize);
 }
 
 #endif // MAUL_NAV_SRC_OUTPUTS_H

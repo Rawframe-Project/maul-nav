@@ -691,7 +691,8 @@ extern "C"
     /// @param indexOut  Receives the index, or NULL on failure.
     /// @param reportOut Receives the result, the first mesh refused and
     ///                  what its check found, and the memory peak; the
-    ///                  other fields are 0. May be NULL.
+    ///                  other fields are 0. May be NULL. Written on failure
+    ///                  too, naming it.
     /// @return `mnav_success`; for a def mnavValidateBakeDef refuses, the
     /// status it gives; for a mesh mnavValidateBakeInput refuses, the
     /// status it gives; `mnav_errorInvalid` for a NULL indexOut, a negative
@@ -723,7 +724,8 @@ extern "C"
     /// @param indexOut     Receives the index, or NULL on failure.
     /// @param reportOut    Receives the result, the first outline refused
     ///                     and what its check found, and the memory peak;
-    ///                     the other fields are 0. May be NULL.
+    ///                     the other fields are 0. May be NULL. Written on
+    ///                     failure too, naming it.
     /// @return As mnavCreateTileIndex, for outlines.
     /// @par Thread safety
     /// Safe from any thread. An index is never changed after it is made,
@@ -793,7 +795,8 @@ extern "C"
     ///
     /// @param baker     The baker.
     /// @param bufferOut Receives the bytes: at least capacity bytes; may be
-    ///                  NULL when capacity is 0.
+    ///                  NULL when capacity is 0. Zeroed over the capacity on
+    ///                  any failure, a buffer too small included.
     /// @param capacity  The buffer's size in bytes.
     /// @param sizeOut   Receives the tile's size in bytes. May be NULL. Zeroed on
     ///                  any failure but mnav_errorCapacity, which gives the size.

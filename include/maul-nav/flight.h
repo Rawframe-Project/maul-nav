@@ -384,7 +384,8 @@ extern "C"
     ///
     /// @param baker     The baker.
     /// @param bufferOut Receives the bytes: at least capacity bytes; may be
-    ///                  NULL when capacity is 0.
+    ///                  NULL when capacity is 0. Zeroed over the capacity on
+    ///                  any failure, a buffer too small included.
     /// @param capacity  The buffer's size in bytes.
     /// @param sizeOut   Receives the tile's size in bytes. May be NULL. Zeroed on
     ///                  any failure but mnav_errorCapacity, which gives the size.

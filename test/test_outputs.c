@@ -5,9 +5,10 @@
 // is an owner object clears them on any failure, before it checks the
 // owner, so that a refused call never leaves an earlier call's values, or
 // part of its own, for the caller to read; so does one that answers "no"
-// without failing. Each output here is filled with
-// a byte pattern first. The outputs a failure defines keep what it
-// gives: the size or count a buffer too small needed, and a bake's report.
+// without failing. A caller's array is an output too, zeroed over its
+// capacity. Each output here is filled with a byte pattern first. The
+// outputs a failure defines keep what it gives: the size or count a buffer
+// too small needed with the first items, and a bake's report.
 
 #include "defs_for.h"
 #include "stored_tiles.h"
@@ -150,6 +151,7 @@ static void TestNoOwner(void)
     mnavLinkGenDef genDef = mnavDefaultLinkGenDef();
     mnavAreaType areas[4] = {1, 1, 1, 1};
     mnavGrid grid = {areas, 2, 2, 1.0f};
+    uint8_t bytes[ROOM];
 
     FillAll();
     CHECK(mnavPolygon_GetArea(nullptr, polygon, &s_out.area) == mnav_errorInvalid && CLEARED(area),
@@ -169,9 +171,10 @@ static void TestNoOwner(void)
               CLEARED(flag),
           "mnavLink_IsEnabled");
     FillAll();
+    Fill(found, sizeof(found));
     CHECK(mnavNavmesh_FindPolygons(nullptr, at, extents, nullptr, found, ROOM, &s_out.found) ==
                   mnav_errorInvalid &&
-              CLEARED(found),
+              CLEARED(found) && Zeroed(found, sizeof(found)),
           "mnavNavmesh_FindPolygons");
     FillAll();
     CHECK(mnavNavmesh_FindNearest(nullptr, at, extents, nullptr, &s_out.nearest) ==
@@ -211,9 +214,10 @@ static void TestNoOwner(void)
               CLEARED(corners),
           "mnavQuery_FindCorridorCorners");
     FillAll();
+    Fill(runs, sizeof(runs));
     CHECK(mnavQuery_FindCorridorAreas(nullptr, &corridor, navmesh, &s_out.corners, runs, ROOM,
                                       &s_out.count) == mnav_errorInvalid &&
-              CLEARED(corners) && CLEARED(count),
+              CLEARED(corners) && CLEARED(count) && Zeroed(runs, sizeof(runs)),
           "mnavQuery_FindCorridorAreas");
     FillAll();
     CHECK(mnavQuery_MoveCorridor(nullptr, &corridor, navmesh, at, nullptr, &s_out.move) ==
@@ -250,9 +254,10 @@ static void TestNoOwner(void)
               CLEARED(wall),
           "mnavQuery_FindWallDistance");
     FillAll();
+    Fill(walls, sizeof(walls));
     CHECK(mnavQuery_FindWalls(nullptr, navmesh, polygon, at, 1.0, nullptr, walls, ROOM,
                               &s_out.walls) == mnav_errorInvalid &&
-              CLEARED(walls),
+              CLEARED(walls) && Zeroed(walls, sizeof(walls)),
           "mnavQuery_FindWalls");
     FillAll();
     CHECK(mnavNavmesh_FindRandomPoint(nullptr, 1, nullptr, &s_out.point) == mnav_errorInvalid &&
@@ -274,9 +279,10 @@ static void TestNoOwner(void)
               CLEARED(ray),
           "mnavQuery_Raycast");
     FillAll();
+    Fill(links, sizeof(links));
     CHECK(mnavQuery_GenerateLinks(nullptr, navmesh, &genDef, &(mnavTileRange){0, 0, 0, 0}, nullptr,
                                   links, ROOM, &s_out.count) == mnav_errorInvalid &&
-              CLEARED(count),
+              CLEARED(count) && Zeroed(links, sizeof(links)),
           "mnavQuery_GenerateLinks");
     FillAll();
     CHECK(mnavQuery_FindHierarchicalPath(nullptr, nullptr, navmesh, polygon, at, polygon, at,
@@ -309,12 +315,14 @@ static void TestNoOwner(void)
               CLEARED(polygonFlow),
           "mnavNavFlow_GetFlow");
     FillAll();
-    CHECK(mnavBaker_CopyTile(nullptr, nullptr, 0, &s_out.size) == mnav_errorInvalid &&
-              CLEARED(size),
+    Fill(bytes, sizeof(bytes));
+    CHECK(mnavBaker_CopyTile(nullptr, bytes, ROOM, &s_out.size) == mnav_errorInvalid &&
+              CLEARED(size) && Zeroed(bytes, sizeof(bytes)),
           "mnavBaker_CopyTile");
     FillAll();
-    CHECK(mnavFlightBaker_CopyTile(nullptr, nullptr, 0, &s_out.size) == mnav_errorInvalid &&
-              CLEARED(size),
+    Fill(bytes, sizeof(bytes));
+    CHECK(mnavFlightBaker_CopyTile(nullptr, bytes, ROOM, &s_out.size) == mnav_errorInvalid &&
+              CLEARED(size) && Zeroed(bytes, sizeof(bytes)),
           "mnavFlightBaker_CopyTile");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -451,14 +459,43 @@ static void TestPastTheOwner(void)
     CHECK(mnavLink_IsEnabled(navmesh, (mnavLinkId){7, 1}, &s_out.flag) == mnav_errorInvalid &&
               CLEARED(flag),
           "a link never handed out, read as a switch");
-    // A buffer too small defines its count: the total, past the room.
+    // A caller's array is zeroed over its capacity too.
+    mnavPolygonId found[ROOM];
+    Fill(found, sizeof(found));
+    CHECK(mnavNavmesh_FindPolygons(navmesh, at, (mnavVec3){-1.0f, 1.0f, 1.0f}, nullptr, found, ROOM,
+                                   &s_out.found) == mnav_errorInvalid &&
+              Zeroed(found, sizeof(found)),
+          "polygons in a box with a negative extent");
+    mnavWall walls[ROOM];
+    Fill(walls, sizeof(walls));
+    CHECK(mnavQuery_FindWalls(query, navmesh, stale, at, 1.0, nullptr, walls, ROOM, &s_out.walls) ==
+                  mnav_errorStale &&
+              Zeroed(walls, sizeof(walls)),
+          "walls around a stale polygon");
+    mnavAreaRun runs[ROOM];
+    mnavCorridor broken = {0};
+    Fill(runs, sizeof(runs));
+    CHECK(mnavQuery_FindCorridorAreas(query, &broken, navmesh, &s_out.corners, runs, ROOM,
+                                      &s_out.count) == mnav_errorInvalid &&
+              Zeroed(runs, sizeof(runs)),
+          "the areas of a corridor not well formed");
+    mnavLinkDef links[ROOM];
+    mnavLinkGenDef unset = {0};
+    Fill(links, sizeof(links));
+    CHECK(mnavQuery_GenerateLinks(query, navmesh, &unset, nullptr, nullptr, links, ROOM,
+                                  &s_out.count) == mnav_errorInvalid &&
+              Zeroed(links, sizeof(links)),
+          "links from a def not built by its default");
+    // A buffer too small defines its count, the total past the room, and
+    // keeps the first items.
     mnavPolygonId one[1];
     FillAll();
+    Fill(one, sizeof(one));
     CHECK(mnavNavmesh_FindPolygons(navmesh, (mnavPos3){32.0, 0.0, 32.0},
                                    (mnavVec3){64.0f, 64.0f, 64.0f}, nullptr, one, 1,
                                    &s_out.found) == mnav_errorCapacity &&
-              s_out.found.count > 1,
-          "a count past the room is kept");
+              s_out.found.count > 1 && one[0].slot != 0 && one[0].generation != 0,
+          "a count past the room is kept, with the first polygon");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
@@ -562,8 +599,11 @@ static void TestFlightOutside(void)
 
     mnavFlightBaker* baker = nullptr;
     CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success, "a baker");
+    uint8_t bytes[ROOM];
     FillAll();
-    CHECK(mnavFlightBaker_CopyTile(baker, nullptr, 0, &s_out.size) != mnav_success && CLEARED(size),
+    Fill(bytes, sizeof(bytes));
+    CHECK(mnavFlightBaker_CopyTile(baker, bytes, ROOM, &s_out.size) == mnav_errorState &&
+              CLEARED(size) && Zeroed(bytes, sizeof(bytes)),
           "no tile to copy");
     mnavDestroyFlightBaker(baker);
 }
