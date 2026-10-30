@@ -76,8 +76,8 @@ static void TestBake(uint32_t other)
 
     mnavBakeDefResult checked = mnavValidateBakeDef(&stale, nullptr);
     mnavBakeDefResult cookie = mnavValidateBakeDef(&wrong, nullptr);
-    CHECK(checked.result == mnav_errorVersion && checked.setting == mnav_settingNone &&
-              cookie.result == mnav_errorInvalid && cookie.setting == mnav_settingCookie,
+    CHECK(checked.result == mnav_errorVersion && checked.setting == mnav_bakeSettingNone &&
+              cookie.result == mnav_errorInvalid && cookie.setting == mnav_bakeSettingCookie,
           "a bake def checked");
 
     mnavBaker* baker = nullptr;

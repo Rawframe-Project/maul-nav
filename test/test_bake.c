@@ -28,7 +28,7 @@ static void TestDefaultDefIsValid(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBakeCells cells = {0};
     mnavBakeDefResult result = mnavValidateBakeDef(&def, &cells);
-    CHECK(result.result == mnav_success && result.setting == mnav_settingNone, "default valid");
+    CHECK(result.result == mnav_success && result.setting == mnav_bakeSettingNone, "default valid");
     CHECK(cells.agentHeight == 16, "2 m over 0.125 m is 16 cells");
     CHECK(cells.agentStep == 6, "0.75 m over 0.125 m is 6 cells");
     CHECK(cells.agentRadius == 2, "0.5 m over 0.25 m is 2 cells");
@@ -52,9 +52,9 @@ static void TestDefaultDefIsValid(void)
 static void TestDefWithoutCookieIsRefused(void)
 {
     mnavBakeDef def = {0};
-    CHECK(Refuses(def, mnav_settingCookie), "zeroed def");
+    CHECK(Refuses(def, mnav_bakeSettingCookie), "zeroed def");
     mnavBakeDefResult result = mnavValidateBakeDef(nullptr, nullptr);
-    CHECK(result.result == mnav_errorInvalid && result.setting == mnav_settingNone, "NULL def");
+    CHECK(result.result == mnav_errorInvalid && result.setting == mnav_bakeSettingNone, "NULL def");
 }
 
 static void TestGridSettingsAreChecked(void)
@@ -64,35 +64,35 @@ static void TestGridSettingsAreChecked(void)
     CHECK(mnavValidateBakeDef(&def, nullptr).result == mnav_success, "context alone is fine");
     mnavBakeDef broken = def;
     broken.origin.y = (double)NAN;
-    CHECK(Refuses(broken, mnav_settingOrigin), "NaN origin");
+    CHECK(Refuses(broken, mnav_bakeSettingOrigin), "NaN origin");
     broken = def;
     broken.origin.x = (double)INFINITY;
-    CHECK(Refuses(broken, mnav_settingOrigin), "infinite origin");
+    CHECK(Refuses(broken, mnav_bakeSettingOrigin), "infinite origin");
     broken = def;
     broken.cellSize = 0.0005f;
-    CHECK(Bounds(broken, mnav_settingCellSize), "cell too small");
+    CHECK(Bounds(broken, mnav_bakeSettingCellSize), "cell too small");
     broken = def;
     broken.cellSize = NAN;
-    CHECK(Refuses(broken, mnav_settingCellSize), "NaN cell");
+    CHECK(Refuses(broken, mnav_bakeSettingCellSize), "NaN cell");
     // An infinity passes the published bound; a NaN is wrong.
     broken.cellSize = INFINITY;
-    CHECK(Bounds(broken, mnav_settingCellSize), "infinite cell");
+    CHECK(Bounds(broken, mnav_bakeSettingCellSize), "infinite cell");
     broken = def;
     broken.cellHeight = 11.0f;
-    CHECK(Bounds(broken, mnav_settingCellHeight), "cell too tall");
+    CHECK(Bounds(broken, mnav_bakeSettingCellHeight), "cell too tall");
     broken = def;
     broken.tileCells = 15;
-    CHECK(Bounds(broken, mnav_settingTileCells), "tile too small");
+    CHECK(Bounds(broken, mnav_bakeSettingTileCells), "tile too small");
     broken = def;
     broken.tileCells = 1025;
-    CHECK(Bounds(broken, mnav_settingTileCells), "tile too large");
+    CHECK(Bounds(broken, mnav_bakeSettingTileCells), "tile too large");
 }
 
 static void TestAllocatorWithOneFunctionIsRefused(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     def.allocator.free = (void (*)(void*, size_t, size_t, void*))1;
-    CHECK(Refuses(def, mnav_settingAllocator), "free without alloc");
+    CHECK(Refuses(def, mnav_bakeSettingAllocator), "free without alloc");
 }
 
 static void TestAgentSettingsAreChecked(void)
@@ -100,55 +100,55 @@ static void TestAgentSettingsAreChecked(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBakeDef broken = def;
     broken.agent.radius = -0.1f;
-    CHECK(Refuses(broken, mnav_settingAgentRadius), "negative radius");
+    CHECK(Refuses(broken, mnav_bakeSettingAgentRadius), "negative radius");
     broken = def;
     broken.agent.radius = 31.5f;
-    CHECK(Refuses(broken, mnav_settingAgentRadius), "border wider than a tile");
+    CHECK(Refuses(broken, mnav_bakeSettingAgentRadius), "border wider than a tile");
     broken = def;
     broken.agent.height = 0.0f;
-    CHECK(Refuses(broken, mnav_settingAgentHeight), "zero height");
+    CHECK(Refuses(broken, mnav_bakeSettingAgentHeight), "zero height");
     broken = def;
     broken.agent.height = 5000.0f;
-    CHECK(Bounds(broken, mnav_settingAgentHeight), "height past the cell range");
+    CHECK(Bounds(broken, mnav_bakeSettingAgentHeight), "height past the cell range");
     broken.agent.height = INFINITY;
-    CHECK(Bounds(broken, mnav_settingAgentHeight), "infinite height");
+    CHECK(Bounds(broken, mnav_bakeSettingAgentHeight), "infinite height");
     broken = def;
     broken.agent.stepHeight = NAN;
-    CHECK(Refuses(broken, mnav_settingAgentStepHeight), "NaN step");
+    CHECK(Refuses(broken, mnav_bakeSettingAgentStepHeight), "NaN step");
     broken = def;
     broken.agent.maxSlopeDegrees = 90.0f;
-    CHECK(Refuses(broken, mnav_settingAgentMaxSlope), "90 degrees");
+    CHECK(Refuses(broken, mnav_bakeSettingAgentMaxSlope), "90 degrees");
     broken = def;
     broken.agent.maxSlopeDegrees = -1.0f;
-    CHECK(Refuses(broken, mnav_settingAgentMaxSlope), "negative slope");
+    CHECK(Refuses(broken, mnav_bakeSettingAgentMaxSlope), "negative slope");
     broken = def;
     broken.minRegionArea = -1.0f;
-    CHECK(Refuses(broken, mnav_settingMinRegionArea), "negative region area");
+    CHECK(Refuses(broken, mnav_bakeSettingMinRegionArea), "negative region area");
     broken = def;
     broken.minRegionArea = NAN;
-    CHECK(Refuses(broken, mnav_settingMinRegionArea), "NaN region area");
+    CHECK(Refuses(broken, mnav_bakeSettingMinRegionArea), "NaN region area");
     broken = def;
     broken.minRegionArea = 1.0e30f;
-    CHECK(Refuses(broken, mnav_settingMinRegionArea), "region area past any tile");
+    CHECK(Refuses(broken, mnav_bakeSettingMinRegionArea), "region area past any tile");
     broken = def;
     broken.maxEdgeError = -0.1f;
-    CHECK(Refuses(broken, mnav_settingMaxEdgeError), "negative edge error");
+    CHECK(Refuses(broken, mnav_bakeSettingMaxEdgeError), "negative edge error");
     broken.maxEdgeError = MNAV_MAX_CELL_SIZE * MNAV_MAX_TILE_CELLS * 2.0f;
-    CHECK(Bounds(broken, mnav_settingMaxEdgeError), "edge error past the bound");
+    CHECK(Bounds(broken, mnav_bakeSettingMaxEdgeError), "edge error past the bound");
     broken.maxEdgeError = INFINITY;
-    CHECK(Bounds(broken, mnav_settingMaxEdgeError), "infinite edge error");
+    CHECK(Bounds(broken, mnav_bakeSettingMaxEdgeError), "infinite edge error");
     broken = def;
     broken.maxEdgeLength = NAN;
-    CHECK(Refuses(broken, mnav_settingMaxEdgeLength), "NaN edge length");
+    CHECK(Refuses(broken, mnav_bakeSettingMaxEdgeLength), "NaN edge length");
     broken = def;
     broken.detailSampleDistance = -1.0f;
-    CHECK(Refuses(broken, mnav_settingDetailSampleDistance), "negative sample distance");
+    CHECK(Refuses(broken, mnav_bakeSettingDetailSampleDistance), "negative sample distance");
     broken = def;
     broken.detailSampleDistance = INFINITY;
-    CHECK(Refuses(broken, mnav_settingDetailSampleDistance), "infinite sample distance");
+    CHECK(Refuses(broken, mnav_bakeSettingDetailSampleDistance), "infinite sample distance");
     broken = def;
     broken.detailMaxError = NAN;
-    CHECK(Refuses(broken, mnav_settingDetailMaxError), "NaN detail error");
+    CHECK(Refuses(broken, mnav_bakeSettingDetailMaxError), "NaN detail error");
 }
 
 static void TestMetersSnapToCells(void)
@@ -172,13 +172,13 @@ static void TestLimitsAreChecked(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavBakeDef broken = def;
     broken.limits.inputTriangles = 0;
-    CHECK(Refuses(broken, mnav_settingInputTriangles), "zero input triangles");
+    CHECK(Refuses(broken, mnav_bakeSettingInputTriangles), "zero input triangles");
     broken = def;
     broken.limits.tileVertices = MNAV_MAX_TILE_VERTICES + 1;
-    CHECK(Bounds(broken, mnav_settingTileVertices), "vertices past the cap");
+    CHECK(Bounds(broken, mnav_bakeSettingTileVertices), "vertices past the cap");
     broken = def;
     broken.limits.memoryBytes = 0;
-    CHECK(Refuses(broken, mnav_settingMemoryBytes), "zero memory");
+    CHECK(Refuses(broken, mnav_bakeSettingMemoryBytes), "zero memory");
 }
 
 static const mnavVec3 s_square[4] = {{0, 0, 0}, {10, 0, 0}, {10, 0, 10}, {0, 0, 10}};

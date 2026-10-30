@@ -283,7 +283,7 @@ static void TestTheDefIsChecked(void)
     def.bake.cellSize = 0.0f;
     mnavNavmeshDefResult got = mnavCreateNavmesh(&def, &navmesh);
     CHECK(got.result == mnav_errorLimit && got.setting == mnav_navmeshSettingBake &&
-              got.bakeSetting == mnav_settingCellSize && navmesh == nullptr,
+              got.bakeSetting == mnav_bakeSettingCellSize && navmesh == nullptr,
           "the bake def's setting named");
     def = good;
     def.limits.tiles = 0;

@@ -98,7 +98,7 @@ extern "C"
 
     // A navmesh def check's outcome: the status, the first setting it
     // refused, and for mnav_navmeshSettingBake, the bake def's setting
-    // (mnav_settingNone otherwise).
+    // (mnav_bakeSettingNone otherwise).
     typedef struct mnavNavmeshDefResult
     {
         mnavResult result;

@@ -31,6 +31,13 @@ The `assets` job refuses, before it builds anything:
 
 It builds from the commit it resolved the tag to and checks that the checkout is that commit, so a tag moved during the run changes nothing it attaches. It never replaces a published file: a run that failed after attaching some files is re-run only after a maintainer has deleted those files from the release by hand.
 
+## The 1.0.0 release
+
+From 1.0.0 the tile and flight tile formats keep their version: a new field gets a new tag, a reader gives an absent field its default and refuses a tag it does not know, and a 1.z library reads every tile a 1.y wrote. Three places still state the 0.x rule, that a layout change bumps the format and the library reads only the formats it writes. The pull request that makes 1.0.0 rewrites them to the 1.y rule:
+- the Formats invariant in `AGENTS.md`;
+- the second note below;
+- the paragraph on format versions in `docs/internals/bake.md`, which already gives the 1.y rule beside the 0.x one.
+
 ## Notes
 
 - A change of results is never a patch release. A pull request that gives existing inputs a different result, or breaks the API or ABI, carries `!` in its title and a `BREAKING CHANGE:` footer naming what a host sees, whatever its type.

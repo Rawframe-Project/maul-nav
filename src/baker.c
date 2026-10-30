@@ -79,7 +79,7 @@ static MNAV_NOINLINE mnavBakeDefResult CreateBakerWork(const mnavBakeDef* def, m
 {
     if (bakerOut == nullptr)
     {
-        return (mnavBakeDefResult){mnav_errorInvalid, mnav_settingNone};
+        return (mnavBakeDefResult){mnav_errorInvalid, mnav_bakeSettingNone};
     }
     *bakerOut = nullptr;
     mnavBakeCells cells = {0};
@@ -94,12 +94,12 @@ static MNAV_NOINLINE mnavBakeDefResult CreateBakerWork(const mnavBakeDef* def, m
         mnavAllocate(&memory, 1, sizeof(mnavBaker), alignof(mnavBaker), (void**)&baker);
     if (result != mnav_success)
     {
-        return (mnavBakeDefResult){result, mnav_settingNone};
+        return (mnavBakeDefResult){result, mnav_bakeSettingNone};
     }
     *baker = (mnavBaker){*def, cells, memory, nullptr, 0, 0, {0}};
     baker->memory.host = &baker->host;
     *bakerOut = baker;
-    return (mnavBakeDefResult){mnav_success, mnav_settingNone};
+    return (mnavBakeDefResult){mnav_success, mnav_bakeSettingNone};
 }
 
 mnavBakeDefResult mnavCreateBaker(const mnavBakeDef* def, mnavBaker** bakerOut)

@@ -49,7 +49,7 @@ static void TestCreateChecksTheDef(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.cellSize = -1.0f;
     mnavBakeDefResult result = mnavCreateBaker(&def, &baker);
-    CHECK(result.result == mnav_errorLimit && result.setting == mnav_settingCellSize &&
+    CHECK(result.result == mnav_errorLimit && result.setting == mnav_bakeSettingCellSize &&
               baker == nullptr,
           "an invalid def names its setting");
     CHECK(mnavCreateBaker(nullptr, &baker).result == mnav_errorInvalid, "no def");

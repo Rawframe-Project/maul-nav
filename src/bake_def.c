@@ -37,7 +37,7 @@ static mnavBakeDefResult Refuse(mnavResult result, mnavBakeSetting setting)
     return (mnavBakeDefResult){result, setting};
 }
 
-static const mnavBakeDefResult s_accept = {mnav_success, mnav_settingNone};
+static const mnavBakeDefResult s_accept = {mnav_success, mnav_bakeSettingNone};
 
 static bool InRange(float value, float low, float high)
 {
@@ -77,11 +77,11 @@ static mnavBakeDefResult CheckLimits(const mnavBakeLimits* limits)
         int32_t max;
         mnavBakeSetting setting;
     } counts[] = {
-        {limits->inputTriangles, MNAV_MAX_INPUT_TRIANGLES, mnav_settingInputTriangles},
-        {limits->tileTriangles, MNAV_MAX_INPUT_TRIANGLES, mnav_settingTileTriangles},
-        {limits->tileSpans, MNAV_MAX_TILE_SPANS, mnav_settingTileSpans},
-        {limits->tilePolygons, MNAV_MAX_TILE_POLYGONS, mnav_settingTilePolygons},
-        {limits->tileVertices, MNAV_MAX_TILE_VERTICES, mnav_settingTileVertices},
+        {limits->inputTriangles, MNAV_MAX_INPUT_TRIANGLES, mnav_bakeSettingInputTriangles},
+        {limits->tileTriangles, MNAV_MAX_INPUT_TRIANGLES, mnav_bakeSettingTileTriangles},
+        {limits->tileSpans, MNAV_MAX_TILE_SPANS, mnav_bakeSettingTileSpans},
+        {limits->tilePolygons, MNAV_MAX_TILE_POLYGONS, mnav_bakeSettingTilePolygons},
+        {limits->tileVertices, MNAV_MAX_TILE_VERTICES, mnav_bakeSettingTileVertices},
     };
     for (size_t i = 0; i < sizeof(counts) / sizeof(counts[0]); ++i)
     {
@@ -96,7 +96,7 @@ static mnavBakeDefResult CheckLimits(const mnavBakeLimits* limits)
     }
     if (limits->memoryBytes == 0)
     {
-        return Refuse(mnav_errorInvalid, mnav_settingMemoryBytes);
+        return Refuse(mnav_errorInvalid, mnav_bakeSettingMemoryBytes);
     }
     return s_accept;
 }
@@ -105,18 +105,18 @@ static mnavBakeDefResult CheckGrid(const mnavBakeDef* def)
 {
     if ((def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
     {
-        return Refuse(mnav_errorInvalid, mnav_settingAllocator);
+        return Refuse(mnav_errorInvalid, mnav_bakeSettingAllocator);
     }
     if (!isfinite(def->origin.x) || !isfinite(def->origin.y) || !isfinite(def->origin.z))
     {
-        return Refuse(mnav_errorInvalid, mnav_settingOrigin);
+        return Refuse(mnav_errorInvalid, mnav_bakeSettingOrigin);
     }
     mnavBakeDefResult r =
-        Bounded(def->cellSize, MNAV_MIN_CELL_SIZE, MNAV_MAX_CELL_SIZE, mnav_settingCellSize);
+        Bounded(def->cellSize, MNAV_MIN_CELL_SIZE, MNAV_MAX_CELL_SIZE, mnav_bakeSettingCellSize);
     if (r.result == mnav_success)
     {
         r = Bounded(def->cellHeight, MNAV_MIN_CELL_SIZE, MNAV_MAX_CELL_SIZE,
-                    mnav_settingCellHeight);
+                    mnav_bakeSettingCellHeight);
     }
     if (r.result != mnav_success)
     {
@@ -124,7 +124,7 @@ static mnavBakeDefResult CheckGrid(const mnavBakeDef* def)
     }
     if (def->tileCells < MNAV_MIN_TILE_CELLS || def->tileCells > MNAV_MAX_TILE_CELLS)
     {
-        return Refuse(mnav_errorLimit, mnav_settingTileCells);
+        return Refuse(mnav_errorLimit, mnav_bakeSettingTileCells);
     }
     return s_accept;
 }
@@ -137,25 +137,25 @@ static mnavBakeDefResult ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cel
     const mnavAgentProfile* agent = &def->agent;
     mnavBakeDefResult r =
         Cells(agent->radius, def->cellSize, true, def->tileCells, mnav_errorInvalid, false,
-              mnav_settingAgentRadius, &cells->agentRadius);
+              mnav_bakeSettingAgentRadius, &cells->agentRadius);
     if (r.result == mnav_success && cells->agentRadius + BORDER_MARGIN_CELLS > def->tileCells)
     {
-        r = Refuse(mnav_errorInvalid, mnav_settingAgentRadius);
+        r = Refuse(mnav_errorInvalid, mnav_bakeSettingAgentRadius);
     }
     if (r.result == mnav_success)
     {
         r = Cells(agent->height, def->cellHeight, true, MNAV_MAX_HEIGHT_CELLS, mnav_errorLimit,
-                  true, mnav_settingAgentHeight, &cells->agentHeight);
+                  true, mnav_bakeSettingAgentHeight, &cells->agentHeight);
     }
     if (r.result == mnav_success)
     {
         r = Cells(agent->stepHeight, def->cellHeight, false, MNAV_MAX_HEIGHT_CELLS, mnav_errorLimit,
-                  false, mnav_settingAgentStepHeight, &cells->agentStep);
+                  false, mnav_bakeSettingAgentStepHeight, &cells->agentStep);
     }
     if (r.result == mnav_success &&
         !(agent->maxSlopeDegrees >= 0.0f && agent->maxSlopeDegrees < 90.0f))
     {
-        r = Refuse(mnav_errorInvalid, mnav_settingAgentMaxSlope);
+        r = Refuse(mnav_errorInvalid, mnav_bakeSettingAgentMaxSlope);
     }
     if (r.result != mnav_success)
     {
@@ -171,14 +171,14 @@ static mnavBakeDefResult ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cel
     // 2^30 cells, past which it can only be a mistake.
     float cellArea = def->cellSize * def->cellSize;
     r = Cells(def->minRegionArea, cellArea, true, 1 << 30, mnav_errorInvalid, false,
-              mnav_settingMinRegionArea, &cells->minRegion);
+              mnav_bakeSettingMinRegionArea, &cells->minRegion);
     if (r.result == mnav_success && !InRange(def->maxEdgeError, 0.0f, INFINITY))
     {
-        r = Refuse(mnav_errorInvalid, mnav_settingMaxEdgeError);
+        r = Refuse(mnav_errorInvalid, mnav_bakeSettingMaxEdgeError);
     }
     if (r.result == mnav_success && def->maxEdgeError > MNAV_MAX_CELL_SIZE * MNAV_MAX_TILE_CELLS)
     {
-        r = Refuse(mnav_errorLimit, mnav_settingMaxEdgeError);
+        r = Refuse(mnav_errorLimit, mnav_bakeSettingMaxEdgeError);
     }
     if (r.result != mnav_success)
     {
@@ -186,18 +186,19 @@ static mnavBakeDefResult ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cel
     }
     cells->edgeError = def->maxEdgeError / def->cellSize;
     r = Cells(def->maxEdgeLength, def->cellSize, false, 1 << 30, mnav_errorInvalid, false,
-              mnav_settingMaxEdgeLength, &cells->edgeLength);
+              mnav_bakeSettingMaxEdgeLength, &cells->edgeLength);
     // Sixteenths of a cell and of a cell height are exact: the division
     // only lowers the exponent.
     if (r.result == mnav_success)
     {
         r = Cells(def->detailSampleDistance, def->cellSize / 16.0f, false, 1 << 30,
-                  mnav_errorInvalid, false, mnav_settingDetailSampleDistance, &cells->detailSample);
+                  mnav_errorInvalid, false, mnav_bakeSettingDetailSampleDistance,
+                  &cells->detailSample);
     }
     if (r.result == mnav_success)
     {
         r = Cells(def->detailMaxError, def->cellHeight / 16.0f, false, 1 << 30, mnav_errorInvalid,
-                  false, mnav_settingDetailMaxError, &cells->detailError);
+                  false, mnav_bakeSettingDetailMaxError, &cells->detailError);
     }
     if (r.result != mnav_success)
     {
@@ -218,15 +219,15 @@ mnavBakeDefResult mnavCheckBakeDef(const mnavBakeDef* def, mnavBakeCells* cells)
 {
     if (def == nullptr)
     {
-        return Refuse(mnav_errorInvalid, mnav_settingNone);
+        return Refuse(mnav_errorInvalid, mnav_bakeSettingNone);
     }
     if (def->cookie != MNAV_BAKE_DEF_COOKIE)
     {
-        return Refuse(mnav_errorInvalid, mnav_settingCookie);
+        return Refuse(mnav_errorInvalid, mnav_bakeSettingCookie);
     }
     if (def->version != MNAV_ABI_VERSION)
     {
-        return Refuse(mnav_errorVersion, mnav_settingNone);
+        return Refuse(mnav_errorVersion, mnav_bakeSettingNone);
     }
     mnavBakeDefResult r = CheckGrid(def);
     if (r.result != mnav_success)
