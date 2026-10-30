@@ -10,6 +10,7 @@
 // structure are test_flight_octree.c's.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "flight_scene.h"
 #include "float_hosts.h"
 #include "test_harness.h"
@@ -337,9 +338,11 @@ static void ReplaceAndEmpty(mnavFlightVolume* volume)
 
 static void TestStagingAndRemoval(void)
 {
-    mnavFlightDef def = Def();
+    mnavFlightDef flight = Def();
+    mnavFlightVolumeDef def = FlightVolumeDefFor(&flight);
     def.limits.tiles = 2;
-    mnavFlightVolume* volume = Volume(&def);
+    mnavFlightVolume* volume = nullptr;
+    CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success, "a volume of 2 tiles");
     StageTwice(volume);
     PastTheTilesLimit(volume);
     ReplaceAndEmpty(volume);
@@ -353,6 +356,64 @@ static void TestStagingAndRemoval(void)
           "NULL arguments");
     mnavDestroyFlightVolume(volume);
     mnavDestroyFlightVolume(nullptr);
+}
+
+// A free function no allocator pairs with an alloc.
+static void FreeAlone(void* memory, size_t size, size_t alignment, void* context)
+{
+    (void)memory;
+    (void)size;
+    (void)alignment;
+    (void)context;
+}
+
+// Whether making a volume from a def is refused with a result and setting,
+// and makes nothing.
+static bool VolumeRefused(const mnavFlightVolumeDef* def, mnavResult result,
+                          mnavFlightVolumeSetting setting)
+{
+    mnavFlightVolume* volume = nullptr;
+    mnavFlightVolumeDefResult got = mnavCreateFlightVolume(def, &volume);
+    mnavDestroyFlightVolume(volume);
+    return got.result == result && got.setting == setting && volume == nullptr;
+}
+
+static void TestTheVolumeDefIsChecked(void)
+{
+    const mnavFlightVolumeDef good = mnavDefaultFlightVolumeDef();
+    CHECK(VolumeRefused(nullptr, mnav_errorInvalid, mnav_flightVolumeSettingNone) &&
+              mnavCreateFlightVolume(&good, nullptr).result == mnav_errorInvalid,
+          "NULL arguments");
+    mnavFlightVolumeDef def = good;
+    def.cookie = 0;
+    CHECK(VolumeRefused(&def, mnav_errorInvalid, mnav_flightVolumeSettingCookie), "no cookie");
+    def = good;
+    def.allocator.free = FreeAlone;
+    CHECK(VolumeRefused(&def, mnav_errorInvalid, mnav_flightVolumeSettingAllocator),
+          "one function");
+    def = good;
+    def.flight.voxelSize = 0.0f;
+    mnavFlightVolume* volume = nullptr;
+    mnavFlightVolumeDefResult got = mnavCreateFlightVolume(&def, &volume);
+    CHECK(got.result == mnav_errorLimit && got.setting == mnav_flightVolumeSettingFlight &&
+              got.flightSetting == mnav_flightSettingVoxelSize && volume == nullptr,
+          "the flight def's setting named");
+    def = good;
+    def.limits.tiles = 0;
+    CHECK(VolumeRefused(&def, mnav_errorInvalid, mnav_flightVolumeSettingTiles), "no tiles");
+    def = good;
+    def.limits.tiles = MNAV_MAX_TILES + 1;
+    CHECK(VolumeRefused(&def, mnav_errorLimit, mnav_flightVolumeSettingTiles),
+          "tiles past the cap");
+    def = good;
+    def.limits.memoryBytes = 0;
+    CHECK(VolumeRefused(&def, mnav_errorInvalid, mnav_flightVolumeSettingMemoryBytes), "no memory");
+    // The flight def's own allocator and memory limit are the bakers'.
+    def = good;
+    def.flight.limits.memoryBytes = 1;
+    CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success,
+          "its memory limit not the volume's");
+    mnavDestroyFlightVolume(volume);
 }
 
 // An allocator that refuses its s_failAt-th call from now, counting.
@@ -375,7 +436,8 @@ static bool RunFailing(int32_t failAt)
     def.allocator = (mnavAllocator){Failing, CountingFree, nullptr};
     s_failAt = failAt;
     mnavFlightVolume* volume = nullptr;
-    if (mnavCreateFlightVolume(&def, &volume).result != mnav_success)
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
+    if (mnavCreateFlightVolume(&volumeDef, &volume).result != mnav_success)
     {
         return false;
     }
@@ -527,8 +589,9 @@ static void TestDefIsChecked(void)
             expect = mnav_flightSettingTileLeaves;
             break;
         case 22:
-            d.limits.tiles = 0;
-            expect = mnav_flightSettingTiles;
+            d.limits.tileLeaves = MNAV_MAX_FLIGHT_TILE_LEAVES + 1;
+            expect = mnav_flightSettingTileLeaves;
+            bound = true;
             break;
         case 23:
             d.limits.memoryBytes = 0;
@@ -557,13 +620,15 @@ static void TestDefIsChecked(void)
     mnavFlightVolume* volume = nullptr;
     mnavFlightDef bad = good;
     bad.cookie = 1;
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&bad);
     CHECK(mnavCreateFlightBaker(&bad, &baker).setting == mnav_flightSettingCookie &&
               baker == nullptr &&
-              mnavCreateFlightVolume(&bad, &volume).result == mnav_errorInvalid &&
+              mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_errorInvalid &&
               volume == nullptr,
           "a bad def makes nothing");
+    mnavFlightVolumeDef volumeDef2 = FlightVolumeDefFor(&good);
     CHECK(mnavCreateFlightBaker(&good, nullptr).result == mnav_errorInvalid &&
-              mnavCreateFlightVolume(&good, nullptr).result == mnav_errorInvalid,
+              mnavCreateFlightVolume(&volumeDef2, nullptr).result == mnav_errorInvalid,
           "NULL outputs");
 }
 
@@ -849,7 +914,6 @@ static void DefOver(mnavFlightDef* def, int pattern)
     def->limits.tileSpans = d.limits.tileSpans;
     def->limits.tileNodes = d.limits.tileNodes;
     def->limits.tileLeaves = d.limits.tileLeaves;
-    def->limits.tiles = d.limits.tiles;
     def->limits.memoryBytes = d.limits.memoryBytes;
 }
 
@@ -894,6 +958,7 @@ static void TestPaddingNeverReachesTheTile(void)
 int main(void)
 {
     TestDefIsChecked();
+    TestTheVolumeDefIsChecked();
     BakeAll();
     TestBakeStageAndQuery();
     TestTruncatedAndFlippedBytes();

@@ -48,7 +48,9 @@ static void TestStamp(void)
               mnavDefaultFlowFieldDef().version == MNAV_ABI_VERSION &&
               mnavDefaultNavFlowDef().version == MNAV_ABI_VERSION &&
               mnavDefaultHierarchyDef().version == MNAV_ABI_VERSION &&
-              mnavDefaultTileCacheDef().version == MNAV_ABI_VERSION,
+              mnavDefaultTileCacheDef().version == MNAV_ABI_VERSION &&
+              mnavDefaultNavmeshDef().version == MNAV_ABI_VERSION &&
+              mnavDefaultFlightVolumeDef().version == MNAV_ABI_VERSION,
           "every root default carries the headers' stamp");
 }
 
@@ -82,10 +84,21 @@ static void TestBake(uint32_t other)
     Refusals r = {mnavCreateBaker(&stale, &baker).result, mnavCreateBaker(&wrong, &baker).result};
     CHECK(Refused(r) && baker == nullptr, "a baker");
 
+    mnavNavmeshDef navStale = mnavDefaultNavmeshDef();
+    navStale.version = other;
+    mnavNavmeshDef navWrong = navStale;
+    navWrong.cookie ^= 1u;
     mnavNavmesh* navmesh = nullptr;
-    r = (Refusals){mnavCreateNavmesh(&stale, &navmesh).result,
-                   mnavCreateNavmesh(&wrong, &navmesh).result};
+    r = (Refusals){mnavCreateNavmesh(&navStale, &navmesh).result,
+                   mnavCreateNavmesh(&navWrong, &navmesh).result};
     CHECK(Refused(r) && navmesh == nullptr, "a navmesh");
+    // A navmesh def of these headers holding a bake def of others.
+    mnavNavmeshDef holding = mnavDefaultNavmeshDef();
+    holding.bake = stale;
+    mnavNavmeshDefResult held = mnavCreateNavmesh(&holding, &navmesh);
+    CHECK(held.result == mnav_errorVersion && held.setting == mnav_navmeshSettingBake &&
+              navmesh == nullptr,
+          "a navmesh of a bake def of other headers");
 
     mnavTileIndex* index = nullptr;
     r = (Refusals){mnavCreateTileIndex(&stale, nullptr, 0, &index, nullptr),
@@ -132,10 +145,20 @@ static void TestFlight(uint32_t other)
     Refusals r = {mnavCreateFlightBaker(&stale, &baker).result,
                   mnavCreateFlightBaker(&wrong, &baker).result};
     CHECK(Refused(r) && baker == nullptr, "a flight baker");
+    mnavFlightVolumeDef volumeStale = mnavDefaultFlightVolumeDef();
+    volumeStale.version = other;
+    mnavFlightVolumeDef volumeWrong = volumeStale;
+    volumeWrong.cookie ^= 1u;
     mnavFlightVolume* volume = nullptr;
-    r = (Refusals){mnavCreateFlightVolume(&stale, &volume).result,
-                   mnavCreateFlightVolume(&wrong, &volume).result};
+    r = (Refusals){mnavCreateFlightVolume(&volumeStale, &volume).result,
+                   mnavCreateFlightVolume(&volumeWrong, &volume).result};
     CHECK(Refused(r) && volume == nullptr, "a flight volume");
+    mnavFlightVolumeDef holding = mnavDefaultFlightVolumeDef();
+    holding.flight = stale;
+    mnavFlightVolumeDefResult held = mnavCreateFlightVolume(&holding, &volume);
+    CHECK(held.result == mnav_errorVersion && held.setting == mnav_flightVolumeSettingFlight &&
+              volume == nullptr,
+          "a flight volume of a flight def of other headers");
 }
 
 static void TestQuery(uint32_t other)
@@ -202,11 +225,11 @@ static void TestFieldsAndAvoidance(uint32_t other)
 // is invalid, and the right one is read with the objects' versions.
 static void TestCookieOnly(void)
 {
-    mnavBakeDef bakeDef = mnavDefaultBakeDef();
+    mnavNavmeshDef navmeshDef = mnavDefaultNavmeshDef();
     mnavQueryDef queryDef = mnavDefaultQueryDef();
     mnavNavmesh* navmesh = nullptr;
     mnavQuery* query = nullptr;
-    CHECK(mnavCreateNavmesh(&bakeDef, &navmesh).result == mnav_success &&
+    CHECK(mnavCreateNavmesh(&navmeshDef, &navmesh).result == mnav_success &&
               mnavCreateQuery(&queryDef, &query) == mnav_success,
           "an empty navmesh and a query");
     mnavQueryFilter filter = mnavDefaultQueryFilter();

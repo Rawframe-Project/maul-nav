@@ -5,6 +5,7 @@
 // tiles. Each polygon's detail triangles are drawn alone and read in
 // sixteenths of a cell on the ground and whole cell heights up.
 
+#include "defs_for.h"
 #include "soup.h"
 #include "squares.h"
 #include "test_harness.h"
@@ -430,7 +431,8 @@ static void TestNoHeightsFallBackAndCount(void)
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&s_def);
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");

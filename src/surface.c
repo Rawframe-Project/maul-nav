@@ -300,7 +300,7 @@ mnavResult mnavMoveAlongSurfaceWork(mnavQuery* query, const mnavNavmesh* navmesh
     Ground from = {start.x, start.z};
     Ground to = {end.x, end.z};
     Ground center = {(from.x + to.x) * 0.5, (from.z + to.z) * 0.5};
-    double radius = sqrt(Distance2(from, to)) * 0.5 + (double)navmesh->def.cellSize;
+    double radius = sqrt(Distance2(from, to)) * 0.5 + (double)navmesh->def.bake.cellSize;
     Mover m = {query, navmesh, usable, to, center, radius * radius, from, Distance2(from, to),
                0,     false,   false,  1};
     // The move takes the node table a sliced search holds: that search

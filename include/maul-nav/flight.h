@@ -46,9 +46,8 @@ extern "C"
 // the origin), so that a walk's voxel indices stay well within 32 bits.
 #define MNAV_MAX_FLIGHT_VOXELS 268435456
 
-    // The named limits that bound a flight bake's work and a flight
-    // volume's size. Each is at least 1 and at most its MNAV_MAX_ value.
-    // Reaching one is mnav_errorCapacity.
+    // The named limits that bound a flight bake's work. Each is at least 1
+    // and at most its MNAV_MAX_ value. Reaching one is mnav_errorCapacity.
     typedef struct mnavFlightLimits
     {
         // Input triangles a bake reads, as mnavBakeLimits counts them.
@@ -58,15 +57,12 @@ extern "C"
         // Octree nodes and leaves in a tile.
         int32_t tileNodes;
         int32_t tileLeaves;
-        // Tiles committed in a flight volume at once.
-        int32_t tiles;
-        // The most memory a baker or a flight volume holds at once; more
-        // than 0.
+        // The most memory a baker holds at once; more than 0.
         uint64_t memoryBytes;
     } mnavFlightLimits;
 
-    // How flight tiles are baked and what a flight volume accepts. Made
-    // by mnavDefaultFlightDef and then changed.
+    // How flight tiles are baked. Made by mnavDefaultFlightDef and then
+    // changed.
     typedef struct mnavFlightDef
     {
         // Set by mnavDefaultFlightDef; a def not made by it is refused.
@@ -117,8 +113,7 @@ extern "C"
         mnav_flightSettingTileSpans = 10,
         mnav_flightSettingTileNodes = 11,
         mnav_flightSettingTileLeaves = 12,
-        mnav_flightSettingTiles = 13,
-        mnav_flightSettingMemoryBytes = 14,
+        mnav_flightSettingMemoryBytes = 13,
     };
 
     // A flight def check's outcome: the status, and the first setting it
@@ -128,6 +123,56 @@ extern "C"
         mnavResult result;
         mnavFlightSetting setting;
     } mnavFlightDefResult;
+
+    // The limits of a flight volume. Reaching one is mnav_errorCapacity.
+    typedef struct mnavFlightVolumeLimits
+    {
+        // Tiles committed at once, 1 to MNAV_MAX_TILES.
+        int32_t tiles;
+        // Bytes the volume may hold allocated at once, at least 1.
+        uint64_t memoryBytes;
+    } mnavFlightVolumeLimits;
+
+    // How a flight volume is made. Build it with
+    // mnavDefaultFlightVolumeDef.
+    typedef struct mnavFlightVolumeDef
+    {
+        uint32_t cookie;
+        // MNAV_ABI_VERSION, set by mnavDefaultFlightVolumeDef.
+        uint32_t version;
+        // The allocator the volume uses; zeroed for the C library's.
+        mnavAllocator allocator;
+        // The def the volume's tiles are baked with, checked whole as a
+        // baker checks it. The volume reads its origin, voxel size, tile
+        // side, floor, ceiling and radius; its allocator and limits are
+        // the bakers'.
+        mnavFlightDef flight;
+        mnavFlightVolumeLimits limits;
+    } mnavFlightVolumeDef;
+
+    // The setting a flight volume def check refused.
+    typedef uint8_t mnavFlightVolumeSetting;
+
+    enum
+    {
+        mnav_flightVolumeSettingNone = 0,
+        mnav_flightVolumeSettingCookie = 1,
+        mnav_flightVolumeSettingAllocator = 2,
+        // The flight def, its own setting named beside.
+        mnav_flightVolumeSettingFlight = 3,
+        mnav_flightVolumeSettingTiles = 4,
+        mnav_flightVolumeSettingMemoryBytes = 5,
+    };
+
+    // A flight volume def check's outcome: the status, the first setting
+    // it refused, and for mnav_flightVolumeSettingFlight, the flight def's
+    // setting (mnav_flightSettingNone otherwise).
+    typedef struct mnavFlightVolumeDefResult
+    {
+        mnavResult result;
+        mnavFlightVolumeSetting setting;
+        mnavFlightSetting flightSetting;
+    } mnavFlightVolumeDefResult;
 
     // What a flight bake did.
     typedef struct mnavFlightBakeReport
@@ -227,6 +272,32 @@ extern "C"
         def.limits.tileSpans = 4194304;
         def.limits.tileNodes = 1048576;
         def.limits.tileLeaves = 1048576;
+        def.limits.memoryBytes = 268435456;
+        return def;
+    }
+
+// The cookie mnavDefaultFlightVolumeDef sets and mnavCreateFlightVolume
+// checks.
+#define MNAV_FLIGHT_VOLUME_DEF_COOKIE 0x4E415656u
+
+    /// Returns the default flight volume def: tiles of the default flight
+    /// def, up to 65536 of them in 256 MiB.
+    /// Built in the program, so that it carries the version of the
+    /// headers the program includes.
+    ///
+    /// @return The def, with a valid cookie.
+    /// @par Thread safety
+    /// Safe from any thread.
+    static inline mnavFlightVolumeDef mnavDefaultFlightVolumeDef(void)
+    {
+#ifdef __cplusplus
+        mnavFlightVolumeDef def = {};
+#else
+    mnavFlightVolumeDef def = {0};
+#endif
+        def.cookie = MNAV_FLIGHT_VOLUME_DEF_COOKIE;
+        def.version = MNAV_ABI_VERSION;
+        def.flight = mnavDefaultFlightDef();
         def.limits.tiles = 65536;
         def.limits.memoryBytes = 268435456;
         return def;
@@ -329,19 +400,24 @@ extern "C"
                                                                 uint8_t* bufferOut, size_t capacity,
                                                                 size_t* sizeOut);
 
-    /// Makes an empty flight volume for tiles baked with a def: checks the
-    /// def and keeps a copy, its allocator and its limits.
+    /// Makes an empty flight volume from a def: checks the def and keeps a
+    /// copy, its allocator and its limits.
     ///
-    /// @param def        The def the tiles are baked with.
+    /// @param def        The def, from mnavDefaultFlightVolumeDef.
     /// @param volumeOut  Receives the volume, or NULL on failure.
-    /// @return `mnav_success`; for a def mnavValidateFlightDef refuses, the
-    /// status and setting it gives; `mnav_errorInvalid` for a NULL
-    /// volumeOut; `mnav_errorCapacity` when the volume does not fit the
+    /// @return `mnav_success`; `mnav_errorInvalid` with the setting for a NULL
+    /// def, a def without its cookie, an allocator with one function or a
+    /// limit below 1; `mnav_errorLimit` with the setting for more tiles than
+    /// MNAV_MAX_TILES; `mnav_errorVersion` with no setting for a def built
+    /// against another version of the headers; for a flight def
+    /// mnavValidateFlightDef refuses, the status it gives with
+    /// mnav_flightVolumeSettingFlight and its setting; `mnav_errorInvalid` for
+    /// a NULL volumeOut; `mnav_errorCapacity` when the volume does not fit the
     /// def's memory limit or the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_NODISCARD MNAV_API mnavFlightDefResult
-    mnavCreateFlightVolume(const mnavFlightDef* def, mnavFlightVolume** volumeOut);
+    MNAV_NODISCARD MNAV_API mnavFlightVolumeDefResult
+    mnavCreateFlightVolume(const mnavFlightVolumeDef* def, mnavFlightVolume** volumeOut);
 
     /// Destroys a flight volume, its tiles and everything staged. Called back
     /// in from the flight volume's allocator, it does nothing and counts one

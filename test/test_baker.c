@@ -439,11 +439,7 @@ static void DefOver(mnavBakeDef* def, int pattern)
     def->limits.tileSpans = d.limits.tileSpans;
     def->limits.tilePolygons = d.limits.tilePolygons;
     def->limits.tileVertices = d.limits.tileVertices;
-    def->limits.tileLinks = d.limits.tileLinks;
-    def->limits.tiles = d.limits.tiles;
-    def->limits.links = d.limits.links;
     def->limits.memoryBytes = d.limits.memoryBytes;
-    def->tier = d.tier;
     def->clock.now = d.clock.now;
     def->clock.context = d.clock.context;
 }

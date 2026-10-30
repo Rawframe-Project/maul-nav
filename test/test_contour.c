@@ -7,6 +7,7 @@
 // corners take the highest floor around them, and the tile's sides split
 // where what lies inside or beyond them changes.
 
+#include "defs_for.h"
 #include "ramp_level.h"
 #include "squares.h"
 #include "test_harness.h"
@@ -407,7 +408,8 @@ static void TestTileSides(void)
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&s_def);
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
@@ -446,7 +448,8 @@ static void TestRegionsOfOneAreaMeetOnTheSide(void)
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&s_def);
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");

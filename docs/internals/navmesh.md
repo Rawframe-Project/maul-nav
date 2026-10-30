@@ -32,7 +32,7 @@ Searches keep each navmesh's attachments sorted by takeoff polygon and by landin
 
 ## Tiers
 
-The def's tier declares what may change once tiles are loaded, so a host that declares less pays for less. `mnav_tierModifiers` adds area changes (a whole polygon's area; a shape is marked on the input at bake time so polygons end where it does) and link toggles (a disabled link stays snapped but is not crossed). `mnav_tierDynamic` adds replacing a loaded tile in one commit. A changed area lasts while its tile is loaded, since a replaced tile's polygons are new polygons.
+The navmesh def's tier declares what may change once tiles are loaded, so a host that declares less pays for less. `mnav_tierModifiers` adds area changes (a whole polygon's area; a shape is marked on the input at bake time so polygons end where it does) and link toggles (a disabled link stays snapped but is not crossed). `mnav_tierDynamic` adds replacing a loaded tile in one commit. A changed area lasts while its tile is loaded, since a replaced tile's polygons are new polygons.
 
 ## Threads
 

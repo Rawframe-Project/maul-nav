@@ -184,7 +184,9 @@ static int32_t Cross(const mnavBakeDef* def)
     mnavNavmesh* navmesh = NULL;
     mnavQuery* query = NULL;
     mnavQueryDef queryDef = mnavDefaultQueryDef();
-    if (mnavCreateNavmesh(def, &navmesh).result != mnav_success ||
+    mnavNavmeshDef meshDef = mnavDefaultNavmeshDef();
+    meshDef.bake = *def;
+    if (mnavCreateNavmesh(&meshDef, &navmesh).result != mnav_success ||
         mnavCreateQuery(&queryDef, &query) != mnav_success)
     {
         mnavDestroyNavmesh(navmesh);

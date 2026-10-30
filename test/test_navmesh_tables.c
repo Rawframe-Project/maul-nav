@@ -9,6 +9,7 @@
 // span, reaches a slot's last generation only after 2^32 commits to it,
 // and checks every id before it looks a polygon up.
 
+#include "defs_for.h"
 #include "navmesh.h"
 #include "test_harness.h"
 #include "world.h"
@@ -26,9 +27,10 @@ static mnavNavmesh* Make(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     return navmesh;
 }
 
@@ -162,9 +164,10 @@ static void TestFailedCommitLinksNothing(void)
     // Past the links limit, the commit adds tile (1, 0) to nothing, and
     // tile (0, 0) keeps its links, none.
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.limits.tileLinks = 1;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.limits.tileLinks = 1;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
           "one tile");
     CHECK(StageAt(navmesh, 1) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_errorCapacity,

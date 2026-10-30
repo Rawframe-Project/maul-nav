@@ -20,8 +20,121 @@ extern "C"
 {
 #endif
 
+// The largest values a navmesh's limits may take.
+#define MNAV_MAX_TILES      1048576
+#define MNAV_MAX_TILE_LINKS 1048576
+#define MNAV_MAX_LINKS      1048576
+
     // A navmesh. Made by mnavCreateNavmesh.
     typedef struct mnavNavmesh mnavNavmesh;
+
+    // A navmesh's runtime tier: what may change once loaded.
+    // Tiles and off-mesh links load and unload in every tier.
+    typedef uint8_t mnavTier;
+
+    enum
+    {
+        // Nothing loaded changes.
+        mnav_tierStatic = 0,
+        // Polygons' areas change, and off-mesh links are enabled and
+        // disabled.
+        mnav_tierModifiers = 1,
+        // Also, a loaded tile is replaced in one commit.
+        mnav_tierDynamic = 2,
+    };
+
+    // The named limits of a navmesh. Each count is at least 1 and at most
+    // its MNAV_MAX_ value. Reaching one is mnav_errorCapacity.
+    typedef struct mnavNavmeshLimits
+    {
+        // Tiles committed at once.
+        int32_t tiles;
+        // Links one tile has to its own polygons and its neighbors', made
+        // as it is committed.
+        int32_t tileLinks;
+        // Off-mesh links, staged or committed, counted by crossings: a
+        // point link takes 1, an edge link 1 + ceil(width / spacing) up to
+        // MNAV_MAX_LINK_CROSSINGS (see mnavLinkDef.width).
+        int32_t links;
+        // Bytes the navmesh may hold allocated at once, at least 1.
+        uint64_t memoryBytes;
+    } mnavNavmeshLimits;
+
+    // How a navmesh is made. Build it with mnavDefaultNavmeshDef.
+    typedef struct mnavNavmeshDef
+    {
+        uint32_t cookie;
+        // MNAV_ABI_VERSION, set by mnavDefaultNavmeshDef.
+        uint32_t version;
+        // The allocator the navmesh uses; zeroed for the C library's.
+        mnavAllocator allocator;
+        // The def the navmesh's tiles are baked with, checked whole as a
+        // baker checks it. The navmesh reads only what a tile's header
+        // records of it, the origin, the cell size and height, the tile
+        // cells and the agent, and refuses a tile baked with other values;
+        // its allocator, limits and clock are the bakers'.
+        mnavBakeDef bake;
+        // What may change once loaded.
+        mnavTier tier;
+        mnavNavmeshLimits limits;
+    } mnavNavmeshDef;
+
+    // The setting a navmesh def check refused.
+    typedef uint8_t mnavNavmeshSetting;
+
+    enum
+    {
+        mnav_navmeshSettingNone = 0,
+        mnav_navmeshSettingCookie = 1,
+        mnav_navmeshSettingAllocator = 2,
+        // The bake def, its own setting named beside.
+        mnav_navmeshSettingBake = 3,
+        mnav_navmeshSettingTier = 4,
+        mnav_navmeshSettingTiles = 5,
+        mnav_navmeshSettingTileLinks = 6,
+        mnav_navmeshSettingLinks = 7,
+        mnav_navmeshSettingMemoryBytes = 8,
+    };
+
+    // A navmesh def check's outcome: the status, the first setting it
+    // refused, and for mnav_navmeshSettingBake, the bake def's setting
+    // (mnav_settingNone otherwise).
+    typedef struct mnavNavmeshDefResult
+    {
+        mnavResult result;
+        mnavNavmeshSetting setting;
+        mnavBakeSetting bakeSetting;
+    } mnavNavmeshDefResult;
+
+// The cookie mnavDefaultNavmeshDef sets and mnavCreateNavmesh checks.
+#define MNAV_NAVMESH_DEF_COOKIE 0x4E41564Du
+
+    /// Returns the default navmesh def: tiles of the default bake def, the
+    /// static tier, and limits sized for a large level: 65536 tiles, 32768
+    /// links in a tile, 4096 off-mesh links and 256 MiB.
+    /// Built in the program, so that it carries the version of the
+    /// headers the program includes.
+    ///
+    /// @return The def, with a valid cookie.
+    /// @par Thread safety
+    /// Safe from any thread.
+    static inline mnavNavmeshDef mnavDefaultNavmeshDef(void)
+    {
+#ifdef __cplusplus
+        mnavNavmeshDef def = {};
+#else
+    mnavNavmeshDef def = {0};
+#endif
+        def.cookie = MNAV_NAVMESH_DEF_COOKIE;
+        def.version = MNAV_ABI_VERSION;
+        def.bake = mnavDefaultBakeDef();
+        def.tier = mnav_tierStatic;
+        def.limits.tiles = 65536;
+        def.limits.tileLinks = 32768;
+        def.limits.links = 4096;
+        def.limits.memoryBytes = 268435456;
+        return def;
+    }
 
     // A tile in a navmesh: its 1-based slot (0 for none) and the slot's
     // generation, which changes whenever the slot's tile does.
@@ -76,19 +189,24 @@ extern "C"
         int32_t index;
     } mnavTileResult;
 
-    /// Makes an empty navmesh for tiles baked with a def: checks the def
-    /// and keeps a copy, its allocator and its limits.
+    /// Makes an empty navmesh from a def: checks the def and keeps a copy,
+    /// its allocator and its limits.
     ///
-    /// @param def          The def the tiles are baked with.
+    /// @param def          The def, from mnavDefaultNavmeshDef.
     /// @param navmeshOut   Receives the navmesh, or NULL on failure.
-    /// @return `mnav_success`; for a def mnavValidateBakeDef refuses, the
-    /// status and setting it gives; `mnav_errorInvalid` for a NULL
+    /// @return `mnav_success`; `mnav_errorInvalid` with the setting for a NULL
+    /// def, a def without its cookie, an allocator with one function, a tier
+    /// past mnav_tierDynamic, a limit below 1; `mnav_errorLimit` with the
+    /// setting for a limit past its MNAV_MAX_ value; `mnav_errorVersion` with
+    /// no setting for a def built against another version of the headers; for
+    /// a bake def mnavValidateBakeDef refuses, the status it gives with
+    /// mnav_navmeshSettingBake and its setting; `mnav_errorInvalid` for a NULL
     /// navmeshOut; `mnav_errorCapacity` when the navmesh does not fit the
     /// def's memory limit or the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_NODISCARD MNAV_API mnavBakeDefResult mnavCreateNavmesh(const mnavBakeDef* def,
-                                                                mnavNavmesh** navmeshOut);
+    MNAV_NODISCARD MNAV_API mnavNavmeshDefResult mnavCreateNavmesh(const mnavNavmeshDef* def,
+                                                                   mnavNavmesh** navmeshOut);
 
     /// Destroys a navmesh, its tiles and everything staged. Called back in from
     /// host code a call on the navmesh runs (its allocator, a link generation's
@@ -101,7 +219,7 @@ extern "C"
     MNAV_API void mnavDestroyNavmesh(mnavNavmesh* navmesh);
 
     /// Loads tile bytes, checking every field as hostile input and the
-    /// tile's settings against the navmesh's def, and stages the tile for
+    /// tile's settings against the navmesh's bake def, and stages the tile for
     /// the next commit, in place of anything staged at its place before.
     /// Queries do not see it until the commit.
     ///

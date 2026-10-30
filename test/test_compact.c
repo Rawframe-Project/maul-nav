@@ -6,6 +6,7 @@
 // headroom, as paths across them, erosion by the radius, and the bake's
 // landmarks on the test level.
 
+#include "defs_for.h"
 #include "soup.h"
 #include "squares.h"
 #include "test_harness.h"
@@ -171,7 +172,8 @@ static void TestOpenSpansToTheFrameEdge(void)
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&s_def);
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
@@ -222,7 +224,8 @@ static void TestLevelLandmarks(void)
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");

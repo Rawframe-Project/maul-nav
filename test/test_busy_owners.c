@@ -11,6 +11,7 @@
 // with no call back in.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
 #include "trench.h"
@@ -389,7 +390,8 @@ static void* MakeVolume(void)
 {
     mnavFlightDef def = FlightDef();
     mnavFlightVolume* volume = nullptr;
-    CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success &&
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
+    CHECK(mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success &&
               mnavFlightVolume_StageTile(volume, s_flight, s_flightSize).result == mnav_success &&
               mnavFlightVolume_Commit(volume) == mnav_success,
           "a flight volume with a tile");
@@ -401,7 +403,8 @@ static void* MakeNavmesh(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.allocator = s_reentrant;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "a navmesh with a tile");
@@ -754,8 +757,9 @@ static void Setup(void)
               mnavCreateTileIndex(&def, &s_trench, 1, &s_heldIndex, nullptr) == mnav_success,
           "a cache with a tile, and an index");
     mnavQueryDef queryDef = mnavDefaultQueryDef();
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     CHECK(mnavCreateQuery(&queryDef, &s_heldQuery) == mnav_success &&
-              mnavCreateNavmesh(&def, &s_heldNavmesh).result == mnav_success &&
+              mnavCreateNavmesh(&meshDef, &s_heldNavmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_heldNavmesh, s_trench0, sizeof(s_trench0)).result ==
                   mnav_success &&
               mnavNavmesh_StageTile(s_heldNavmesh, s_trench1, sizeof(s_trench1)).result ==

@@ -6,6 +6,7 @@
 // alike, in which the far corner across each inner edge lies outside the
 // circumcircle. A sample on an edge between two triangles splits both.
 
+#include "defs_for.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -42,7 +43,8 @@ static void Load(const mnavBakeDef* def, const mnavBakeInput* input, mnavBakeRep
     mnavDestroyBaker(baker);
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(def, &s_navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(def);
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");

@@ -6,6 +6,7 @@
 // across it near the place they need, the link limit, removal, toggles and
 // the checks.
 
+#include "defs_for.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -46,10 +47,11 @@ static void BakeLedge(void)
 static mnavNavmesh* Load(int32_t links, mnavTier tier)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.limits.links = links;
-    def.tier = tier;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.limits.links = links;
+    meshDef.tier = tier;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_tile, s_size).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");

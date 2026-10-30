@@ -9,6 +9,7 @@
 // state, and every made object is destroyed with nothing held.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "dense.h"
 #include "ramp_level.h"
 #include "test_harness.h"
@@ -348,11 +349,12 @@ static void TestCommits(void)
 {
     // The tiles TestBakes baked, so its def.
     mnavBakeDef def = BakeDef();
-    def.tier = mnav_tierDynamic;
     FailAfter(-1);
     mnavNavmesh* navmesh = nullptr;
     bool committing = false;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               Load(navmesh, &committing) == mnav_success,
           "loaded");
     int32_t calls = s_calls;
@@ -365,7 +367,8 @@ static void TestCommits(void)
     {
         FailAfter(k);
         navmesh = nullptr;
-        mnavResult made = mnavCreateNavmesh(&def, &navmesh).result;
+        mnavNavmeshDef meshDef2 = NavmeshDefFor(&def);
+        mnavResult made = mnavCreateNavmesh(&meshDef2, &navmesh).result;
         mnavResult result = made == mnav_success ? Load(navmesh, &committing) : made;
         refused += result == mnav_errorCapacity ? 1 : 0;
         clean = clean && result == mnav_errorCapacity;

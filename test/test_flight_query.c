@@ -9,6 +9,7 @@
 // limits and refusals; and an end in a closed space.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "dense.h"
 #include "test_harness.h"
 
@@ -94,8 +95,9 @@ static mnavFlightVolume* Volume(int32_t skipX, int32_t skipZ)
     mnavFlightDef def = Def();
     mnavFlightBaker* baker = nullptr;
     mnavFlightVolume* volume = nullptr;
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
     CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success &&
-              mnavCreateFlightVolume(&def, &volume).result == mnav_success,
+              mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success,
           "baker and volume");
     mnavTriangleMesh scene = Scene();
     mnavBakeInput input = {&scene, 1, nullptr, 0, nullptr, 0, nullptr};
@@ -1104,8 +1106,9 @@ static mnavFlightVolume* Small(const float boxes[][6], int32_t count, float radi
     def.enableGroundFill = false;
     mnavFlightBaker* baker = nullptr;
     mnavFlightVolume* volume = nullptr;
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
     CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success &&
-              mnavCreateFlightVolume(&def, &volume).result == mnav_success,
+              mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success,
           "a small volume");
     static uint8_t bytes[TILE_BYTES];
     int32_t wrong = 0;

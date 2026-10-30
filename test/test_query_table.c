@@ -7,6 +7,7 @@
 // search a clear, and no result shows it; the results the next search
 // gives are surface's and path's to check.
 
+#include "defs_for.h"
 #include "query.h"
 #include "test_harness.h"
 #include "world.h"
@@ -39,7 +40,8 @@ static mnavNavmesh* WorldNavmesh(void)
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,

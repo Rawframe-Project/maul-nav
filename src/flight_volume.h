@@ -28,7 +28,7 @@ typedef struct mnavFlightEntry
 
 struct mnavFlightVolume
 {
-    mnavFlightDef def;
+    mnavFlightVolumeDef def;
     mnavFlightShape shape;
     mnavMemory memory;
     // The committed tiles, sorted by x, then z.

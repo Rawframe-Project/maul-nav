@@ -8,6 +8,7 @@
 #ifndef MAUL_NAV_TEST_SQUARES_H
 #define MAUL_NAV_TEST_SQUARES_H
 
+#include "defs_for.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -133,7 +134,8 @@ static inline void LoadInput(const mnavBakeInput* input)
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&s_def);
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_navmesh, s_tile, s_tileSize).result == mnav_success &&
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");

@@ -49,7 +49,9 @@ static mnavNavmesh* BakeAndLoad(void)
     mnavBaker* baker = NULL;
     mnavNavmesh* navmesh = NULL;
     Check(mnavCreateBaker(&def, &baker).result, "baker");
-    Check(mnavCreateNavmesh(&def, &navmesh).result, "navmesh");
+    mnavNavmeshDef meshDef = mnavDefaultNavmeshDef();
+    meshDef.bake = def;
+    Check(mnavCreateNavmesh(&meshDef, &navmesh).result, "navmesh");
     const mnavTriangleMesh mesh = {s_vertices, 12, s_indices,
                                    (int32_t)(sizeof(s_indices) / sizeof(s_indices[0]) / 3), NULL};
     uint8_t* bytes = malloc(TILE_ROOM);

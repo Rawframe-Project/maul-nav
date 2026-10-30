@@ -14,6 +14,7 @@
 
 #include <stdlib.h>
 #endif
+#include "defs_for.h"
 #include "hand_tiles.h"
 #include "test_harness.h"
 
@@ -30,7 +31,8 @@ static mnavNavmesh* Make(const uint8_t* first, size_t firstSize, const uint8_t* 
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     CHECK(mnavNavmesh_StageTile(navmesh, first, firstSize).result == mnav_success, "first staged");
     if (second != nullptr)
     {

@@ -11,6 +11,7 @@
 // tiles are baked here, so nothing is pinned by hash; test_spatial pins the
 // random points around a center on the stored world.
 
+#include "defs_for.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -36,8 +37,9 @@ static mnavNavmesh* Load(void)
     def.tileCells = 32;
     mnavBaker* baker = nullptr;
     mnavNavmesh* navmesh = nullptr;
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
-              mnavCreateNavmesh(&def, &navmesh).result == mnav_success,
+              mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success,
           "baker and navmesh");
     mnavTriangleMesh world = World();
     for (int32_t t = 0; t < SIDE * SIDE; ++t)

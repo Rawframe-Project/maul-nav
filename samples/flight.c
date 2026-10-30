@@ -119,7 +119,8 @@ static void BakeTiles(mnavFlightVolume* volume, bool raised, const int32_t tiles
 // Bakes the four tiles and loads them into a volume.
 static mnavFlightVolume* BakeAndLoad(void)
 {
-    mnavFlightDef def = Def();
+    mnavFlightVolumeDef def = mnavDefaultFlightVolumeDef();
+    def.flight = Def();
     mnavFlightVolume* volume = NULL;
     Check(mnavCreateFlightVolume(&def, &volume).result, "volume");
     static const int32_t all[4][2] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};

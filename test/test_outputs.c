@@ -8,6 +8,7 @@
 // a byte pattern first. The outputs a failure defines keep what it
 // gives: the size or count a buffer too small needed, and a bake's report.
 
+#include "defs_for.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
 #include "world.h"
@@ -101,7 +102,8 @@ static mnavNavmesh* WorldNavmesh(void)
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "a navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
@@ -521,7 +523,8 @@ static void TestFlightOutside(void)
 {
     mnavFlightDef def = FlightDef();
     mnavFlightVolume* volume = nullptr;
-    CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success, "a volume");
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
+    CHECK(mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success, "a volume");
     const uint8_t* stored[4] = {s_flight0, s_flight1, s_flight2, s_flight3};
     const size_t sizes[4] = {sizeof(s_flight0), sizeof(s_flight1), sizeof(s_flight2),
                              sizeof(s_flight3)};

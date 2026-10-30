@@ -3,7 +3,7 @@
 A bake turns geometry into navmesh tiles. The world is cut into square tiles of `tileCells` cells of `cellSize` meters, counted from the def's `origin` (by default 128 cells of 0.25 m, so 32 m tiles), and each tile bakes on its own.
 
 ```c
-mnavBakeDef def = mnavDefaultBakeDef();   // agent, cells, limits, tier
+mnavBakeDef def = mnavDefaultBakeDef();   // agent, cells, limits
 mnavBaker* baker = NULL;
 mnavBakeDefResult made = mnavCreateBaker(&def, &baker);
 // made.result; on a refused def, made.setting names the bad setting.
@@ -26,8 +26,7 @@ The bytes are the tile: store them as cooked content, and load them into a [navm
 - **The agent.** `agent` (radius, height, step height, steepest slope) decides what is walkable. A navmesh serves one agent profile; agents of very different sizes need a navmesh each.
 - **Cells.** `cellSize` and `cellHeight` set the resolution. Smaller cells follow walls more closely and cost more memory and time. `mnavValidateBakeDef` checks a def without making anything and reports what its meters become in cells (`mnavBakeCells`), so a tool can show the effect of a setting.
 - **The frame.** Input vertices are floats in meters relative to `origin`, a world position in doubles. A world much more than 1,000 km across at 0.25 m cells needs more than one origin.
-- **Limits.** `limits` bounds the work of one bake and the size of the navmesh made from the same def: triangles, spans, polygons, vertices, links, tiles and memory. A limit reached is `mnav_errorCapacity`, with the report's `stage` saying where.
-- **The tier.** `tier` is read by the navmesh, not the bake: it says what may change once tiles are loaded. See [the navmesh](navmesh.md#tiers).
+- **Limits.** `limits` bounds the work of one bake: triangles, spans, polygons, vertices and memory. A limit reached is `mnav_errorCapacity`, with the report's `stage` saying where. A navmesh has a def and limits of its own; see [the navmesh](navmesh.md).
 
 ## Input
 
