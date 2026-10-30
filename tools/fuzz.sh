@@ -12,6 +12,9 @@
 #                                             into out/corpus-run/TARGET
 #   tools/fuzz.sh run OUT SECONDS JOBS        every target for SECONDS from
 #                                             its committed seeds, JOBS at once
+#   tools/fuzz.sh check OUT TARGET SECONDS    one target for SECONDS from
+#                                             its seeds and out/corpus/TARGET,
+#                                             which is left as it was
 #   tools/fuzz.sh night OUT TARGET SECONDS    one target for SECONDS from
 #                                             out/corpus/TARGET and its seeds,
 #                                             the corpus merged back there
@@ -20,13 +23,13 @@
 # also gets test_tile --seed's tile. Every run goes through
 # tools/fuzz_target.sh, bounded by -max_total_time: it keeps the log in
 # out/fuzz-logs and a finding in out/fuzz-crashes, and reports a finding
-# without its input. CI's fuzz job runs the targets as run does, step by
-# step.
+# without its input. CI's fuzz job runs each target through check, over
+# the corpus fuzz-night left in the Actions cache, when there is one.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-mode=${1:?usage: tools/fuzz.sh targets|build|seeds|run|night OUT ...}
-out=${2:?usage: tools/fuzz.sh targets|build|seeds|run|night OUT ...}
+mode=${1:?usage: tools/fuzz.sh targets|build|seeds|run|check|night OUT ...}
+out=${2:?usage: tools/fuzz.sh targets|build|seeds|run|check|night OUT ...}
 # The build's log goes beside OUT, which a fresh checkout does not have.
 mkdir -p "$(dirname "$out")"
 
@@ -122,6 +125,26 @@ run)
     cat out/fuzz-reports/*.txt 2>/dev/null || true
     exit "$status"
     ;;
+check)
+    target=${3:?target}
+    seconds=${4:?seconds}
+    [ -x "$out/$target" ] || {
+        echo "::error::$target was not built"
+        exit 1
+    }
+    # The corpus CI restored from the last night, or an empty directory,
+    # is read and never written: new inputs go to out/corpus-run/TARGET,
+    # and no run but the night's saves a corpus.
+    rm -rf "out/corpus-run/$target" "out/seeds/$target"
+    mkdir -p "out/corpus-run/$target" "out/corpus/$target"
+    seeds "$target" "out/seeds/$target"
+    status=0
+    rm -rf out/fuzz-reports
+    fuzz "$target" "$seconds" "out/corpus-run/$target" "out/seeds/$target" "out/corpus/$target" ||
+        status=1
+    cat out/fuzz-reports/*.txt 2>/dev/null || true
+    exit $status
+    ;;
 night)
     target=${3:?target}
     seconds=${4:?seconds}
@@ -163,7 +186,7 @@ night)
     exit $status
     ;;
 *)
-    echo "usage: tools/fuzz.sh targets|build|seeds|run|night OUT ..." >&2
+    echo "usage: tools/fuzz.sh targets|build|seeds|run|check|night OUT ..." >&2
     exit 2
     ;;
 esac

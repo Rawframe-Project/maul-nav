@@ -50,6 +50,7 @@ Each target, `test/fuzz_<area>.c`, reads bytes as the library's input: tile and 
 tools/fuzz.sh build out/fuzz                     # every target, Clang 20 with the sanitizers
 tools/fuzz.sh run out/fuzz 300 4                 # each for 300 s from its seeds, 4 at a time
 tools/fuzz.sh seeds out/fuzz                     # every target's seeds, into out/corpus-run/<target>
+tools/fuzz.sh check out/fuzz fuzz_tile 20        # one target as CI's fuzz job runs it, over out/corpus/fuzz_tile
 tools/fuzz.sh night out/fuzz fuzz_query 600      # one target from out/corpus/fuzz_query and its seeds, merged back
 tools/fuzz.sh targets out/fuzz                   # the targets the build defines, as JSON
 ./out/fuzz/fuzz_query out/fuzz-crashes/fuzz_query/crash-<hash>
