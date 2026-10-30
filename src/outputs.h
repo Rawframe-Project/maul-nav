@@ -94,4 +94,18 @@ static inline void mnavClearArray(mnavResult result, bool defined, void* array, 
     memset(array, 0, (size_t)capacity * itemSize);
 }
 
+// A byte buffer's size as mnavClearArray's capacity: -1, a span refused,
+// for one past INT64_MAX, which no memory holds. A size_t of 32 bits never
+// is, so the test is compiled only where one could be.
+static inline int64_t mnavByteCapacity(size_t bytes)
+{
+#if SIZE_MAX > INT64_MAX
+    if (bytes > (size_t)INT64_MAX)
+    {
+        return -1;
+    }
+#endif
+    return (int64_t)bytes;
+}
+
 #endif // MAUL_NAV_SRC_OUTPUTS_H
