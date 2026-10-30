@@ -406,7 +406,7 @@ extern "C"
         // apart than the agent's radius (the cell size when the radius is
         // 0): 1 + ceil(width / spacing) crossings, at most
         // MNAV_MAX_LINK_CROSSINGS. Each crossing takes one of the navmesh's
-        // links (mnavBakeLimits.links), so a link 16 m wide for agents of
+        // links (mnavNavmeshLimits.links), so a link 16 m wide for agents of
         // 0.5 m takes 33; size the limit by crossings, not by links.
         float width;
     } mnavLinkDef;
