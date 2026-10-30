@@ -502,7 +502,10 @@ extern "C"
     /// all of its triangles even with a tile index, every terrain and
     /// volume, their size against the def's inputTriangles limit, and that
     /// the tile index fits them, for an import step that wants to catch bad
-    /// input early. Input it accepts, every bake with the def accepts.
+    /// input early. Input it accepts, every bake with the def accepts at its
+    /// input stage; a bake may still refuse later, for a tile past the
+    /// extent, a piece past MNAV_MAX_PIECE_CORNERS or a limit reached, as
+    /// mnavBaker_BakeTile's return value says.
     ///
     /// @param def   The bake def the input is for.
     /// @param input The meshes, terrains, volumes and index.
@@ -523,7 +526,9 @@ extern "C"
     /// Checks a 2D bake's whole input as hostile input to a bake with a
     /// def, as mnavBaker_BakeTile2D checks it, without baking: every
     /// outline, their points against the def's inputTriangles limit, and
-    /// that the tile index fits them.
+    /// that the tile index fits them. Input it accepts, every 2D bake with
+    /// the def accepts at its input stage; a bake may still refuse later,
+    /// as mnavBaker_BakeTile2D's return value says.
     ///
     /// @param def   The bake def the input is for.
     /// @param input The outlines and index.
