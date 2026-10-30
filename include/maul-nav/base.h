@@ -221,7 +221,7 @@ extern "C"
     /// @return The hash.
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_API uint64_t mnavHash64(uint64_t seed, const void* data, int32_t byteCount);
+    MNAV_API uint64_t mnavHash64(uint64_t seed, const void* data, int64_t byteCount);
 
     /// Returns the name of a result code, for diagnostics.
     ///
