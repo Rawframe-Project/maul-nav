@@ -449,12 +449,13 @@ FindHierarchicalPathCounted(mnavQuery* query, mnavHierarchy* hierarchy, const mn
                             mnavPolygonId startPolygon, mnavPos3 start, mnavPolygonId endPolygon,
                             mnavPos3 end, mnavPath* pathOut)
 {
-    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavPath pathMade = {0};
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), mnavHostFirst(MNAV_HOST(hierarchy), MNAV_HOST(navmesh))),
         FindHierarchicalPathWork(query, hierarchy, navmesh, startPolygon, start, endPolygon, end,
-                                 pathOut));
-    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
+                                 pathOut != nullptr ? &pathMade : nullptr));
+    mnavGiveOutput(result, false, pathOut, &pathMade, sizeof(pathMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindHierarchicalPath(mnavQuery* query, mnavHierarchy* hierarchy,

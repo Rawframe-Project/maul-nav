@@ -172,8 +172,9 @@ extern "C"
     /// @param field    The field.
     /// @param navmesh  The navmesh the work began on.
     /// @param polygons The most polygons to settle, at least 1.
-    /// @param endedOut Receives whether the work has ended. May be NULL. Zeroed on
-    ///                 any failure.
+    /// @param endedOut Receives whether the work has ended. May be NULL. Zeroed
+    ///                 on any failure but mnav_errorBusy, which leaves it as it
+    ///                 was.
     /// @return `mnav_success`, also when the work had already ended;
     /// `mnav_errorInvalid` for a NULL field or navmesh, fewer than 1 polygon,
     /// or a navmesh other than the field's; `mnav_errorState` for nothing

@@ -301,11 +301,13 @@ static MNAV_NOINLINE mnavResult CorridorCornersCounted(mnavQuery* query, const m
                                                        const mnavCorridor* corridor,
                                                        mnavCorners* cornersOut)
 {
-    mnavClearOutput(cornersOut, sizeof(*cornersOut));
+    mnavCorners cornersMade = {0};
     mnavResult result =
         mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                             CorridorCornersWork(query, navmesh, corridor, cornersOut));
-    return mnavClearOnFailure(result, cornersOut, sizeof(*cornersOut));
+                             CorridorCornersWork(query, navmesh, corridor,
+                                                 cornersOut != nullptr ? &cornersMade : nullptr));
+    mnavGiveOutput(result, false, cornersOut, &cornersMade, sizeof(cornersMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindCorridorCorners(mnavQuery* query, const mnavCorridor* corridor,
@@ -451,13 +453,15 @@ static MNAV_NOINLINE mnavResult CorridorAreasCounted(mnavQuery* query, const mna
                                                      mnavCorners* cornersOut, mnavAreaRun* runsOut,
                                                      int32_t capacity, int32_t* countOut)
 {
-    mnavClearOutput(cornersOut, sizeof(*cornersOut));
-    mnavClearOutput(countOut, sizeof(*countOut));
+    mnavCorners cornersMade = {0};
+    int32_t countMade = 0;
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        CorridorAreasWork(query, navmesh, corridor, cornersOut, runsOut, capacity, countOut));
-    return mnavClearUnlessCapacity(mnavClearOnFailure(result, cornersOut, sizeof(*cornersOut)),
-                                   countOut, sizeof(*countOut));
+        CorridorAreasWork(query, navmesh, corridor, cornersOut != nullptr ? &cornersMade : nullptr,
+                          runsOut, capacity, countOut != nullptr ? &countMade : nullptr));
+    mnavGiveOutput(result, false, cornersOut, &cornersMade, sizeof(cornersMade));
+    mnavGiveOutput(result, result == mnav_errorCapacity, countOut, &countMade, sizeof(countMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindCorridorAreas(mnavQuery* query, const mnavCorridor* corridor,
@@ -577,11 +581,13 @@ static MNAV_NOINLINE mnavResult MoveCorridorCounted(mnavQuery* query, const mnav
                                                     mnavCorridor* corridor, mnavPos3 wanted,
                                                     mnavMove* moveOut)
 {
-    mnavClearOutput(moveOut, sizeof(*moveOut));
+    mnavMove moveMade = {0};
     mnavResult result =
         mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                             MoveCorridorWork(query, navmesh, filter, corridor, wanted, moveOut));
-    return mnavClearOnFailure(result, moveOut, sizeof(*moveOut));
+                             MoveCorridorWork(query, navmesh, filter, corridor, wanted,
+                                              moveOut != nullptr ? &moveMade : nullptr));
+    mnavGiveOutput(result, false, moveOut, &moveMade, sizeof(moveMade));
+    return result;
 }
 
 mnavResult mnavQuery_MoveCorridor(mnavQuery* query, mnavCorridor* corridor,
@@ -630,11 +636,13 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetCounted(mnavQuery* query,
                                                           mnavCorridor* corridor, mnavPos3 wanted,
                                                           mnavMove* moveOut)
 {
-    mnavClearOutput(moveOut, sizeof(*moveOut));
-    mnavResult result = mnavHostCountInvalid(
-        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        MoveCorridorTargetWork(query, navmesh, filter, corridor, wanted, moveOut));
-    return mnavClearOnFailure(result, moveOut, sizeof(*moveOut));
+    mnavMove moveMade = {0};
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                             MoveCorridorTargetWork(query, navmesh, filter, corridor, wanted,
+                                                    moveOut != nullptr ? &moveMade : nullptr));
+    mnavGiveOutput(result, false, moveOut, &moveMade, sizeof(moveMade));
+    return result;
 }
 
 mnavResult mnavQuery_MoveCorridorTarget(mnavQuery* query, mnavCorridor* corridor,
@@ -698,11 +706,13 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorCounted(mnavQuery* query,
                                                         mnavCorridor* corridor, mnavPos3 toward,
                                                         bool* shortenedOut)
 {
-    mnavClearOutput(shortenedOut, sizeof(*shortenedOut));
+    bool shortenedMade = false;
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        ShortcutCorridorWork(query, navmesh, filter, corridor, toward, shortenedOut));
-    return mnavClearOnFailure(result, shortenedOut, sizeof(*shortenedOut));
+        ShortcutCorridorWork(query, navmesh, filter, corridor, toward,
+                             shortenedOut != nullptr ? &shortenedMade : nullptr));
+    mnavGiveOutput(result, false, shortenedOut, &shortenedMade, sizeof(shortenedMade));
+    return result;
 }
 
 mnavResult mnavQuery_ShortcutCorridor(mnavQuery* query, mnavCorridor* corridor,
@@ -785,11 +795,13 @@ static MNAV_NOINLINE mnavResult ReplanCorridorCounted(mnavQuery* query, const mn
                                                       mnavCorridor* corridor, mnavVec3 halfExtents,
                                                       mnavPath* pathOut)
 {
-    mnavClearOutput(pathOut, sizeof(*pathOut));
-    mnavResult result = mnavHostCountInvalid(
-        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        ReplanCorridorWork(query, navmesh, filter, corridor, halfExtents, pathOut));
-    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
+    mnavPath pathMade = {0};
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                             ReplanCorridorWork(query, navmesh, filter, corridor, halfExtents,
+                                                pathOut != nullptr ? &pathMade : nullptr));
+    mnavGiveOutput(result, false, pathOut, &pathMade, sizeof(pathMade));
+    return result;
 }
 
 mnavResult mnavQuery_ReplanCorridor(mnavQuery* query, mnavCorridor* corridor,

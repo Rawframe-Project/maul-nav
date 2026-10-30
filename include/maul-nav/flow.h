@@ -148,8 +148,9 @@ extern "C"
     /// @param grid     The grid the work began on, its areas unchanged;
     ///                 it may lie elsewhere in memory.
     /// @param cells    The most cells to settle, at least 1.
-    /// @param endedOut Receives whether the work has ended. May be NULL. Zeroed on
-    ///                 any failure.
+    /// @param endedOut Receives whether the work has ended. May be NULL. Zeroed
+    ///                 on any failure but mnav_errorBusy, which leaves it as it
+    ///                 was.
     /// @return `mnav_success`, also when the work had already ended;
     /// `mnav_errorInvalid` for a NULL field or grid, fewer than 1 cell, or a
     /// grid of another size or cell size; `mnav_errorState` for no work begun.

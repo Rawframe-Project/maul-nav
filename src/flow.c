@@ -496,10 +496,12 @@ static MNAV_NOINLINE mnavResult ContinueFlowFieldWork(mnavGridFlow* field, const
 static MNAV_NOINLINE mnavResult ContinueFlowFieldCounted(mnavGridFlow* field, const mnavGrid* grid,
                                                          int32_t cells, bool* endedOut)
 {
-    mnavClearOutput(endedOut, sizeof(*endedOut));
-    mnavResult result =
-        mnavHostCountInvalid(MNAV_HOST(field), ContinueFlowFieldWork(field, grid, cells, endedOut));
-    return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
+    bool endedMade = false;
+    mnavResult result = mnavHostCountInvalid(
+        MNAV_HOST(field),
+        ContinueFlowFieldWork(field, grid, cells, endedOut != nullptr ? &endedMade : nullptr));
+    mnavGiveOutput(result, false, endedOut, &endedMade, sizeof(endedMade));
+    return result;
 }
 
 mnavResult mnavGridFlow_Continue(mnavGridFlow* field, const mnavGrid* grid, int32_t cells,

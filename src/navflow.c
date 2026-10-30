@@ -624,11 +624,12 @@ static MNAV_NOINLINE mnavResult ContinueNavFlowCounted(mnavNavFlow* field,
                                                        const mnavNavmesh* navmesh, int32_t polygons,
                                                        bool* endedOut)
 {
-    mnavClearOutput(endedOut, sizeof(*endedOut));
-    mnavResult result =
-        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
-                             ContinueNavFlowWork(field, navmesh, polygons, endedOut));
-    return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
+    bool endedMade = false;
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(field), MNAV_HOST(navmesh)),
+        ContinueNavFlowWork(field, navmesh, polygons, endedOut != nullptr ? &endedMade : nullptr));
+    mnavGiveOutput(result, false, endedOut, &endedMade, sizeof(endedMade));
+    return result;
 }
 
 mnavResult mnavNavFlow_Continue(mnavNavFlow* field, const mnavNavmesh* navmesh, int32_t polygons,

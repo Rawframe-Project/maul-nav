@@ -537,10 +537,12 @@ static MNAV_NOINLINE mnavResult FindGridPathCounted(mnavQuery* query, const mnav
                                                     const mnavQueryFilter* filter, mnavCell start,
                                                     mnavCell end, mnavGridPath* pathOut)
 {
-    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavGridPath pathMade = {0};
     mnavResult result = mnavHostCountInvalid(
-        MNAV_HOST(query), FindGridPathWork(query, grid, filter, start, end, pathOut));
-    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
+        MNAV_HOST(query), FindGridPathWork(query, grid, filter, start, end,
+                                           pathOut != nullptr ? &pathMade : nullptr));
+    mnavGiveOutput(result, false, pathOut, &pathMade, sizeof(pathMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindGridPath(mnavQuery* query, const mnavGrid* grid, mnavCell start,

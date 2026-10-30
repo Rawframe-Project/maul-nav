@@ -918,12 +918,13 @@ static MNAV_NOINLINE mnavResult FindShortestPathCounted(mnavQuery* query,
                                                         mnavPolygonId endPolygon, mnavPos3 end,
                                                         mnavPath* pathOut)
 {
-    mnavClearOutput(pathOut, sizeof(*pathOut));
-    mnavResult result =
-        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                             FindShortestPathWork(query, navmesh, filter, startPolygon, start,
-                                                  endPolygon, end, pathOut));
-    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
+    mnavPath pathMade = {0};
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        FindShortestPathWork(query, navmesh, filter, startPolygon, start, endPolygon, end,
+                             pathOut != nullptr ? &pathMade : nullptr));
+    mnavGiveOutput(result, false, pathOut, &pathMade, sizeof(pathMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindShortestPath(mnavQuery* query, const mnavNavmesh* navmesh,
