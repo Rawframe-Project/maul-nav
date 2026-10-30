@@ -21,82 +21,82 @@ extern "C"
 {
 #endif
 
-// The most cells a flow field may hold.
-#define MNAV_MAX_FLOW_CELLS 16777216
+// The most cells a grid flow field may hold.
+#define MNAV_MAX_GRID_FLOW_CELLS 16777216
 
-    // How a flow field is made. Build it with mnavDefaultFlowFieldDef.
-    typedef struct mnavFlowFieldDef
+    // How a grid flow field is made. Build it with mnavDefaultGridFlowDef.
+    typedef struct mnavGridFlowDef
     {
         uint32_t cookie;
-        // MNAV_ABI_VERSION, set by mnavDefaultFlowFieldDef.
+        // MNAV_ABI_VERSION, set by mnavDefaultGridFlowDef.
         uint32_t version;
         // The allocator the field uses; zeroed for the C library's.
         mnavAllocator allocator;
-        // The most cells a grid may have, 1 to MNAV_MAX_FLOW_CELLS.
+        // The most cells a grid may have, 1 to MNAV_MAX_GRID_FLOW_CELLS.
         int32_t cells;
-    } mnavFlowFieldDef;
+    } mnavGridFlowDef;
 
-    // A flow field: the memory for its cells, and the field last built.
-    typedef struct mnavFlowField mnavFlowField;
+    // A grid flow field: the memory for its cells, and the field last built.
+    typedef struct mnavGridFlow mnavGridFlow;
 
     // A cell's way to the goals: its cost, infinite where no goal is
     // reached, and the next cell, the cell itself at a goal and where no
     // goal is reached.
-    typedef struct mnavFlow
+    typedef struct mnavCellFlow
     {
         double cost;
         mnavCell next;
-    } mnavFlow;
+    } mnavCellFlow;
 
-// The cookie mnavDefaultFlowFieldDef sets and mnavCreateFlowField checks.
-#define MNAV_FLOW_FIELD_DEF_COOKIE 0x4E415646u
+// The cookie mnavDefaultGridFlowDef sets and mnavCreateGridFlow checks.
+#define MNAV_GRID_FLOW_DEF_COOKIE 0x4E415646u
 
-    /// Returns the default flow field def: up to 65536 cells.
+    /// Returns the default grid flow field def: up to 65536 cells.
     /// Built in the program, so that it carries the version of the
     /// headers the program includes.
     ///
     /// @return The def.
     /// @par Thread safety
     /// Safe from any thread.
-    static inline mnavFlowFieldDef mnavDefaultFlowFieldDef(void)
+    static inline mnavGridFlowDef mnavDefaultGridFlowDef(void)
     {
 #ifdef __cplusplus
-        mnavFlowFieldDef def = {};
+        mnavGridFlowDef def = {};
 #else
-    mnavFlowFieldDef def = {0};
+    mnavGridFlowDef def = {0};
 #endif
-        def.cookie = MNAV_FLOW_FIELD_DEF_COOKIE;
+        def.cookie = MNAV_GRID_FLOW_DEF_COOKIE;
         def.version = MNAV_ABI_VERSION;
         def.cells = 65536;
         return def;
     }
 
-    /// Makes a flow field with the memory its cell limit needs.
+    /// Makes a grid flow field with the memory its cell limit needs.
     ///
-    /// @param def      The def, from mnavDefaultFlowFieldDef.
+    /// @param def      The def, from mnavDefaultGridFlowDef.
     /// @param fieldOut Receives the field, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
-    /// not from mnavDefaultFlowFieldDef; `mnav_errorVersion` for one built
+    /// not from mnavDefaultGridFlowDef; `mnav_errorVersion` for one built
     /// against another version of the headers; `mnav_errorInvalid` also for an
     /// allocator with one function or a cell limit below 1; `mnav_errorLimit`
-    /// for a cell limit past MNAV_MAX_FLOW_CELLS; `mnav_errorCapacity` when the
+    /// for a cell limit past MNAV_MAX_GRID_FLOW_CELLS; `mnav_errorCapacity` when the
     /// allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
-    MNAV_NODISCARD MNAV_API mnavResult mnavCreateFlowField(const mnavFlowFieldDef* def,
-                                                           mnavFlowField** fieldOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavCreateGridFlow(const mnavGridFlowDef* def,
+                                                          mnavGridFlow** fieldOut);
 
-    /// Destroys a flow field. Called back in from the field's allocator, it
+    /// Destroys a grid flow field. Called back in from the field's allocator, it
     /// does nothing and counts one misuse.
     ///
     /// @param field The field, or NULL.
     /// @par Thread safety
     /// Safe from any thread; the field is used by one thread at a time.
-    MNAV_API void mnavDestroyFlowField(mnavFlowField* field);
+    MNAV_API void mnavDestroyGridFlow(mnavGridFlow* field);
 
-    /// Returns how many calls against the flow field were refused as misuse
+    /// Returns how many calls against the grid flow field were refused as misuse
     /// since it was made: an argument refused with `mnav_errorInvalid` when the
-    /// flow field was the first object the call was given, and a call back in
+    /// grid flow field was the first object the call was given, and a call back in
     /// from host code it ran (`mnav_errorBusy`).
     ///
     /// @param field The field.
@@ -104,7 +104,7 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. It may be read at any time, also while host
     /// code the object runs calls back in.
-    MNAV_API uint64_t mnavFlowField_GetMisuse(const mnavFlowField* field);
+    MNAV_API uint64_t mnavGridFlow_GetMisuse(const mnavGridFlow* field);
 
     /// Begins building the field for a region of a grid and a set of goal
     /// cells: one search from all the goals, with the steps of
@@ -115,7 +115,7 @@ extern "C"
     /// first by cost, then by index; the same grid, region and goals give
     /// the same field on every platform, however the work is divided.
     /// Blocked goals and goals outside the region are left out.
-    /// mnavFlowField_Continue does the work.
+    /// mnavGridFlow_Continue does the work.
     ///
     /// @param field     The field; its last field is dropped.
     /// @param grid      The grid; its areas are read until the work ends.
@@ -136,11 +136,10 @@ extern "C"
     /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the field is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFlowField_Begin(mnavFlowField* field,
-                                                           const mnavGrid* grid,
-                                                           const mnavCellRange* region,
-                                                           const mnavCell* goals, int32_t goalCount,
-                                                           const mnavQueryFilter* filter);
+    MNAV_NODISCARD MNAV_API mnavResult mnavGridFlow_Begin(mnavGridFlow* field, const mnavGrid* grid,
+                                                          const mnavCellRange* region,
+                                                          const mnavCell* goals, int32_t goalCount,
+                                                          const mnavQueryFilter* filter);
 
     /// Continues the work begun on a field: settles up to a number of
     /// cells, fewer when the work ends first.
@@ -159,16 +158,16 @@ extern "C"
     /// one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the field is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFlowField_Continue(mnavFlowField* field,
-                                                              const mnavGrid* grid, int32_t cells,
-                                                              bool* endedOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavGridFlow_Continue(mnavGridFlow* field,
+                                                             const mnavGrid* grid, int32_t cells,
+                                                             bool* endedOut);
 
     /// Begins repairing the field after its goals or the areas of some of
     /// its grid's cells changed: only the cells whose ways
     /// change are searched again, and when the work ends the field is the
-    /// one mnavFlowField_Begin would make with the new goals and areas, bit
+    /// one mnavGridFlow_Begin would make with the new goals and areas, bit
     /// for bit. The cells whose ways ran through what changed are reset in
-    /// this call; mnavFlowField_Continue does the rest by its budget.
+    /// this call; mnavGridFlow_Continue does the rest by its budget.
     ///
     /// @param field        The field; its work must have ended.
     /// @param grid         The grid the field was begun on, of the same
@@ -188,26 +187,27 @@ extern "C"
     /// misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the field is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult
-    mnavFlowField_Update(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
-                         int32_t goalCount, const mnavCell* changed, int32_t changedCount);
+    MNAV_NODISCARD MNAV_API mnavResult mnavGridFlow_Update(mnavGridFlow* field,
+                                                           const mnavGrid* grid,
+                                                           const mnavCell* goals, int32_t goalCount,
+                                                           const mnavCell* changed,
+                                                           int32_t changedCount);
 
     /// Builds the field for a whole grid and a set of goal cells: begins as
-    /// mnavFlowField_Begin and continues to the end.
+    /// mnavGridFlow_Begin and continues to the end.
     ///
     /// @param field     The field; its last field is replaced.
     /// @param grid      The grid, read only during the call.
     /// @param goals     The goal cells.
     /// @param goalCount How many, at least 0.
     /// @param filter    The areas usable and their costs, or NULL.
-    /// @return As mnavFlowField_Begin. Also `mnav_errorBusy` when called back in
+    /// @return As mnavGridFlow_Begin. Also `mnav_errorBusy` when called back in
     /// from the field's allocator, one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the field is used by one thread at a time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFlowField_Build(mnavFlowField* field,
-                                                           const mnavGrid* grid,
-                                                           const mnavCell* goals, int32_t goalCount,
-                                                           const mnavQueryFilter* filter);
+    MNAV_NODISCARD MNAV_API mnavResult mnavGridFlow_Build(mnavGridFlow* field, const mnavGrid* grid,
+                                                          const mnavCell* goals, int32_t goalCount,
+                                                          const mnavQueryFilter* filter);
 
     /// Reads a cell's way to the goals from the field.
     ///
@@ -222,8 +222,8 @@ extern "C"
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read a field at once
     /// while no work runs on it.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFlowField_GetFlow(const mnavFlowField* field,
-                                                             mnavCell cell, mnavFlow* flowOut);
+    MNAV_NODISCARD MNAV_API mnavResult mnavGridFlow_GetFlow(const mnavGridFlow* field,
+                                                            mnavCell cell, mnavCellFlow* flowOut);
 
     /// Appends an arrow for each cell of the field that has a next cell
     /// (mnav_debugFlow): from the cell's center toward the next one's, 0.8
@@ -243,8 +243,8 @@ extern "C"
     /// Safe from any thread. Any number of threads may read a field at once
     /// while no work runs on it; the buffer is used by one thread at a
     /// time.
-    MNAV_NODISCARD MNAV_API mnavResult mnavFlowField_Debug(const mnavFlowField* field,
-                                                           double height, mnavDebugBuffer* buffer);
+    MNAV_NODISCARD MNAV_API mnavResult mnavGridFlow_Debug(const mnavGridFlow* field, double height,
+                                                          mnavDebugBuffer* buffer);
 
 #ifdef __cplusplus
 }

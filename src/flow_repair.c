@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 // Marks a cell raised and lists it, once.
-static void Raise(mnavFlowField* f, int32_t cell)
+static void Raise(mnavGridFlow* f, int32_t cell)
 {
     if ((f->marks[cell] & mnav_flowRaised) == 0)
     {
@@ -37,7 +37,7 @@ static void Raise(mnavFlowField* f, int32_t cell)
 }
 
 // The cell of the region at grid place (x, y), or -1 outside it.
-static int32_t CellAt(const mnavFlowField* f, int32_t x, int32_t y)
+static int32_t CellAt(const mnavGridFlow* f, int32_t x, int32_t y)
 {
     const mnavFlowWindow* r = &f->region;
     if (x < r->x || y < r->y || x >= r->x + r->width || y >= r->y + r->height)
@@ -49,7 +49,7 @@ static int32_t CellAt(const mnavFlowField* f, int32_t x, int32_t y)
 
 // Raises a changed cell and the cells beside it whose diagonal step to
 // their next cell passes its corner.
-static void RaiseChanged(mnavFlowField* f, int32_t x, int32_t y)
+static void RaiseChanged(mnavGridFlow* f, int32_t x, int32_t y)
 {
     int32_t cell = CellAt(f, x, y);
     if (cell < 0)
@@ -80,7 +80,7 @@ static void RaiseChanged(mnavFlowField* f, int32_t x, int32_t y)
 
 // Raises the subtrees of the raised cells listed: every cell whose next
 // cell is raised.
-static void RaiseSubtrees(mnavFlowField* f)
+static void RaiseSubtrees(mnavGridFlow* f)
 {
     int32_t width = f->region.width;
     for (int32_t i = 0; i < f->touchedCount; ++i)
@@ -106,7 +106,7 @@ static void RaiseSubtrees(mnavFlowField* f)
 // that of a way the grid has, so any offer is one.
 static void Offer(const mnavFlowSearch* s, int32_t cell)
 {
-    mnavFlowField* f = s->field;
+    mnavGridFlow* f = s->field;
     for (int32_t d = 0; d < 8; ++d)
     {
         int32_t n = 0;
@@ -126,7 +126,7 @@ static void Offer(const mnavFlowSearch* s, int32_t cell)
 // Whether grid cell (x, y) is open: in the region and walkable.
 static bool OpenCell(const mnavFlowSearch* s, int32_t cell)
 {
-    const mnavFlowField* f = s->field;
+    const mnavGridFlow* f = s->field;
     return mnavFlowOpen(s, f->region.x + cell % f->region.width,
                         f->region.y + cell / f->region.width);
 }
@@ -148,7 +148,7 @@ static void OfferAround(const mnavFlowSearch* s, int32_t x, int32_t y)
     }
 }
 
-static mnavResult Check(const mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
+static mnavResult Check(const mnavGridFlow* field, const mnavGrid* grid, const mnavCell* goals,
                         int32_t goalCount, const mnavCell* changed, int32_t changedCount)
 {
     if (field == nullptr || grid == nullptr || goalCount < 0 ||
@@ -180,7 +180,7 @@ static mnavResult Check(const mnavFlowField* field, const mnavGrid* grid, const 
 // new list.
 static void SwapGoals(const mnavFlowSearch* s, const mnavCell* goals, int32_t goalCount)
 {
-    mnavFlowField* f = s->field;
+    mnavGridFlow* f = s->field;
     for (int32_t i = 0; i < goalCount; ++i)
     {
         int32_t cell = CellAt(f, goals[i].x, goals[i].y);
@@ -208,7 +208,7 @@ static void SwapGoals(const mnavFlowSearch* s, const mnavCell* goals, int32_t go
     }
 }
 
-static MNAV_NOINLINE mnavResult UpdateFlowFieldWork(mnavFlowField* field, const mnavGrid* grid,
+static MNAV_NOINLINE mnavResult UpdateFlowFieldWork(mnavGridFlow* field, const mnavGrid* grid,
                                                     const mnavCell* goals, int32_t goalCount,
                                                     const mnavCell* changed, int32_t changedCount)
 {
@@ -265,7 +265,7 @@ static MNAV_NOINLINE mnavResult UpdateFlowFieldWork(mnavFlowField* field, const 
     return mnav_success;
 }
 
-static MNAV_NOINLINE mnavResult UpdateFlowFieldCounted(mnavFlowField* field, const mnavGrid* grid,
+static MNAV_NOINLINE mnavResult UpdateFlowFieldCounted(mnavGridFlow* field, const mnavGrid* grid,
                                                        const mnavCell* goals, int32_t goalCount,
                                                        const mnavCell* changed,
                                                        int32_t changedCount)
@@ -274,8 +274,8 @@ static MNAV_NOINLINE mnavResult UpdateFlowFieldCounted(mnavFlowField* field, con
                                                                       changed, changedCount));
 }
 
-mnavResult mnavFlowField_Update(mnavFlowField* field, const mnavGrid* grid, const mnavCell* goals,
-                                int32_t goalCount, const mnavCell* changed, int32_t changedCount)
+mnavResult mnavGridFlow_Update(mnavGridFlow* field, const mnavGrid* grid, const mnavCell* goals,
+                               int32_t goalCount, const mnavCell* changed, int32_t changedCount)
 {
     uint64_t env = mnavFloatEnvEnter();
     mnavResult result =
@@ -289,7 +289,7 @@ mnavResult mnavFlowField_Update(mnavFlowField* field, const mnavGrid* grid, cons
 // the lowest by cost and then by index.
 static int32_t NextOf(const mnavFlowSearch* s, int32_t cell)
 {
-    const mnavFlowField* f = s->field;
+    const mnavGridFlow* f = s->field;
     double cost = f->costs[cell];
     if (cost == 0.0 || !isfinite(cost))
     {
@@ -316,7 +316,7 @@ static int32_t NextOf(const mnavFlowSearch* s, int32_t cell)
 
 int32_t mnavFlowFix(const mnavFlowSearch* s, int32_t budget)
 {
-    mnavFlowField* f = s->field;
+    mnavGridFlow* f = s->field;
     int32_t width = f->region.width;
     int32_t done = 0;
     for (; done < budget && f->fixed < f->touchedCount; ++done)

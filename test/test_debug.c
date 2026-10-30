@@ -222,23 +222,23 @@ static void TestFlowAndAvoidance(void)
     mnavAreaType areas[12];
     memset(areas, 1, sizeof(areas));
     mnavGrid grid = {areas, 4, 3, 2.0f};
-    mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef def = mnavDefaultGridFlowDef();
     def.cells = 12;
-    mnavFlowField* field = nullptr;
+    mnavGridFlow* field = nullptr;
     const mnavCell goal = {0, 0};
-    CHECK(mnavCreateFlowField(&def, &field) == mnav_success &&
-              mnavFlowField_Build(field, &grid, &goal, 1, nullptr) == mnav_success,
+    CHECK(mnavCreateGridFlow(&def, &field) == mnav_success &&
+              mnavGridFlow_Build(field, &grid, &goal, 1, nullptr) == mnav_success,
           "a field");
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavFlowField_Debug(field, 0.5, &b) == mnav_success && b.lineCount == 11 * 3 * 2 &&
+    CHECK(mnavGridFlow_Debug(field, 0.5, &b) == mnav_success && b.lineCount == 11 * 3 * 2 &&
               Count(&b, mnav_debugFlow, -1) == b.vertexCount,
           "eleven arrows");
     // The arrow of cell (1, 0) points along -X at its center, height 0.5.
     CHECK(b.vertices[0].x == 3.8f && b.vertices[1].x == 2.2f && b.vertices[0].y == 0.5f &&
               b.vertices[0].z == 1.0f,
           "from (1, 0) toward the goal");
-    CHECK(mnavFlowField_Debug(field, (double)NAN, &b) == mnav_errorInvalid, "no height");
-    mnavDestroyFlowField(field);
+    CHECK(mnavGridFlow_Debug(field, (double)NAN, &b) == mnav_errorInvalid, "no height");
+    mnavDestroyGridFlow(field);
     // Three agents, two near: the near pair sees each other.
     mnavAvoidanceDef avoidDef = mnavDefaultAvoidanceDef();
     avoidDef.limits.agents = 8;

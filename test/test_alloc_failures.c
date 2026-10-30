@@ -452,14 +452,14 @@ static void DestroyNavFlow(void* object)
 
 static mnavResult MakeFlowField(void** out)
 {
-    mnavFlowFieldDef def = mnavDefaultFlowFieldDef();
+    mnavGridFlowDef def = mnavDefaultGridFlowDef();
     def.allocator = Allocator();
-    return mnavCreateFlowField(&def, (mnavFlowField**)out);
+    return mnavCreateGridFlow(&def, (mnavGridFlow**)out);
 }
 
 static void DestroyFlowField(void* object)
 {
-    mnavDestroyFlowField(object);
+    mnavDestroyGridFlow(object);
 }
 
 static mnavResult MakeAvoidance(void** out)

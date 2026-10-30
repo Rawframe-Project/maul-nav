@@ -24,20 +24,20 @@ extern "C"
 
 // The most polygons, tile slots and off-mesh links a navmesh flow field
 // may hold.
-#define MNAV_MAX_NAVFLOW_POLYGONS 16777216
-#define MNAV_MAX_NAVFLOW_TILES    1048576
-#define MNAV_MAX_NAVFLOW_LINKS    1048576
+#define MNAV_MAX_NAV_FLOW_POLYGONS 16777216
+#define MNAV_MAX_NAV_FLOW_TILES    1048576
+#define MNAV_MAX_NAV_FLOW_LINKS    1048576
 
     // What a navmesh flow field may hold; its memory is taken for them all
     // when it is made, and a build needs no more.
     typedef struct mnavNavFlowLimits
     {
-        // Polygons in the tiles searched, 1 to MNAV_MAX_NAVFLOW_POLYGONS.
+        // Polygons in the tiles searched, 1 to MNAV_MAX_NAV_FLOW_POLYGONS.
         int32_t polygons;
-        // Tile slots of the navmesh, 1 to MNAV_MAX_NAVFLOW_TILES.
+        // Tile slots of the navmesh, 1 to MNAV_MAX_NAV_FLOW_TILES.
         int32_t tiles;
         // Off-mesh links of the navmesh, counted as its links limit counts
-        // them (by crossings), 1 to MNAV_MAX_NAVFLOW_LINKS.
+        // them (by crossings), 1 to MNAV_MAX_NAV_FLOW_LINKS.
         int32_t links;
     } mnavNavFlowLimits;
 
@@ -115,7 +115,7 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
     /// not from mnavDefaultNavFlowDef; `mnav_errorVersion` for one built
     /// against another version of the headers; `mnav_errorInvalid` also for a
-    /// limit below 1; `mnav_errorLimit` for a limit past its MNAV_MAX_NAVFLOW_
+    /// limit below 1; `mnav_errorLimit` for a limit past its MNAV_MAX_NAV_FLOW_
     /// value; `mnav_errorCapacity` when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.

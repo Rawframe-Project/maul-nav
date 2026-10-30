@@ -4,11 +4,11 @@ When many agents share goals, one search serves them all: a flow field holds, fo
 
 ## Over a grid
 
-- `mnavCreateFlowField` with a def of the most cells it covers (65,536 by default), then `mnavFlowField_Build` over an `mnavGrid` of area types, a [filter](paths.md#filters) and a set of goal cells.
-- `mnavFlowField_GetFlow` gives a cell's cost and its next cell; following next cells walks a cheapest grid path, each step strictly downhill. A cell no goal reaches has an infinite cost; a cell outside the field's region is `mnav_errorOutside`.
+- `mnavCreateGridFlow` with a def of the most cells it covers (65,536 by default), then `mnavGridFlow_Build` over an `mnavGrid` of area types, a [filter](paths.md#filters) and a set of goal cells.
+- `mnavGridFlow_GetFlow` gives a cell's cost and its next cell; following next cells walks a cheapest grid path, each step strictly downhill. A cell no goal reaches has an infinite cost; a cell outside the field's region is `mnav_errorOutside`.
 - Steps are the grid path's: eight neighbors, never across a blocked corner, each costing its length times the mean of its two cells' area costs. Blocked goals and goals in areas the filter leaves out are dropped.
-- **In steps.** `mnavFlowField_Begin` takes a region of the grid, an `mnavCellRange` from one corner cell to the other, both included (cells outside count as blocked), and `mnavFlowField_Continue` does the work a budget of cells at a time. The field is the same for any budgets; read it when the work is done.
-- **Repairs.** When goals move or cells change area, `mnavFlowField_Update` takes the new goals and the changed cells and repairs only what they reach, in steps too. The repaired field is the one a rebuild gives, bit for bit.
+- **In steps.** `mnavGridFlow_Begin` takes a region of the grid, an `mnavCellRange` from one corner cell to the other, both included (cells outside count as blocked), and `mnavGridFlow_Continue` does the work a budget of cells at a time. The field is the same for any budgets; read it when the work is done.
+- **Repairs.** When goals move or cells change area, `mnavGridFlow_Update` takes the new goals and the changed cells and repairs only what they reach, in steps too. The repaired field is the one a rebuild gives, bit for bit.
 
 ## Over a navmesh
 

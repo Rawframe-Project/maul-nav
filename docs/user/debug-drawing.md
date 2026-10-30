@@ -11,7 +11,7 @@ The library never draws. It fills an `mnavDebugBuffer` the host owns with vertic
 | `mnavNavmesh_Debug` | Polygons by area, inner edges, walls, tile sides and tile bounds, over an `mnavTileRange` of tile places, or every tile for NULL. |
 | `mnavNavmesh_DebugLinks` | Every off-mesh link as an arc, at its snapped ends when attached. |
 | `mnavDebugPath`, `mnavNavmesh_DebugCorridor` | A path's straight line; a corridor's polygons. |
-| `mnavFlowField_Debug`, `mnavNavFlow_Debug` | An arrow for each cell or polygon with a way on. |
+| `mnavGridFlow_Debug`, `mnavNavFlow_Debug` | An arrow for each cell or polygon with a way on. |
 | `mnavAvoidance_Debug` | Each agent's outline and a line to each neighbor `mnavAvoidance_Avoid` would give it. |
 | `mnavAvoidance_Debug3D` | Each flier as three rings, its neighbors, and the spheres it avoids. |
 | `mnavFlightVolume_Debug` | A flight volume's open blocks inside a box, as wire boxes. Solid space shows as gaps. |

@@ -81,8 +81,8 @@ static mnavResult CheckLimits(const mnavNavFlowLimits* l)
     {
         return mnav_errorInvalid;
     }
-    return l->polygons > MNAV_MAX_NAVFLOW_POLYGONS || l->tiles > MNAV_MAX_NAVFLOW_TILES ||
-                   l->links > MNAV_MAX_NAVFLOW_LINKS
+    return l->polygons > MNAV_MAX_NAV_FLOW_POLYGONS || l->tiles > MNAV_MAX_NAV_FLOW_TILES ||
+                   l->links > MNAV_MAX_NAV_FLOW_LINKS
                ? mnav_errorLimit
                : mnav_success;
 }

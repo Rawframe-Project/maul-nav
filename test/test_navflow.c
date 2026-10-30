@@ -604,10 +604,10 @@ static void TestChecks(mnavNavFlow* field, const mnavNavmesh* navmesh)
               mnavNavFlow_Build(small, navmesh, &goal, 1, nullptr) == mnav_success,
           "within it");
     mnavDestroyNavFlow(small);
-    const mnavNavFlowLimits outOfRange[6] = {{0, 1, 1}, {MNAV_MAX_NAVFLOW_POLYGONS + 1, 1, 1},
-                                             {1, 0, 1}, {1, MNAV_MAX_NAVFLOW_TILES + 1, 1},
-                                             {1, 1, 0}, {1, 1, MNAV_MAX_NAVFLOW_LINKS + 1}};
-    // Below 1 is wrong; past an MNAV_MAX_NAVFLOW_ value is a bound.
+    const mnavNavFlowLimits outOfRange[6] = {{0, 1, 1}, {MNAV_MAX_NAV_FLOW_POLYGONS + 1, 1, 1},
+                                             {1, 0, 1}, {1, MNAV_MAX_NAV_FLOW_TILES + 1, 1},
+                                             {1, 1, 0}, {1, 1, MNAV_MAX_NAV_FLOW_LINKS + 1}};
+    // Below 1 is wrong; past an MNAV_MAX_NAV_FLOW_ value is a bound.
     bool refused = true;
     for (int32_t i = 0; i < 6; ++i)
     {
