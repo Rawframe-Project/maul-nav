@@ -176,7 +176,7 @@ static mnavBakeDefResult ConvertAgent(const mnavBakeDef* def, mnavBakeCells* cel
     {
         r = Refuse(mnav_errorInvalid, mnav_bakeSettingMaxEdgeError);
     }
-    if (r.result == mnav_success && def->maxEdgeError > MNAV_MAX_CELL_SIZE * MNAV_MAX_TILE_CELLS)
+    if (r.result == mnav_success && def->maxEdgeError > MNAV_MAX_EDGE_ERROR)
     {
         r = Refuse(mnav_errorLimit, mnav_bakeSettingMaxEdgeError);
     }

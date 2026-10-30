@@ -27,6 +27,10 @@ extern "C"
 #define MNAV_MIN_TILE_CELLS 16
 #define MNAV_MAX_TILE_CELLS 1024
 
+// The most a simplified wall may stray from the cells it follows, in
+// meters: a tile's side at the largest cells and tiles.
+#define MNAV_MAX_EDGE_ERROR (MNAV_MAX_CELL_SIZE * MNAV_MAX_TILE_CELLS)
+
 // How far input may lie from the bake's origin: horizontally, in cells of
 // the bake's cell size; vertically, in cells of its cell height, up or down.
 #define MNAV_MAX_EXTENT_CELLS 4194304
@@ -86,7 +90,8 @@ extern "C"
     {
         // Triangles in one bake's input.
         int32_t inputTriangles;
-        // Input triangles that touch one tile.
+        // Input triangles that touch one tile; its MNAV_MAX_ value is
+        // MNAV_MAX_INPUT_TRIANGLES.
         int32_t tileTriangles;
         // Span fragments rasterized into one tile: one per cell a triangle
         // covers, before they merge into spans.
@@ -132,23 +137,25 @@ extern "C"
         int32_t tileCells;
         // The agent the navmesh is for.
         mnavAgentProfile agent;
-        // The smallest walkable region kept, in square meters, at least 0:
-        // smaller islands away from a tile's edge are dropped.
+        // The smallest walkable region kept, in square meters, from 0 to the
+        // area of 2^30 cells: smaller islands away from a tile's edge are
+        // dropped.
         float minRegionArea;
         // How far a simplified wall may stray from the cells it follows, in
-        // meters, at least 0. Walls simplified a cell or more can cross
-        // themselves or each other, and a ring that then does not
+        // meters, 0 to MNAV_MAX_EDGE_ERROR. Walls simplified a cell or more
+        // can cross themselves or each other, and a ring that then does not
         // triangulate whole loses the area it did not triangulate; the
         // report counts it in partialRings.
         float maxEdgeError;
-        // The longest wall edge, in meters, at least 0; 0 for no limit.
+        // The longest wall edge, in meters, from 0 to 2^30 cells; 0 for no
+        // limit.
         float maxEdgeLength;
         // How far apart the detail mesh samples the floor's height along
-        // polygon edges and inside polygons, in meters, at least 0; 0 for
-        // none, and at least one cell otherwise.
+        // polygon edges and inside polygons, in meters, from 0 to 2^26
+        // cells; 0 for none, and a distance below a cell samples every cell.
         float detailSampleDistance;
         // How far the detail surface may stray from a sampled height, in
-        // meters, at least 0.
+        // meters, from 0 to 2^26 cell heights.
         float detailMaxError;
         // The limits on the work.
         mnavBakeLimits limits;

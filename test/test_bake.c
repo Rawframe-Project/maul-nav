@@ -133,7 +133,7 @@ static void TestAgentSettingsAreChecked(void)
     broken = def;
     broken.maxEdgeError = -0.1f;
     CHECK(Refuses(broken, mnav_bakeSettingMaxEdgeError), "negative edge error");
-    broken.maxEdgeError = MNAV_MAX_CELL_SIZE * MNAV_MAX_TILE_CELLS * 2.0f;
+    broken.maxEdgeError = MNAV_MAX_EDGE_ERROR * 2.0f;
     CHECK(Bounds(broken, mnav_bakeSettingMaxEdgeError), "edge error past the bound");
     broken.maxEdgeError = INFINITY;
     CHECK(Bounds(broken, mnav_bakeSettingMaxEdgeError), "infinite edge error");
@@ -149,6 +149,47 @@ static void TestAgentSettingsAreChecked(void)
     broken = def;
     broken.detailMaxError = NAN;
     CHECK(Refuses(broken, mnav_bakeSettingDetailMaxError), "NaN detail error");
+}
+
+// The bounds the def's fields state, at each bound and at the next float
+// past it. At the default cells (0.25 m by 0.125 m) each is a power of 2,
+// exact in binary32.
+static void TestLengthBounds(void)
+{
+    const mnavBakeDef def = mnavDefaultBakeDef();
+    mnavBakeDef d = def;
+    d.maxEdgeError = MNAV_MAX_EDGE_ERROR;
+    CHECK(mnavValidateBakeDef(&d, nullptr).result == mnav_success, "edge error at its bound");
+    d.maxEdgeError = nextafterf(MNAV_MAX_EDGE_ERROR, INFINITY);
+    CHECK(Bounds(d, mnav_bakeSettingMaxEdgeError), "edge error past its bound");
+    // 2^30 cells of 0.25 m, and 2^30 cell areas of 0.0625 m^2.
+    d = def;
+    d.maxEdgeLength = 0x1p28f;
+    CHECK(mnavValidateBakeDef(&d, nullptr).result == mnav_success, "edge length of 2^30 cells");
+    d.maxEdgeLength = nextafterf(0x1p28f, INFINITY);
+    CHECK(Refuses(d, mnav_bakeSettingMaxEdgeLength), "edge length past 2^30 cells");
+    d = def;
+    d.minRegionArea = 0x1p26f;
+    CHECK(mnavValidateBakeDef(&d, nullptr).result == mnav_success, "region of 2^30 cells");
+    d.minRegionArea = nextafterf(0x1p26f, INFINITY);
+    CHECK(Refuses(d, mnav_bakeSettingMinRegionArea), "region past 2^30 cells");
+    // 2^26 cells of 0.25 m, and 2^26 cell heights of 0.125 m.
+    d = def;
+    d.detailSampleDistance = 0x1p24f;
+    CHECK(mnavValidateBakeDef(&d, nullptr).result == mnav_success, "samples 2^26 cells apart");
+    d.detailSampleDistance = nextafterf(0x1p24f, INFINITY);
+    CHECK(Refuses(d, mnav_bakeSettingDetailSampleDistance), "samples past 2^26 cells apart");
+    d = def;
+    d.detailMaxError = 0x1p23f;
+    CHECK(mnavValidateBakeDef(&d, nullptr).result == mnav_success, "detail error of 2^26 heights");
+    d.detailMaxError = nextafterf(0x1p23f, INFINITY);
+    CHECK(Refuses(d, mnav_bakeSettingDetailMaxError), "detail error past 2^26 heights");
+    // A distance below a cell samples every cell.
+    d = def;
+    d.detailSampleDistance = 0.1f;
+    mnavBakeCells cells = {0};
+    CHECK(mnavValidateBakeDef(&d, &cells).result == mnav_success && cells.detailSample == 16,
+          "samples closer than a cell take every cell");
 }
 
 static void TestMetersSnapToCells(void)
@@ -179,6 +220,25 @@ static void TestLimitsAreChecked(void)
     broken = def;
     broken.limits.memoryBytes = 0;
     CHECK(Refuses(broken, mnav_bakeSettingMemoryBytes), "zero memory");
+    // Each count limit takes its constant and refuses one past it.
+    const int32_t caps[5] = {MNAV_MAX_INPUT_TRIANGLES, MNAV_MAX_INPUT_TRIANGLES,
+                             MNAV_MAX_TILE_SPANS, MNAV_MAX_TILE_POLYGONS, MNAV_MAX_TILE_VERTICES};
+    const mnavBakeSetting settings[5] = {
+        mnav_bakeSettingInputTriangles, mnav_bakeSettingTileTriangles, mnav_bakeSettingTileSpans,
+        mnav_bakeSettingTilePolygons, mnav_bakeSettingTileVertices};
+    for (int32_t i = 0; i < 5; ++i)
+    {
+        int32_t* fields[5] = {&broken.limits.inputTriangles, &broken.limits.tileTriangles,
+                              &broken.limits.tileSpans, &broken.limits.tilePolygons,
+                              &broken.limits.tileVertices};
+        broken = def;
+        *fields[i] = caps[i];
+        CHECK(mnavValidateBakeDef(&broken, nullptr).result == mnav_success, "limit at its cap");
+        *fields[i] = caps[i] + 1;
+        CHECK(Bounds(broken, settings[i]), "limit past its cap");
+        *fields[i] = 0;
+        CHECK(Refuses(broken, settings[i]), "limit of 0");
+    }
 }
 
 static const mnavVec3 s_square[4] = {{0, 0, 0}, {10, 0, 0}, {10, 0, 10}, {0, 0, 10}};
@@ -300,6 +360,7 @@ int main(void)
     TestGridSettingsAreChecked();
     TestAllocatorWithOneFunctionIsRefused();
     TestAgentSettingsAreChecked();
+    TestLengthBounds();
     TestMetersSnapToCells();
     TestLimitsAreChecked();
     TestValidMeshPasses();
