@@ -135,16 +135,27 @@ static void TestLikeItsMesh(mnavBaker* baker)
           "a tile it misses");
 }
 
+// Whether two input checks' outcomes are the same.
+static bool SameInput(mnavInputResult a, mnavInputResult b)
+{
+    return a.result == b.result && a.kind == b.kind && a.index == b.index &&
+           a.element == b.element && a.elementIndex == b.elementIndex;
+}
+
+// The element of the terrain a bake refuses with a result, or -2; the
+// whole-input check refuses it the same way.
 static int32_t Refused(mnavBaker* baker, const mnavTerrain* terrain, mnavResult result,
                        mnavInputElement element)
 {
     const mnavTriangleMesh none = {nullptr, 0, nullptr, 0, nullptr};
     const mnavBakeInput input = {&none, 1, terrain, 1, nullptr, 0, nullptr};
     mnavBakeReport report;
+    mnavBakeDef def = mnavDefaultBakeDef();
     bool refused = mnavBaker_BakeTile(baker, &input, 0, 0, &report) == result &&
-                   report.stage == mnav_stageInput && report.mesh == 1 &&
-                   report.input.element == element;
-    return refused ? report.input.index : -2;
+                   SameInput(mnavValidateBakeInput(&def, &input), report.input) &&
+                   report.stage == mnav_stageInput && report.input.kind == mnav_inputTerrain &&
+                   report.input.index == 0 && report.input.element == element;
+    return refused ? report.input.elementIndex : -2;
 }
 
 static void TestChecks(mnavBaker* baker)
@@ -198,7 +209,7 @@ static void TestLimits(void)
     const mnavBakeInput input = {nullptr, 0, &terrain, 1, nullptr, 0, nullptr};
     mnavBakeReport report;
     CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_errorCapacity &&
-              report.mesh == 0,
+              report.input.kind == mnav_inputTerrain && report.input.index == 0,
           "one triangle over the input limit");
     // A mesh's triangles and a terrain's count together.
     mnavTriangleMesh mesh = Mesh(&terrain);

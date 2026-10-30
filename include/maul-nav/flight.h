@@ -133,9 +133,8 @@ extern "C"
     typedef struct mnavFlightBakeReport
     {
         mnavResult result;
-        // The first mesh refused, or -1, and what its check found, as in
-        // mnavBakeReport.
-        int32_t mesh;
+        // The first input refused, by its kind and index, and what its
+        // check found, as in mnavBakeReport.
         mnavInputResult input;
         // The hash of everything that shaped the tile: the generator's
         // version, the def's settings, the tile's place and the input that
@@ -296,8 +295,8 @@ extern "C"
     /// @param reportOut Receives the report. May be NULL. Written on failure too,
     ///                  naming it.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL baker or input;
-    /// for input mnavBaker_BakeTile refuses, the status it gives, the mesh named in
-    /// the report; `mnav_errorLimit` for a tile past the extent, or when
+    /// for input mnavBaker_BakeTile refuses, the status it gives, the input named
+    /// in the report; `mnav_errorLimit` for a tile past the extent, or when
     /// rasterizing cuts a triangle into a piece of more than
     /// MNAV_MAX_PIECE_CORNERS corners, as for mnavBaker_BakeTile;
     /// `mnav_errorCapacity` past a named limit or the memory limit, or when the

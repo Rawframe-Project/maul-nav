@@ -9,6 +9,7 @@
 
 #include "allocator.h"
 #include "compact.h"
+#include "input.h"
 #include "outline.h"
 #include "raster.h"
 
@@ -22,7 +23,7 @@
 
 static mnavInputResult Refuse(mnavResult result, mnavInputElement element, int32_t index)
 {
-    return (mnavInputResult){result, element, index};
+    return mnavInputElementResult(result, element, index);
 }
 
 mnavInputResult mnavCheckVolume(const mnavBakeDef* def, const mnavBakeVolume* volume)

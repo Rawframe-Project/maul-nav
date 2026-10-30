@@ -14,6 +14,7 @@
 #include "flight_tile.h"
 #include "fpenv.h"
 #include "host_code.h"
+#include "input.h"
 #include "outputs.h"
 #include "raster.h"
 #include "tile_index.h"
@@ -143,8 +144,7 @@ static mnavResult Bake(mnavFlightBaker* baker, const mnavBakeInput* input, int32
     {
         return mnav_errorInvalid;
     }
-    mnavResult result =
-        mnavCheckSolidInput(&baker->voxels, input, false, &report->mesh, &report->input);
+    mnavResult result = mnavCheckSolidInput(&baker->voxels, input, false, &report->input);
     mnavTileFrame frame = {0};
     if (result == mnav_success &&
         !mnavMakeTileFrame(&baker->voxels, &baker->cells, tileX, tileZ, &frame))
@@ -184,8 +184,7 @@ static MNAV_NOINLINE mnavResult BakeFlightTileWork(mnavFlightBaker* baker,
         return mnav_errorBusy;
     }
     mnavFlightBakeReport report = {0};
-    report.mesh = -1;
-    report.input = (mnavInputResult){mnav_success, mnav_elementNone, -1};
+    report.input = mnavInputElementResult(mnav_success, mnav_elementNone, -1);
     mnavResult result = mnav_errorInvalid;
     if (baker != nullptr && input != nullptr)
     {

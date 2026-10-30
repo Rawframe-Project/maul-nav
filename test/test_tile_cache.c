@@ -320,10 +320,13 @@ static void TestRefusals(mnavBaker* baker, mnavTileCache* cache)
                                    Volume(&s, -1, 2, mnav_volumeExclude, 0)};
     obstacles[1].pointCount = 2;
     mnavBakeReport r = Rebuilt(baker, cache, 0, obstacles, 2, mnav_errorInvalid);
-    CHECK(r.mesh == 1 && r.input.element == mnav_elementNone, "an obstacle named by its index");
+    CHECK(r.input.kind == mnav_inputObstacle && r.input.index == 1 &&
+              r.input.element == mnav_elementNone,
+          "an obstacle named by its index");
     obstacles[1] = (mnavBakeVolume){points, 4, -1, 2, mnav_volumeExclude, 0};
     r = Rebuilt(baker, cache, 0, obstacles, 2, mnav_errorInvalid);
-    CHECK(r.mesh == 1 && r.input.element == mnav_elementPoint && r.input.index == 2,
+    CHECK(r.input.kind == mnav_inputObstacle && r.input.index == 1 &&
+              r.input.element == mnav_elementPoint && r.input.elementIndex == 2,
           "an obstacle's NaN point");
     Rebuilt(baker, cache, 0, obstacles, 1, mnav_success);
     // A baker that differs in any one setting the tile was baked with is

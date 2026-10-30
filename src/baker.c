@@ -162,8 +162,7 @@ static mnavResult CheckOutlines(const mnavBaker* baker, const Input* in, int32_t
         mnavInputResult input = mnavCheckOutline(&baker->def, outline);
         if (input.result != mnav_success)
         {
-            report->mesh = (int32_t)(outline - outlines);
-            report->input = input;
+            report->input = mnavInputNamed(input, mnav_inputOutline, (int32_t)(outline - outlines));
             return input.result;
         }
     }
@@ -190,8 +189,7 @@ static mnavResult CheckIndexed(const mnavBaker* baker, const mnavBakeInput* soli
         mnavInputResult input = mnavCheckMeshShape(&baker->def, &solid->meshes[m]);
         if (input.result != mnav_success)
         {
-            report->mesh = m;
-            report->input = input;
+            report->input = mnavInputNamed(input, mnav_inputMesh, m);
             return input.result;
         }
     }
@@ -204,8 +202,7 @@ static mnavResult CheckIndexed(const mnavBaker* baker, const mnavBakeInput* soli
             mnavCheckMeshTriangle(&baker->def, &solid->meshes[list[k].mesh], list[k].triangle);
         if (input.result != mnav_success)
         {
-            report->mesh = list[k].mesh;
-            report->input = input;
+            report->input = mnavInputNamed(input, mnav_inputMesh, list[k].mesh);
             return input.result;
         }
     }
@@ -231,8 +228,7 @@ static mnavResult CheckInput(const mnavBaker* baker, const Input* in, int32_t ti
             return result;
         }
     }
-    return mnavCheckSolidInput(&baker->def, &in->solid, in->solid.index != nullptr, &report->mesh,
-                               &report->input);
+    return mnavCheckSolidInput(&baker->def, &in->solid, in->solid.index != nullptr, &report->input);
 }
 
 // The generator, the settings that shape the tile and its place.
@@ -515,8 +511,7 @@ static mnavResult Encode(mnavBaker* baker, int32_t tileX, int32_t tileZ, const S
 static bool Start(mnavBaker* baker, mnavBakeReport* report, mnavBakeReport* reportOut)
 {
     *report = (mnavBakeReport){0};
-    report->mesh = -1;
-    report->input = (mnavInputResult){mnav_success, mnav_elementNone, -1};
+    report->input = mnavInputElementResult(mnav_success, mnav_elementNone, -1);
     if (baker == nullptr)
     {
         report->result = mnav_errorInvalid;
@@ -747,8 +742,7 @@ static mnavResult CheckObstacles(const mnavBaker* baker, const mnavCachedTile* t
         mnavInputResult input = mnavCheckVolume(&baker->def, &obstacles[i]);
         if (input.result != mnav_success)
         {
-            report->mesh = i;
-            report->input = input;
+            report->input = mnavInputNamed(input, mnav_inputObstacle, i);
             return input.result;
         }
         total += obstacles[i].pointCount;

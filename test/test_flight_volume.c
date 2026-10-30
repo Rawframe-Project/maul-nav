@@ -596,8 +596,8 @@ static void InputRefusals(mnavFlightBaker* baker, const mnavBakeInput* input)
     mnavBakeInput two = {meshes, 2, nullptr, 0, nullptr, 0, nullptr};
     mnavFlightBakeReport report;
     CHECK(mnavFlightBaker_BakeTile(baker, &two, 0, 0, &report) == mnav_errorInvalid &&
-              report.result == mnav_errorInvalid && report.mesh == 1 &&
-              report.input.result == mnav_errorInvalid,
+              report.result == mnav_errorInvalid && report.input.kind == mnav_inputMesh &&
+              report.input.index == 1 && report.input.result == mnav_errorInvalid,
           "a mesh refused");
     size_t size = 0;
     CHECK(mnavFlightBaker_CopyTile(baker, nullptr, 0, &size) == mnav_errorState,

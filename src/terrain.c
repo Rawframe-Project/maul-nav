@@ -8,6 +8,7 @@
 
 #include "terrain.h"
 
+#include "input.h"
 #include "raster.h"
 
 #include "maul-nav/bake.h"
@@ -18,7 +19,7 @@
 
 static mnavInputResult Refuse(mnavResult result, mnavInputElement element, int32_t index)
 {
-    return (mnavInputResult){result, element, index};
+    return mnavInputElementResult(result, element, index);
 }
 
 // A sample's place.
