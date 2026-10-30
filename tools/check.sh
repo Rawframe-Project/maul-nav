@@ -46,16 +46,30 @@ jobs=${JOBS:-8}
 
 step() { printf '\n== %s\n' "$*"; }
 
+# A CI cell's configure and build presets.
+build() {
+    local name=$1
+    step "preset $name"
+    cmake --preset "$name" >"$out/$name.log"
+    python3 tools/check_test_hygiene.py --ctest "out/$name"
+    cmake --build --preset "$name" -j "$jobs" >>"$out/$name.log"
+}
+
 # A CI cell: its configure, build and test presets. More ctest arguments
 # (a label filter) follow the preset's name.
 preset() {
     local name=$1
     shift
-    step "preset $name"
-    cmake --preset "$name" >"$out/$name.log"
-    python3 tools/check_test_hygiene.py --ctest "out/$name"
-    cmake --build --preset "$name" -j "$jobs" >>"$out/$name.log"
+    build "$name"
     ctest --preset "$name" -j "$jobs" "$@"
+}
+
+# The hand tiles' writer is a manual suite, which ctest does not run: it
+# writes the tiles again, with the build of the preset named, and fails
+# when they differ from the header.
+hand_tiles() {
+    step "the hand tiles are what their writer writes"
+    "$out/$1/test_hand_tiles" --check test/hand_tiles.h
 }
 
 # The suites a changed path reaches: a suite's own file reaches it, the
@@ -121,10 +135,18 @@ if [ "$tier" = changed ]; then
     fi
     if [[ " $labels " == *" all "* ]]; then
         preset linux-clang-20-asan
-    else
-        regex=$(printf '%s\n' $labels | sort -u | paste -sd '|')
+        hand_tiles linux-clang-20-asan
+        exit 0
+    fi
+    regex=$(printf '%s\n' $labels | sort -u | { grep -vx hand_tiles || true; } | paste -sd '|')
+    if [ -n "$regex" ]; then
         echo "suites labeled $regex"
         preset linux-clang-20-asan -L "^($regex)\$"
+    else
+        build linux-clang-20-asan
+    fi
+    if [[ " $labels " == *" hand_tiles "* ]]; then
+        hand_tiles linux-clang-20-asan
     fi
     exit 0
 fi
@@ -149,8 +171,7 @@ done
 preset linux-clang-20-asan
 preset linux-gcc-14
 
-step "the hand tiles are what their writer writes"
-"$out/linux-gcc-14/test_hand_tiles" --check test/hand_tiles.h
+hand_tiles linux-gcc-14
 
 fuzz_seconds=10
 [ "$tier" = full ] && fuzz_seconds=60
