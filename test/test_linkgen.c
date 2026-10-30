@@ -259,6 +259,22 @@ static void TestChecksAndBuffer(const mnavNavmesh* navmesh)
     CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
                                   s_links, LINKS, &count) == mnav_errorLimit,
           "an infinite drop");
+    // Kinds past the last, and negative ones, which a signed comparison
+    // would let through.
+    const mnavLinkKind kinds[3] = {MNAV_LINK_KINDS, -1, INT32_MIN};
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        def = Def();
+        def.dropKind = kinds[i];
+        CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
+                                      s_links, LINKS, &count) == mnav_errorInvalid,
+              "no such drop kind");
+        def = Def();
+        def.jumpKind = kinds[i];
+        CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
+                                      s_links, LINKS, &count) == mnav_errorInvalid,
+              "no such jump kind");
+    }
     def = Def();
     def.detour = 0.5f;
     CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,

@@ -81,7 +81,7 @@ static mnavNavmeshDefResult CheckDef(const mnavNavmeshDef* def, mnavBakeCells* c
     {
         return (mnavNavmeshDefResult){bake.result, mnav_navmeshSettingBake, bake.setting};
     }
-    if (def->tier > mnav_tierDynamic)
+    if ((uint32_t)def->tier > mnav_tierDynamic)
     {
         return Refuse(mnav_errorInvalid, mnav_navmeshSettingTier);
     }

@@ -98,7 +98,7 @@ static mnavResult CheckDef(const mnavNavmesh* navmesh, const mnavLinkDef* def)
         return mnav_errorLimit;
     }
     if (!(def->radius >= 0.0f && def->cost >= 0.0f && def->width >= 0.0f) ||
-        def->kind >= MNAV_LINK_KINDS)
+        (uint32_t)def->kind >= MNAV_LINK_KINDS)
     {
         return mnav_errorInvalid;
     }

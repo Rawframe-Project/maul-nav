@@ -30,7 +30,7 @@ extern "C"
 
     // A navmesh's runtime tier: what may change once loaded.
     // Tiles and off-mesh links load and unload in every tier.
-    typedef uint8_t mnavTier;
+    typedef int32_t mnavTier;
 
     enum
     {
@@ -80,7 +80,7 @@ extern "C"
     } mnavNavmeshDef;
 
     // The setting a navmesh def check refused.
-    typedef uint8_t mnavNavmeshSetting;
+    typedef int32_t mnavNavmeshSetting;
 
     enum
     {
@@ -162,7 +162,7 @@ extern "C"
     } mnavTileRange;
 
     // The part of tile bytes a load refused.
-    typedef uint8_t mnavTileSection;
+    typedef int32_t mnavTileSection;
 
     enum
     {
@@ -370,7 +370,7 @@ extern "C"
 
     // How an agent traverses an off-mesh link: kinds 0 to 5 are the
     // library's, 6 to MNAV_LINK_KINDS - 1 the host's to name.
-    typedef uint8_t mnavLinkKind;
+    typedef int32_t mnavLinkKind;
 
     enum
     {

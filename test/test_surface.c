@@ -232,7 +232,9 @@ static void TestWorldMoves(void)
                                             nullptr, &n) == mnav_success &&
                     n.polygon.slot != 0 &&
                     hypot(n.point.x - move.point.x, n.point.z - move.point.z) < 1.0e-9;
-            hash = mnavHash64(hash, &move.end, (int64_t)sizeof(move.end));
+            // The end as one byte, whatever the width of its type.
+            const uint8_t endByte = (uint8_t)move.end;
+            hash = mnavHash64(hash, &endByte, (int64_t)sizeof(endByte));
             hash = mnavHash64(hash, &move.point, (int64_t)sizeof(move.point));
             hash =
                 mnavHash64(hash, move.polygons, move.polygonCount * (int64_t)sizeof(mnavPolygonId));

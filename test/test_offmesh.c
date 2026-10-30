@@ -277,9 +277,15 @@ static void TestDefsAndLimits(void)
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "a NaN cost");
     link.cost = -1.0f;
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "a negative cost");
-    link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
-    link.kind = MNAV_LINK_KINDS;
-    CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "no such kind");
+    // A kind past the last, and negative ones, which a signed comparison
+    // would let through.
+    const mnavLinkKind kinds[3] = {MNAV_LINK_KINDS, -1, INT32_MIN};
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
+        link.kind = kinds[i];
+        CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorInvalid, "no such kind");
+    }
     // Ends farther than bake input may lie: past the extent on the ground
     // or in height, and an edge link whose ends are far enough apart that
     // their difference overflows.

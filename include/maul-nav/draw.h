@@ -17,7 +17,7 @@ extern "C"
 #endif
 
     // What a debug vertex shows; its value says more.
-    typedef uint16_t mnavDebugKind;
+    typedef int32_t mnavDebugKind;
 
     enum
     {
@@ -38,7 +38,7 @@ extern "C"
         // A path's straight line.
         mnav_debugPath = 7,
         // A corridor polygon's fill; the value is its place in the
-        // corridor, modulo 65536.
+        // corridor.
         mnav_debugCorridor = 8,
         // A flow field's arrow.
         mnav_debugFlow = 9,
@@ -60,7 +60,7 @@ extern "C"
         float y;
         float z;
         mnavDebugKind kind;
-        uint16_t value;
+        uint32_t value;
     } mnavDebugVertex;
 
     // A caller's debug buffer: vertices, and triangle and line lists of

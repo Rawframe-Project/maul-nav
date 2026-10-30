@@ -52,7 +52,7 @@ static mnavResult CheckDef(const mnavLinkGenDef* d)
         past = past || values[k] > most[k];
     }
     if (d->spacing == 0.0f || (d->detour != 0.0f && !Within(d->detour, 1.0f, 1.0e6f)) ||
-        d->dropKind >= MNAV_LINK_KINDS || d->jumpKind >= MNAV_LINK_KINDS)
+        (uint32_t)d->dropKind >= MNAV_LINK_KINDS || (uint32_t)d->jumpKind >= MNAV_LINK_KINDS)
     {
         return mnav_errorInvalid;
     }

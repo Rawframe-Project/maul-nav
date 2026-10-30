@@ -285,6 +285,15 @@ static void TestTheDefIsChecked(void)
     CHECK(got.result == mnav_errorLimit && got.setting == mnav_navmeshSettingBake &&
               got.bakeSetting == mnav_bakeSettingCellSize && navmesh == nullptr,
           "the bake def's setting named");
+    // A tier past the last, and negative ones, which a signed comparison
+    // would let through.
+    const mnavTier tiers[3] = {mnav_tierDynamic + 1, -1, INT32_MIN};
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        def = good;
+        def.tier = tiers[i];
+        CHECK(Refused(&def, mnav_errorInvalid, mnav_navmeshSettingTier), "no such tier");
+    }
     def = good;
     def.limits.tiles = 0;
     CHECK(Refused(&def, mnav_errorInvalid, mnav_navmeshSettingTiles), "no tiles");

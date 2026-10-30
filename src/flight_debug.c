@@ -36,7 +36,7 @@ static void DrawBlock(mnavDebugBuffer* buffer, const mnavFlightFrame* frame,
         corner[c] = mnavFlightToWorld(frame, v);
     }
     // Corners differing in one bit share an edge.
-    uint16_t value = b->size < 65535 ? (uint16_t)b->size : (uint16_t)65535;
+    uint32_t value = (uint32_t)b->size;
     for (int32_t c = 0; c < 8; ++c)
     {
         for (int32_t bit = 1; bit < 8; bit *= 2)

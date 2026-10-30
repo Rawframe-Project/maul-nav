@@ -97,7 +97,7 @@ extern "C"
     } mnavFlightDef;
 
     // The setting a flight def check refused.
-    typedef uint8_t mnavFlightSetting;
+    typedef int32_t mnavFlightSetting;
     enum
     {
         mnav_flightSettingNone = 0,
@@ -151,7 +151,7 @@ extern "C"
     } mnavFlightVolumeDef;
 
     // The setting a flight volume def check refused.
-    typedef uint8_t mnavFlightVolumeSetting;
+    typedef int32_t mnavFlightVolumeSetting;
 
     enum
     {
@@ -211,7 +211,7 @@ extern "C"
     } mnavFlightPath;
 
     // What stopped a flight raycast.
-    typedef uint8_t mnavFlightStop;
+    typedef int32_t mnavFlightStop;
     enum
     {
         // Nothing: the ray reached its end.

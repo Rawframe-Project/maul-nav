@@ -29,7 +29,7 @@ bool mnavGoodBuffer(const mnavDebugBuffer* buffer)
            GoodList(buffer->lines, buffer->lineCapacity, buffer->lineCount);
 }
 
-uint32_t mnavDrawVertex(mnavDebugBuffer* buffer, mnavPos3 p, mnavDebugKind kind, uint16_t value)
+uint32_t mnavDrawVertex(mnavDebugBuffer* buffer, mnavPos3 p, mnavDebugKind kind, uint32_t value)
 {
     int32_t at = buffer->vertexCount;
     if (at < buffer->vertexCapacity)
@@ -53,7 +53,7 @@ static void Index(uint32_t* list, int32_t capacity, int32_t* count, uint32_t ind
 }
 
 void mnavDrawLine(mnavDebugBuffer* buffer, mnavPos3 a, mnavPos3 b, mnavDebugKind kind,
-                  uint16_t value)
+                  uint32_t value)
 {
     uint32_t ia = mnavDrawVertex(buffer, a, kind, value);
     uint32_t ib = mnavDrawVertex(buffer, b, kind, value);
@@ -62,7 +62,7 @@ void mnavDrawLine(mnavDebugBuffer* buffer, mnavPos3 a, mnavPos3 b, mnavDebugKind
 }
 
 void mnavDrawTriangle(mnavDebugBuffer* buffer, mnavPos3 a, mnavPos3 b, mnavPos3 c,
-                      mnavDebugKind kind, uint16_t value)
+                      mnavDebugKind kind, uint32_t value)
 {
     uint32_t ia = mnavDrawVertex(buffer, a, kind, value);
     uint32_t ib = mnavDrawVertex(buffer, b, kind, value);

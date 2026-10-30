@@ -53,7 +53,9 @@ extern "C"
 // The most tiles a tile cache may hold.
 #define MNAV_MAX_CACHED_TILES 1048576
 
-    // An area type, 0 to MNAV_AREA_TYPES - 1.
+    // An area type: a number from 0 to MNAV_AREA_TYPES - 1 that the host
+    // chooses, which a query filter's costs index. It is a value, not an
+    // enumeration; the two constants below name common values.
     typedef uint8_t mnavAreaType;
 
     enum
@@ -166,7 +168,7 @@ extern "C"
     } mnavBakeDef;
 
     // The setting a def check refused.
-    typedef uint8_t mnavBakeSetting;
+    typedef int32_t mnavBakeSetting;
 
     enum
     {
@@ -292,7 +294,7 @@ extern "C"
     } mnavOutline;
 
     // What a bake volume does.
-    typedef uint8_t mnavVolumeKind;
+    typedef int32_t mnavVolumeKind;
 
     enum
     {
@@ -358,7 +360,7 @@ extern "C"
     } mnavBake2DInput;
 
     // The kind of input element a check refused.
-    typedef uint8_t mnavInputElement;
+    typedef int32_t mnavInputElement;
 
     enum
     {
@@ -373,7 +375,7 @@ extern "C"
     };
 
     // The kind of input a check refused.
-    typedef uint8_t mnavInputKind;
+    typedef int32_t mnavInputKind;
 
     enum
     {
@@ -534,7 +536,7 @@ extern "C"
     typedef struct mnavBaker mnavBaker;
 
     // The stage a bake ended in.
-    typedef uint8_t mnavBakeStage;
+    typedef int32_t mnavBakeStage;
 
     enum
     {

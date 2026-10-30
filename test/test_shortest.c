@@ -444,7 +444,9 @@ static bool Compare(mnavQuery* query, const mnavNavmesh* navmesh, mnavNearest a,
     bool found = exact.end == mnav_pathFound;
     CHECK(!found || ground <= plainGround + 1e-9, "never longer than the A* search's path");
     CHECK(!found || OnTheNavmesh(navmesh, &exact), "on the navmesh");
-    *hash = mnavHash64(*hash, &exact.end, (int64_t)sizeof(exact.end));
+    // The end as one byte, whatever the width of its type.
+    const uint8_t endByte = (uint8_t)exact.end;
+    *hash = mnavHash64(*hash, &endByte, (int64_t)sizeof(endByte));
     *hash = mnavHash64(*hash, exact.points, exact.pointCount * (int64_t)sizeof(mnavPos3));
     *hash = mnavHash64(*hash, exact.polygons, exact.polygonCount * (int64_t)sizeof(mnavPolygonId));
     *hash = mnavHash64(*hash, &exact.cost, (int64_t)sizeof(exact.cost));

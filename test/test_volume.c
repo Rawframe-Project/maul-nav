@@ -317,9 +317,15 @@ static void TestChecks(mnavBaker* baker)
     v.pointCount = 2;
     mnavBakeReport r = Refused(baker, v, mnav_errorInvalid);
     CHECK(FirstVolume(r) && r.input.element == mnav_elementNone, "two points, the volume named");
-    v = good;
-    v.kind = 3;
-    CHECK(FirstVolume(Refused(baker, v, mnav_errorInvalid)), "a kind out of range");
+    // A kind past the last, and negative ones, which a signed comparison
+    // would let through.
+    const mnavVolumeKind kinds[3] = {mnav_volumeArea + 1, -1, INT32_MIN};
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        v = good;
+        v.kind = kinds[i];
+        CHECK(FirstVolume(Refused(baker, v, mnav_errorInvalid)), "a kind out of range");
+    }
     v = good;
     v.area = mnav_areaNone;
     CHECK(FirstVolume(Refused(baker, v, mnav_errorInvalid)), "an area volume of no area");

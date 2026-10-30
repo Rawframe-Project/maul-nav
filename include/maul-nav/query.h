@@ -196,7 +196,7 @@ extern "C"
     } mnavQueryDef;
 
     // How a path search ended, checked in this order.
-    typedef uint8_t mnavPathEnd;
+    typedef int32_t mnavPathEnd;
 
     enum
     {
@@ -472,7 +472,7 @@ extern "C"
                                                             mnavPath* pathOut);
 
     // How a move along the surface ended.
-    typedef uint8_t mnavMoveEnd;
+    typedef int32_t mnavMoveEnd;
 
     enum
     {
@@ -705,7 +705,7 @@ extern "C"
     } mnavSteerDef;
 
     // What mnavSteer found.
-    typedef uint8_t mnavSteerState;
+    typedef int32_t mnavSteerState;
 
     enum
     {
@@ -1170,7 +1170,7 @@ extern "C"
         mnavPolygonId endPolygon, mnavPos3 end, const mnavQueryFilter* filter, mnavPathEnd* endOut);
 
     // How a raycast ended.
-    typedef uint8_t mnavRayEnd;
+    typedef int32_t mnavRayEnd;
 
     enum
     {
