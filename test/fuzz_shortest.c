@@ -11,6 +11,7 @@
 // to the point after it. The contexts give back all they took.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "hand_tile.h"
 
 #include "maul-nav/bake.h"
@@ -224,7 +225,8 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     mnavBakeDef def = mnavDefaultBakeDef();
     def.allocator = CountingAllocator();
     mnavNavmesh* navmesh = nullptr;
-    Expect(mnavCreateNavmesh(&def, &navmesh).result == mnav_success);
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    Expect(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success);
     for (int32_t place = 0; place < 2; ++place)
     {
         if (layout.counts[place] > 0)

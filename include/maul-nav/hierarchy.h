@@ -142,7 +142,8 @@ extern "C"
     /// @param navmesh   The navmesh.
     /// @param filter    The areas usable and their costs, or NULL; the
     ///                  hierarchy keeps a copy.
-    /// @param reportOut Receives what was made. May be NULL. Zeroed on any failure.
+    /// @param reportOut Receives what was made. May be NULL. Zeroed on any
+    ///                  failure but mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// filter not built from mnavDefaultQueryFilter or with a NaN cost;
     /// `mnav_errorLimit` for a filter cost past MNAV_MIN_AREA_COST or
@@ -173,8 +174,9 @@ extern "C"
     /// @param query     A context for the searches within clusters; its
     ///                  last search ends.
     /// @param navmesh   The navmesh.
-    /// @param reportOut Receives what the graph holds and the searches run. May be
-    ///                  NULL. Zeroed on any failure.
+    /// @param reportOut Receives what the graph holds and the searches run. May
+    ///                  be NULL. Zeroed on any failure but mnav_errorBusy, which
+    ///                  leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// hierarchy built for another navmesh; `mnav_errorState` for a hierarchy
     /// with no graph; `mnav_errorCapacity` as mnavHierarchy_Build. On an error
@@ -209,7 +211,8 @@ extern "C"
     /// @param start        The start point.
     /// @param endPolygon   The polygon the end lies in.
     /// @param end          The end point.
-    /// @param pathOut      Receives the path. Zeroed on any failure.
+    /// @param pathOut      Receives the path. Zeroed on any failure but
+    ///                     mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// with a NaN coordinate, or a hierarchy built for another navmesh;
     /// `mnav_errorState` for a hierarchy with no graph, or a navmesh committed

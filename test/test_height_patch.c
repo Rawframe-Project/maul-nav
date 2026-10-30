@@ -8,6 +8,7 @@
 // sample off the surface shows as a corner. test_height_patch_hand.c
 // covers the cases no bake reaches.
 
+#include "defs_for.h"
 #include "ramp_level.h"
 #include "squares.h"
 #include "test_harness.h"
@@ -234,7 +235,8 @@ static void LoadRampLevel(const mnavBakeDef* def, int32_t turns, float top, floa
           "baked");
     mnavDestroyNavmesh(s_navmesh);
     s_navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&s_def, &s_navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&s_def);
+    CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(s_navmesh, s_tile, s_tileSize).result == mnav_success &&
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");

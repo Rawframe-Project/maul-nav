@@ -37,7 +37,7 @@ static uint32_t Ones(uint32_t mask)
 
 mnavFlightCursor mnavMakeFlightCursor(const mnavFlightVolume* volume)
 {
-    int32_t side = volume->def.tileVoxels;
+    int32_t side = volume->def.flight.tileVoxels;
     int32_t shift = 0;
     while (1 << shift < side)
     {

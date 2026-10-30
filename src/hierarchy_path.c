@@ -366,8 +366,8 @@ static mnavResult CheckQuery(const mnavQuery* query, const mnavHierarchy* h,
 // ground.
 static bool Near(const mnavHierarchy* h, const mnavNavmesh* navmesh, mnavPos3 a, mnavPos3 b)
 {
-    double side = (double)h->def.clusterTiles * (double)navmesh->def.cellSize *
-                  (double)navmesh->def.tileCells;
+    double side = (double)h->def.clusterTiles * (double)navmesh->def.bake.cellSize *
+                  (double)navmesh->def.bake.tileCells;
     double dx = a.x - b.x;
     double dz = a.z - b.z;
     return dx * dx + dz * dz <= side * side;
@@ -444,12 +444,13 @@ FindHierarchicalPathCounted(mnavQuery* query, const mnavHierarchy* hierarchy,
                             const mnavNavmesh* navmesh, mnavPolygonId startPolygon, mnavPos3 start,
                             mnavPolygonId endPolygon, mnavPos3 end, mnavPath* pathOut)
 {
-    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavPath pathMade = {0};
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), mnavHostFirst(MNAV_HOST(hierarchy), MNAV_HOST(navmesh))),
         FindHierarchicalPathWork(query, hierarchy, navmesh, startPolygon, start, endPolygon, end,
-                                 pathOut));
-    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
+                                 pathOut != nullptr ? &pathMade : nullptr));
+    mnavGiveOutput(result, false, pathOut, &pathMade, sizeof(pathMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindHierarchicalPath(mnavQuery* query, const mnavHierarchy* hierarchy,

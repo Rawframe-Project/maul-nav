@@ -12,6 +12,7 @@
 // ThreadSanitizer, the test also shows that bakers and queries share
 // nothing they write.
 
+#include "defs_for.h"
 #include "float_hosts.h"
 #include "test_harness.h"
 #include "world.h"
@@ -145,7 +146,8 @@ static mnavNavmesh* Load(bool backward)
 {
     mnavBakeDef def = SmallDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "a navmesh");
     for (int32_t i = 0; i < TILES; ++i)
     {
         int32_t t = backward ? TILES - 1 - i : i;

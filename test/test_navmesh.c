@@ -6,6 +6,7 @@
 // themselves are test_navmesh_tables.c's.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "hand_tiles.h"
 #include "test_harness.h"
 #include "world.h"
@@ -15,15 +16,18 @@
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 static mnavNavmesh* Make(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     // Tests here replace loaded tiles.
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     return navmesh;
 }
 
@@ -123,10 +127,11 @@ static void TestReplacingAndRemovingMakeIdsStale(void)
 static void TestFailedCommitChangesNothing(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.limits.tileLinks = 1;
     def.allocator = CountingAllocator();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.limits.tileLinks = 1;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     CHECK(StageAt(navmesh, 0) == mnav_success && mnavNavmesh_Commit(navmesh) == mnav_success,
           "one tile");
     size_t before = s_held;
@@ -144,8 +149,9 @@ static void TestFailedCommitChangesNothing(void)
     CHECK(s_held < before + 64 && staged > before + 512, "the staged tile freed");
     mnavDestroyNavmesh(navmesh);
     def = mnavDefaultBakeDef();
-    def.limits.tiles = 1;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef2 = NavmeshDefFor(&def);
+    meshDef2.limits.tiles = 1;
+    CHECK(mnavCreateNavmesh(&meshDef2, &navmesh).result == mnav_success, "created");
     CHECK(StageAt(navmesh, 0) == mnav_success && StageAt(navmesh, 1) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_errorCapacity,
           "past the tiles limit");
@@ -158,7 +164,8 @@ static void TestTilesMustMatchTheDef(void)
     def.agent.stepHeight = 0.5f;
     def.allocator = CountingAllocator();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     size_t held = s_held;
     mnavTileResult result = mnavNavmesh_StageTile(navmesh, s_tiles[0], s_sizes[0]);
     CHECK(result.result == mnav_errorFormat && result.section == mnav_tileHeader,
@@ -178,9 +185,10 @@ static void TestDestroyGivesEverythingBack(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     def.allocator = CountingAllocator();
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(StageAt(navmesh, t) == mnav_success, "staged");
@@ -239,8 +247,79 @@ static void TestLinksNeedHeightsWithinAStepAtBothEnds(void)
           "the same slope links");
 }
 
+// A free function no allocator pairs with an alloc.
+static void FreeAlone(void* memory, size_t size, size_t alignment, void* context)
+{
+    (void)memory;
+    (void)size;
+    (void)alignment;
+    (void)context;
+}
+
+// Whether making a navmesh from a def is refused with a result and setting,
+// and makes nothing.
+static bool Refused(const mnavNavmeshDef* def, mnavResult result, mnavNavmeshSetting setting)
+{
+    mnavNavmesh* navmesh = nullptr;
+    mnavNavmeshDefResult got = mnavCreateNavmesh(def, &navmesh);
+    mnavDestroyNavmesh(navmesh);
+    return got.result == result && got.setting == setting && navmesh == nullptr;
+}
+
+static void TestTheDefIsChecked(void)
+{
+    const mnavNavmeshDef good = mnavDefaultNavmeshDef();
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&good, nullptr).result == mnav_errorInvalid &&
+              Refused(nullptr, mnav_errorInvalid, mnav_navmeshSettingNone),
+          "NULL arguments");
+    mnavNavmeshDef def = good;
+    def.cookie = 0;
+    CHECK(Refused(&def, mnav_errorInvalid, mnav_navmeshSettingCookie), "no cookie");
+    def = good;
+    def.allocator.free = FreeAlone;
+    CHECK(Refused(&def, mnav_errorInvalid, mnav_navmeshSettingAllocator), "one function");
+    def = good;
+    def.bake.cellSize = 0.0f;
+    mnavNavmeshDefResult got = mnavCreateNavmesh(&def, &navmesh);
+    CHECK(got.result == mnav_errorLimit && got.setting == mnav_navmeshSettingBake &&
+              got.bakeSetting == mnav_settingCellSize && navmesh == nullptr,
+          "the bake def's setting named");
+    def = good;
+    def.limits.tiles = 0;
+    CHECK(Refused(&def, mnav_errorInvalid, mnav_navmeshSettingTiles), "no tiles");
+    def = good;
+    def.limits.tiles = MNAV_MAX_TILES + 1;
+    CHECK(Refused(&def, mnav_errorLimit, mnav_navmeshSettingTiles), "tiles past the cap");
+    def = good;
+    def.limits.tileLinks = -1;
+    CHECK(Refused(&def, mnav_errorInvalid, mnav_navmeshSettingTileLinks), "negative tile links");
+    def = good;
+    def.limits.tileLinks = MNAV_MAX_TILE_LINKS + 1;
+    CHECK(Refused(&def, mnav_errorLimit, mnav_navmeshSettingTileLinks), "tile links past the cap");
+    def = good;
+    def.limits.links = 0;
+    CHECK(Refused(&def, mnav_errorInvalid, mnav_navmeshSettingLinks), "no links");
+    def = good;
+    def.limits.links = MNAV_MAX_LINKS + 1;
+    CHECK(Refused(&def, mnav_errorLimit, mnav_navmeshSettingLinks), "links past the cap");
+    def = good;
+    def.limits.memoryBytes = 0;
+    CHECK(Refused(&def, mnav_errorInvalid, mnav_navmeshSettingMemoryBytes), "no memory");
+    // The bake def's own allocator, limits and clock are the bakers'.
+    def = good;
+    def.bake.limits.memoryBytes = 1;
+    def.bake.allocator.free = FreeAlone;
+    CHECK(Refused(&def, mnav_errorInvalid, mnav_navmeshSettingBake), "the bake def checked whole");
+    def.bake.allocator.free = nullptr;
+    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success,
+          "its memory limit not the navmesh's");
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
+    TestTheDefIsChecked();
     LoadWorldTiles();
     TestLinksNeedHeightsWithinAStepAtBothEnds();
     TestStagedTilesAppearAtCommit();

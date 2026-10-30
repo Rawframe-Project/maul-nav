@@ -35,11 +35,13 @@ int main(void)
     size_t room = (size_t)1 << 16;
     size_t size = 0;
     unsigned char* bytes = malloc(room);
+    mnavNavmeshDef meshDef = mnavDefaultNavmeshDef();
+    meshDef.bake = def;
     int ok = bytes != NULL && mnavCreateBaker(&def, &baker).result == mnav_success &&
              mnavBaker_BakeTile(baker, &(mnavBakeInput){&floor, 1, NULL, 0, NULL, 0, NULL}, 0, 0,
                                 NULL) == mnav_success &&
              mnavBaker_CopyTile(baker, bytes, room, &size) == mnav_success &&
-             mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+             mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
              mnavNavmesh_StageTile(navmesh, bytes, size).result == mnav_success &&
              mnavNavmesh_Commit(navmesh) == mnav_success &&
              mnavCreateQuery(&queryDef, &query) == mnav_success;

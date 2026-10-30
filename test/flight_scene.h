@@ -9,6 +9,7 @@
 #define MAUL_NAV_TEST_FLIGHT_SCENE_H
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -95,7 +96,8 @@ static inline uint64_t BakeOne(mnavFlightBaker* baker, const mnavBakeInput* inpu
 static inline mnavFlightVolume* Volume(const mnavFlightDef* def)
 {
     mnavFlightVolume* volume = nullptr;
-    CHECK(mnavCreateFlightVolume(def, &volume).result == mnav_success, "volume");
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(def);
+    CHECK(mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success, "volume");
     return volume;
 }
 

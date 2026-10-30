@@ -136,12 +136,14 @@ static void Load(World* w)
     const mnavTriangleMesh floor = {vertices, 4, indices, 2, NULL};
     const mnavBakeInput input = {&floor, 1, NULL, 0, NULL, 0, NULL};
     w->def = mnavDefaultBakeDef();
-    // Tiles are replaced at runtime: the dynamic tier.
-    w->def.tier = mnav_tierDynamic;
     mnavTileCacheDef cacheDef = mnavDefaultTileCacheDef();
     Check(mnavCreateBaker(&w->def, &w->baker).result, "baker");
     Check(mnavCreateTileCache(&cacheDef, &w->cache), "cache");
-    Check(mnavCreateNavmesh(&w->def, &w->navmesh).result, "navmesh");
+    mnavNavmeshDef meshDef = mnavDefaultNavmeshDef();
+    meshDef.bake = w->def;
+    // Tiles are replaced at runtime: the dynamic tier.
+    meshDef.tier = mnav_tierDynamic;
+    Check(mnavCreateNavmesh(&meshDef, &w->navmesh).result, "navmesh");
     w->bytes = malloc(TILE_ROOM);
     for (int32_t t = 0; t < TILES * TILES; ++t)
     {

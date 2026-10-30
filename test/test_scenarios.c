@@ -12,6 +12,7 @@
 // nightly-labeled test doorway. The terrain's bytes hold under every host
 // floating-point setting.
 
+#include "defs_for.h"
 #include "dense.h"
 #include "doorway.h"
 #include "float_hosts.h"
@@ -174,7 +175,8 @@ static void Building(Quads* q, bool stairs)
 static mnavNavmesh* LoadOne(const mnavBakeDef* def)
 {
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "loaded");
@@ -242,11 +244,12 @@ static void TestCollapsingBridge(mnavQuery* query)
     static Quads q;
     mnavBakeDef def = mnavDefaultBakeDef();
     def.tileCells = 32;
-    def.tier = mnav_tierDynamic;
     Plateaus(&q, true);
     Bake(&def, &q, 0, 0, 3, 3);
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 16; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
@@ -408,7 +411,8 @@ static void TestStreamedTerrain(mnavQuery* query)
     CHECK(FloatHosts(TerrainHash, TERRAIN_HASH, s_dense ? 1 : 3),
           "the pinned hash under the host settings");
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     bool loaded[4][4] = {{false}};
     int32_t most = 0;
     int32_t outCount = 0;
@@ -720,8 +724,9 @@ static void TestDoorway(mnavQuery* query, int32_t crowd, uint64_t pinned)
     mnavBakeDef def = DoorwayDef();
     CHECK(def.agent.radius == (float)CROWD_RADIUS, "the tiles baked for the crowd's agents");
     mnavNavmesh* navmesh = nullptr;
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     CHECK(
-        mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+        mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
             mnavNavmesh_StageTile(navmesh, s_doorway0, sizeof(s_doorway0)).result == mnav_success &&
             mnavNavmesh_StageTile(navmesh, s_doorway1, sizeof(s_doorway1)).result == mnav_success &&
             mnavNavmesh_Commit(navmesh) == mnav_success,

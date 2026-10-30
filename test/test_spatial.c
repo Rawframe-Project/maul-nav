@@ -6,6 +6,7 @@
 // whose inside no one can reach; random points, over the whole navmesh and
 // around a center, on the stored test world, where they are pinned.
 
+#include "defs_for.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -73,12 +74,13 @@ static mnavTriangleMesh Slope(void)
 static mnavNavmesh* Load(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierModifiers;
     mnavBaker* baker = nullptr;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success, "baker");
     mnavTriangleMesh world = Slope();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierModifiers;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavBaker_BakeTile(baker,
@@ -101,7 +103,8 @@ static mnavNavmesh* LoadWorld(void)
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,

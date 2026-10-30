@@ -3,6 +3,7 @@
 //
 // Grid paths: jump point search and A*, their limits and ends.
 
+#include "defs_for.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -301,7 +302,8 @@ static void TestEndsASlicedSearch(void)
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "a navmesh");

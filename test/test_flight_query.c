@@ -9,6 +9,7 @@
 // limits and refusals; and an end in a closed space.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "dense.h"
 #include "test_harness.h"
 
@@ -94,8 +95,9 @@ static mnavFlightVolume* Volume(int32_t skipX, int32_t skipZ)
     mnavFlightDef def = Def();
     mnavFlightBaker* baker = nullptr;
     mnavFlightVolume* volume = nullptr;
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
     CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success &&
-              mnavCreateFlightVolume(&def, &volume).result == mnav_success,
+              mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success,
           "baker and volume");
     mnavTriangleMesh scene = Scene();
     mnavBakeInput input = {&scene, 1, nullptr, 0, nullptr, 0, nullptr};
@@ -1031,12 +1033,12 @@ static void TestHole(void)
                   mnav_success &&
               hit.stop != mnav_flightClear && hit.point.x <= 16.0 + 1e-9,
           "a raycast into the hole");
-    mnavPos3 nearest;
+    mnavPos3 nearest = At(24.5, 28.5, 24.5);
     bool found = true;
     CHECK(mnavFlightVolume_FindNearestPoint(volume, At(24.5, 28.5, 24.5), 2.0f, &nearest, &found) ==
                   mnav_success &&
-              !found,
-          "nothing near in the hole");
+              !found && nearest.x == 0.0 && nearest.y == 0.0 && nearest.z == 0.0,
+          "nothing near in the hole, the point zeroed");
     mnavDestroyQuery(query);
     mnavDestroyFlightVolume(volume);
 }
@@ -1104,8 +1106,9 @@ static mnavFlightVolume* Small(const float boxes[][6], int32_t count, float radi
     def.enableGroundFill = false;
     mnavFlightBaker* baker = nullptr;
     mnavFlightVolume* volume = nullptr;
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
     CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success &&
-              mnavCreateFlightVolume(&def, &volume).result == mnav_success,
+              mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success,
           "a small volume");
     static uint8_t bytes[TILE_BYTES];
     int32_t wrong = 0;

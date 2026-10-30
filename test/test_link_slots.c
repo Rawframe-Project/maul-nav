@@ -6,6 +6,7 @@
 // the last one only after 2^32 links staged and removed; the suite sets
 // it in the navmesh instead.
 
+#include "defs_for.h"
 #include "navmesh.h"
 #include "test_harness.h"
 
@@ -19,7 +20,8 @@ static void TestAWornSlotIsNotReused(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     const mnavLinkDef link = {
         {7.5, 0.0, 7.5}, {17.5, 0.0, 7.5}, 0.5f, 4.0f, mnav_linkJump, false, 0.0f};
     mnavLinkId id = {0, 0};
@@ -47,7 +49,8 @@ static void TestNoSlotPastTheLast(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               navmesh->linkSlotLimit == MNAV_MAX_LINKS,
           "created with the keys' limit");
     navmesh->linkSlotLimit = 4;

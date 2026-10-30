@@ -338,7 +338,7 @@ static bool GoodBox(mnavPos3 point, mnavVec3 half)
 
 mnavCover mnavCoverOf(const mnavNavmesh* navmesh, mnavPos3 point, mnavPos3 half)
 {
-    const mnavBakeDef* def = &navmesh->def;
+    const mnavBakeDef* def = &navmesh->def.bake;
     double size = (double)def->tileCells * (double)def->cellSize;
     int64_t reach = MNAV_MAX_EXTENT_CELLS / def->tileCells + 1;
     mnavCover c = {0};
@@ -436,7 +436,7 @@ mnavResult mnavFindNearestWork(const mnavNavmesh* navmesh, const mnavQueryFilter
         return checked;
     }
     *nearestOut = (mnavNearest){0};
-    const mnavBakeDef* def = &navmesh->def;
+    const mnavBakeDef* def = &navmesh->def.bake;
     mnavPos3 half = {(double)halfExtents.x, (double)halfExtents.y, (double)halfExtents.z};
     Search s = {navmesh,
                 point,

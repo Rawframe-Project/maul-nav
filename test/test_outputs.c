@@ -4,10 +4,12 @@
 // What a failure leaves in a call's outputs. A call whose first parameter
 // is an owner object clears them on any failure, before it checks the
 // owner, so that a refused call never leaves an earlier call's values, or
-// part of its own, for the caller to read. Each output here is filled with
+// part of its own, for the caller to read; so does one that answers "no"
+// without failing. Each output here is filled with
 // a byte pattern first. The outputs a failure defines keep what it
 // gives: the size or count a buffer too small needed, and a bake's report.
 
+#include "defs_for.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
 #include "world.h"
@@ -101,7 +103,8 @@ static mnavNavmesh* WorldNavmesh(void)
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "a navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
@@ -521,7 +524,8 @@ static void TestFlightOutside(void)
 {
     mnavFlightDef def = FlightDef();
     mnavFlightVolume* volume = nullptr;
-    CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success, "a volume");
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
+    CHECK(mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success, "a volume");
     const uint8_t* stored[4] = {s_flight0, s_flight1, s_flight2, s_flight3};
     const size_t sizes[4] = {sizeof(s_flight0), sizeof(s_flight1), sizeof(s_flight2),
                              sizeof(s_flight3)};
@@ -546,6 +550,13 @@ static void TestFlightOutside(void)
     CHECK(mnavFlightVolume_GetTile(volume, 9, 9, &s_out.fingerprint) == mnav_errorNotLoaded &&
               CLEARED(fingerprint),
           "a flight tile not loaded");
+    // A "no" clears the outputs too: no open point within the radius of
+    // one in the ground.
+    FillAll();
+    CHECK(mnavFlightVolume_FindNearestPoint(volume, (mnavPos3){1.0, -1.5, 1.0}, 0.25f,
+                                            &s_out.position, &s_out.flag) == mnav_success &&
+              CLEARED(position) && CLEARED(flag),
+          "no open point near");
     mnavDestroyQuery(query);
     mnavDestroyFlightVolume(volume);
 
@@ -557,6 +568,24 @@ static void TestFlightOutside(void)
     mnavDestroyFlightBaker(baker);
 }
 
+// A call that answers "no" without failing clears its outputs as a
+// failure does: no polygon has its nearest point in a box far from every
+// tile, and only whether the box was all loaded is an answer.
+static void TestNoAnswer(void)
+{
+    mnavNavmesh* navmesh = WorldNavmesh();
+    FillAll();
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){500.0, 0.0, 500.0},
+                                  (mnavVec3){1.0f, 1.0f, 1.0f}, nullptr,
+                                  &s_out.nearest) == mnav_success,
+          "a nearest polygon far away");
+    mnavNearest none;
+    memcpy(&none, &s_out.nearest, sizeof(none));
+    memset((unsigned char*)&none + offsetof(mnavNearest, incomplete), 0, sizeof(none.incomplete));
+    CHECK(Zeroed(&none, sizeof(none)), "no polygon, and nothing else left");
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     TestNoOwner();
@@ -565,5 +594,6 @@ int main(void)
     TestPastTheOwner();
     TestFlowOutside();
     TestFlightOutside();
+    TestNoAnswer();
     return s_failures == 0 ? 0 : 1;
 }

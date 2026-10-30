@@ -6,6 +6,7 @@
 // default, an agent not finite, a removed link's slot skipped when drawn,
 // and two settings at the edge of their conversion to cells.
 
+#include "defs_for.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -30,9 +31,10 @@ static mnavNavmesh* Load(void)
 {
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierModifiers;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierModifiers;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
@@ -47,7 +49,8 @@ static void TestMaking(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavFlowDef navFlowDef = mnavDefaultNavFlowDef();
     mnavFlowFieldDef flowDef = mnavDefaultFlowFieldDef();
-    CHECK(mnavCreateNavmesh(&def, nullptr).result == mnav_errorInvalid &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, nullptr).result == mnav_errorInvalid &&
               mnavCreateNavFlow(&navFlowDef, nullptr) == mnav_errorInvalid &&
               mnavCreateFlowField(&flowDef, nullptr) == mnav_errorInvalid,
           "no place for the object");

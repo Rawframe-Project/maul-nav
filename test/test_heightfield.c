@@ -61,8 +61,8 @@ static mnavResult Bake(const mnavBakeDef* def, const mnavTriangleMesh* meshes, i
     if (result == mnav_success)
     {
         // The navmesh takes the default allocator, which never refuses.
-        mnavBakeDef navmeshDef = *def;
-        navmeshDef.allocator = mnavDefaultBakeDef().allocator;
+        mnavNavmeshDef navmeshDef = mnavDefaultNavmeshDef();
+        navmeshDef.bake = *def;
         size_t size = 0;
         CHECK(mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success &&
                   mnavCreateNavmesh(&navmeshDef, &s_navmesh).result == mnav_success &&

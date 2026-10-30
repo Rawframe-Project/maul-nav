@@ -7,6 +7,7 @@
 // commit is refused with mnav_errorBusy and counted as misuse. The links
 // are those of a generation with no second thread.
 
+#include "defs_for.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
 
@@ -79,9 +80,10 @@ static bool Clearance(void* context, mnavPos3 from, mnavPos3 to)
 static mnavNavmesh* Load(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_trench0, sizeof(s_trench0)).result == mnav_success &&
               mnavNavmesh_StageTile(navmesh, s_trench1, sizeof(s_trench1)).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,

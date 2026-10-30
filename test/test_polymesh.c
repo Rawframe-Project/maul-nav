@@ -11,6 +11,7 @@
 // unfinished is counted. Several scenes were found by a search of floors
 // with blocks cut out or of other areas.
 
+#include "defs_for.h"
 #include "soup.h"
 #include "test_harness.h"
 
@@ -88,7 +89,8 @@ static mnavResult Load(const mnavBakeDef* def, const Shape* shapes, int32_t coun
         CHECK(mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success, "copied");
         mnavDestroyNavmesh(s_navmesh);
         s_navmesh = nullptr;
-        CHECK(mnavCreateNavmesh(def, &s_navmesh).result == mnav_success &&
+        mnavNavmeshDef meshDef = NavmeshDefFor(def);
+        CHECK(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success &&
                   mnavNavmesh_StageTile(s_navmesh, s_tile, size).result == mnav_success &&
                   mnavNavmesh_Commit(s_navmesh) == mnav_success,
               "loaded");

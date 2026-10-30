@@ -229,11 +229,13 @@ static MNAV_NOINLINE mnavResult RaycastCounted(mnavQuery* query, const mnavNavme
                                                mnavPolygonId startPolygon, mnavPos3 start,
                                                mnavPos3 end, mnavRay* rayOut)
 {
-    mnavClearOutput(rayOut, sizeof(*rayOut));
-    mnavResult result = mnavHostCountInvalid(
-        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        mnavRaycastWork(query, navmesh, filter, startPolygon, start, end, rayOut));
-    return mnavClearOnFailure(result, rayOut, sizeof(*rayOut));
+    mnavRay rayMade = {0};
+    mnavResult result =
+        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+                             mnavRaycastWork(query, navmesh, filter, startPolygon, start, end,
+                                             rayOut != nullptr ? &rayMade : nullptr));
+    mnavGiveOutput(result, false, rayOut, &rayMade, sizeof(rayMade));
+    return result;
 }
 
 mnavResult mnavQuery_Raycast(mnavQuery* query, const mnavNavmesh* navmesh,

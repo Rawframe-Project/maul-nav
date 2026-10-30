@@ -8,6 +8,7 @@
 // regions. The scene is baked turned to each of the tile's four sides.
 // test_border_vertices_rings.c covers the cases no bake reaches.
 
+#include "defs_for.h"
 #include "ramp_level.h"
 #include "test_harness.h"
 
@@ -72,7 +73,8 @@ static void TestFloorAndRampMeetOnEachSide(void)
               "baked");
         mnavDestroyBaker(baker);
         mnavNavmesh* navmesh = nullptr;
-        CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+        mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+        CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
                   mnavNavmesh_StageTile(navmesh, s_tile, size).result == mnav_success &&
                   mnavNavmesh_Commit(navmesh) == mnav_success,
               "loaded");

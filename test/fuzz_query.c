@@ -11,6 +11,7 @@
 // back all they took.
 
 #include "counting_allocator.h"
+#include "defs_for.h"
 #include "world.h"
 
 #include "maul-nav/bake.h"
@@ -102,7 +103,8 @@ static void Load(void)
 {
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
-    Expect(mnavCreateNavmesh(&def, &s_navmesh).result == mnav_success);
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    Expect(mnavCreateNavmesh(&meshDef, &s_navmesh).result == mnav_success);
     for (int32_t t = 0; t < 3; ++t)
     {
         Expect(mnavNavmesh_StageTile(s_navmesh, s_tiles[t], s_sizes[t]).result == mnav_success);

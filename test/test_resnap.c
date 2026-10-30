@@ -4,6 +4,7 @@
 // Off-mesh links snapped again only near the places a commit
 // changes, yet always as if snapped from scratch.
 
+#include "defs_for.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -92,10 +93,11 @@ static void TestOnlyChangedPlacesResnap(void)
     // place were snapped again.
     LoadWorldTiles();
     mnavBakeDef def = mnavDefaultBakeDef();
-    def.tier = mnav_tierDynamic;
     mnavNavmesh* navmesh = nullptr;
     mnavBakeCells cells;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success &&
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    meshDef.tier = mnav_tierDynamic;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
               mnavValidateBakeDef(&def, &cells).result == mnav_success,
           "created");
     float stepHeight = (float)((double)cells.agentStep * (double)def.cellHeight);

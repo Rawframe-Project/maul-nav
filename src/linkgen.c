@@ -349,21 +349,21 @@ static mnavResult Generate(mnavQuery* query, const mnavNavmesh* navmesh,
         return result;
     }
     // Samples closer than a cell tell nothing a cell's resolution can.
-    if (def->spacing < navmesh->def.cellSize)
+    if (def->spacing < navmesh->def.bake.cellSize)
     {
         return mnav_errorInvalid;
     }
     // The filter is copied: the searches begun here replace the context's.
     mnavQueryFilter own = *usable;
-    const mnavAgentProfile* agent = &navmesh->def.agent;
+    const mnavAgentProfile* agent = &navmesh->def.bake.agent;
     Gen g = {query,
              navmesh,
              &own,
              def,
              (double)agent->radius,
              (double)agent->stepHeight,
-             (double)navmesh->def.cellSize,
-             (double)navmesh->def.cellHeight,
+             (double)navmesh->def.bake.cellSize,
+             (double)navmesh->def.bake.cellHeight,
              linksOut,
              capacity,
              0,
@@ -409,14 +409,16 @@ static MNAV_NOINLINE mnavResult GenerateLinksCounted(mnavQuery* query, const mna
                                                      mnavLinkDef* linksOut, int32_t capacity,
                                                      int32_t* countOut)
 {
-    mnavClearOutput(countOut, sizeof(*countOut));
+    int32_t countMade = 0;
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        GenerateLinksWork(query, navmesh, filter, def, tiles, linksOut, capacity, countOut));
+        GenerateLinksWork(query, navmesh, filter, def, tiles, linksOut, capacity,
+                          countOut != nullptr ? &countMade : nullptr));
     // Generation that stopped at a bound counts the links found, as a
     // buffer too small does.
-    return result == mnav_errorLimit ? result
-                                     : mnavClearUnlessCapacity(result, countOut, sizeof(*countOut));
+    mnavGiveOutput(result, result == mnav_errorCapacity || result == mnav_errorLimit, countOut,
+                   &countMade, sizeof(countMade));
+    return result;
 }
 
 mnavResult mnavQuery_GenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,

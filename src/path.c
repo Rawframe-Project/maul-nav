@@ -656,10 +656,12 @@ mnavResult mnavContinuePathWork(mnavQuery* query, const mnavNavmesh* navmesh, in
 static MNAV_NOINLINE mnavResult ContinuePathCounted(mnavQuery* query, const mnavNavmesh* navmesh,
                                                     int32_t nodes, bool* endedOut)
 {
-    mnavClearOutput(endedOut, sizeof(*endedOut));
-    mnavResult result = mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                                             mnavContinuePathWork(query, navmesh, nodes, endedOut));
-    return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
+    bool endedMade = false;
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        mnavContinuePathWork(query, navmesh, nodes, endedOut != nullptr ? &endedMade : nullptr));
+    mnavGiveOutput(result, false, endedOut, &endedMade, sizeof(endedMade));
+    return result;
 }
 
 mnavResult mnavQuery_ContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, int32_t nodes,
@@ -709,10 +711,12 @@ mnavResult mnavFinishPathWork(mnavQuery* query, const mnavNavmesh* navmesh, mnav
 static MNAV_NOINLINE mnavResult FinishPathCounted(mnavQuery* query, const mnavNavmesh* navmesh,
                                                   mnavPath* pathOut)
 {
-    mnavClearOutput(pathOut, sizeof(*pathOut));
-    mnavResult result = mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                                             mnavFinishPathWork(query, navmesh, pathOut));
-    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
+    mnavPath pathMade = {0};
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        mnavFinishPathWork(query, navmesh, pathOut != nullptr ? &pathMade : nullptr));
+    mnavGiveOutput(result, false, pathOut, &pathMade, sizeof(pathMade));
+    return result;
 }
 
 mnavResult mnavQuery_FinishPath(mnavQuery* query, const mnavNavmesh* navmesh, mnavPath* pathOut)
@@ -752,11 +756,13 @@ static MNAV_NOINLINE mnavResult FindPathCounted(mnavQuery* query, const mnavNavm
                                                 mnavPolygonId endPolygon, mnavPos3 end,
                                                 mnavPath* pathOut)
 {
-    mnavClearOutput(pathOut, sizeof(*pathOut));
+    mnavPath pathMade = {0};
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        mnavFindPathWork(query, navmesh, filter, startPolygon, start, endPolygon, end, pathOut));
-    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
+        mnavFindPathWork(query, navmesh, filter, startPolygon, start, endPolygon, end,
+                         pathOut != nullptr ? &pathMade : nullptr));
+    mnavGiveOutput(result, false, pathOut, &pathMade, sizeof(pathMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindPath(mnavQuery* query, const mnavNavmesh* navmesh,
@@ -806,12 +812,13 @@ static MNAV_NOINLINE mnavResult CheckReachableCounted(mnavQuery* query, const mn
                                                       mnavPolygonId endPolygon, mnavPos3 end,
                                                       mnavPathEnd* endOut)
 {
-    mnavClearOutput(endOut, sizeof(*endOut));
-    mnavResult result =
-        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-                             mnavCheckReachableWork(query, navmesh, filter, startPolygon, start,
-                                                    endPolygon, end, endOut));
-    return mnavClearOnFailure(result, endOut, sizeof(*endOut));
+    mnavPathEnd endMade = 0;
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
+        mnavCheckReachableWork(query, navmesh, filter, startPolygon, start, endPolygon, end,
+                               endOut != nullptr ? &endMade : nullptr));
+    mnavGiveOutput(result, false, endOut, &endMade, sizeof(endMade));
+    return result;
 }
 
 mnavResult mnavQuery_CheckReachable(mnavQuery* query, const mnavNavmesh* navmesh,

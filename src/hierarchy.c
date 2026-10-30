@@ -898,11 +898,13 @@ static MNAV_NOINLINE mnavResult BuildHierarchyCounted(mnavHierarchy* hierarchy, 
                                                       const mnavQueryFilter* filter,
                                                       mnavHierarchyReport* reportOut)
 {
-    mnavClearOutput(reportOut, sizeof(*reportOut));
+    mnavHierarchyReport reportMade = {0};
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(hierarchy), mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh))),
-        BuildHierarchyWork(hierarchy, query, navmesh, filter, reportOut));
-    return mnavClearOnFailure(result, reportOut, sizeof(*reportOut));
+        BuildHierarchyWork(hierarchy, query, navmesh, filter,
+                           reportOut != nullptr ? &reportMade : nullptr));
+    mnavGiveOutput(result, false, reportOut, &reportMade, sizeof(reportMade));
+    return result;
 }
 
 mnavResult mnavHierarchy_Build(mnavHierarchy* hierarchy, mnavQuery* query,
@@ -955,11 +957,13 @@ static MNAV_NOINLINE mnavResult UpdateHierarchyCounted(mnavHierarchy* hierarchy,
                                                        const mnavNavmesh* navmesh,
                                                        mnavHierarchyReport* reportOut)
 {
-    mnavClearOutput(reportOut, sizeof(*reportOut));
+    mnavHierarchyReport reportMade = {0};
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(hierarchy), mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh))),
-        UpdateHierarchyWork(hierarchy, query, navmesh, reportOut));
-    return mnavClearOnFailure(result, reportOut, sizeof(*reportOut));
+        UpdateHierarchyWork(hierarchy, query, navmesh,
+                            reportOut != nullptr ? &reportMade : nullptr));
+    mnavGiveOutput(result, false, reportOut, &reportMade, sizeof(reportMade));
+    return result;
 }
 
 mnavResult mnavHierarchy_Update(mnavHierarchy* hierarchy, mnavQuery* query,

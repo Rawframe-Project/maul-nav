@@ -13,6 +13,7 @@
 // that adds a scene's tiles while the existing tiles stay byte-identical,
 // and only then.
 
+#include "defs_for.h"
 #include "doorway.h"
 #include "float_hosts.h"
 #include "stored_format1.h"
@@ -210,10 +211,12 @@ static void TestFormat1(void)
     const size_t flightSizes[2] = {sizeof(s_flight100), sizeof(s_flight101)};
     mnavBakeDef def = GroundDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "a navmesh");
     mnavFlightDef flightDef = FlightDef();
     mnavFlightVolume* volume = nullptr;
-    CHECK(mnavCreateFlightVolume(&flightDef, &volume).result == mnav_success, "a flight volume");
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&flightDef);
+    CHECK(mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success, "a flight volume");
     for (int32_t k = 0; k < 2; ++k)
     {
         mnavTileResult got = mnavNavmesh_StageTile(navmesh, grounds[k], groundSizes[k]);
@@ -279,7 +282,8 @@ static uint64_t GroundHash(void)
 {
     mnavBakeDef def = GroundDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "a navmesh");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_grounds[t], s_groundSizes[t]).result == mnav_success,
@@ -305,7 +309,8 @@ static uint64_t TerrainHash(void)
 {
     mnavBakeDef def = GroundDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "a navmesh");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "a navmesh");
     CHECK(mnavNavmesh_StageTile(navmesh, s_terrain, sizeof(s_terrain)).result == mnav_success,
           "the stored terrain tile staged");
     CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
@@ -337,7 +342,8 @@ static uint64_t FlightHash(void)
 {
     mnavFlightDef def = FlightDef();
     mnavFlightVolume* volume = nullptr;
-    CHECK(mnavCreateFlightVolume(&def, &volume).result == mnav_success, "a flight volume");
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
+    CHECK(mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success, "a flight volume");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavFlightVolume_StageTile(volume, s_flights[t], s_flightSizes[t]).result ==

@@ -20,7 +20,7 @@
 // Tile (0, 0) holds two squares apart (s_handApartPair): (5, 5) to
 // (10, 10) and (15, 5) to (20, 10); tile (1, 0) one (s_handSquareEast):
 // (37, 5) to (42, 10).
-static mnavNavmesh* Make(mnavBakeDef def)
+static mnavNavmesh* Make(mnavNavmeshDef def)
 {
     mnavNavmesh* navmesh = nullptr;
     CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
@@ -85,7 +85,7 @@ static mnavQuery* MakeQuery(void)
 
 static void TestLinksAttachAtTheCommit(void)
 {
-    mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
+    mnavNavmesh* navmesh = Make(mnavDefaultNavmeshDef());
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
     mnavLinkState state;
     CHECK(mnavLink_GetState(navmesh, id, &state) == mnav_errorState && !state.attached,
@@ -146,7 +146,7 @@ static void TestLinksAttachAtTheCommit(void)
 // corners still cross the link.
 static void TestLinkBackToItsOwnPolygon(void)
 {
-    mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
+    mnavNavmesh* navmesh = Make(mnavDefaultNavmeshDef());
     mnavLinkDef loop = Link(5.5, 5.5, 9.5, 9.5, 0.25f);
     loop.cost = 0.0f;
     Stage(navmesh, loop);
@@ -184,7 +184,7 @@ static void TestLinkBackToItsOwnPolygon(void)
 
 static void TestLinksFollowTheTiles(void)
 {
-    mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
+    mnavNavmesh* navmesh = Make(mnavDefaultNavmeshDef());
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 39.5, 7.5, 0.5f));
     CHECK(mnavNavmesh_Commit(navmesh) == mnav_success && !Get(navmesh, id).attached,
           "detached while tile (1, 0) is not loaded");
@@ -208,7 +208,7 @@ static void TestLinksFollowTheTiles(void)
 // share a tile.
 static void TestLinksLeaveTheirOwnPolygon(void)
 {
-    mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
+    mnavNavmesh* navmesh = Make(mnavDefaultNavmeshDef());
     mnavLinkId id = Stage(navmesh, Link(17.5, 7.5, 39.5, 7.5, 0.5f));
     CHECK(mnavNavmesh_StageTile(navmesh, s_handSquareEast, sizeof(s_handSquareEast)).result ==
                   mnav_success &&
@@ -226,7 +226,7 @@ static void TestLinksLeaveTheirOwnPolygon(void)
 
 static void TestRemovalAndIds(void)
 {
-    mnavNavmesh* navmesh = Make(mnavDefaultBakeDef());
+    mnavNavmesh* navmesh = Make(mnavDefaultNavmeshDef());
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
     CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     CHECK(mnavStageLinkRemoval(navmesh, id) == mnav_success && Get(navmesh, id).attached,
@@ -261,7 +261,7 @@ static void TestRemovalAndIds(void)
 
 static void TestDefsAndLimits(void)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmeshDef def = mnavDefaultNavmeshDef();
     def.limits.links = 2;
     mnavNavmesh* navmesh = Make(def);
     mnavLinkId id;
@@ -283,17 +283,17 @@ static void TestDefsAndLimits(void)
     // Ends farther than bake input may lie: past the extent on the ground
     // or in height, and an edge link whose ends are far enough apart that
     // their difference overflows.
-    double ground = (double)def.cellSize * (double)MNAV_MAX_EXTENT_CELLS;
-    double height = (double)def.cellHeight * (double)MNAV_MAX_HEIGHT_CELLS;
+    double ground = (double)def.bake.cellSize * (double)MNAV_MAX_EXTENT_CELLS;
+    double height = (double)def.bake.cellHeight * (double)MNAV_MAX_HEIGHT_CELLS;
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
-    link.end.x = def.origin.x + ground;
+    link.end.x = def.bake.origin.x + ground;
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_success &&
               mnavStageLinkRemoval(navmesh, id) == mnav_success,
           "at the extent");
-    link.end.x = def.origin.x + ground * 1.001;
+    link.end.x = def.bake.origin.x + ground * 1.001;
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "past the extent");
     link = Link(7.5, 7.5, 17.5, 7.5, 0.5f);
-    link.start.y = def.origin.y - height * 1.001;
+    link.start.y = def.bake.origin.y - height * 1.001;
     CHECK(mnavStageLink(navmesh, &link, &id) == mnav_errorLimit, "below the extent");
     link = Link(-1.0e308, 7.5, 1.0e308, 7.5, 0.5f);
     link.width = 2.0f;
@@ -325,7 +325,7 @@ static void TestDefsAndLimits(void)
 
 static void TestFailedCommitKeepsLinksStaged(void)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmeshDef def = mnavDefaultNavmeshDef();
     def.limits.tiles = 1;
     mnavNavmesh* navmesh = Make(def);
     mnavLinkId id = Stage(navmesh, Link(7.5, 7.5, 17.5, 7.5, 0.5f));
@@ -343,7 +343,7 @@ static void TestFailedCommitKeepsLinksStaged(void)
 
 static void TestDestroyGivesLinksBack(void)
 {
-    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmeshDef def = mnavDefaultNavmeshDef();
     def.allocator = CountingAllocator();
     mnavNavmesh* navmesh = Make(def);
     for (int32_t i = 0; i < 9; ++i)

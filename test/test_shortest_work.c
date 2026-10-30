@@ -8,6 +8,7 @@
 // in for one, since a search short of nodes ends on the A* search's
 // answer, which tells an unreachable end on far fewer nodes.
 
+#include "defs_for.h"
 #include "hand_tiles.h"
 #include "query.h"
 #include "test_harness.h"
@@ -34,7 +35,8 @@ static mnavNavmesh* Make(const uint8_t* first, size_t firstSize, const uint8_t* 
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     CHECK(mnavNavmesh_StageTile(navmesh, first, firstSize).result == mnav_success, "first staged");
     if (second != nullptr)
     {
@@ -158,7 +160,8 @@ static mnavNavmesh* LoadWorld(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavmesh* navmesh = nullptr;
-    CHECK(mnavCreateNavmesh(&def, &navmesh).result == mnav_success, "created");
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "created");
     for (int32_t t = 0; t < 4; ++t)
     {
         CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success,
