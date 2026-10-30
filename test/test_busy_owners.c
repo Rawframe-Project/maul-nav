@@ -531,7 +531,7 @@ static Outcome BakeOuter(void* object)
     size_t size = 0;
     if (mnavBaker_CopyTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
     {
-        out.hash = mnavHash64(0, s_bytes, (int32_t)size);
+        out.hash = mnavHash64(0, s_bytes, (int64_t)size);
     }
     return out;
 }
@@ -553,7 +553,7 @@ static Outcome FlightBakeOuter(void* object)
     size_t size = 0;
     if (mnavFlightBaker_CopyTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
     {
-        out.hash = mnavHash64(0, s_bytes, (int32_t)size);
+        out.hash = mnavHash64(0, s_bytes, (int64_t)size);
     }
     return out;
 }
@@ -643,7 +643,7 @@ static Outcome Hashed(mnavResult result, const mnavBaker* baker)
     size_t size = 0;
     if (mnavBaker_CopyTile(baker, s_bytes, sizeof(s_bytes), &size) == mnav_success)
     {
-        out.hash = mnavHash64(0, s_bytes, (int32_t)size);
+        out.hash = mnavHash64(0, s_bytes, (int64_t)size);
     }
     return out;
 }
@@ -674,7 +674,7 @@ static Outcome FlightIndexedOuter(void* object)
     size_t size = 0;
     if (mnavFlightBaker_CopyTile(object, s_bytes, sizeof(s_bytes), &size) == mnav_success)
     {
-        out.hash = mnavHash64(0, s_bytes, (int32_t)size);
+        out.hash = mnavHash64(0, s_bytes, (int64_t)size);
     }
     return out;
 }
@@ -717,7 +717,7 @@ static Outcome BuildOuter(void* object)
 {
     mnavHierarchyReport report = {0};
     Outcome out = {mnavHierarchy_Build(object, s_heldQuery, s_heldNavmesh, nullptr, &report), 0};
-    out.hash = mnavHash64(0, &report, (int32_t)sizeof(report));
+    out.hash = mnavHash64(0, &report, (int64_t)sizeof(report));
     return out;
 }
 

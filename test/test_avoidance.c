@@ -133,7 +133,7 @@ static void TestCircle(void)
     for (int32_t i = 0; i < CIRCLE; ++i)
     {
         arrived += Miss(&agents[i], goals[i]) < 0.1 ? 1 : 0;
-        hash = mnavHash64(hash, &agents[i].position, (int32_t)sizeof(mnavPos2));
+        hash = mnavHash64(hash, &agents[i].position, (int64_t)sizeof(mnavPos2));
     }
     printf("CIRCLE_HASH=%016llx closest=%.6f arrived=%d\n", (unsigned long long)hash, closest,
            arrived);
@@ -571,7 +571,7 @@ static void TestMixedScene(void)
         CHECK(mnavAvoidance_Avoid(avoidance, agents, AGENTS, obstacles, 8, 0.1, velocities) ==
                   mnav_success,
               "stepped");
-        hash = mnavHash64(hash, velocities, (int32_t)sizeof(velocities));
+        hash = mnavHash64(hash, velocities, (int64_t)sizeof(velocities));
         for (int32_t i = 0; i < AGENTS; ++i)
         {
             agents[i].velocity = velocities[i];
@@ -792,7 +792,7 @@ static uint64_t CloseHash(void)
               mnav_success,
           "stepped");
     mnavDestroyAvoidance(avoidance);
-    return mnavHash64(MNAV_HASH_INIT, s_closeVelocities, (int32_t)sizeof(s_closeVelocities));
+    return mnavHash64(MNAV_HASH_INIT, s_closeVelocities, (int64_t)sizeof(s_closeVelocities));
 }
 
 static void TestUnderEveryHost(void)

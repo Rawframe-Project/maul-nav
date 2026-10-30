@@ -205,7 +205,7 @@ static void TestTiesGoToTheNodeMadeFirst(void)
     mnavQuery* query = MakeQuery(256);
     mnavPath path = Walk(query, navmesh, 2.5, 2.5, 17.5, 17.5);
     uint64_t corridor = mnavHash64(MNAV_HASH_INIT, path.polygons,
-                                   path.polygonCount * (int32_t)sizeof(mnavPolygonId));
+                                   path.polygonCount * (int64_t)sizeof(mnavPolygonId));
     printf("TIES diagonal=%d across=%d corridor=%016llx\n", diagonal, across,
            (unsigned long long)corridor);
     CHECK(diagonal == 26 && across == 8 && corridor == 0x564019609892cfd3ull, "the pinned ties");
@@ -262,7 +262,7 @@ static void WalkLayout(mnavQuery* query, const uint8_t* tile, size_t size, uint3
                                      nullptr, &path) == mnav_success,
                   "searched");
             *found += path.end == mnav_pathFound ? 1 : 0;
-            *hash = mnavHash64(*hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));
+            *hash = mnavHash64(*hash, path.points, path.pointCount * (int64_t)sizeof(mnavPos3));
         }
     }
     mnavDestroyNavmesh(navmesh);

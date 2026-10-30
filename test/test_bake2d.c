@@ -83,7 +83,7 @@ static uint64_t RoomHash(void)
               mnavBaker_CopyTile(baker, bytes, CAPACITY, &size) == mnav_success,
           "the room baked");
     mnavDestroyBaker(baker);
-    return mnavHash64(MNAV_HASH_INIT, bytes, (int32_t)size);
+    return mnavHash64(MNAV_HASH_INIT, bytes, (int64_t)size);
 }
 
 static void TestTheRoom(void)
@@ -97,7 +97,7 @@ static void TestTheRoom(void)
               report.triangles == 4 && report.polygons > 0 &&
               mnavBaker_CopyTile(baker, s_bytes[0], CAPACITY, &s_sizes[0]) == mnav_success,
           "baked, four outlines reaching the tile");
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_bytes[0], (int32_t)s_sizes[0]);
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_bytes[0], (int64_t)s_sizes[0]);
     printf("ROOM_HASH=%016llx polygons=%d bytes=%zu\n", (unsigned long long)hash, report.polygons,
            s_sizes[0]);
     CHECK(hash == ROOM_HASH, "the pinned hash");

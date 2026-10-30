@@ -221,7 +221,7 @@ static uint64_t Swap(double radius, Scene* s, mnavAgent3D* agents, mnavPos3* goa
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t i = 0; i < SWAP; ++i)
     {
-        hash = mnavHash64(hash, &agents[i].position, (int32_t)sizeof(mnavPos3));
+        hash = mnavHash64(hash, &agents[i].position, (int64_t)sizeof(mnavPos3));
     }
     return hash;
 }

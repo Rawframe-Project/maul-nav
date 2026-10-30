@@ -91,9 +91,9 @@ static void TestNavmesh(const mnavNavmesh* navmesh)
     }
     CHECK(outside == 0, "within the world");
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, b.vertices,
-                               (int32_t)((size_t)b.vertexCount * sizeof(mnavDebugVertex)));
-    hash = mnavHash64(hash, b.triangles, (int32_t)((size_t)b.triangleCount * sizeof(uint32_t)));
-    hash = mnavHash64(hash, b.lines, (int32_t)((size_t)b.lineCount * sizeof(uint32_t)));
+                               (int64_t)((size_t)b.vertexCount * sizeof(mnavDebugVertex)));
+    hash = mnavHash64(hash, b.triangles, (int64_t)((size_t)b.triangleCount * sizeof(uint32_t)));
+    hash = mnavHash64(hash, b.lines, (int64_t)((size_t)b.lineCount * sizeof(uint32_t)));
     printf("NAVMESH_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == NAVMESH_HASH, "the pinned hash");
     // An empty buffer counts what the whole needs.

@@ -135,11 +135,11 @@ static uint64_t TestWays(mnavNavFlow* field, const mnavNavmesh* navmesh)
         mnavPolygonFlow f;
         CHECK(mnavNavFlow_GetFlow(field, navmesh, ids[i], &f) == mnav_success, "read");
         // Field by field: the struct has padding.
-        hash = mnavHash64(hash, &f.cost, (int32_t)sizeof(f.cost));
-        hash = mnavHash64(hash, &f.next, (int32_t)sizeof(f.next));
-        hash = mnavHash64(hash, &f.left, (int32_t)sizeof(f.left));
-        hash = mnavHash64(hash, &f.right, (int32_t)sizeof(f.right));
-        hash = mnavHash64(hash, &f.link, (int32_t)sizeof(f.link));
+        hash = mnavHash64(hash, &f.cost, (int64_t)sizeof(f.cost));
+        hash = mnavHash64(hash, &f.next, (int64_t)sizeof(f.next));
+        hash = mnavHash64(hash, &f.left, (int64_t)sizeof(f.left));
+        hash = mnavHash64(hash, &f.right, (int64_t)sizeof(f.right));
+        hash = mnavHash64(hash, &f.link, (int64_t)sizeof(f.link));
         if (!isfinite(f.cost))
         {
             continue;
@@ -343,10 +343,10 @@ static uint64_t TilesHash(const mnavNavFlow* field, const mnavNavmesh* navmesh, 
                     break;
                 }
                 CHECK(mnavNavFlow_GetFlow(field, navmesh, id, &f) == mnav_success, "read");
-                hash = mnavHash64(hash, &f.cost, (int32_t)sizeof(f.cost));
-                hash = mnavHash64(hash, &f.next.polygon, (int32_t)sizeof(f.next.polygon));
-                hash = mnavHash64(hash, &f.left, (int32_t)sizeof(f.left));
-                hash = mnavHash64(hash, &f.right, (int32_t)sizeof(f.right));
+                hash = mnavHash64(hash, &f.cost, (int64_t)sizeof(f.cost));
+                hash = mnavHash64(hash, &f.next.polygon, (int64_t)sizeof(f.next.polygon));
+                hash = mnavHash64(hash, &f.left, (int64_t)sizeof(f.left));
+                hash = mnavHash64(hash, &f.right, (int64_t)sizeof(f.right));
             }
         }
     }

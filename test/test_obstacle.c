@@ -70,8 +70,8 @@ static uint64_t LinesWith(const mnavObstacleVertex* vertices, int32_t count, dou
                 *touching += lines[k].point.x == 0.0 && lines[k].point.y == 0.0 ? 1 : 0;
             }
             *total += made;
-            hash = mnavHash64(hash, &made, (int32_t)sizeof(made));
-            hash = mnavHash64(hash, lines, (int32_t)((size_t)made * sizeof(mnavLine)));
+            hash = mnavHash64(hash, &made, (int64_t)sizeof(made));
+            hash = mnavHash64(hash, lines, (int64_t)((size_t)made * sizeof(mnavLine)));
         }
     }
     return hash;

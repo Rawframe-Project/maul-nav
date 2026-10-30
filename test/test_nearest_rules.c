@@ -113,7 +113,7 @@ static void TestHeightsOnADiagonal(void)
         CHECK(mnavPolygon_GetHeight(navmesh, polygon, t * 20.0, t * 12.0, &height) == mnav_success,
               "a height");
         off += fabs(height - (3.0 + t * (1.0 - 3.0)) * 0.125) < 1e-9 ? 0 : 1;
-        hash = mnavHash64(hash, &height, (int32_t)sizeof(height));
+        hash = mnavHash64(hash, &height, (int64_t)sizeof(height));
     }
     printf("DIAGONAL_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(off == 0, "on the diagonal's line");

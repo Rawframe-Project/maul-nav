@@ -374,7 +374,7 @@ static uint64_t BakeHash(mnavBaker* baker, const mnavBakeVolume* volumes, int32_
     CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, report) == mnav_success &&
               mnavBaker_CopyTile(baker, s_tile, TILE_ROOM, &size) == mnav_success,
           "baked");
-    return mnavHash64(MNAV_HASH_INIT, s_tile, (int32_t)size);
+    return mnavHash64(MNAV_HASH_INIT, s_tile, (int64_t)size);
 }
 
 // The baker and the three volumes of the pinned tile, made beforehand,

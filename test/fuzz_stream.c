@@ -121,7 +121,7 @@ typedef struct Run
 
 static void Note(Run* run, const void* value, size_t size)
 {
-    run->hash = mnavHash64(run->hash, value, (int32_t)size);
+    run->hash = mnavHash64(run->hash, value, (int64_t)size);
 }
 
 static void NoteResult(Run* run, mnavResult result)

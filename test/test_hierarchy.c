@@ -418,7 +418,7 @@ static uint64_t PairsHash(const mnavNavmesh* navmesh, mnavQuery* query, mnavHier
                                            b.point, &path) == mnav_success)
         {
             hash = mnavHash64(hash, path.points,
-                              (int32_t)((size_t)path.pointCount * sizeof(mnavPos3)));
+                              (int64_t)((size_t)path.pointCount * sizeof(mnavPos3)));
         }
     }
     return hash;
@@ -892,8 +892,8 @@ static uint64_t PathsHash(mnavQuery* query, mnavHierarchy* h, const mnavNavmesh*
             mnavQuery_FindHierarchicalPath(query, h, navmesh, a.polygon, a.point, b.polygon,
                                            b.point, &path) == mnav_success)
         {
-            hash = mnavHash64(hash, &path.cost, (int32_t)sizeof(path.cost));
-            hash = mnavHash64(hash, path.points, path.pointCount * (int32_t)sizeof(mnavPos3));
+            hash = mnavHash64(hash, &path.cost, (int64_t)sizeof(path.cost));
+            hash = mnavHash64(hash, path.points, path.pointCount * (int64_t)sizeof(mnavPos3));
         }
     }
     return hash;
@@ -1014,7 +1014,7 @@ static void TestStoredWorld(void)
     CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &report) == mnav_success &&
               report.clusters == 4 && report.transitions > 0 && report.edges > 0,
           "built");
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, &report, (int32_t)sizeof(report));
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, &report, (int64_t)sizeof(report));
     const double pairs[3][4] = {
         {2.0, 2.0, 62.0, 62.0}, {2.0, 62.0, 62.0, 2.0}, {16.0, 40.0, 48.0, 16.0}};
     for (int32_t p = 0; p < 3; ++p)
@@ -1033,7 +1033,7 @@ static void TestStoredWorld(void)
         CHECK(through.length <= plain.length * 1.06 && through.length >= plain.length - 1e-9,
               "within 6% of the plain path");
         hash = mnavHash64(hash, through.points,
-                          (int32_t)((size_t)through.pointCount * sizeof(mnavPos3)));
+                          (int64_t)((size_t)through.pointCount * sizeof(mnavPos3)));
     }
     printf("WORLD_PATHS_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == WORLD_PATHS_HASH, "the pinned hash");

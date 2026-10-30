@@ -85,7 +85,7 @@ static void Load(const uint8_t* data, size_t size)
         mnavPutU32(&w, payload);
         w.at = bytes + 16;
         mnavPutU64(&w,
-                   mnavHash64(MNAV_HASH_INIT, bytes + MNAV_FLIGHT_HEADER_BYTES, (int32_t)payload));
+                   mnavHash64(MNAV_HASH_INIT, bytes + MNAV_FLIGHT_HEADER_BYTES, (int64_t)payload));
     }
     mnavFlightDef def = LoaderDef();
     mnavFlightShape shape;

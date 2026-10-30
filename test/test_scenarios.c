@@ -392,7 +392,7 @@ static uint64_t TerrainHash(void)
         CHECK(mnavBaker_BakeTile(baker, &input, t % 4, t / 4, nullptr) == mnav_success &&
                   mnavBaker_CopyTile(baker, s_tiles[t], TILE_ROOM, &s_sizes[t]) == mnav_success,
               "baked");
-        hash = mnavHash64(hash, s_tiles[t], (int32_t)s_sizes[t]);
+        hash = mnavHash64(hash, s_tiles[t], (int64_t)s_sizes[t]);
     }
     mnavDestroyBaker(baker);
     return hash;
@@ -586,7 +586,7 @@ static void TestGroup(void)
         double dx = agents[i].position.x - 56.5;
         double dy = agents[i].position.y - 32.5;
         arrived += dx * dx + dy * dy < 8.0 * 8.0 ? 1 : 0;
-        hash = mnavHash64(hash, &agents[i].position, (int32_t)sizeof(mnavPos2));
+        hash = mnavHash64(hash, &agents[i].position, (int64_t)sizeof(mnavPos2));
     }
     printf("group: %d of %d arrived, closest pair %.3f m apart, %d places in the wall; "
            "GROUP_HASH=%016llx\n",
@@ -668,7 +668,7 @@ static int32_t GatherWalls(mnavQuery* query, const mnavNavmesh* navmesh, int32_t
                                  wall->start.z - (double)wall->normal.z * CROWD_RADIUS},
                                 {wall->end.x - (double)wall->normal.x * CROWD_RADIUS,
                                  wall->end.z - (double)wall->normal.z * CROWD_RADIUS}};
-            uint32_t cell = (uint32_t)mnavHash64(MNAV_HASH_INIT, ends, (int32_t)sizeof(ends)) &
+            uint32_t cell = (uint32_t)mnavHash64(MNAV_HASH_INIT, ends, (int64_t)sizeof(ends)) &
                             (WALL_TABLE - 1);
             while (s_wallTable[cell] >= 0 &&
                    memcmp(s_wallEnds[s_wallTable[cell]], ends, sizeof(ends)) != 0)
@@ -805,7 +805,7 @@ static void TestDoorway(mnavQuery* query, int32_t crowd, uint64_t pinned)
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t i = 0; i < crowd; ++i)
     {
-        hash = mnavHash64(hash, &s_crowd[i].position, (int32_t)sizeof(s_crowd[i].position));
+        hash = mnavHash64(hash, &s_crowd[i].position, (int64_t)sizeof(s_crowd[i].position));
     }
     printf("doorway: %d of %d arrived in %d steps, moves %.3f m short against walls, closest "
            "%.3f m, at most %d walls; %s=%016llx\n",

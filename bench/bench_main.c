@@ -755,7 +755,7 @@ static int32_t CrowdWalls(mnavQuery* query, const mnavNavmesh* navmesh)
                                  wall->start.z - (double)wall->normal.z * radius},
                                 {wall->end.x - (double)wall->normal.x * radius,
                                  wall->end.z - (double)wall->normal.z * radius}};
-            uint32_t cell = (uint32_t)mnavHash64(MNAV_HASH_INIT, ends, (int32_t)sizeof(ends)) &
+            uint32_t cell = (uint32_t)mnavHash64(MNAV_HASH_INIT, ends, (int64_t)sizeof(ends)) &
                             (CROWD_WALL_TABLE - 1);
             while (s_crowdWallTable[cell] >= 0 &&
                    memcmp(s_crowdEnds[s_crowdWallTable[cell]], ends, sizeof(ends)) != 0)

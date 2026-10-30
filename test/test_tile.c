@@ -83,7 +83,7 @@ static void Reseal(uint8_t* bytes, size_t size)
     size_t payload = size - MNAV_TILE_HEADER_BYTES;
     PutLittle(bytes + PAYLOAD_AT, payload, 4);
     PutLittle(bytes + HASH_AT,
-              mnavHash64(MNAV_HASH_INIT, bytes + MNAV_TILE_HEADER_BYTES, (int32_t)payload), 8);
+              mnavHash64(MNAV_HASH_INIT, bytes + MNAV_TILE_HEADER_BYTES, (int64_t)payload), 8);
 }
 
 // A field of a well-formed tile: its tag and payload.
@@ -288,7 +288,7 @@ static MNAV_NOINLINE uint64_t LevelHashWork(void)
 {
     static Fixture f;
     Bake(&f);
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, f.bytes, (int32_t)f.size);
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, f.bytes, (int64_t)f.size);
     Unbake(&f);
     return hash;
 }
@@ -317,7 +317,7 @@ static void TestRoundTrip(void)
     mnavReleaseDetailMesh(&f.memory, &detail);
     mnavReleasePolyMesh(&f.memory, &mesh);
     CHECK(Load(&f.memory, f.bytes, f.size).result == mnav_success, "loads and writes back");
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, f.bytes, (int32_t)f.size);
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, f.bytes, (int64_t)f.size);
     printf("LEVEL_TILE_HASH=%016llx bytes=%zu\n", (unsigned long long)hash, f.size);
     CHECK(hash == LEVEL_TILE_HASH, "the pinned hash");
     CHECK(EveryFloatHost(LevelHash, LEVEL_TILE_HASH), "the pinned hash under every host setting");

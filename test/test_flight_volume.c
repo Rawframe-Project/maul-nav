@@ -50,8 +50,8 @@ static uint64_t WorldHash(void)
         CHECK(mnavFlightBaker_BakeTile(baker, &input, t % 2, t / 2, nullptr) == mnav_success &&
                   mnavFlightBaker_CopyTile(baker, bytes, TILE_MOST, &size) == mnav_success,
               "baked");
-        uint64_t one = mnavHash64(MNAV_HASH_INIT, bytes, (int32_t)size);
-        hash = mnavHash64(hash, &one, (int32_t)sizeof(one));
+        uint64_t one = mnavHash64(MNAV_HASH_INIT, bytes, (int64_t)size);
+        hash = mnavHash64(hash, &one, (int64_t)sizeof(one));
     }
     mnavDestroyFlightBaker(baker);
     return hash;
@@ -70,7 +70,7 @@ static void BakeAll(void)
     for (int32_t t = 0; t < 4; ++t)
     {
         uint64_t one = BakeOne(baker, &input, t);
-        hash = mnavHash64(hash, &one, (int32_t)sizeof(one));
+        hash = mnavHash64(hash, &one, (int64_t)sizeof(one));
     }
     printf("FLIGHT_BYTES_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == FLIGHT_BYTES_HASH, "the pinned bytes");
@@ -107,7 +107,7 @@ static uint64_t OpenHash(const mnavFlightVolume* volume, int32_t* openOut)
                 row[x] = open ? 1 : 0;
                 *openOut += open ? 1 : 0;
             }
-            hash = mnavHash64(hash, row, (int32_t)sizeof(row));
+            hash = mnavHash64(hash, row, (int64_t)sizeof(row));
         }
     }
     return hash;
@@ -781,7 +781,7 @@ static mnavTileResult Fields(const Piece* pieces, int32_t count, uint8_t pad)
         }
     }
     PutLittle32(s_bad + AT_PAYLOAD, at - FIELDS_START);
-    uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_bad + FIELDS_START, (int32_t)(at - FIELDS_START));
+    uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_bad + FIELDS_START, (int64_t)(at - FIELDS_START));
     for (int32_t k = 0; k < 8; ++k)
     {
         s_bad[AT_HASH + k] = (uint8_t)(hash >> (8 * k));

@@ -90,7 +90,7 @@ static inline uint64_t BakeOne(mnavFlightBaker* baker, const mnavBakeInput* inpu
     s_fingerprints[t] = report.fingerprint;
     printf("flight tile %d: %zu bytes, %d nodes, %d leaves\n", t, size, report.nodes,
            report.leaves);
-    return mnavHash64(MNAV_HASH_INIT, s_bytes[t], (int32_t)size);
+    return mnavHash64(MNAV_HASH_INIT, s_bytes[t], (int64_t)size);
 }
 
 static inline mnavFlightVolume* Volume(const mnavFlightDef* def)

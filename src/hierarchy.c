@@ -585,7 +585,7 @@ static uint64_t AreaHash(const mnavTile* tile)
     uint64_t hash = MNAV_HASH_INIT;
     for (int32_t p = 0; p < tile->mesh.polygonCount; ++p)
     {
-        hash = mnavHash64(hash, &tile->mesh.polygons[p].area, (int32_t)sizeof(mnavAreaType));
+        hash = mnavHash64(hash, &tile->mesh.polygons[p].area, (int64_t)sizeof(mnavAreaType));
     }
     return hash;
 }
@@ -595,16 +595,16 @@ static uint64_t AreaHash(const mnavTile* tile)
 static uint64_t LinkHash(const mnavNavmesh* navmesh)
 {
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, navmesh->attachments,
-                               (int32_t)((size_t)navmesh->attachmentCount * sizeof(uint64_t)));
+                               (int64_t)((size_t)navmesh->attachmentCount * sizeof(uint64_t)));
     for (int32_t i = 0; i < navmesh->attachmentCount; ++i)
     {
         const mnavOffLink* link = &navmesh->links[mnavAttachmentOf(navmesh->attachments[i]).link];
-        hash = mnavHash64(hash, &link->def.kind, (int32_t)sizeof(link->def.kind));
-        hash = mnavHash64(hash, &link->def.cost, (int32_t)sizeof(link->def.cost));
-        hash = mnavHash64(hash, &link->state.start, (int32_t)sizeof(mnavPos3));
-        hash = mnavHash64(hash, &link->state.end, (int32_t)sizeof(mnavPos3));
-        hash = mnavHash64(hash, &link->state.startPolygon, (int32_t)sizeof(mnavPolygonId));
-        hash = mnavHash64(hash, &link->state.endPolygon, (int32_t)sizeof(mnavPolygonId));
+        hash = mnavHash64(hash, &link->def.kind, (int64_t)sizeof(link->def.kind));
+        hash = mnavHash64(hash, &link->def.cost, (int64_t)sizeof(link->def.cost));
+        hash = mnavHash64(hash, &link->state.start, (int64_t)sizeof(mnavPos3));
+        hash = mnavHash64(hash, &link->state.end, (int64_t)sizeof(mnavPos3));
+        hash = mnavHash64(hash, &link->state.startPolygon, (int64_t)sizeof(mnavPolygonId));
+        hash = mnavHash64(hash, &link->state.endPolygon, (int64_t)sizeof(mnavPolygonId));
     }
     return hash;
 }
