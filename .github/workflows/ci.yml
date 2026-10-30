@@ -218,45 +218,11 @@ jobs:
         # The static library's size, reported, not gated.
         run: stat -c '%s bytes' out/web-emscripten/libmaul-nav.a
 
-  # Every fuzz target from its committed seeds, four at a time, briefly: on
-  # pull requests and on main. The night's long run is fuzz-night. Each
-  # target runs through tools/fuzz_target.sh, which keeps its log and any
-  # finding on the runner and prints a finding's report without its input;
-  # nothing is uploaded.
-  fuzz:
+  # The fuzz targets the build defines, so that a new one runs without a
+  # list to keep.
+  fuzz-targets:
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    container: ghcr.io/rawframe-project/ci-cpp:2026.10.7@sha256:08c846597243dc000c83d6c008d078a8c3fabf8633d83963d46c0e6d02c2577e
-    permissions:
-      contents: read
-    env:
-      FUZZ_SECONDS: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Build
-        run: tools/fuzz.sh build out/fuzz
-      - name: Seeds
-        run: tools/fuzz.sh seeds out/fuzz
-      - name: Run
-        # The step pattern of tools/fuzz_target.sh: the reports cleared, the
-        # targets' status kept, and every report printed once they finish.
-        run: |
-          rm -rf out/fuzz-reports
-          status=0
-          printf '%s\n' out/fuzz/fuzz_* |
-            xargs -P 4 -I {} sh -c 'tools/fuzz_target.sh "$1" -max_total_time="$FUZZ_SECONDS" -timeout=30 "out/corpus-run/${1##*/}"' _ {} ||
-            status=$?
-          cat out/fuzz-reports/*.txt 2>/dev/null || true
-          exit "$status"
-
-  # The fuzz targets the build defines, so that a new one runs at night
-  # without a list to keep.
-  fuzz-targets:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     container: ghcr.io/rawframe-project/ci-cpp:2026.10.7@sha256:08c846597243dc000c83d6c008d078a8c3fabf8633d83963d46c0e6d02c2577e
@@ -275,11 +241,48 @@ jobs:
           targets=$(tools/fuzz.sh targets out/fuzz)
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
 
+  # Every fuzz target briefly, each in a job of its own: on pull requests
+  # and on main, from its committed seeds and the corpus fuzz-night left
+  # in its cache, restored and never saved here, so that a change that
+  # breaks a harness's promise fails on its own pull request. The night's
+  # long run is fuzz-night. Each target runs through tools/fuzz_target.sh,
+  # which keeps its log and any finding on the runner and prints a
+  # finding's report without its input; nothing is uploaded.
+  fuzz:
+    needs: [changes, fuzz-targets]
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.fuzz-targets.outputs.targets) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.7@sha256:08c846597243dc000c83d6c008d078a8c3fabf8633d83963d46c0e6d02c2577e
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Restore the corpus
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out/corpus/${{ matrix.target }}
+          key: corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: corpus-${{ matrix.target }}-
+      - name: Build
+        run: tools/fuzz.sh build out/fuzz
+      - name: Run
+        env:
+          TARGET: ${{ matrix.target }}
+        run: tools/fuzz.sh check out/fuzz "$TARGET" 20
+
   # Every night, each target alone for ten minutes, from the corpus the last
   # night left in its cache and the committed seeds; the merged corpus is
   # saved for the next night when the target found nothing.
   fuzz-night:
     needs: fuzz-targets
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -294,7 +297,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Restore the corpus
-        if: github.event_name != 'pull_request'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: out/corpus/${{ matrix.target }}
