@@ -148,11 +148,12 @@ extern "C"
         // report counts it in partialRings.
         float maxEdgeError;
         // The longest wall edge, in meters, from 0 to 2^30 cells; 0 for no
-        // limit.
+        // limit, and a length below a cell limits walls to one cell.
         float maxEdgeLength;
         // How far apart the detail mesh samples the floor's height along
         // polygon edges and inside polygons, in meters, from 0 to 2^26
-        // cells; 0 for none, and a distance below a cell samples every cell.
+        // cells; 0 for none, and any other distance below a cell samples
+        // every cell.
         float detailSampleDistance;
         // How far the detail surface may stray from a sampled height, in
         // meters, from 0 to 2^26 cell heights.
@@ -223,8 +224,8 @@ extern "C"
         int32_t minRegion;
         // The maximum edge error, in cells, unrounded.
         float edgeError;
-        // The maximum wall edge length, in cells, rounded down; 0 for no
-        // limit.
+        // The maximum wall edge length, in cells, rounded down to at least
+        // 1; 0 for no limit.
         int32_t edgeLength;
         // The detail sample distance, in sixteenths of a cell, rounded
         // down; 0 for none, at least 16 otherwise.
@@ -526,7 +527,7 @@ extern "C"
 // other tile bytes for the same def and input, and only then, so a tile a
 // host keeps by its fingerprint goes stale exactly when a bake would
 // differ, not at every release.
-#define MNAV_BAKE_GENERATOR 3
+#define MNAV_BAKE_GENERATOR 4
 
     // A baker: the def it was made with, its memory, and the last tile it
     // baked. Made by mnavCreateBaker.

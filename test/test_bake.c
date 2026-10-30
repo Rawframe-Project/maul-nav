@@ -190,6 +190,21 @@ static void TestLengthBounds(void)
     mnavBakeCells cells = {0};
     CHECK(mnavValidateBakeDef(&d, &cells).result == mnav_success && cells.detailSample == 16,
           "samples closer than a cell take every cell");
+    // 0.01 m is 0.64 sixteenths of a 0.25 m cell: it still samples.
+    d.detailSampleDistance = 0.01f;
+    CHECK(mnavValidateBakeDef(&d, &cells).result == mnav_success && cells.detailSample == 16,
+          "samples closer than a sixteenth take every cell");
+    d.detailSampleDistance = 0.0f;
+    CHECK(mnavValidateBakeDef(&d, &cells).result == mnav_success && cells.detailSample == 0,
+          "a distance of 0 samples nothing");
+    // A wall limit below a cell is one cell, never no limit.
+    d = def;
+    d.maxEdgeLength = 0.01f;
+    CHECK(mnavValidateBakeDef(&d, &cells).result == mnav_success && cells.edgeLength == 1,
+          "an edge length below a cell is one cell");
+    d.maxEdgeLength = 0.0f;
+    CHECK(mnavValidateBakeDef(&d, &cells).result == mnav_success && cells.edgeLength == 0,
+          "an edge length of 0 is no limit");
 }
 
 static void TestMetersSnapToCells(void)
