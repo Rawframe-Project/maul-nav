@@ -6,6 +6,10 @@
 // where a test needs them. The suites load the bytes through the public
 // loader and need no internal header.
 //
+// White-box: the polygons are laid by hand and encoded with the tile
+// format's own writer (polymesh.h, detail.h and tile.h), since a bake
+// gives only the polygons its stages make from geometry.
+//
 // `test_hand_tiles --write > test/hand_tiles.h` writes the header after a
 // change of the tiles below or of the tile format; `test_hand_tiles
 // --check test/hand_tiles.h` writes it again and fails when the file
