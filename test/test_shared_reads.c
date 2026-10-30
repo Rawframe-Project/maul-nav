@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Every read the documentation lets threads share, run on 8 threads at
-// once: one navmesh with links, one navmesh flow field and one grid, read
-// by threads that each own their query context, corridor, debug buffers,
-// fields and hierarchy. Each thread runs the same rounds of reads,
+// once: one navmesh with links, one navmesh flow field, one grid and one
+// hierarchy, read by threads that each own their query context, corridor,
+// debug buffers and fields. Each thread runs the same rounds of reads,
 // starting at a different round so that different reads meet, and must
 // get what one thread gets, round by round. Run under ThreadSanitizer,
 // the test also shows that these reads write nothing they share.
@@ -44,6 +44,8 @@ static mnavNavmesh* s_navmesh;
 static mnavNavFlow* s_field;
 static mnavAreaType s_areas[GRID_SIDE * GRID_SIDE];
 static mnavGrid s_grid;
+static mnavHierarchy* s_hierarchy;
+static mnavHierarchyReport s_report;
 
 static uint64_t Mix(uint64_t hash, const void* data, size_t size)
 {
@@ -84,8 +86,6 @@ typedef struct Reader
     mnavQuery* query;
     mnavNavFlow* field;
     mnavFlowField* flow;
-    mnavHierarchy* hierarchy;
-    mnavHierarchyReport report;
     mnavDebugVertex* vertices;
     uint32_t* triangles;
     uint32_t* lines;
@@ -331,8 +331,8 @@ static uint64_t Wide(Reader* reader, int32_t round, uint32_t* state, uint64_t ha
     }
     mnavPath path = {0};
     hash = Path(hash,
-                mnavQuery_FindHierarchicalPath(query, reader->hierarchy, s_navmesh, a.polygon,
-                                               a.point, b.polygon, b.point, &path),
+                mnavQuery_FindHierarchicalPath(query, s_hierarchy, s_navmesh, a.polygon, a.point,
+                                               b.polygon, b.point, &path),
                 &path);
     mnavDebugBuffer buffer = Buffer(reader);
     hash =
@@ -360,23 +360,17 @@ static bool Open(Reader* reader)
     mnavNavFlowDef fieldDef = mnavDefaultNavFlowDef();
     mnavFlowFieldDef flowDef = mnavDefaultFlowFieldDef();
     flowDef.cells = GRID_SIDE * GRID_SIDE;
-    mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
-    hierarchyDef.clusterTiles = 1;
     reader->vertices = malloc(DRAW_VERTICES * sizeof(mnavDebugVertex));
     reader->triangles = malloc(DRAW_INDICES * sizeof(uint32_t));
     reader->lines = malloc(DRAW_INDICES * sizeof(uint32_t));
     return reader->vertices != nullptr && reader->triangles != nullptr &&
            reader->lines != nullptr && mnavCreateQuery(&queryDef, &reader->query) == mnav_success &&
            mnavCreateNavFlow(&fieldDef, &reader->field) == mnav_success &&
-           mnavCreateFlowField(&flowDef, &reader->flow) == mnav_success &&
-           mnavCreateHierarchy(&hierarchyDef, &reader->hierarchy) == mnav_success &&
-           mnavHierarchy_Build(reader->hierarchy, reader->query, s_navmesh, nullptr,
-                               &reader->report) == mnav_success;
+           mnavCreateFlowField(&flowDef, &reader->flow) == mnav_success;
 }
 
 static void Close(Reader* reader)
 {
-    mnavDestroyHierarchy(reader->hierarchy);
     mnavDestroyFlowField(reader->flow);
     mnavDestroyNavFlow(reader->field);
     mnavDestroyQuery(reader->query);
@@ -438,6 +432,17 @@ static void Share(void)
         s_areas[c] = r < 4u ? mnav_areaNone : (mnavAreaType)(r < 14u ? 1u : 2u + r % 3u);
     }
     s_grid = (mnavGrid){s_areas, GRID_SIDE, GRID_SIDE, 1.0f};
+    // The hierarchy every thread searches at once.
+    mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
+    hierarchyDef.clusterTiles = 1;
+    mnavQueryDef queryDef = mnavDefaultQueryDef();
+    mnavQuery* query = nullptr;
+    CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success &&
+              mnavCreateHierarchy(&hierarchyDef, &s_hierarchy) == mnav_success &&
+              mnavHierarchy_Build(s_hierarchy, query, s_navmesh, nullptr, &s_report) ==
+                  mnav_success,
+          "a hierarchy");
+    mnavDestroyQuery(query);
 }
 
 static Reader s_readers[THREADS + 1];
@@ -448,7 +453,7 @@ static void TestEveryReadOnManyThreads(void)
     Reader* one = &s_readers[THREADS];
     *one = (Reader){0};
     Read(one);
-    CHECK(!one->failed && one->report.clusters == 4 && one->report.edges > 0,
+    CHECK(!one->failed && s_report.clusters == 4 && s_report.edges > 0,
           "one thread read, over a hierarchy of four clusters");
     pthread_t threads[THREADS];
     for (int32_t w = 0; w < THREADS; ++w)
@@ -461,10 +466,11 @@ static void TestEveryReadOnManyThreads(void)
     for (int32_t w = 0; w < THREADS; ++w)
     {
         pthread_join(threads[w], nullptr);
-        same = same && !s_readers[w].failed && s_readers[w].report.edges == one->report.edges &&
+        same = same && !s_readers[w].failed &&
                memcmp(s_readers[w].hashes, one->hashes, sizeof(one->hashes)) == 0;
     }
-    CHECK(same, "8 threads reading at once get what one thread gets");
+    CHECK(same, "8 threads reading at once, one hierarchy among them, get what one thread gets");
+    mnavDestroyHierarchy(s_hierarchy);
     mnavDestroyNavFlow(s_field);
     mnavDestroyNavmesh(s_navmesh);
 }

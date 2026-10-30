@@ -106,7 +106,6 @@ static mnavResult Allocate(mnavHierarchy* h)
     mnavResult r = mnav_success;
     Take(h, &r, n.tiles, sizeof(int32_t), alignof(int32_t), (void**)&h->clusterOf);
     Take(h, &r, n.tiles, sizeof(int32_t), alignof(int32_t), (void**)&h->firstOfSlot);
-    Take(h, &r, n.tiles, sizeof(uint8_t), alignof(uint8_t), (void**)&h->inside);
     Take(h, &r, n.tiles, sizeof(uint64_t), alignof(uint64_t), (void**)&h->keys);
     Take(h, &r, n.tiles, sizeof(uint64_t), alignof(uint64_t), (void**)&h->scratch);
     Take(h, &r, n.tiles + 1, sizeof(int32_t), alignof(int32_t), (void**)&h->firstSlot);
@@ -121,11 +120,7 @@ static mnavResult Allocate(mnavHierarchy* h)
     Take(h, &r, n.tiles, sizeof(uint64_t), alignof(uint64_t), (void**)&h->areaHashes);
     Take(h, &r, n.tiles, sizeof(uint8_t), alignof(uint8_t), (void**)&h->changed);
     Take(h, &r, n.tiles, sizeof(uint8_t), alignof(uint8_t), (void**)&h->dirty);
-    Take(h, &r, n.transitions + 1, sizeof(double), alignof(double), (void**)&h->costs);
-    Take(h, &r, n.transitions, sizeof(double), alignof(double), (void**)&h->joins);
-    Take(h, &r, n.transitions + 1, sizeof(int32_t), alignof(int32_t), (void**)&h->parents);
-    Take(h, &r, n.transitions + 1, sizeof(int32_t), alignof(int32_t), (void**)&h->places);
-    Take(h, &r, n.transitions + 1, sizeof(int32_t), alignof(int32_t), (void**)&h->heap);
+    Take(h, &r, n.tiles + 1, sizeof(int32_t), alignof(int32_t), (void**)&h->cursors);
     return r;
 }
 
@@ -172,7 +167,6 @@ static MNAV_NOINLINE mnavResult CreateHierarchyWork(const mnavHierarchyDef* def,
         mnavDestroyHierarchy(h);
         return result;
     }
-    memset(h->inside, 0, (size_t)def->limits.tiles);
     *hierarchyOut = h;
     return mnav_success;
 }
@@ -200,7 +194,6 @@ void mnavDestroyHierarchy(mnavHierarchy* hierarchy)
     Sizes n = SizesOf(&h->def);
     Give(h, h->clusterOf, n.tiles, sizeof(int32_t), alignof(int32_t));
     Give(h, h->firstOfSlot, n.tiles, sizeof(int32_t), alignof(int32_t));
-    Give(h, h->inside, n.tiles, sizeof(uint8_t), alignof(uint8_t));
     Give(h, h->keys, n.tiles, sizeof(uint64_t), alignof(uint64_t));
     Give(h, h->scratch, n.tiles, sizeof(uint64_t), alignof(uint64_t));
     Give(h, h->firstSlot, n.tiles + 1, sizeof(int32_t), alignof(int32_t));
@@ -214,11 +207,7 @@ void mnavDestroyHierarchy(mnavHierarchy* hierarchy)
     Give(h, h->areaHashes, n.tiles, sizeof(uint64_t), alignof(uint64_t));
     Give(h, h->changed, n.tiles, sizeof(uint8_t), alignof(uint8_t));
     Give(h, h->dirty, n.tiles, sizeof(uint8_t), alignof(uint8_t));
-    Give(h, h->costs, n.transitions + 1, sizeof(double), alignof(double));
-    Give(h, h->joins, n.transitions, sizeof(double), alignof(double));
-    Give(h, h->parents, n.transitions + 1, sizeof(int32_t), alignof(int32_t));
-    Give(h, h->places, n.transitions + 1, sizeof(int32_t), alignof(int32_t));
-    Give(h, h->heap, n.transitions + 1, sizeof(int32_t), alignof(int32_t));
+    Give(h, h->cursors, n.tiles + 1, sizeof(int32_t), alignof(int32_t));
     // The mark lives in the block being freed: it is set for good, so that
     // a call back in from this release is refused too, and the release
     // does not touch it.
@@ -494,9 +483,8 @@ static mnavResult FindTransitions(mnavHierarchy* h, const mnavNavmesh* navmesh, 
     {
         h->firstLeaving[c + 1] += h->firstLeaving[c];
     }
-    // Counting sort by the cluster left, keeping transition order; the
-    // end costs' slots serve as cursors.
-    int32_t* cursors = h->parents;
+    // Counting sort by the cluster left, keeping transition order.
+    int32_t* cursors = h->cursors;
     memcpy(cursors, h->firstLeaving, ((size_t)h->clusterCount + 1) * sizeof(int32_t));
     for (int32_t u = 0; u < h->transitionCount; ++u)
     {
