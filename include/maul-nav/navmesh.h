@@ -329,8 +329,8 @@ extern "C"
     ///
     /// @param navmesh  The navmesh.
     /// @param def      The link.
-    /// @param linkOut  Receives its id, usable once it is committed. Zeroed on any
-    ///                 failure.
+    /// @param linkOut  Receives its id, usable once it is committed. Zeroed on
+    ///                 any failure but mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// with a NaN coordinate, or an edge link whose ends lie at one place on
     /// the ground or so near that the square of their distance rounds to 0, a

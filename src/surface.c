@@ -352,11 +352,13 @@ static MNAV_NOINLINE mnavResult MoveAlongSurfaceCounted(mnavQuery* query,
                                                         mnavPolygonId startPolygon, mnavPos3 start,
                                                         mnavPos3 end, mnavMove* moveOut)
 {
-    mnavClearOutput(moveOut, sizeof(*moveOut));
+    mnavMove moveMade = {0};
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        mnavMoveAlongSurfaceWork(query, navmesh, filter, startPolygon, start, end, moveOut));
-    return mnavClearOnFailure(result, moveOut, sizeof(*moveOut));
+        mnavMoveAlongSurfaceWork(query, navmesh, filter, startPolygon, start, end,
+                                 moveOut != nullptr ? &moveMade : nullptr));
+    mnavGiveOutput(result, false, moveOut, &moveMade, sizeof(moveMade));
+    return result;
 }
 
 mnavResult mnavQuery_MoveAlongSurface(mnavQuery* query, const mnavNavmesh* navmesh,

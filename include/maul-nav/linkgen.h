@@ -132,7 +132,8 @@ extern "C"
     /// @param countOut  Receives the number of links generated, also beyond the
     ///                  capacity. Zeroed on any failure but those that count the
     ///                  links found: mnav_errorCapacity, and mnav_errorLimit when
-    ///                  generation stops at a bound.
+    ///                  generation stops at a bound; mnav_errorBusy leaves it as
+    ///                  it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a def
     /// not from mnavDefaultLinkGenDef, a def value NaN or below 0, a spacing of
     /// 0 or below the navmesh's cell size, a detour other than 0 below 1 or

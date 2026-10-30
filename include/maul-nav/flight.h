@@ -470,11 +470,12 @@ extern "C"
     ///                 at once: `mnav_pathNone` for a blocked voxel,
     ///                 `mnav_pathNotLoaded` for a place with no tile, with the
     ///                 start alone as its path. So does an end in a closed space
-    ///                 without the start, such as the inside of a closed mesh, when
-    ///                 the space is found closed within 512 blocks and the node
-    ///                 budget: the search looks over the end's space that far
-    ///                 first. `mnav_pathNone`, with the start alone. Zeroed on any
-    ///                 failure.
+    ///                 without the start, such as the inside of a closed mesh,
+    ///                 when the space is found closed within 512 blocks and the
+    ///                 node budget: the search looks over the end's space that
+    ///                 far first. `mnav_pathNone`, with the start alone. Zeroed
+    ///                 on any failure but mnav_errorBusy, which leaves it as it
+    ///                 was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// point with a NaN coordinate; `mnav_errorOutside` for a point below or
     /// above the volume; `mnav_errorLimit` for a point
@@ -522,7 +523,7 @@ extern "C"
     /// @param volume   The volume the search began on.
     /// @param nodes    The most nodes to close, at least 1.
     /// @param endedOut Receives whether the search has ended. Zeroed on any
-    ///                 failure.
+    ///                 failure but mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, fewer
     /// than 1 node, or a volume other than the search's; `mnav_errorState` for
     /// no flight search begun, or a volume committed to since the search began:
@@ -542,7 +543,8 @@ extern "C"
     ///
     /// @param query    The query context; its memory holds the path.
     /// @param volume   The volume the search began on.
-    /// @param pathOut  Receives the path. Zeroed on any failure.
+    /// @param pathOut  Receives the path. Zeroed on any failure but
+    ///                 mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// volume other than the search's; `mnav_errorState` for no flight search
     /// begun, or a volume committed to since the search began. Also

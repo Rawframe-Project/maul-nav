@@ -328,7 +328,8 @@ extern "C"
     /// @param end          The end point.
     /// @param filter       The areas usable and their costs, or NULL for
     ///                     every walkable area at a cost of 1.
-    /// @param pathOut      Receives the result. Zeroed on any failure.
+    /// @param pathOut      Receives the result. Zeroed on any failure but
+    ///                     mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success` whenever a search ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
     /// polygon id that never existed, or a filter not built from
@@ -372,7 +373,8 @@ extern "C"
     /// @param end          The end point.
     /// @param filter       The areas usable and their costs, or NULL for
     ///                     every walkable area at a cost of 1.
-    /// @param pathOut      Receives the result. Zeroed on any failure.
+    /// @param pathOut      Receives the result. Zeroed on any failure but
+    ///                     mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success` whenever a search ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
     /// polygon id that never existed, a filter not built from
@@ -427,7 +429,7 @@ extern "C"
     /// @param navmesh  The navmesh the search began on.
     /// @param nodes    The most nodes to close, at least 1.
     /// @param endedOut Receives whether the search has ended. Zeroed on any
-    ///                 failure.
+    ///                 failure but mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, fewer
     /// than 1 node, or a navmesh other than the search's; `mnav_errorState` for
     /// no search begun, or a navmesh committed to since the search began: begin
@@ -446,7 +448,8 @@ extern "C"
     ///
     /// @param query    The context; its memory holds the result.
     /// @param navmesh  The navmesh the search began on.
-    /// @param pathOut  Receives the result. Zeroed on any failure.
+    /// @param pathOut  Receives the result. Zeroed on any failure but
+    ///                 mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a
     /// navmesh other than the search's; `mnav_errorState` for no search begun,
     /// or a navmesh committed to since the search began. Also `mnav_errorBusy`
@@ -503,7 +506,8 @@ extern "C"
     /// @param end          The wanted point; only its ground position
     ///                     counts.
     /// @param filter       The areas usable, or NULL for every walkable one.
-    /// @param moveOut      Receives the result. Zeroed on any failure.
+    /// @param moveOut      Receives the result. Zeroed on any failure but
+    ///                     mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success` whenever the move ran, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
     /// polygon id that never existed or a filter not built from
@@ -616,7 +620,8 @@ extern "C"
     /// @param query    The context; its memory holds the corners.
     /// @param corridor The corridor.
     /// @param navmesh  The navmesh.
-    /// @param cornersOut Receives the straight path. Zeroed on any failure.
+    /// @param cornersOut Receives the straight path. Zeroed on any failure but
+    ///                   mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor not well formed or polygons not joined; `mnav_errorStale` for a
     /// polygon whose tile has been replaced or removed; `mnav_errorCapacity`
@@ -642,13 +647,14 @@ extern "C"
     /// @param corridor   The corridor.
     /// @param navmesh    The navmesh.
     /// @param cornersOut Receives the straight path, or NULL. Zeroed on any
-    ///                   failure.
+    ///                   failure but mnav_errorBusy, which leaves it as it was.
     /// @param runsOut    Receives the runs, in order. May be NULL when
     ///                   capacity is 0.
     /// @param capacity   How many runs fit, at least 0.
     /// @param countOut   Receives how many runs there are, also when they do not
     ///                   all fit. Zeroed on any failure but mnav_errorCapacity,
-    ///                   which gives the total.
+    ///                   which gives the total, and mnav_errorBusy, which leaves
+    ///                   it as it was.
     /// @return As mnavQuery_FindCorridorCorners; also `mnav_errorInvalid` for a NULL
     /// countOut, a negative capacity or NULL runs with a positive one, and
     /// `mnav_errorCapacity` when the runs do not fit, the first capacity of
@@ -773,7 +779,8 @@ extern "C"
     /// @param wanted   Where the agent would be; only its ground position
     ///                 counts.
     /// @param filter   The areas usable, or NULL for every walkable one.
-    /// @param moveOut  Receives the walk, or NULL. Zeroed on any failure.
+    /// @param moveOut  Receives the walk, or NULL. Zeroed on any failure but
+    ///                 mnav_errorBusy, which leaves it as it was.
     /// @return As mnavQuery_MoveAlongSurface; also `mnav_errorInvalid` for a corridor
     /// not well formed, and `mnav_errorCapacity` when the merged corridor would
     /// outgrow its buffer, which leaves it unchanged. Also `mnav_errorBusy`
@@ -798,7 +805,8 @@ extern "C"
     /// @param wanted   Where the target would be; only its ground position
     ///                 counts.
     /// @param filter   The areas usable, or NULL for every walkable one.
-    /// @param moveOut  Receives the walk, or NULL. Zeroed on any failure.
+    /// @param moveOut  Receives the walk, or NULL. Zeroed on any failure but
+    ///                 mnav_errorBusy, which leaves it as it was.
     /// @return As mnavQuery_MoveCorridor. Also `mnav_errorBusy` when called back in
     /// from host code a call using the context runs (a link generation's
     /// clearance test, a hierarchy's allocator as it builds), one misuse
@@ -821,7 +829,7 @@ extern "C"
     /// @param toward       The point to look toward.
     /// @param filter       The areas usable, or NULL for every walkable one.
     /// @param shortenedOut Receives whether the corridor changed. Zeroed on any
-    ///                     failure.
+    ///                     failure but mnav_errorBusy, which leaves it as it was.
     /// @return As mnavQuery_Raycast; also `mnav_errorInvalid` for a corridor not well
     /// formed or a NULL shortenedOut. Also `mnav_errorBusy` when called back in
     /// from host code a call using the context runs (a link generation's
@@ -846,8 +854,9 @@ extern "C"
     /// @param halfExtents The box's half sizes for finding polygons again.
     /// @param filter      The areas usable and their costs, or NULL.
     /// @param pathOut     Receives the path, or an empty one ended
-    ///                    mnav_pathNotLoaded or mnav_pathNone when an end found no
-    ///                    polygon. Zeroed on any failure.
+    ///                    mnav_pathNotLoaded or mnav_pathNone when an end found
+    ///                    no polygon. Zeroed on any failure but mnav_errorBusy,
+    ///                    which leaves it as it was.
     /// @return `mnav_success` whenever the corridor was looked at;
     /// `mnav_errorInvalid` for a NULL argument or a corridor not well formed;
     /// `mnav_errorCapacity` when the path has more polygons than the buffer,
@@ -922,7 +931,8 @@ extern "C"
     /// @param end     The end cell.
     /// @param filter  The areas usable and their costs, or NULL.
     /// @param pathOut Receives the path; mnav_pathNone with the start alone when
-    ///                the start is blocked. Zeroed on any failure.
+    ///                the start is blocked. Zeroed on any failure but
+    ///                mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a grid
     /// with no areas, a side below 1 or a cell size not more than 0 or not
     /// finite, a cell outside the grid, or a filter not built from
@@ -1005,7 +1015,8 @@ extern "C"
     /// @param radius     How far to look, in meters, at least 0 and finite.
     /// @param filter     The areas usable, or NULL.
     /// @param nearestOut Receives whether a wall was found, and the wall. Zeroed
-    ///                   on any failure.
+    ///                   on any failure but mnav_errorBusy, which leaves it as it
+    ///                   was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// or radius not finite, a negative radius, a polygon id never handed out,
     /// or a filter not built from mnavDefaultQueryFilter or with a NaN cost;
@@ -1045,9 +1056,10 @@ extern "C"
     /// @param wallsOut Receives up to capacity walls, the nearest; NULL when
     ///                 capacity is 0.
     /// @param capacity The room, at least 0.
-    /// @param foundOut Receives the count and whether the node limit cut the search
-    ///                 short. Zeroed on any failure but mnav_errorCapacity, which
-    ///                 gives the total.
+    /// @param foundOut Receives the count and whether the node limit cut the
+    ///                 search short. Zeroed on any failure but
+    ///                 mnav_errorCapacity, which gives the total, and
+    ///                 mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorCapacity` when more walls lie within
     /// the radius than the buffer holds: it holds the nearest and foundOut
     /// counts all; `mnav_errorInvalid` for a NULL argument, a negative
@@ -1106,7 +1118,8 @@ extern "C"
     /// @param radius   How far to search, in meters, at least 0 and finite.
     /// @param seed     Any value.
     /// @param filter   The areas usable, or NULL.
-    /// @param pointOut Receives the point. Zeroed on any failure.
+    /// @param pointOut Receives the point. Zeroed on any failure but
+    ///                 mnav_errorBusy, which leaves it as it was.
     /// @return As mnavQuery_FindWallDistance; also `mnav_errorLimit` when a polygon
     /// clipped to the circle, its 32-gon, has more than MNAV_MAX_CLIP_CORNERS
     /// corners, which rounding alone can cause. Also `mnav_errorBusy` when
@@ -1131,7 +1144,8 @@ extern "C"
     /// @param endPolygon   The polygon the end lies in.
     /// @param end          The end point.
     /// @param filter       The areas usable and their costs, or NULL.
-    /// @param endOut       Receives how the search ended. Zeroed on any failure.
+    /// @param endOut       Receives how the search ended. Zeroed on any failure
+    ///                     but mnav_errorBusy, which leaves it as it was.
     /// @return As mnavQuery_FindPath. Also `mnav_errorBusy` when called back in from
     /// host code a call using the context runs (a link generation's clearance
     /// test, a hierarchy's allocator as it builds), one misuse counted.
@@ -1189,7 +1203,8 @@ extern "C"
     /// @param start        The start point.
     /// @param end          The end point; only its ground position counts.
     /// @param filter       The areas usable, or NULL for every walkable one.
-    /// @param rayOut       Receives the result. Zeroed on any failure.
+    /// @param rayOut       Receives the result. Zeroed on any failure but
+    ///                     mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success` whenever the ray was cast, however it ended;
     /// `mnav_errorInvalid` for a NULL argument, a point that is not finite, a
     /// polygon id that never existed, or a filter not built from

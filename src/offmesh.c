@@ -231,10 +231,11 @@ static MNAV_NOINLINE mnavResult StageLinkWork(mnavNavmesh* navmesh, const mnavLi
 static MNAV_NOINLINE mnavResult StageLinkCounted(mnavNavmesh* navmesh, const mnavLinkDef* def,
                                                  mnavLinkId* linkOut)
 {
-    mnavClearOutput(linkOut, sizeof(*linkOut));
-    mnavResult result =
-        mnavHostCountInvalid(MNAV_HOST(navmesh), StageLinkWork(navmesh, def, linkOut));
-    return mnavClearOnFailure(result, linkOut, sizeof(*linkOut));
+    mnavLinkId linkMade = {0};
+    mnavResult result = mnavHostCountInvalid(
+        MNAV_HOST(navmesh), StageLinkWork(navmesh, def, linkOut != nullptr ? &linkMade : nullptr));
+    mnavGiveOutput(result, false, linkOut, &linkMade, sizeof(linkMade));
+    return result;
 }
 
 mnavResult mnavStageLink(mnavNavmesh* navmesh, const mnavLinkDef* def, mnavLinkId* linkOut)

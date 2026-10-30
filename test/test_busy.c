@@ -5,8 +5,9 @@
 // and as it frees, every call that would change the navmesh is refused
 // with mnav_errorBusy and counted as misuse; from a link generation's
 // clearance test, every such call but staging a tile or its removal, and
-// every call that uses the generating context. The outer call gives what
-// it gives with no call back in.
+// every call that uses the generating context. A call refused as busy
+// writes none of the outputs it is given, and the outer call gives what it
+// gives with no call back in.
 
 #include "counting_allocator.h"
 #include "stored_tiles.h"
@@ -54,9 +55,68 @@ typedef struct Reentry
     int32_t made;
     int32_t busy;
     int32_t succeeded;
+    // Calls back in that wrote an output they were given.
+    int32_t wrote;
 } Reentry;
 
 static Reentry s_reentry;
+
+enum
+{
+    PATTERN = 0xA5
+};
+
+// The outputs the calls back in are given, each filled with a byte pattern
+// first: a call refused as busy writes none of them.
+typedef struct Outputs
+{
+    mnavFlightPath flightPath;
+    bool ended;
+    mnavHierarchyReport report;
+    mnavPath path;
+    mnavMove move;
+    mnavCorners corners;
+    int32_t count;
+    bool shortened;
+    mnavGridPath gridPath;
+    mnavNearestWall wall;
+    mnavWallsFound walls;
+    mnavPathEnd end;
+    mnavRay ray;
+    mnavRandomPoint point;
+    mnavLinkId link;
+} Outputs;
+
+static Outputs s_out;
+
+static void Fill(void* output, size_t size)
+{
+    memset(output, PATTERN, size);
+}
+
+// Counts a busy call that wrote its output; any other keeps what it wrote.
+static void Kept(mnavResult result, const void* output, size_t size)
+{
+    const unsigned char* bytes = output;
+    for (size_t i = 0; result == mnav_errorBusy && i < size; ++i)
+    {
+        if (bytes[i] != PATTERN)
+        {
+            s_reentry.wrote += 1;
+            return;
+        }
+    }
+}
+
+// Makes a call back in with its one output filled first.
+#define CALL_WITH(field, call)                                                                     \
+    do                                                                                             \
+    {                                                                                              \
+        Fill(&s_out.field, sizeof(s_out.field));                                                   \
+        mnavResult made_ = (call);                                                                 \
+        Kept(made_, &s_out.field, sizeof(s_out.field));                                            \
+        Count(made_);                                                                              \
+    } while (false)
 
 static void Count(mnavResult result)
 {
@@ -72,12 +132,11 @@ static void CallNavmesh(mnavNavmesh* navmesh)
 {
     const Reentry* r = &s_reentry;
     mnavLinkDef def = s_links[0];
-    mnavLinkId id = {0};
     Count(mnavNavmesh_StageTile(navmesh, s_trench0, sizeof(s_trench0)).result);
     Count(mnavNavmesh_StageTileRemoval(navmesh, 0, 0));
     Count(mnavNavmesh_Commit(navmesh));
     Count(mnavPolygon_StageArea(navmesh, r->polygon, mnav_areaWalkable));
-    Count(mnavStageLink(navmesh, &def, &id));
+    CALL_WITH(link, mnavStageLink(navmesh, &def, &s_out.link));
     Count(mnavStageLinkRemoval(navmesh, r->link));
     Count(mnavLink_StageEnable(navmesh, r->link, false));
     mnavDestroyNavmesh(navmesh);
@@ -90,33 +149,36 @@ static void CallQuery(mnavQuery* q, const mnavNavmesh* n)
 {
     const mnavPolygonId p = s_reentry.polygon;
     const mnavPos3 a = {0.0, 0.0, 0.0};
-    Count(mnavQuery_FindFlightPath(q, nullptr, a, a, nullptr));
+    CALL_WITH(flightPath, mnavQuery_FindFlightPath(q, nullptr, a, a, &s_out.flightPath));
     Count(mnavQuery_BeginFlightPath(q, nullptr, a, a));
-    Count(mnavQuery_ContinueFlightPath(q, nullptr, 1, nullptr));
-    Count(mnavQuery_FinishFlightPath(q, nullptr, nullptr));
-    Count(mnavHierarchy_Build(nullptr, q, n, nullptr, nullptr));
-    Count(mnavHierarchy_Update(nullptr, q, n, nullptr));
-    Count(mnavQuery_FindHierarchicalPath(q, nullptr, n, p, a, p, a, nullptr));
-    Count(mnavQuery_FindPath(q, n, p, a, p, a, nullptr, nullptr));
+    CALL_WITH(ended, mnavQuery_ContinueFlightPath(q, nullptr, 1, &s_out.ended));
+    CALL_WITH(flightPath, mnavQuery_FinishFlightPath(q, nullptr, &s_out.flightPath));
+    CALL_WITH(report, mnavHierarchy_Build(nullptr, q, n, nullptr, &s_out.report));
+    CALL_WITH(report, mnavHierarchy_Update(nullptr, q, n, &s_out.report));
+    CALL_WITH(path, mnavQuery_FindHierarchicalPath(q, nullptr, n, p, a, p, a, &s_out.path));
+    CALL_WITH(path, mnavQuery_FindPath(q, n, p, a, p, a, nullptr, &s_out.path));
     Count(mnavQuery_BeginPath(q, n, p, a, p, a, nullptr));
-    Count(mnavQuery_ContinuePath(q, n, 1, nullptr));
-    Count(mnavQuery_FinishPath(q, n, nullptr));
-    Count(mnavQuery_MoveAlongSurface(q, n, p, a, a, nullptr, nullptr));
-    Count(mnavQuery_FindCorridorCorners(q, nullptr, n, nullptr));
-    Count(mnavQuery_FindCorridorAreas(q, nullptr, n, nullptr, nullptr, 0, nullptr));
-    Count(mnavQuery_MoveCorridor(q, nullptr, n, a, nullptr, nullptr));
-    Count(mnavQuery_MoveCorridorTarget(q, nullptr, n, a, nullptr, nullptr));
-    Count(mnavQuery_ShortcutCorridor(q, nullptr, n, a, nullptr, nullptr));
-    Count(mnavQuery_ReplanCorridor(q, nullptr, n, (mnavVec3){1.0f, 1.0f, 1.0f}, nullptr, nullptr));
-    Count(mnavQuery_FindGridPath(q, nullptr, (mnavCell){0, 0}, (mnavCell){0, 0}, nullptr, nullptr));
-    Count(mnavQuery_FindWallDistance(q, n, p, a, 1.0, nullptr, nullptr));
-    Count(mnavQuery_FindWalls(q, n, p, a, 1.0, nullptr, nullptr, 0, nullptr));
-    Count(mnavQuery_CheckReachable(q, n, p, a, p, a, nullptr, nullptr));
-    Count(mnavQuery_Raycast(q, n, p, a, a, nullptr, nullptr));
-    Count(mnavQuery_FindShortestPath(q, n, p, a, p, a, nullptr, nullptr));
-    Count(mnavQuery_FindRandomPointAround(q, n, p, a, 1.0, 1, nullptr, nullptr));
-    Count(mnavQuery_GenerateLinks(q, n, nullptr, &(mnavTileRange){0, 0, 0, 0}, nullptr, nullptr, 0,
-                                  nullptr));
+    CALL_WITH(ended, mnavQuery_ContinuePath(q, n, 1, &s_out.ended));
+    CALL_WITH(path, mnavQuery_FinishPath(q, n, &s_out.path));
+    CALL_WITH(move, mnavQuery_MoveAlongSurface(q, n, p, a, a, nullptr, &s_out.move));
+    CALL_WITH(corners, mnavQuery_FindCorridorCorners(q, nullptr, n, &s_out.corners));
+    CALL_WITH(count,
+              mnavQuery_FindCorridorAreas(q, nullptr, n, &s_out.corners, nullptr, 0, &s_out.count));
+    CALL_WITH(move, mnavQuery_MoveCorridor(q, nullptr, n, a, nullptr, &s_out.move));
+    CALL_WITH(move, mnavQuery_MoveCorridorTarget(q, nullptr, n, a, nullptr, &s_out.move));
+    CALL_WITH(shortened, mnavQuery_ShortcutCorridor(q, nullptr, n, a, nullptr, &s_out.shortened));
+    CALL_WITH(path, mnavQuery_ReplanCorridor(q, nullptr, n, (mnavVec3){1.0f, 1.0f, 1.0f}, nullptr,
+                                             &s_out.path));
+    CALL_WITH(gridPath, mnavQuery_FindGridPath(q, nullptr, (mnavCell){0, 0}, (mnavCell){0, 0},
+                                               nullptr, &s_out.gridPath));
+    CALL_WITH(wall, mnavQuery_FindWallDistance(q, n, p, a, 1.0, nullptr, &s_out.wall));
+    CALL_WITH(walls, mnavQuery_FindWalls(q, n, p, a, 1.0, nullptr, nullptr, 0, &s_out.walls));
+    CALL_WITH(end, mnavQuery_CheckReachable(q, n, p, a, p, a, nullptr, &s_out.end));
+    CALL_WITH(ray, mnavQuery_Raycast(q, n, p, a, a, nullptr, &s_out.ray));
+    CALL_WITH(path, mnavQuery_FindShortestPath(q, n, p, a, p, a, nullptr, &s_out.path));
+    CALL_WITH(point, mnavQuery_FindRandomPointAround(q, n, p, a, 1.0, 1, nullptr, &s_out.point));
+    CALL_WITH(count, mnavQuery_GenerateLinks(q, n, nullptr, &(mnavTileRange){0, 0, 0, 0}, nullptr,
+                                             nullptr, 0, &s_out.count));
     mnavDestroyQuery(q);
     s_reentry.made += 1;
 }
@@ -262,11 +324,12 @@ static void TestAllocator(bool onAlloc)
     mnavLinkId link;
     mnavNavmesh* plain = Load(false, &plainLink);
     mnavNavmesh* navmesh = Load(true, &link);
-    s_reentry = (Reentry){navmesh, nullptr, link, Polygon(navmesh), onAlloc, !onAlloc, 0, 0, 0};
+    s_reentry = (Reentry){navmesh, nullptr, link, Polygon(navmesh), onAlloc, !onAlloc, 0, 0, 0, 0};
     uint64_t before = mnavNavmesh_GetMisuse(navmesh);
     mnavResult expected = mnav_success;
     mnavResult got = Restage(plain, navmesh, &expected);
     CHECK(s_reentry.made == NAVMESH_CALLS, "called back in");
+    CHECK(s_reentry.wrote == 0, "no call refused as busy wrote an output");
     CHECK(s_reentry.busy == NAVMESH_CALLS - 1, "every call refused as busy");
     CHECK(mnavNavmesh_GetMisuse(navmesh) - before == NAVMESH_CALLS, "each a misuse");
     CHECK(got == expected && Tiles(navmesh) == Tiles(plain), "the outer call's result");
@@ -315,7 +378,7 @@ static void TestClearance(void)
     CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
                                   s_again, LINKS, &expected) == mnav_success,
           "links with a clearance test");
-    s_reentry = (Reentry){navmesh, query, link, Polygon(navmesh), false, false, 0, 0, 0};
+    s_reentry = (Reentry){navmesh, query, link, Polygon(navmesh), false, false, 0, 0, 0, 0};
     uint64_t tiles = Tiles(navmesh);
     uint64_t navmeshBefore = mnavNavmesh_GetMisuse(navmesh);
     uint64_t queryBefore = mnavQuery_GetMisuse(query);
@@ -328,6 +391,7 @@ static void TestClearance(void)
               memcmp(s_links, s_again, (size_t)count * sizeof(s_links[0])) == 0,
           "the same links");
     CHECK(s_reentry.made == NAVMESH_CALLS + QUERY_CALLS, "called back in");
+    CHECK(s_reentry.wrote == 0, "no call refused as busy wrote an output");
     CHECK(s_reentry.succeeded == STAGING_CALLS, "staging allowed");
     CHECK(s_reentry.busy == NAVMESH_CALLS - STAGING_CALLS - 1 + QUERY_CALLS - 1,
           "every other call refused as busy");

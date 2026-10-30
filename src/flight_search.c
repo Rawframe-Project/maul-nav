@@ -673,11 +673,12 @@ static MNAV_NOINLINE mnavResult ContinueFlightPathCounted(mnavQuery* query,
                                                           const mnavFlightVolume* volume,
                                                           int32_t nodes, bool* endedOut)
 {
-    mnavClearOutput(endedOut, sizeof(*endedOut));
-    mnavResult result =
-        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
-                             ContinueFlightPathWork(query, volume, nodes, endedOut));
-    return mnavClearOnFailure(result, endedOut, sizeof(*endedOut));
+    bool endedMade = false;
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
+        ContinueFlightPathWork(query, volume, nodes, endedOut != nullptr ? &endedMade : nullptr));
+    mnavGiveOutput(result, false, endedOut, &endedMade, sizeof(endedMade));
+    return result;
 }
 
 mnavResult mnavQuery_ContinueFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
@@ -733,10 +734,12 @@ static MNAV_NOINLINE mnavResult FinishFlightPathCounted(mnavQuery* query,
                                                         const mnavFlightVolume* volume,
                                                         mnavFlightPath* pathOut)
 {
-    mnavClearOutput(pathOut, sizeof(*pathOut));
-    mnavResult result = mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
-                                             FinishFlightPathWork(query, volume, pathOut));
-    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
+    mnavFlightPath pathMade = {0};
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
+        FinishFlightPathWork(query, volume, pathOut != nullptr ? &pathMade : nullptr));
+    mnavGiveOutput(result, false, pathOut, &pathMade, sizeof(pathMade));
+    return result;
 }
 
 mnavResult mnavQuery_FinishFlightPath(mnavQuery* query, const mnavFlightVolume* volume,
@@ -774,11 +777,12 @@ static MNAV_NOINLINE mnavResult FindFlightPathCounted(mnavQuery* query,
                                                       mnavPos3 start, mnavPos3 end,
                                                       mnavFlightPath* pathOut)
 {
-    mnavClearOutput(pathOut, sizeof(*pathOut));
-    mnavResult result =
-        mnavHostCountInvalid(mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
-                             FindFlightPathWork(query, volume, start, end, pathOut));
-    return mnavClearOnFailure(result, pathOut, sizeof(*pathOut));
+    mnavFlightPath pathMade = {0};
+    mnavResult result = mnavHostCountInvalid(
+        mnavHostFirst(MNAV_HOST(query), MNAV_HOST(volume)),
+        FindFlightPathWork(query, volume, start, end, pathOut != nullptr ? &pathMade : nullptr));
+    mnavGiveOutput(result, false, pathOut, &pathMade, sizeof(pathMade));
+    return result;
 }
 
 mnavResult mnavQuery_FindFlightPath(mnavQuery* query, const mnavFlightVolume* volume,

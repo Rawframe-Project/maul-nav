@@ -409,14 +409,16 @@ static MNAV_NOINLINE mnavResult GenerateLinksCounted(mnavQuery* query, const mna
                                                      mnavLinkDef* linksOut, int32_t capacity,
                                                      int32_t* countOut)
 {
-    mnavClearOutput(countOut, sizeof(*countOut));
+    int32_t countMade = 0;
     mnavResult result = mnavHostCountInvalid(
         mnavHostFirst(MNAV_HOST(query), MNAV_HOST(navmesh)),
-        GenerateLinksWork(query, navmesh, filter, def, tiles, linksOut, capacity, countOut));
+        GenerateLinksWork(query, navmesh, filter, def, tiles, linksOut, capacity,
+                          countOut != nullptr ? &countMade : nullptr));
     // Generation that stopped at a bound counts the links found, as a
     // buffer too small does.
-    return result == mnav_errorLimit ? result
-                                     : mnavClearUnlessCapacity(result, countOut, sizeof(*countOut));
+    mnavGiveOutput(result, result == mnav_errorCapacity || result == mnav_errorLimit, countOut,
+                   &countMade, sizeof(countMade));
+    return result;
 }
 
 mnavResult mnavQuery_GenerateLinks(mnavQuery* query, const mnavNavmesh* navmesh,
