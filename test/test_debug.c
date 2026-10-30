@@ -212,6 +212,16 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
     mnavPolygonId never = {9999, 1, 0};
     CHECK(mnavNavmesh_DebugCorridor(navmesh, &never, 1, &b) == mnav_errorInvalid,
           "an id never handed out");
+    // A refused run leaves the buffer as it was, though its first polygon
+    // would draw.
+    mnavPolygonId run[2] = {path.polygons[0], never};
+    b = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    memset(&s_debugVertices[0], 0xA5, sizeof(s_debugVertices[0]));
+    mnavDebugVertex before = s_debugVertices[0];
+    CHECK(mnavNavmesh_DebugCorridor(navmesh, run, 2, &b) == mnav_errorInvalid &&
+              b.vertexCount == 0 && b.triangleCount == 0 && b.lineCount == 0 &&
+              memcmp(&s_debugVertices[0], &before, sizeof(before)) == 0,
+          "a run refused at its last id draws none of it");
     mnavDestroyQuery(query);
 }
 

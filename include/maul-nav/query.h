@@ -606,10 +606,10 @@ extern "C"
     /// edge, a tile link or an off-mesh link of a kind it includes. Fewer
     /// than all means the corridor needs trimming there and replanning.
     ///
-    /// @param navmesh  The navmesh.
-    /// @param corridor The corridor.
-    /// @param filter   The areas and kinds usable, or NULL for all.
-    /// @param validOut Receives the count. Zeroed on any failure.
+    /// @param navmesh       The navmesh.
+    /// @param corridor      The corridor.
+    /// @param filter        The areas and kinds usable, or NULL for all.
+    /// @param validCountOut Receives the count. Zeroed on any failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor not well formed or a filter not built from
     /// mnavDefaultQueryFilter or with a NaN cost; `mnav_errorLimit` for a
@@ -621,7 +621,7 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_CheckCorridor(const mnavNavmesh* navmesh,
                                                                  const mnavCorridor* corridor,
                                                                  const mnavQueryFilter* filter,
-                                                                 int32_t* validOut);
+                                                                 int32_t* validCountOut);
 
     /// Finds a corridor's straight path from its position to its target:
     /// the funnel over the portals between its polygons.

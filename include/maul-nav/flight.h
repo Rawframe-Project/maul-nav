@@ -716,7 +716,9 @@ extern "C"
     /// @param volume  The flight volume.
     /// @param low     The box's lowest corner, in world coordinates.
     /// @param high    Its highest corner, at least low on every axis.
-    /// @param buffer  The buffer appended to.
+    /// @param buffer  The buffer appended to. Left as it was on any failure but
+    ///                the buffer filling (mnav_errorCapacity), which writes what
+    ///                fits and counts what the whole needs.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corner with a NaN coordinate, a box backward, or a buffer with a count
     /// out of range, an array missing or an origin not finite;
@@ -735,7 +737,9 @@ extern "C"
     /// Appends a flight path's steps, point to point (mnav_debugPath).
     ///
     /// @param path    The path.
-    /// @param buffer  The buffer appended to.
+    /// @param buffer  The buffer appended to. Left as it was on any failure but
+    ///                the buffer filling (mnav_errorCapacity), which writes what
+    ///                fits and counts what the whole needs.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// path with a negative count or no points, or a buffer as
     /// mnavFlightVolume_Debug refuses it; `mnav_errorCapacity` when the buffer

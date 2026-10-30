@@ -331,7 +331,9 @@ extern "C"
     /// @param agents     The agents.
     /// @param agentCount How many, at least 0.
     /// @param height     The lines' height.
-    /// @param buffer     The buffer appended to.
+    /// @param buffer     The buffer appended to. Left as it was on any failure
+    ///                   but the buffer filling (mnav_errorCapacity), which
+    ///                   writes what fits and counts what the whole needs.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents, a height not finite, or a buffer with a count out of range, an
     /// array missing or an origin not finite; for an agent mnavAvoidance_Avoid refuses,
@@ -357,7 +359,9 @@ extern "C"
     /// @param agentCount  How many, at least 0.
     /// @param spheres     The spheres.
     /// @param sphereCount How many, at least 0.
-    /// @param buffer      The buffer appended to.
+    /// @param buffer      The buffer appended to. Left as it was on any failure
+    ///                    but the buffer filling (mnav_errorCapacity), which
+    ///                    writes what fits and counts what the whole needs.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with
     /// agents or spheres, a negative count, or a buffer with a count out of
     /// range, an array missing or an origin not finite; for an agent or sphere

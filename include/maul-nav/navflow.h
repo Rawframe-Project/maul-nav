@@ -255,7 +255,9 @@ extern "C"
     ///
     /// @param field   The field.
     /// @param navmesh The navmesh the field was built on.
-    /// @param buffer  The buffer appended to.
+    /// @param buffer  The buffer appended to. Left as it was on any failure but
+    ///                the buffer filling (mnav_errorCapacity), which writes what
+    ///                fits and counts what the whole needs.
     /// @return `mnav_success`, appending nothing when nothing was begun;
     /// `mnav_errorInvalid` for a NULL argument, a navmesh other than the
     /// field's, or a buffer with a count out of range, an array missing or an
