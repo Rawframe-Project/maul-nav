@@ -220,9 +220,10 @@ static int32_t Valid(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
 
 static MNAV_NOINLINE mnavResult CheckCorridorWork(const mnavNavmesh* navmesh,
                                                   const mnavQueryFilter* filter,
-                                                  const mnavCorridor* corridor, int32_t* validOut)
+                                                  const mnavCorridor* corridor,
+                                                  int32_t* validCountOut)
 {
-    if (navmesh == nullptr || validOut == nullptr || !WellFormed(corridor))
+    if (navmesh == nullptr || validCountOut == nullptr || !WellFormed(corridor))
     {
         return mnav_errorInvalid;
     }
@@ -233,26 +234,26 @@ static MNAV_NOINLINE mnavResult CheckCorridorWork(const mnavNavmesh* navmesh,
         return result;
     }
     bool stale = false;
-    *validOut = Valid(navmesh, usable, corridor, &stale);
+    *validCountOut = Valid(navmesh, usable, corridor, &stale);
     return mnav_success;
 }
 
 static MNAV_NOINLINE mnavResult CheckCorridorCounted(const mnavNavmesh* navmesh,
                                                      const mnavQueryFilter* filter,
                                                      const mnavCorridor* corridor,
-                                                     int32_t* validOut)
+                                                     int32_t* validCountOut)
 {
-    mnavClearOutput(validOut, sizeof(*validOut));
+    mnavClearOutput(validCountOut, sizeof(*validCountOut));
     mnavResult result = mnavHostCountInvalid(
-        MNAV_HOST(navmesh), CheckCorridorWork(navmesh, filter, corridor, validOut));
-    return mnavClearOnFailure(result, validOut, sizeof(*validOut));
+        MNAV_HOST(navmesh), CheckCorridorWork(navmesh, filter, corridor, validCountOut));
+    return mnavClearOnFailure(result, validCountOut, sizeof(*validCountOut));
 }
 
 mnavResult mnavNavmesh_CheckCorridor(const mnavNavmesh* navmesh, const mnavCorridor* corridor,
-                                     const mnavQueryFilter* filter, int32_t* validOut)
+                                     const mnavQueryFilter* filter, int32_t* validCountOut)
 {
     uint64_t env = mnavFloatEnvEnter();
-    mnavResult result = CheckCorridorCounted(navmesh, filter, corridor, validOut);
+    mnavResult result = CheckCorridorCounted(navmesh, filter, corridor, validCountOut);
     mnavFloatEnvLeave(env);
     return result;
 }

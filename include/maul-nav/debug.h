@@ -26,7 +26,9 @@ extern "C"
     ///
     /// @param navmesh The navmesh.
     /// @param tiles   The tile places drawn, or NULL for every tile.
-    /// @param buffer  The buffer appended to.
+    /// @param buffer  The buffer appended to. Left as it was on any failure but
+    ///                the buffer filling (mnav_errorCapacity), which writes what
+    ///                fits and counts what the whole needs.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// range backward, or a buffer with a count out of range, an array
     /// missing or an origin not finite; `mnav_errorCapacity` when the
@@ -44,7 +46,9 @@ extern "C"
     /// snapped points when attached, its defined ones otherwise.
     ///
     /// @param navmesh The navmesh.
-    /// @param buffer  The buffer appended to.
+    /// @param buffer  The buffer appended to. Left as it was on any failure but
+    ///                the buffer filling (mnav_errorCapacity), which writes what
+    ///                fits and counts what the whole needs.
     /// @return As mnavNavmesh_Debug.
     /// @par Thread safety
     /// Safe from any thread. Any number of threads may read the navmesh
@@ -56,7 +60,9 @@ extern "C"
     /// Appends a path's straight line, point to point.
     ///
     /// @param path   The path.
-    /// @param buffer The buffer appended to.
+    /// @param buffer The buffer appended to. Left as it was on any failure but
+    ///               the buffer filling (mnav_errorCapacity), which writes what
+    ///               fits and counts what the whole needs.
     /// @return As mnavNavmesh_Debug.
     /// @par Thread safety
     /// Safe from any thread; the buffer is used by one thread at a time.
@@ -69,7 +75,9 @@ extern "C"
     /// @param navmesh  The navmesh.
     /// @param polygons The polygons.
     /// @param count    How many, at least 0.
-    /// @param buffer   The buffer appended to.
+    /// @param buffer   The buffer appended to. Left as it was on any failure but
+    ///                 the buffer filling (mnav_errorCapacity), which writes what
+    ///                 fits and counts what the whole needs.
     /// @return As mnavNavmesh_Debug, and `mnav_errorInvalid` for a polygon id
     /// never handed out.
     /// @par Thread safety

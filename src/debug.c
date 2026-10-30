@@ -234,14 +234,18 @@ static MNAV_NOINLINE mnavResult DebugCorridorWork(const mnavNavmesh* navmesh,
     {
         return mnav_errorInvalid;
     }
+    // Every id is checked before the first fill, so a refused corridor
+    // leaves the buffer as it was.
     for (int32_t i = 0; i < count; ++i)
     {
-        mnavResult result = mnavCheckPolygon(navmesh, polygons[i]);
-        if (result == mnav_errorInvalid)
+        if (mnavCheckPolygon(navmesh, polygons[i]) == mnav_errorInvalid)
         {
-            return result;
+            return mnav_errorInvalid;
         }
-        if (result == mnav_success)
+    }
+    for (int32_t i = 0; i < count; ++i)
+    {
+        if (mnavCheckPolygon(navmesh, polygons[i]) == mnav_success)
         {
             Fill(buffer, navmesh, (int32_t)polygons[i].slot - 1, (int32_t)polygons[i].polygon,
                  mnav_debugCorridor, (uint16_t)(i & 0xFFFF));

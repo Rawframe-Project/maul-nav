@@ -232,7 +232,9 @@ extern "C"
     ///
     /// @param field  The field.
     /// @param height The arrows' height.
-    /// @param buffer The buffer appended to.
+    /// @param buffer The buffer appended to. Left as it was on any failure but
+    ///               the buffer filling (mnav_errorCapacity), which writes what
+    ///               fits and counts what the whole needs.
     /// @return `mnav_success`, appending nothing when nothing was begun;
     /// `mnav_errorInvalid` for a NULL argument, a height not finite, or a
     /// buffer with a count out of range, an array missing or an origin not
