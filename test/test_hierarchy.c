@@ -184,7 +184,7 @@ static void TestAgainstPlainPaths(float side)
     mnavHierarchy* hierarchy = Hierarchy(2);
     mnavHierarchyReport report;
     CHECK(mnavHierarchy_Build(hierarchy, small, navmesh, nullptr, &report) == mnav_success &&
-              report.clusters == 16 && report.transitions > 0 && report.edges > 0,
+              report.clusterCount == 16 && report.transitionCount > 0 && report.edgeCount > 0,
           "built");
     int32_t starved = 0;
     for (int32_t p = 0; p < 4; ++p)
@@ -287,13 +287,13 @@ static void TestLinksBetweenClusters(void)
           "linked");
     mnavHierarchyReport after;
     CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &after) == mnav_success &&
-              after.transitions == before.transitions + 1,
+              after.transitionCount == before.transitionCount + 1,
           "one transition, one way");
     // A hierarchy with room for the sides' transitions alone refuses the
     // link's.
     mnavHierarchyDef tight = Small();
     tight.clusterTiles = 2;
-    tight.limits.transitions = before.transitions;
+    tight.limits.transitions = before.transitionCount;
     mnavHierarchy* full = nullptr;
     CHECK(mnavCreateHierarchy(&tight, &full) == mnav_success &&
               mnavHierarchy_Build(full, query, navmesh, nullptr, nullptr) == mnav_errorCapacity,
@@ -315,7 +315,7 @@ static void TestLinksBetweenClusters(void)
     mnavQueryFilter walkers = mnavDefaultQueryFilter();
     walkers.kinds = 0;
     CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, &walkers, &after) == mnav_success &&
-              after.transitions == before.transitions,
+              after.transitionCount == before.transitionCount,
           "no transition for a kind not crossed");
     mnavDestroyHierarchy(hierarchy);
     mnavDestroyQuery(query);
@@ -443,7 +443,8 @@ static bool Agree(mnavHierarchy* updated, mnavHierarchy* fresh, mnavQuery* query
     mnavHierarchyReport built;
     bool ok = mnavHierarchy_Update(updated, query, navmesh, out) == mnav_success &&
               mnavHierarchy_Build(fresh, query, navmesh, filter, &built) == mnav_success;
-    return ok && out->transitions == built.transitions && out->edges == built.edges &&
+    return ok && out->transitionCount == built.transitionCount &&
+           out->edgeCount == built.edgeCount &&
            PairsHash(navmesh, query, updated) == PairsHash(navmesh, query, fresh);
 }
 
@@ -460,26 +461,26 @@ static void TestUpdates(void)
     mnavHierarchyReport built;
     mnavHierarchyReport report;
     CHECK(mnavHierarchy_Build(updated, query, navmesh, &filter, &built) == mnav_success &&
-              built.searches == built.transitions,
+              built.searchCount == built.transitionCount,
           "built, a search per transition");
     CHECK(mnavHierarchy_Update(updated, query, navmesh, &report) == mnav_success &&
-              report.searches == 0,
+              report.searchCount == 0,
           "nothing to update");
     // Areas changed in one tile: only its cluster's entries searched.
     Paint(navmesh, 70.0, 90.0, 100.0, 3);
-    CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) && report.searches > 0 &&
-              report.searches * 4 < built.searches,
+    CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) && report.searchCount > 0 &&
+              report.searchCount * 4 < built.searchCount,
           "a few searches, the same graph and paths");
-    int32_t first = report.searches;
+    int32_t first = report.searchCount;
     // Again elsewhere: only the new change searched, as by a hierarchy
     // that saw only that change.
     Paint(navmesh, 150.0, 170.0, 200.0, 3);
     mnavHierarchyReport alone;
     CHECK(mnavHierarchy_Update(fresh, query, navmesh, &alone) == mnav_success &&
               Agree(updated, fresh, query, navmesh, &filter, &report) &&
-              report.searches == alone.searches && report.searches > 0,
+              report.searchCount == alone.searchCount && report.searchCount > 0,
           "only the new change searched");
-    printf("updates searched %d and %d of %d\n", first, report.searches, built.searches);
+    printf("updates searched %d and %d of %d\n", first, report.searchCount, built.searchCount);
     // A link: built again.
     mnavLinkDef def = {{40.0, 0.0, 56.0}, {40.0, 0.0, 66.0}, 1.0f, 2.0f, 0, true, 0.0f};
     mnavLinkId id;
@@ -487,13 +488,15 @@ static void TestUpdates(void)
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "linked");
     CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
-              report.searches == report.transitions && report.transitions == built.transitions + 2,
+              report.searchCount == report.transitionCount &&
+              report.transitionCount == built.transitionCount + 2,
           "built again for a link");
     // The ground the link lands on left out: built again, one transition
     // gone.
     Paint(navmesh, 38.0, 42.0, 66.0, 4);
     CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
-              report.searches == report.transitions && report.transitions == built.transitions + 1,
+              report.searchCount == report.transitionCount &&
+              report.transitionCount == built.transitionCount + 1,
           "built again for a landing");
     // The link removed, then another with another cost in its place,
     // with no update between: built again all the same.
@@ -505,7 +508,7 @@ static void TestUpdates(void)
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "linked again");
     CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
-              report.searches == report.transitions,
+              report.searchCount == report.transitionCount,
           "built again for a link's cost");
     // A tile replaced by another, with a block on it: built again.
     mnavBakeDef bakeDef = mnavDefaultBakeDef();
@@ -522,14 +525,14 @@ static void TestUpdates(void)
           "a tile replaced");
     s_outlineCount -= 1;
     CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
-              report.searches == report.transitions,
+              report.searchCount == report.transitionCount,
           "built again for a tile");
     // A tile removed: built again.
     CHECK(mnavNavmesh_StageTileRemoval(navmesh, 7, 7) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "a tile removed");
     CHECK(Agree(updated, fresh, query, navmesh, &filter, &report) &&
-              report.searches == report.transitions,
+              report.searchCount == report.transitionCount,
           "built again without a tile");
     mnavNavmesh* other = Load(false);
     CHECK(mnavHierarchy_Update(updated, query, other, &report) == mnav_errorInvalid &&
@@ -556,7 +559,7 @@ static void TestNegativePlaces(void)
     mnavHierarchy* hierarchy = Hierarchy(2);
     mnavHierarchyReport here;
     CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &here) == mnav_success &&
-              here.clusters == 4,
+              here.clusterCount == 4,
           "built");
     mnavDestroyNavmesh(navmesh);
     BakeWorld(-128.0f, 4, back, backSizes);
@@ -673,7 +676,7 @@ static void TestUpdatePastTheEdgeLimit(void)
     mnavDestroyHierarchy(probe);
     mnavHierarchyDef def = Small();
     def.clusterTiles = 2;
-    def.limits.edges = closed.edges;
+    def.limits.edges = closed.edgeCount;
     mnavHierarchy* tight = nullptr;
     CHECK(mnavCreateHierarchy(&def, &tight) == mnav_success &&
               mnavHierarchy_Build(tight, query, navmesh, &filter, nullptr) == mnav_success,
@@ -681,7 +684,7 @@ static void TestUpdatePastTheEdgeLimit(void)
     Paint(navmesh, 226.0, 232.0, 60.5, mnav_areaWalkable);
     mnavHierarchyReport opened;
     mnavResult result = mnavHierarchy_Update(tight, query, navmesh, &opened);
-    printf("edge limit: %d edges closed\n", closed.edges);
+    printf("edge limit: %d edges closed\n", closed.edgeCount);
     CHECK(result == mnav_errorCapacity, "the opened gap's edges past the limit");
     mnavDestroyHierarchy(tight);
     mnavDestroyQuery(query);
@@ -832,11 +835,11 @@ static void TestLimitsAndChecks(void)
     // with room for one fewer is refused, one with room for all searches.
     mnavHierarchyReport report = {0};
     CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &report) == mnav_success &&
-              report.transitions > 1,
+              report.transitionCount > 1,
           "rebuilt");
     mnavQueryDef fewDef = mnavDefaultQueryDef();
     fewDef.limits.pathLength = 1.0e5f;
-    fewDef.limits.transitions = report.transitions - 1;
+    fewDef.limits.transitions = report.transitionCount - 1;
     mnavQuery* few = nullptr;
     CHECK(mnavCreateQuery(&fewDef, &few) == mnav_success &&
               mnavQuery_FindHierarchicalPath(few, hierarchy, navmesh, a.polygon, a.point, a.polygon,
@@ -844,7 +847,7 @@ static void TestLimitsAndChecks(void)
               path.end == 0 && path.polygonCount == 0,
           "a context with room for too few transitions");
     mnavDestroyQuery(few);
-    fewDef.limits.transitions = report.transitions;
+    fewDef.limits.transitions = report.transitionCount;
     CHECK(mnavCreateQuery(&fewDef, &few) == mnav_success &&
               mnavQuery_FindHierarchicalPath(few, hierarchy, navmesh, a.polygon, a.point, a.polygon,
                                              a.point, &path) == mnav_success,
@@ -947,7 +950,7 @@ static void TestUpdatesMatchBuildsUnderAFilter(float side)
                   mnavHierarchy_Update(updated, query, navmesh, &a) == mnav_success &&
                   mnavHierarchy_Build(built, query, navmesh, &filter, &b) == mnav_success,
               "brought up to date");
-        same = same && a.transitions == b.transitions && a.edges == b.edges &&
+        same = same && a.transitionCount == b.transitionCount && a.edgeCount == b.edgeCount &&
                PathsHash(query, updated, navmesh, side) == PathsHash(query, built, navmesh, side);
     }
     CHECK(same, "an update gives the graph a build gives");
@@ -1012,7 +1015,7 @@ static void TestStoredWorld(void)
     mnavHierarchy* hierarchy = Hierarchy(1);
     mnavHierarchyReport report;
     CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, &report) == mnav_success &&
-              report.clusters == 4 && report.transitions > 0 && report.edges > 0,
+              report.clusterCount == 4 && report.transitionCount > 0 && report.edgeCount > 0,
           "built");
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, &report, (int64_t)sizeof(report));
     const double pairs[3][4] = {

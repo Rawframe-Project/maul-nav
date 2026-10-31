@@ -167,20 +167,20 @@ static void TestABlockedBox(void)
     mnavVec3 half = {1.0f, 1.0f, 1.0f};
     CHECK(mnavNavmesh_FindPolygons(navmesh, door, half, nullptr, found, 8, &count) ==
                   mnav_success &&
-              count.count == 1 && !count.incomplete,
+              count.polygonCount == 1 && !count.incomplete,
           "the middle square");
     CHECK(mnavPolygon_StageArea(navmesh, found[0], mnav_areaNone) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success &&
               Reach(query, navmesh, 18.0) == mnav_pathNone &&
               mnavNavmesh_FindPolygons(navmesh, door, half, nullptr, found, 8, &count) ==
                   mnav_success &&
-              count.count == 0,
+              count.polygonCount == 0,
           "blocked, and no longer walkable");
     mnavQueryFilter blocked = mnavDefaultQueryFilter();
     blocked.areas = (uint64_t)1 << mnav_areaNone;
     CHECK(mnavNavmesh_FindPolygons(navmesh, door, half, &blocked, found, 8, &count) ==
                   mnav_success &&
-              count.count == 1 &&
+              count.polygonCount == 1 &&
               mnavPolygon_StageArea(navmesh, found[0], mnav_areaWalkable) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success &&
               Reach(query, navmesh, 18.0) == mnav_pathFound,

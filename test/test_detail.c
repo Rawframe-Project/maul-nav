@@ -215,7 +215,7 @@ static void TestFlatSquare(void)
     Load(&scene);
     part = Read(Over(4, 4, 0));
     CHECK(part.vertices == 4, "flat samples are dropped");
-    CHECK(s_report.fallbackHeights == 0, "every sample found a height");
+    CHECK(s_report.fallbackHeightCount == 0, "every sample found a height");
 }
 
 static void TestBumpOnAnEdgeIsSampled(void)
@@ -249,7 +249,7 @@ static void TestHillInsideIsSampled(void)
     Part part = Read(polygon);
     CHECK(part.sound && part.outline == 4, "the outline unsampled");
     CHECK(HasCorner(polygon, 80, 6, 80), "the hilltop added");
-    CHECK(s_report.cappedDetail == 0, "within the cap");
+    CHECK(s_report.cappedDetailCount == 0, "within the cap");
     // A hill exactly the maximum error tall is within it.
     scene = Bumped(5, 5, 1);
     Load(&scene);
@@ -452,7 +452,7 @@ static void TestNoHeightsFallBackAndCount(void)
     {
         level = level && s_drawVertices[i].y == s_drawVertices[0].y;
     }
-    CHECK(s_report.fallbackHeights > 0 && level, "counted, the surface flat");
+    CHECK(s_report.fallbackHeightCount > 0 && level, "counted, the surface flat");
 }
 
 static void TestSearchTakesTheHeightNearestTheMean(void)
@@ -531,7 +531,8 @@ static void TestBumpyGroundReachesTheCap(void)
               mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
     mnavDestroyBaker(baker);
-    CHECK(report.cappedDetail > 0 && report.partialRings == 0, "some polygons reach the cap");
+    CHECK(report.cappedDetailCount > 0 && report.partialRingCount == 0,
+          "some polygons reach the cap");
 }
 
 static void TestLevelDetailIsSound(void)
@@ -556,7 +557,7 @@ static void TestLevelDetailIsSound(void)
                   mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
               "baked");
         mnavDestroyBaker(baker);
-        CHECK(report.partialRings == 0 && report.detailTriangles >= report.polygons,
+        CHECK(report.partialRingCount == 0 && report.detailTriangleCount >= report.polygonCount,
               "every polygon's detail whole");
     }
 }
@@ -613,7 +614,7 @@ static void TestSliverOutlinesTriangulateWhole(void)
     // triangulate whole; on their edges, every outline does.
     const mnavVec3 vertices[3] = {{4.0f, 0.0f, 4.0f}, {35.0f, 0.5f, 25.0f}, {33.0f, 0.5f, 25.0f}};
     LoadTriangle(vertices, 2);
-    CHECK(s_report.polygons == 7 && s_report.partialRings == 0, "every outline whole");
+    CHECK(s_report.polygonCount == 7 && s_report.partialRingCount == 0, "every outline whole");
     CHECK(EveryTriangleHasArea(), "every triangle with area");
 }
 
@@ -626,7 +627,7 @@ static void TestEdgeTakesEachOfItsSixteenths(void)
     // each of them once: no two of its points coincide.
     const mnavVec3 vertices[3] = {{1.0f, 0.0f, 1.25f}, {5.75f, 0.5f, 1.5f}, {5.0f, 0.0f, 8.5f}};
     LoadTriangle(vertices, 1);
-    CHECK(s_report.polygons == 1 && s_report.partialRings == 0, "one polygon, whole");
+    CHECK(s_report.polygonCount == 1 && s_report.partialRingCount == 0, "one polygon, whole");
     CHECK(EveryTriangleHasArea(), "every triangle with area");
 }
 

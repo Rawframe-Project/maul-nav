@@ -140,10 +140,10 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a def
     /// not from mnavDefaultLinkGenDef, a def value NaN or below 0, a spacing of
     /// 0 or below the navmesh's cell size, a detour other than 0 below 1 or
-    /// past 10^6, a kind of MNAV_LINK_KINDS or more, a tile range backward, or
-    /// a filter not built from mnavDefaultQueryFilter or with a NaN cost;
-    /// `mnav_errorLimit` for a def value past its MNAV_MAX_ bound, an infinity
-    /// included, or a filter cost past MNAV_MIN_AREA_COST or
+    /// past 10^6, a negative kind or one of MNAV_LINK_KINDS or more, a tile
+    /// range backward, or a filter not built from mnavDefaultQueryFilter or
+    /// with a NaN cost; `mnav_errorLimit` for a def value past its MNAV_MAX_
+    /// bound, an infinity included, or a filter cost past MNAV_MIN_AREA_COST or
     /// MNAV_MAX_AREA_COST, an infinity included; `mnav_errorCapacity` when more
     /// links were generated than the buffer holds, the first capacity written;
     /// `mnav_errorLimit` when generation stops, the links found so far counted

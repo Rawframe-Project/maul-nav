@@ -89,7 +89,7 @@ extern "C"
     typedef struct mnavFound
     {
         // The polygons found, also beyond the buffer's capacity.
-        int32_t count;
+        int32_t polygonCount;
         // Whether part of the box lies on places with no tile loaded.
         bool incomplete;
     } mnavFound;
@@ -544,7 +544,7 @@ extern "C"
         mnavPos3 position;
         mnavPos3 target;
         mnavPolygonId* polygons;
-        int32_t count;
+        int32_t polygonCount;
         int32_t capacity;
     } mnavCorridor;
 
@@ -1047,7 +1047,7 @@ extern "C"
     typedef struct mnavWallsFound
     {
         // The walls within the radius, also beyond the buffer's capacity.
-        int32_t count;
+        int32_t wallCount;
         // Whether the context's node limit cut the search short, so that
         // more walls may lie unseen.
         bool limited;

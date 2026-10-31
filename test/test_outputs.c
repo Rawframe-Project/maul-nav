@@ -494,7 +494,7 @@ static void TestPastTheOwner(void)
     CHECK(mnavNavmesh_FindPolygons(navmesh, (mnavPos3){32.0, 0.0, 32.0},
                                    (mnavVec3){64.0f, 64.0f, 64.0f}, nullptr, one, 1,
                                    &s_out.found) == mnav_errorCapacity &&
-              s_out.found.count > 1 && one[0].slot != 0 && one[0].generation != 0,
+              s_out.found.polygonCount > 1 && one[0].slot != 0 && one[0].generation != 0,
           "a count past the room is kept, with the first polygon");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);

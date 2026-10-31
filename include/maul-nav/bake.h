@@ -147,7 +147,7 @@ extern "C"
         // meters, 0 to MNAV_MAX_EDGE_ERROR. Walls simplified a cell or more
         // can cross themselves or each other, and a ring that then does not
         // triangulate whole loses the area it did not triangulate; the
-        // report counts it in partialRings.
+        // report counts it in partialRingCount.
         float maxEdgeError;
         // The longest wall edge, in meters, from 0 to 2^30 cells; 0 for no
         // limit, and a length below a cell limits walls to one cell.
@@ -575,13 +575,13 @@ extern "C"
         uint64_t fingerprint;
         // Input triangles that reach the tile, walkable open spans,
         // regions, polygons, vertices, detail vertices and triangles.
-        int32_t triangles;
-        int32_t spans;
-        int32_t regions;
-        int32_t polygons;
-        int32_t vertices;
-        int32_t detailVertices;
-        int32_t detailTriangles;
+        int32_t triangleCount;
+        int32_t spanCount;
+        int32_t regionCount;
+        int32_t polygonCount;
+        int32_t vertexCount;
+        int32_t detailVertexCount;
+        int32_t detailTriangleCount;
         // The tile's bytes, and the most memory the bake held at once.
         uint64_t tileBytes;
         uint64_t memoryPeak;
@@ -595,13 +595,13 @@ extern "C"
         // height and took the polygon's, and polygons whose detail reached
         // its vertex cap. Rings cut short usually come from a large
         // maxEdgeError.
-        int32_t droppedHoles;
-        int32_t partialRings;
-        int32_t fallbackHeights;
-        int32_t cappedDetail;
+        int32_t holesDropped;
+        int32_t partialRingCount;
+        int32_t fallbackHeightCount;
+        int32_t cappedDetailCount;
         // Islands of walkable space smaller than the minimum region area
         // and away from the tile's border, dropped.
-        int32_t droppedRegions;
+        int32_t regionsDropped;
     } mnavBakeReport;
 
     /// Makes a baker from a def: checks the def and keeps a copy, its
@@ -666,8 +666,9 @@ extern "C"
     /// height (the sample) or an area of MNAV_AREA_TYPES or more (the cell) is
     /// `mnav_errorInvalid`, a side past MNAV_MAX_TERRAIN_SIDE or a sample past
     /// the extent input may have `mnav_errorLimit`; a volume with fewer than 3
-    /// points, a kind out of range, an area volume's area not walkable, heights
-    /// not finite or backward, or a NaN point coordinate (the point) is
+    /// points, a negative kind or one past mnav_volumeArea, an area volume's
+    /// area not walkable, heights not finite or backward, or a NaN point
+    /// coordinate (the point) is
     /// `mnav_errorInvalid`, a point past the extent, an infinity included (the
     /// point), `mnav_errorLimit`; a tile index made for another grid, another
     /// number of meshes or another number of triangles in a mesh is

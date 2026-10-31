@@ -77,7 +77,7 @@ static void TestMaking(void)
     mnavBakeReport report;
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBaker_BakeTile(baker, &input, 9, 9, &report) == mnav_success &&
-              report.polygons == 0,
+              report.polygonCount == 0,
           "an include volume over empty ground");
     mnavDestroyBaker(baker);
 }

@@ -265,7 +265,7 @@ static void TestHoles(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
                                  0, 0, &report) == mnav_success &&
-              report.polygons > 4,
+              report.polygonCount > 4,
           "a floor round a pillar");
     // Counted on a baker that has baked before, as every bake below is.
     FailAfter(-1);
@@ -302,7 +302,7 @@ static void TestBorderVertices(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr},
                                  0, 0, &report) == mnav_success &&
-              report.regions == 2,
+              report.regionCount == 2,
           "the floor and the ramp");
     // Counted on a baker that has baked before, as every bake below is.
     FailAfter(-1);

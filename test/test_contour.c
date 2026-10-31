@@ -111,7 +111,7 @@ static void TestSquareIsFourWalls(void)
     }
     CHECK(level, "at the floor's top");
     CHECK(Lines(mnav_debugInnerEdge) == 0 && Lines(mnav_debugTileSide) == 0 &&
-              s_report.polygons == 1,
+              s_report.polygonCount == 1,
           "one polygon, walls all round");
 }
 
@@ -126,7 +126,7 @@ static void TestDroppedRegionHasNoContour(void)
     Scene scene = Flat(0, false);
     AddCells(&scene, 20, 20, 22, 22, 0, mnav_areaWalkable);
     Load(&scene);
-    CHECK(s_report.regions == 1 && s_report.droppedRegions == 1, "the island dropped");
+    CHECK(s_report.regionCount == 1 && s_report.regionsDropped == 1, "the island dropped");
     CHECK(Lines(mnav_debugWall) == 4, "the square's walls alone");
 }
 
@@ -173,7 +173,7 @@ static void TestRegionsShareTheirEdge(void)
         }
     }
     Load(&scene);
-    CHECK(s_report.regions == 2, "two regions");
+    CHECK(s_report.regionCount == 2, "two regions");
     int32_t inner = Lines(mnav_debugInnerEdge);
     int32_t along = 0;
     for (int32_t l = 0; l < inner; ++l)
@@ -284,7 +284,7 @@ static void TestCornerHoleLeavesNoRepeat(void)
         {
             repeats = repeats || (s_lines[l].x0 == s_lines[l].x1 && s_lines[l].z0 == s_lines[l].z1);
         }
-        CHECK(walls >= 3 && !repeats && s_report.polygons > 0, "no wall of no length");
+        CHECK(walls >= 3 && !repeats && s_report.polygonCount > 0, "no wall of no length");
     }
 }
 
@@ -454,7 +454,7 @@ static void TestRegionsOfOneAreaMeetOnTheSide(void)
               mnavNavmesh_Commit(s_navmesh) == mnav_success,
           "loaded");
     int32_t sides = Lines(mnav_debugTileSide);
-    CHECK(s_report.regions == 2 && HasTileLine(sides, 128, 0, 128, 118),
+    CHECK(s_report.regionCount == 2 && HasTileLine(sides, 128, 0, 128, 118),
           "one edge across where the regions meet");
 }
 

@@ -188,11 +188,11 @@ extern "C"
         // Input triangles that reach the tile, solid spans, the tile's
         // cubes, nodes and leaves, its bytes, and the most memory the bake
         // held at once.
-        int32_t triangles;
-        int32_t spans;
-        int32_t cubes;
-        int32_t nodes;
-        int32_t leaves;
+        int32_t triangleCount;
+        int32_t spanCount;
+        int32_t cubeCount;
+        int32_t nodeCount;
+        int32_t leafCount;
         uint64_t tileBytes;
         uint64_t memoryPeak;
     } mnavFlightBakeReport;

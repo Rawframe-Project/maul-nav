@@ -180,15 +180,15 @@ static void AfterCommit(Run* run)
     int32_t valid = -1;
     mnavResult checked = mnavNavmesh_CheckCorridor(run->navmesh, &run->corridor, nullptr, &valid);
     NoteResult(run, checked);
-    Expect(checked != mnav_success || (valid >= 0 && valid <= run->corridor.count));
+    Expect(checked != mnav_success || (valid >= 0 && valid <= run->corridor.polygonCount));
     Note(run, &valid, sizeof(valid));
-    if (checked == mnav_success && valid < run->corridor.count)
+    if (checked == mnav_success && valid < run->corridor.polygonCount)
     {
         mnavPath path;
         mnavResult replanned = mnavQuery_ReplanCorridor(run->query, &run->corridor, run->navmesh,
                                                         (mnavVec3){2, 2, 2}, nullptr, &path);
         NotePath(run, replanned, &path);
-        Expect(run->corridor.count >= 0 && run->corridor.count <= CORRIDOR);
+        Expect(run->corridor.polygonCount >= 0 && run->corridor.polygonCount <= CORRIDOR);
     }
 }
 
@@ -220,7 +220,7 @@ static mnavResult DrawCorridor(void* context, mnavDebugBuffer* buffer)
 {
     const Drawing* d = context;
     return mnavNavmesh_DebugCorridor(d->run->navmesh, d->run->corridor.polygons,
-                                     d->run->corridor.count, buffer);
+                                     d->run->corridor.polygonCount, buffer);
 }
 
 static mnavResult DrawPath(void* context, mnavDebugBuffer* buffer)
@@ -331,7 +331,7 @@ static void Step(Run* run, Reader* r)
                                                   Point(r), nullptr, &move);
         NoteResult(run, moved);
         Expect(moved != mnav_success || Finite(move.point));
-        Expect(run->corridor.count >= 0 && run->corridor.count <= CORRIDOR);
+        Expect(run->corridor.polygonCount >= 0 && run->corridor.polygonCount <= CORRIDOR);
     }
 }
 

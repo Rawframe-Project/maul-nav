@@ -279,7 +279,7 @@ static void TestCollapsingBridge(mnavQuery* query)
           "the bridge's tiles replaced");
     int32_t valid = 0;
     CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
-              valid < corridor.count,
+              valid < corridor.polygonCount,
           "the corridor broken where the bridge was");
     mnavNearest middle = {0};
     CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){16, 5, 5}, (mnavVec3){0.5f, 1.0f, 0.5f},
@@ -650,7 +650,7 @@ static int32_t GatherWalls(mnavQuery* query, const mnavNavmesh* navmesh, int32_t
             mnavQuery_FindWalls(query, navmesh, w->corridor.polygons[0], w->corridor.position,
                                 WALL_RANGE, nullptr, w->walls, CROWD_WALLS, &found);
         CHECK(result == mnav_success || result == mnav_errorCapacity, "walls");
-        w->wallCount = found.count < CROWD_WALLS ? found.count : CROWD_WALLS;
+        w->wallCount = found.wallCount < CROWD_WALLS ? found.wallCount : CROWD_WALLS;
         w->wallsAt = w->corridor.position;
     }
     memset(s_wallTable, 0xFF, sizeof(s_wallTable));

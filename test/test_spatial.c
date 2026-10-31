@@ -226,9 +226,9 @@ static void TestWalls(mnavNavmesh* navmesh)
     CHECK(mnavNavmesh_FindPolygons(navmesh, (mnavPos3){32.5, 1.6, 25.0},
                                    (mnavVec3){0.4f, 1.0f, 6.0f}, nullptr, across, 16,
                                    &found) == mnav_success &&
-              found.count > 0 && found.count <= 16,
+              found.polygonCount > 0 && found.polygonCount <= 16,
           "the polygons beyond the side");
-    for (int32_t i = 0; i < found.count; ++i)
+    for (int32_t i = 0; i < found.polygonCount; ++i)
     {
         CHECK(mnavPolygon_StageArea(navmesh, across[i], 3) == mnav_success, "painted");
     }
@@ -240,7 +240,7 @@ static void TestWalls(mnavNavmesh* navmesh)
               wall.found && fabs(wall.wall.point.x - 32.0) < 1e-6 &&
               fabs(wall.wall.distance - (32.0 - near.point.x)) < 1e-6,
           "the tile side as a wall");
-    for (int32_t i = 0; i < found.count; ++i)
+    for (int32_t i = 0; i < found.polygonCount; ++i)
     {
         CHECK(mnavPolygon_StageArea(navmesh, across[i], mnav_areaWalkable) == mnav_success,
               "painted back");
@@ -367,10 +367,10 @@ static void TestWallList(const mnavNavmesh* navmesh)
                       !found.limited,
                   "listed");
             tried += 1;
-            listed += found.count;
-            sound = sound && (found.count > 0) == wall.found &&
-                    (found.count == 0 || SameWall(&walls[0], &wall.wall));
-            for (int32_t w = 0; w < found.count; ++w)
+            listed += found.wallCount;
+            sound = sound && (found.wallCount > 0) == wall.found &&
+                    (found.wallCount == 0 || SameWall(&walls[0], &wall.wall));
+            for (int32_t w = 0; w < found.wallCount; ++w)
             {
                 sound = sound && SoundWall(navmesh, n.point, 8.0, &walls[w],
                                            w > 0 ? &walls[w - 1] : nullptr);
@@ -378,18 +378,18 @@ static void TestWallList(const mnavNavmesh* navmesh)
             mnavWallsFound some;
             mnavResult result = mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 8.0,
                                                     nullptr, few, 3, &some);
-            int32_t held = found.count < 3 ? found.count : 3;
-            sound = sound && result == (found.count > 3 ? mnav_errorCapacity : mnav_success) &&
-                    some.count == found.count;
+            int32_t held = found.wallCount < 3 ? found.wallCount : 3;
+            sound = sound && result == (found.wallCount > 3 ? mnav_errorCapacity : mnav_success) &&
+                    some.wallCount == found.wallCount;
             for (int32_t w = 0; w < held; ++w)
             {
                 sound = sound && SameWall(&few[w], &walls[w]);
             }
-            cut += found.count > 3 ? 1 : 0;
+            cut += found.wallCount > 3 ? 1 : 0;
             result = mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 8.0, nullptr, nullptr,
                                          0, &some);
-            sound = sound && result == (found.count > 0 ? mnav_errorCapacity : mnav_success) &&
-                    some.count == found.count;
+            sound = sound && result == (found.wallCount > 0 ? mnav_errorCapacity : mnav_success) &&
+                    some.wallCount == found.wallCount;
         }
     }
     printf("wall lists: %d centers, %d walls, %d cut to three\n", tried, listed, cut);
@@ -402,7 +402,7 @@ static void TestWallList(const mnavNavmesh* navmesh)
     mnavWallsFound found;
     CHECK(mnavQuery_FindWalls(query, navmesh, n.polygon, n.point, 60.0, &none, walls, 256,
                               &found) == mnav_success &&
-              found.count >= 3 && found.count <= 6,
+              found.wallCount >= 3 && found.wallCount <= 6,
           "the polygon's own edges");
     mnavQuery* tiny = Query(2);
     CHECK(mnavQuery_FindWalls(tiny, navmesh, n.polygon, n.point, 60.0, nullptr, walls, 256,

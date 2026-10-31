@@ -237,7 +237,7 @@ static void TestTileIsOneQuadOnFourSides(void)
     const Shape floor = {{-20, -20, -20, 150, 150, 150, 150, -20}, 4, mnav_areaWalkable};
     mnavBakeDef def = Exact();
     CHECK(Load(&def, &floor, 1) == mnav_success, "baked");
-    CHECK(s_report.polygons == 1 && s_report.vertices == 4, "one quad");
+    CHECK(s_report.polygonCount == 1 && s_report.vertexCount == 4, "one quad");
     int32_t sides = Sides();
     CHECK(sides == 4 && HasSide(sides, 0, 0, 128, 0) && HasSide(sides, 128, 0, 128, 128) &&
               HasSide(sides, 128, 128, 0, 128) && HasSide(sides, 0, 128, 0, 0),
@@ -251,7 +251,7 @@ static void TestConcaveRingBecomesLinkedConvexPolygons(void)
 {
     mnavBakeDef def = Exact();
     CHECK(Load(&def, &s_l, 1) == mnav_success, "baked");
-    CHECK(s_report.polygons == 2 && s_report.vertices == 6, "two convex pieces");
+    CHECK(s_report.polygonCount == 2 && s_report.vertexCount == 6, "two convex pieces");
     CHECK(Reaches(1, 9, 9, 1), "linked, from one arm to the other");
     CHECK(TwiceArea() == 2 * 64 && CornersMeet(), "the L's area, corner to corner");
 }
@@ -264,7 +264,7 @@ static void TestRingsWeldAndLinkAcrossRegions(void)
                               {{5, 0, 5, 5, 10, 5, 10, 0}, 4, 7}};
     mnavBakeDef def = Exact();
     CHECK(Load(&def, squares, 2) == mnav_success, "baked");
-    CHECK(s_report.regions == 2 && s_report.polygons == 2 && s_report.vertices == 6,
+    CHECK(s_report.regionCount == 2 && s_report.polygonCount == 2 && s_report.vertexCount == 6,
           "one quad per region, the shared edge's ends welded");
     CHECK(Reaches(1, 2, 8, 2) && Reaches(8, 2, 1, 2), "linked both ways across the regions");
     mnavAreaType left = 0;
@@ -291,7 +291,7 @@ static void TestStackedFloorsKeepTheirCorners(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
-    CHECK(report.regions == 2 && report.polygons == 2 && report.vertices == 8,
+    CHECK(report.regionCount == 2 && report.polygonCount == 2 && report.vertexCount == 8,
           "two quads of four corners each");
     mnavDestroyBaker(baker);
 }
@@ -322,7 +322,7 @@ static void TestBridgedRingWithAHiddenVertex(void)
                              {{7, 10, 7, 12, 9, 12, 9, 10}, 4, mnav_areaNone}};
     mnavBakeDef def = Exact();
     CHECK(Load(&def, shapes, 4) == mnav_success, "baked");
-    CHECK(s_report.partialRings == 0 && s_report.droppedHoles == 0, "the ring is complete");
+    CHECK(s_report.partialRingCount == 0 && s_report.holesDropped == 0, "the ring is complete");
     CHECK(TwiceArea() == 776 && CornersMeet(), "the floor less three holes, corner to corner");
 }
 
@@ -341,7 +341,7 @@ static void TestPinchedRingNeedsTheLooseTest(void)
     mnavBakeDef def = Exact();
     def.maxEdgeError = 0.25f;
     CHECK(Load(&def, shapes, 4) == mnav_success, "baked");
-    CHECK(s_report.partialRings == 0 && CornersMeet(), "every ring complete, corner to corner");
+    CHECK(s_report.partialRingCount == 0 && CornersMeet(), "every ring complete, corner to corner");
 }
 
 static void TestFlatTrianglesAreDropped(void)
@@ -360,7 +360,7 @@ static void TestFlatTrianglesAreDropped(void)
     mnavBakeDef def = Exact();
     def.maxEdgeError = 0.25f;
     CHECK(Load(&def, shapes, 7) == mnav_success, "baked and loaded");
-    CHECK(s_report.partialRings == 0 && CornersMeet(), "every ring whole, corner to corner");
+    CHECK(s_report.partialRingCount == 0 && CornersMeet(), "every ring whole, corner to corner");
 }
 
 static void TestRingCutShortIsCounted(void)
@@ -377,7 +377,7 @@ static void TestRingCutShortIsCounted(void)
     mnavBakeDef def = Exact();
     def.maxEdgeError = 1.0f;
     CHECK(Load(&def, shapes, 5) == mnav_success, "baked and loaded");
-    CHECK(s_report.partialRings == 1, "one ring cut short, counted");
+    CHECK(s_report.partialRingCount == 1, "one ring cut short, counted");
 }
 
 static void TestEarDiagonalThroughAVertex(void)
@@ -393,7 +393,7 @@ static void TestEarDiagonalThroughAVertex(void)
                              {{5, 4, 5, 7, 7, 7, 7, 4}, 4, mnav_areaNone}};
     mnavBakeDef def = Exact();
     CHECK(Load(&def, shapes, 3) == mnav_success, "baked and loaded");
-    CHECK(s_report.partialRings == 0 && TwiceArea() == 2 * 75, "the floor covered exactly");
+    CHECK(s_report.partialRingCount == 0 && TwiceArea() == 2 * 75, "the floor covered exactly");
     CHECK(CornersMeet(), "corner to corner");
 }
 
@@ -409,7 +409,7 @@ static void TestUnfinishedRingIsCounted(void)
     mnavBakeDef def = Exact();
     def.maxEdgeError = 1.0f;
     CHECK(Load(&def, shapes, 3) == mnav_success, "baked and loaded");
-    CHECK(s_report.partialRings == 1, "one ring unfinished, counted");
+    CHECK(s_report.partialRingCount == 1, "one ring unfinished, counted");
 }
 
 static void TestLevelRingsAreComplete(void)
@@ -425,7 +425,7 @@ static void TestLevelRingsAreComplete(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
           "baked");
-    CHECK(report.partialRings == 0 && report.polygons > 0, "every ring complete");
+    CHECK(report.partialRingCount == 0 && report.polygonCount > 0, "every ring complete");
     mnavDestroyBaker(baker);
 }
 

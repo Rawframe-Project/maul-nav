@@ -95,9 +95,9 @@ static int32_t Polygons(const mnavNavmesh* navmesh, mnavPolygonId* out, int32_t 
     mnavFound found;
     CHECK(mnavNavmesh_FindPolygons(navmesh, (mnavPos3){32, 0, 32}, (mnavVec3){40, 10, 40}, nullptr,
                                    ids, 4096, &found) == mnav_success &&
-              found.count <= 4096,
+              found.polygonCount <= 4096,
           "listed");
-    int32_t n = found.count < capacity ? found.count : capacity;
+    int32_t n = found.polygonCount < capacity ? found.polygonCount : capacity;
     memcpy(out, ids, (size_t)n * sizeof(mnavPolygonId));
     return n;
 }

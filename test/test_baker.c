@@ -77,10 +77,10 @@ static void TestLevelBakesAndCopies(void)
     CHECK(report.result == mnav_success && report.stage == mnav_stageDone &&
               report.input.kind == mnav_inputNone,
           "done");
-    CHECK(report.triangles > 0 && report.spans > 0 && report.regions == 3 &&
-              report.polygons == 54 && report.vertices > 0 && report.detailTriangles > 0,
+    CHECK(report.triangleCount > 0 && report.spanCount > 0 && report.regionCount == 3 &&
+              report.polygonCount == 54 && report.vertexCount > 0 && report.detailTriangleCount > 0,
           "counts");
-    CHECK(report.droppedHoles == 0 && report.partialRings == 0 && report.cappedDetail == 0,
+    CHECK(report.holesDropped == 0 && report.partialRingCount == 0 && report.cappedDetailCount == 0,
           "nothing given up");
     CHECK(report.memoryPeak > 0 && report.memoryPeak <= def.limits.memoryBytes, "memory");
     CHECK(mnavBaker_CopyTile(baker, nullptr, 0, &size) == mnav_errorCapacity &&
@@ -97,7 +97,7 @@ static void TestLevelBakesAndCopies(void)
     CHECK(mnavBaker_CopyTile(baker, bytes, sizeof(bytes), nullptr) == mnav_success, "copied");
     CHECK(memcmp(bytes, "MNAV", 4) == 0 && bytes[4] == MNAV_TILE_FORMAT, "a tile");
     printf("level: %zu bytes, %d polygons, %d detail triangles, peak %llu bytes\n", size,
-           report.polygons, report.detailTriangles, (unsigned long long)report.memoryPeak);
+           report.polygonCount, report.detailTriangleCount, (unsigned long long)report.memoryPeak);
     mnavDestroyBaker(baker);
 }
 
@@ -116,7 +116,7 @@ static void TestFlatFloorAtNoSlope(void)
     mnavBakeReport report;
     CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){&mesh, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
                              0, &report) == mnav_success &&
-              report.polygons > 0,
+              report.polygonCount > 0,
           "a flat floor is walkable at a slope of 0");
     mnavDestroyBaker(baker);
 }
@@ -163,7 +163,7 @@ static void TestFingerprintFollowsTheTilesInput(void)
                              0, &report) == mnav_success,
           "baked");
     uint64_t base = report.fingerprint;
-    int32_t triangles = report.triangles;
+    int32_t triangles = report.triangleCount;
     // A triangle far beyond the tile and its border.
     mnavVec3 far[3] = {{200.0f, 0.0f, 200.0f}, {200.0f, 0.0f, 201.0f}, {201.0f, 0.0f, 200.0f}};
     const int32_t one[3] = {0, 1, 2};
@@ -171,7 +171,7 @@ static void TestFingerprintFollowsTheTilesInput(void)
     CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){meshes, 2, nullptr, 0, nullptr, 0, nullptr}, 0,
                              0, &report) == mnav_success,
           "baked");
-    CHECK(report.fingerprint == base && report.triangles == triangles,
+    CHECK(report.fingerprint == base && report.triangleCount == triangles,
           "far geometry leaves the fingerprint");
     // The same triangle on the tile.
     mnavVec3 near[3] = {{10.0f, 0.5f, 10.0f}, {10.0f, 0.5f, 11.0f}, {11.0f, 0.5f, 10.0f}};
@@ -179,7 +179,7 @@ static void TestFingerprintFollowsTheTilesInput(void)
     CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){meshes, 2, nullptr, 0, nullptr, 0, nullptr}, 0,
                              0, &report) == mnav_success,
           "baked");
-    CHECK(report.fingerprint != base && report.triangles == triangles + 1,
+    CHECK(report.fingerprint != base && report.triangleCount == triangles + 1,
           "geometry on the tile moves it");
     uint64_t withNear = report.fingerprint;
     // The same triangle with another area type.
@@ -220,7 +220,7 @@ static void TestDetailSearchesAsFarAsWallsStray(void)
     CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr}, 0,
                              0, &report) == mnav_success,
           "baked");
-    CHECK(report.fallbackHeights == 0, "every sample found a height");
+    CHECK(report.fallbackHeightCount == 0, "every sample found a height");
     mnavDestroyBaker(baker);
 }
 
@@ -257,7 +257,7 @@ static void TestBadInputIsNamed(void)
           "no meshes");
     CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){nullptr, 0, nullptr, 0, nullptr, 0, nullptr},
                              0, 0, &report) == mnav_success &&
-              report.polygons == 0,
+              report.polygonCount == 0,
           "no meshes, an empty tile");
     CHECK(mnavBaker_BakeTile(baker, &(mnavBakeInput){&level, 1, nullptr, 0, nullptr, 0, nullptr},
                              1 << 20, 0, &report) == mnav_errorLimit,

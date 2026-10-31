@@ -94,12 +94,12 @@ static void TestTheRoom(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){s_outlines, 6, nullptr}, 0, 0,
                                    &report) == mnav_success &&
-              report.triangles == 4 && report.polygons > 0 &&
+              report.triangleCount == 4 && report.polygonCount > 0 &&
               mnavBaker_CopyTile(baker, s_bytes[0], CAPACITY, &s_sizes[0]) == mnav_success,
           "baked, four outlines reaching the tile");
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, s_bytes[0], (int64_t)s_sizes[0]);
-    printf("ROOM_HASH=%016llx polygons=%d bytes=%zu\n", (unsigned long long)hash, report.polygons,
-           s_sizes[0]);
+    printf("ROOM_HASH=%016llx polygons=%d bytes=%zu\n", (unsigned long long)hash,
+           report.polygonCount, s_sizes[0]);
     CHECK(hash == ROOM_HASH, "the pinned hash");
     CHECK(EveryFloatHost(RoomHash, ROOM_HASH), "the pinned hash under every host setting");
     mnavNavmesh* navmesh = Load(1);
@@ -198,15 +198,15 @@ static void TestFillRules(void)
     CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
               mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outlines[0], 1, nullptr}, 0, 0,
                                    &report) == mnav_success &&
-              report.polygons == 0,
+              report.polygonCount == 0,
           "twice round: empty");
     CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outlines[1], 1, nullptr}, 0, 0,
                                &report) == mnav_success &&
-              report.polygons > 0 && report.spans == 80 * 80,
+              report.polygonCount > 0 && report.spanCount == 80 * 80,
           "once round: every cell, 20 m by 20 m");
     CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&outlines[2], 1, nullptr}, 0, 0,
                                &report) == mnav_success &&
-              report.spans == 0,
+              report.spanCount == 0,
           "a sliver between centers: no cell");
     // A strip whose bottom edge lies on a row of centers (they sit at
     // 0.125 m past each quarter here) holds that row: an edge end on the
@@ -215,7 +215,7 @@ static void TestFillRules(void)
     const mnavOutline onLine = {strip, 4, 1};
     CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&onLine, 1, nullptr}, 0, 0, &report) ==
                   mnav_success &&
-              report.spans == 80,
+              report.spanCount == 80,
           "a bottom edge on the centers' line holds its row");
     // An outline past the tile on every side fills all its cells, border
     // included, and none beyond.
@@ -225,12 +225,12 @@ static void TestFillRules(void)
     CHECK(mnavValidateBakeDef(&def, &cells).result == mnav_success &&
               mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){&all, 1, nullptr}, 0, 0, &report) ==
                   mnav_success &&
-              report.spans ==
+              report.spanCount ==
                   (def.tileCells + 2 * cells.border) * (def.tileCells + 2 * cells.border),
           "every cell of the tile and its border");
     CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){nullptr, 0, nullptr}, 0, 0, &report) ==
                   mnav_success &&
-              report.polygons == 0 && report.triangles == 0,
+              report.polygonCount == 0 && report.triangleCount == 0,
           "nothing: an empty tile");
     mnavDestroyBaker(baker);
 }
@@ -337,7 +337,7 @@ static void TestIslands(void)
         CHECK(mnavBaker_BakeTile2D(baker, &(mnavBake2DInput){outlines, 2, nullptr}, 0, 0,
                                    &report) == mnav_success,
               "baked");
-        CHECK(report.regions == 1 + k && report.droppedRegions == 1 - k,
+        CHECK(report.regionCount == 1 + k && report.regionsDropped == 1 - k,
               "a small island dropped and counted, a larger one kept");
     }
     mnavDestroyBaker(baker);

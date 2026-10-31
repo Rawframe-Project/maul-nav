@@ -79,7 +79,7 @@ static void TestOpenSpansAreTheSpaceAboveWalkableSpans(void)
     CHECK(At(4, 4, 0) == 2, "up to the next solid");
     // Inside each floor's ledge ring, 7 by 7 open spans; none over the
     // solid square.
-    CHECK(At(4, 4, 40) == NO_POLYGON && s_report.spans == 2 * 7 * 7,
+    CHECK(At(4, 4, 40) == NO_POLYGON && s_report.spanCount == 2 * 7 * 7,
           "the unwalkable span has no open space");
     CHECK(At(4, 4, 60) == 5, "open to the top; the area is kept");
 }
@@ -186,7 +186,7 @@ static void TestOpenSpansToTheFrameEdge(void)
             walkable += At(x - AT, z - AT, 0) == mnav_areaWalkable ? 1 : 0;
         }
     }
-    CHECK(report.spans == 134 * 134 && walkable == 128 * 128, "every cell walkable");
+    CHECK(report.spanCount == 134 * 134 && walkable == 128 * 128, "every cell walkable");
 }
 
 // The area of the polygon over world (x, z) within a meter of height y,

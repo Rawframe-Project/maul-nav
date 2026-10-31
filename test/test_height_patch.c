@@ -106,7 +106,7 @@ static void TestNoSampleOnTheSidesFallsBack(void)
     Scene scene = Flat(0, false);
     UseError(0);
     Load(&scene);
-    CHECK(s_report.fallbackHeights == 0, "none falls back");
+    CHECK(s_report.fallbackHeightCount == 0, "none falls back");
 }
 
 static void TestPatchReachesACellPastThePolygon(void)
@@ -217,7 +217,7 @@ static void TestSearchReadsTheWholeRing(void)
     scene.level[7][6] = NO_FLOOR;
     UseError(32);
     Load(&scene);
-    CHECK(s_report.fallbackHeights == 0, "none falls back");
+    CHECK(s_report.fallbackHeightCount == 0, "none falls back");
 }
 
 // Bakes the ramp level, its ramp up to z = top and its deck on to z = end,

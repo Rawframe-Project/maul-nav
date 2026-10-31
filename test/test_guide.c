@@ -41,7 +41,7 @@ static void GuideObstacles(mnavBaker* baker, const mnavTriangleMesh* world, int3
     const mnavBakeVolume crate = {ring, 4, -1.0f, 2.0f, mnav_volumeExclude, 0};
     mnavResult rebuilt = mnavBaker_RebuildTile(baker, cache, tileX, tileZ, &crate, 1, &report);
     // clang-format on
-    CHECK(cached == mnav_success && rebuilt == mnav_success && report.polygons > 0,
+    CHECK(cached == mnav_success && rebuilt == mnav_success && report.polygonCount > 0,
           "the obstacle snippet rebuilds a tile");
     mnavDestroyTileCache(cache);
 }
@@ -73,7 +73,8 @@ static void GuideBake(void)
         baked = mnavBaker_CopyTile(baker, bytes, capacity, &size);   // the tile's bytes
     }
     // clang-format on
-    CHECK(made.result == mnav_success && baked == mnav_success && size > 0 && report.polygons > 0,
+    CHECK(made.result == mnav_success && baked == mnav_success && size > 0 &&
+              report.polygonCount > 0,
           "the bake snippet bakes a tile");
     GuideObstacles(baker, &mesh, tileX, tileZ);
     mnavDestroyBaker(baker);

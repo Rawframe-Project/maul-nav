@@ -78,7 +78,7 @@ static void TestFloorAndRampMeetOnEachSide(void)
                   mnavNavmesh_StageTile(navmesh, s_tile, size).result == mnav_success &&
                   mnavNavmesh_Commit(navmesh) == mnav_success,
               "loaded");
-        CHECK(report.regions == 2, "the floor and the ramp");
+        CHECK(report.regionCount == 2, "the floor and the ramp");
         // Along the side, the detail surface of the polygons that replace
         // the vertex's follows the floor, the ramp and the deck: their
         // heights are sampled from both regions, as the polygons mix them.
@@ -145,10 +145,10 @@ static void TestFloorAndRampMeetOnEachSide(void)
             }
             corners += first ? 1 : 0;
         }
-        CHECK(corners == report.vertices, "every vertex a corner");
+        CHECK(corners == report.vertexCount, "every vertex a corner");
         // The two polygons round the vertex are replaced by one: five in
         // all, from six before the removal.
-        CHECK(report.polygons == 5, "the hole filled by one polygon");
+        CHECK(report.polygonCount == 5, "the hole filled by one polygon");
         mnavDestroyNavmesh(navmesh);
     }
 }

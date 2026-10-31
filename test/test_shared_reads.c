@@ -163,8 +163,9 @@ static uint64_t Points(Reader* reader, uint32_t* state, uint64_t hash)
     hash =
         MixResult(hash, mnavNavmesh_FindPolygons(s_navmesh, a.point, (mnavVec3){4.0f, 2.0f, 4.0f},
                                                  nullptr, found, 32, &count));
-    hash = MixInt(hash, count.count);
-    hash = Mix(hash, found, (size_t)(count.count < 32 ? count.count : 32) * sizeof(mnavPolygonId));
+    hash = MixInt(hash, count.polygonCount);
+    hash = Mix(hash, found,
+               (size_t)(count.polygonCount < 32 ? count.polygonCount : 32) * sizeof(mnavPolygonId));
     double height = 0.0;
     hash =
         MixResult(hash, mnavPolygon_GetHeight(s_navmesh, a.polygon, a.point.x, a.point.z, &height));
@@ -179,7 +180,7 @@ static uint64_t Points(Reader* reader, uint32_t* state, uint64_t hash)
     hash = MixInt(hash, mnavNavmesh_GetTier(s_navmesh));
     mnavLinkState link = {0};
     hash = MixResult(hash, mnavLink_GetState(s_navmesh, (mnavLinkId){1, 1}, &link));
-    hash = MixInt(hash, link.crossings);
+    hash = MixInt(hash, link.crossingCount);
     mnavRay ray = {0};
     hash = MixResult(
         hash, mnavQuery_Raycast(query, s_navmesh, a.polygon, a.point, b.point, nullptr, &ray));
@@ -265,10 +266,10 @@ static uint64_t Corridor(Reader* reader, uint32_t* state, uint64_t hash)
     hash = Path(hash, mnavQuery_ReplanCorridor(query, &corridor, s_navmesh, box, nullptr, &path),
                 &path);
     hash = Mix(hash, &corridor.position, sizeof(corridor.position));
-    hash = Mix(hash, corridor.polygons, (size_t)corridor.count * sizeof(mnavPolygonId));
+    hash = Mix(hash, corridor.polygons, (size_t)corridor.polygonCount * sizeof(mnavPolygonId));
     mnavDebugBuffer buffer = Buffer(reader);
     mnavResult drawn =
-        mnavNavmesh_DebugCorridor(s_navmesh, corridor.polygons, corridor.count, &buffer);
+        mnavNavmesh_DebugCorridor(s_navmesh, corridor.polygons, corridor.polygonCount, &buffer);
     return Drawn(reader, drawn, &buffer, hash);
 }
 
@@ -453,7 +454,7 @@ static void TestEveryReadOnManyThreads(void)
     Reader* one = &s_readers[THREADS];
     *one = (Reader){0};
     Read(one);
-    CHECK(!one->failed && s_report.clusters == 4 && s_report.edges > 0,
+    CHECK(!one->failed && s_report.clusterCount == 4 && s_report.edgeCount > 0,
           "one thread read, over a hierarchy of four clusters");
     pthread_t threads[THREADS];
     for (int32_t w = 0; w < THREADS; ++w)

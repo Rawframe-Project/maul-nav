@@ -247,7 +247,7 @@ static void Bake(void)
                 }
             }
             bytes += s_sizes[t];
-            polygons += report.polygons;
+            polygons += report.polygonCount;
         }
         double took = Seconds() - start;
         best = took < best ? took : best;
@@ -736,7 +736,7 @@ static int32_t CrowdWalls(mnavQuery* query, const mnavNavmesh* navmesh)
             mnavQuery_FindWalls(query, navmesh, s_crowd[i].polygons[0], s_crowd[i].position,
                                 CROWD_WALL_RANGE, NULL, s_crowdWalls[i], CROWD_WALLS, &found);
         Check(result == mnav_errorCapacity ? mnav_success : result, "crowd walls");
-        s_crowdWallCounts[i] = found.count < CROWD_WALLS ? found.count : CROWD_WALLS;
+        s_crowdWallCounts[i] = found.wallCount < CROWD_WALLS ? found.wallCount : CROWD_WALLS;
         s_crowdWallsAt[i] = s_crowd[i].position;
     }
     memset(s_crowdWallTable, 0xFF, sizeof(s_crowdWallTable));
@@ -1247,7 +1247,7 @@ static void Hierarchy(void)
     Check(mnavHierarchy_Build(hierarchy, small, navmesh, NULL, &report), "build");
     double built = Seconds() - start;
     printf("# hierarchy: %d clusters, %d transitions, %d edges, built in %.0f us\n",
-           report.clusters, report.transitions, report.edges, built * 1e6);
+           report.clusterCount, report.transitionCount, report.edgeCount, built * 1e6);
     Report("hierarchy build", built * 1e6, "us");
     double plainSum = 0.0;
     double throughSum = 0.0;
@@ -1292,8 +1292,8 @@ static void Hierarchy(void)
         double took = Seconds() - begin;
         update = took < update ? took : update;
     }
-    printf("# hierarchy update: %d of %d transitions searched\n", report.searches,
-           report.transitions);
+    printf("# hierarchy update: %d of %d transitions searched\n", report.searchCount,
+           report.transitionCount);
     Report("hierarchy update, one tile", update * 1e6, "us");
     NavFlow(navmesh, side);
     mnavDestroyHierarchy(hierarchy);
@@ -1391,8 +1391,8 @@ static mnavFlightVolume* FlightBake(int32_t runs)
                 Check(mnavFlightVolume_StageTile(volume, buffer, size).result, "flight stage");
             }
             bytes += size;
-            nodes += report.nodes;
-            leaves += report.leaves;
+            nodes += report.nodeCount;
+            leaves += report.leafCount;
         }
         double took = Seconds() - start;
         best = took < best ? took : best;

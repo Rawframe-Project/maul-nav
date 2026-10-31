@@ -267,8 +267,9 @@ static void Hierarchies(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
         Expect((up == mnav_success) == (made == mnav_success));
         if (up == mnav_success)
         {
-            Expect(updated.clusters == fresh.clusters && updated.transitions == fresh.transitions &&
-                   updated.edges == fresh.edges);
+            Expect(updated.clusterCount == fresh.clusterCount &&
+                   updated.transitionCount == fresh.transitionCount &&
+                   updated.edgeCount == fresh.edgeCount);
             mnavResult ra =
                 mnavQuery_FindHierarchicalPath(query, h, navmesh, from, start, to, end, &path);
             CheckPath(ra, &path);

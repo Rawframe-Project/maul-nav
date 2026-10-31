@@ -404,7 +404,7 @@ static void TestBake(mnavBaker* baker)
     CHECK(BakeHash(baker, &away, 1, &report) == none && report.fingerprint == plain.fingerprint,
           "an exclude volume missing the tile: the same tile");
     away.kind = mnav_volumeInclude;
-    CHECK(BakeHash(baker, &away, 1, &report) != none && report.polygons == 0,
+    CHECK(BakeHash(baker, &away, 1, &report) != none && report.polygonCount == 0,
           "an include volume missing the tile: an empty one");
     Square inside = MakeSquare(2, 2, 18, 18);
     Square hole = MakeSquare(8, 8, 12, 12);
@@ -413,9 +413,9 @@ static void TestBake(mnavBaker* baker)
                                    Volume(&hole, -1, 1, mnav_volumeExclude, 0),
                                    Volume(&mud, -1, 1, mnav_volumeArea, 6)};
     uint64_t hash = BakeHash(baker, all, 3, &report);
-    printf("volumes: %d polygons; VOLUME_HASH=%016llx\n", report.polygons,
+    printf("volumes: %d polygons; VOLUME_HASH=%016llx\n", report.polygonCount,
            (unsigned long long)hash);
-    CHECK(report.polygons > 2 && report.fingerprint != plain.fingerprint, "a shaped tile");
+    CHECK(report.polygonCount > 2 && report.fingerprint != plain.fingerprint, "a shaped tile");
     CHECK(hash == VOLUME_HASH, "the pinned hash");
     s_volumeBaker = baker;
     memcpy(s_pinned, all, sizeof(s_pinned));
