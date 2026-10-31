@@ -5,6 +5,26 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.6.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.5.0...v0.6.0) (2026-10-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* the counters of mnavBakeReport, mnavFlightBakeReport, mnavHierarchyReport and mnavLinkState, and the totals of mnavFound, mnavWallsFound and mnavCorridor, are renamed to thingCount or thingDropped, as listed above.
+* every enumeration typedef but mnavAreaType is int32_t, which changes the layout of the structs that hold one; mnavDebugVertex.value is uint32_t, a corridor polygon's value is its place without modulo 65536, and a flight block's value is its side without a cap at 65535.
+* **bake:** MNAV_BAKE_GENERATOR is 4, so every tile's fingerprint changes and hosts rebake; a def with a maxEdgeLength below one cell or a detailSampleDistance below a sixteenth of a cell bakes other tile bytes.
+
+### Fixed
+
+* **bake:** keep small edge lengths and sample distances in force ([#218](https://github.com/Rawframe-Project/maul-nav/issues/218)) ([ae3daa0](https://github.com/Rawframe-Project/maul-nav/commit/ae3daa0e32efb9e35373baf8d338a62c5c575acb)), closes [#215](https://github.com/Rawframe-Project/maul-nav/issues/215)
+* **navmesh:** free removed tiles only once their ids are stale ([#227](https://github.com/Rawframe-Project/maul-nav/issues/227)) ([777b27a](https://github.com/Rawframe-Project/maul-nav/commit/777b27ae8a86f6878e7ce4f2955bb4cee0789eda)), closes [#225](https://github.com/Rawframe-Project/maul-nav/issues/225)
+
+
+### Changed
+
+* make every enumeration typedef int32_t ([#230](https://github.com/Rawframe-Project/maul-nav/issues/230)) ([9d38058](https://github.com/Rawframe-Project/maul-nav/commit/9d38058b15b934b12d3f0a83d1bb8ebb4ad9c6f8)), closes [#223](https://github.com/Rawframe-Project/maul-nav/issues/223)
+* name the counters thingCount and thingDropped ([#231](https://github.com/Rawframe-Project/maul-nav/issues/231)) ([9588326](https://github.com/Rawframe-Project/maul-nav/commit/95883266ddb5524bcf8d9d44a2ca360a0a1b42c9)), closes [#224](https://github.com/Rawframe-Project/maul-nav/issues/224)
+
 ## [0.5.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.4.0...v0.5.0) (2026-10-30)
 
 This release finishes the API review for 1.0.0. A call that fills a
