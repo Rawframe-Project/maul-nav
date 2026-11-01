@@ -375,8 +375,8 @@ static void TestRingCutShortIsCounted(void)
 {
     // Found by a search of floors with blocks of other areas: within 3
     // cells of edge error, the ring of this floor of 9 by 9 round an L of
-    // area 7 is simplified so far that it does not triangulate whole. What
-    // is left is dropped, and the bake counts the ring as cut short.
+    // area 7 is simplified so far that one of its triangles turns the wrong
+    // way. It is dropped, and the bake counts the ring as cut short.
     const Shape shapes[3] = {{{0, 0, 0, 9, 9, 9, 9, 0}, 4, mnav_areaWalkable},
                              {{6, 3, 6, 4, 8, 4, 8, 3}, 4, 7},
                              {{5, 0, 5, 3, 7, 3, 7, 0}, 4, 7}};
