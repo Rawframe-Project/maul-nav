@@ -71,6 +71,23 @@ static bool Refuse(void* context, mnavPos3 from, mnavPos3 to)
     return false;
 }
 
+// Whether the first count links of two lists are the same, field by
+// field: the def has padding.
+static bool SameLinks(const mnavLinkDef* a, const mnavLinkDef* b, int32_t count)
+{
+    for (int32_t i = 0; i < count; ++i)
+    {
+        if (memcmp(&a[i].start, &b[i].start, sizeof(a[i].start)) != 0 ||
+            memcmp(&a[i].end, &b[i].end, sizeof(a[i].end)) != 0 || a[i].radius != b[i].radius ||
+            a[i].cost != b[i].cost || a[i].kind != b[i].kind || a[i].twoWay != b[i].twoWay ||
+            a[i].width != b[i].width)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 static void TestKinds(const mnavNavmesh* navmesh)
 {
     mnavQuery* query = Query();
@@ -212,11 +229,25 @@ static void TestChecksAndBuffer(const mnavNavmesh* navmesh)
     CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
                                   s_links, LINKS, &all) == mnav_success,
           "generated");
+    static mnavLinkDef full[LINKS];
+    memcpy(full, s_links, sizeof(full));
+    // Links past a short buffer are not filtered against each other: the
+    // count is room enough, more than are kept here.
     int32_t count = 0;
     CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
                                   s_links, 3, &count) == mnav_errorCapacity &&
-              count >= all,
-          "a short buffer, counted");
+              count > all && count <= LINKS && SameLinks(s_links, full, 3),
+          "a short buffer: the first links, and a count past them");
+    int32_t again = 0;
+    CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
+                                  s_links, count, &again) == mnav_success &&
+              again == all && SameLinks(s_links, full, all),
+          "the count as the capacity: every link");
+    count = 0;
+    CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
+                                  nullptr, 0, &count) == mnav_errorCapacity &&
+              count > all,
+          "no buffer, counted");
     // Tile 1 holds the pillar and none of the edges that make links.
     CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){1, 0, 1, 0}, nullptr,
                                   s_links, LINKS, &count) == mnav_success &&
