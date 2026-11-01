@@ -44,9 +44,10 @@ typedef struct mnavDetailMesh
     // Polygons that reached MNAV_MAX_DETAIL_VERTICES with samples still
     // beyond the maximum error.
     int32_t cappedPolygons;
-    // Edges, each counted once, sampled more widely than the sample
-    // distance: past MNAV_MAX_DETAIL_EDGE_SAMPLES, or with fewer whole
-    // sixteenths on them than the samples asked.
+    // Edges, each counted once, with two neighboring points farther apart
+    // than the sample distance: past MNAV_MAX_DETAIL_EDGE_SAMPLES, with
+    // fewer whole sixteenths on them than the samples asked, or where
+    // snapping the points to whole sixteenths widened a gap.
     int32_t coarseEdges;
 } mnavDetailMesh;
 

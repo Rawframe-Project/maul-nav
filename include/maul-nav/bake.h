@@ -163,11 +163,14 @@ extern "C"
         // polygon edges and inside polygons, in meters, from 0 to 2^26
         // cells; 0 for none, and any other distance below a cell samples
         // every cell. An edge takes at most MNAV_MAX_DETAIL_EDGE_SAMPLES
-        // samples inside it, each on a whole sixteenth of a cell along it,
-        // so a long edge may be sampled more widely: an edge whose ends
-        // lie a number of cells apart along X and Z that share no factor
-        // has only 15 such places inside it. The report counts such edges
-        // in coarseEdgeCount. maxEdgeLength shortens walls, but not edges
+        // samples inside it, each on the whole sixteenth of a cell along
+        // it nearest its even place, so an edge may be sampled more
+        // widely: a long one, one whose ends lie a number of cells apart
+        // along X and Z that share no factor, which has only 15 such
+        // places inside it, or a slanted one whose snapped samples leave a
+        // gap past the distance. The report counts every edge with two
+        // neighboring samples farther apart than the distance in
+        // coarseEdgeCount. maxEdgeLength shortens walls, but not edges
         // between polygons or along a tile's side.
         float detailSampleDistance;
         // How far the detail surface may stray from a sampled height, in

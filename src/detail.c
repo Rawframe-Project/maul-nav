@@ -131,8 +131,9 @@ static int64_t Divisor(int64_t a, int64_t b)
 // place, so the outline runs exactly along the polygon's edges and stays
 // a simple ring however sharp a corner is; an edge with fewer such
 // sixteenths than segments takes each of them.
-// Returns the number of segments, and whether they are fewer than the
-// sample distance asks, so that the edge is sampled more widely.
+// Returns the number of segments, and whether two neighboring points lie
+// farther apart than the sample distance: past the cap, with fewer whole
+// sixteenths than segments, or where snapping to them widens a gap.
 static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mnavDetailVertex* b,
                            bool* coarse)
 {
@@ -160,10 +161,8 @@ static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mn
         segments = (SquareRoot(length2) + sample - 1) / sample;
         segments += segments * sample * segments * sample < length2 ? 1 : 0;
         segments = segments < 1 ? 1 : segments;
-        int64_t wanted = segments;
         segments = segments > EDGE_POINTS - 1 ? EDGE_POINTS - 1 : segments;
         segments = segments > steps ? steps : segments;
-        *coarse = segments < wanted;
     }
     for (int64_t k = 0; k <= segments; ++k)
     {
@@ -174,6 +173,12 @@ static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mn
         int32_t reference = a->y + (int32_t)RoundDivide(dy * k, segments);
         bool end = k == 0 || k == segments;
         p->y = end ? reference : Height(builder, p->x, p->z, reference);
+        if (k > 0 && sample > 0)
+        {
+            int64_t gx = p->x - part->points[k - 1].x;
+            int64_t gz = p->z - part->points[k - 1].z;
+            *coarse = *coarse || gx * gx + gz * gz > sample * sample;
+        }
     }
     return (int32_t)segments;
 }
