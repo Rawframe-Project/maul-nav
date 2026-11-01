@@ -551,8 +551,8 @@ static mnavTileResult ReadParts(mnavByteReader* r, const mnavPolyMesh* mesh, con
     {
         int64_t count = mesh->polygons[p].count + (int64_t)mnavGetU8(r);
         int64_t parts = (int64_t)mnavGetU8(r);
-        if (r->exhausted || count > MNAV_DETAIL_VERTICES || parts < 1 ||
-            parts > 2 * MNAV_DETAIL_VERTICES)
+        if (r->exhausted || count > MNAV_MAX_DETAIL_VERTICES || parts < 1 ||
+            parts > 2 * MNAV_MAX_DETAIL_VERTICES)
         {
             return Refuse(mnav_errorFormat, mnav_tileDetailParts, p);
         }

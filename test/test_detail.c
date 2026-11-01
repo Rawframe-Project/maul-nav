@@ -216,6 +216,7 @@ static void TestFlatSquare(void)
     part = Read(Over(4, 4, 0));
     CHECK(part.vertices == 4, "flat samples are dropped");
     CHECK(s_report.fallbackHeightCount == 0, "every sample found a height");
+    CHECK(s_report.coarseEdgeCount == 0, "every edge sampled every cell");
 }
 
 static void TestBumpOnAnEdgeIsSampled(void)
@@ -405,6 +406,42 @@ static void TestLongEdgeTakesTheMostSamples(void)
     mnavPolygonId polygon = Over(4, 4, 0);
     CHECK(HasCorner(polygon, 4, 2, 30) && HasCorner(polygon, 4, 1, 36),
           "21 segments on an edge of 34 cells");
+    CHECK(s_report.coarseEdgeCount == 4, "the quad's four edges, sampled more widely, counted");
+    // Every 26 sixteenths an edge of 544 wants 21 segments, the most, and
+    // is not counted; every 25 it wants 22.
+    def.detailSampleDistance = 0.0625f * 26.0f / 16.0f;
+    UseDef(&def);
+    Load(&scene);
+    CHECK(s_report.coarseEdgeCount == 0, "21 segments wanted, none counted");
+    def.detailSampleDistance = 0.0625f * 25.0f / 16.0f;
+    UseDef(&def);
+    Load(&scene);
+    CHECK(s_report.coarseEdgeCount == 4, "22 segments wanted, all four counted");
+}
+
+static void TestSharedCoarseEdgeCountsOnce(void)
+{
+    // The long edges' def, and area 7 from x = 4 on: two quads share the
+    // edge x = 4, which runs 34 cells like the quads' -X and +X edges,
+    // while their -Z and +Z edges run under 21. The shared edge is
+    // counted once.
+    mnavBakeDef def = Exact();
+    def.cellSize = 0.0625f;
+    def.tileCells = 256;
+    def.detailSampleDistance = 0.0625f;
+    def.detailMaxError = 0.0f;
+    UseDef(&def);
+    Scene scene = Flat(0, false);
+    for (int32_t z = 0; z < SIDE; ++z)
+    {
+        for (int32_t x = 4; x < SIDE; ++x)
+        {
+            scene.area[z][x] = 7;
+        }
+    }
+    Load(&scene);
+    CHECK(s_report.polygonCount == 2, "two quads");
+    CHECK(s_report.coarseEdgeCount == 3, "the -X, shared and +X edges, each once");
 }
 
 static void TestNoHeightsFallBackAndCount(void)
@@ -629,6 +666,7 @@ static void TestEdgeTakesEachOfItsSixteenths(void)
     LoadTriangle(vertices, 1);
     CHECK(s_report.polygonCount == 1 && s_report.partialRingCount == 0, "one polygon, whole");
     CHECK(EveryTriangleHasArea(), "every triangle with area");
+    CHECK(s_report.coarseEdgeCount == 2, "the two long sides, sampled more widely, counted");
 }
 
 int main(void)
@@ -644,6 +682,7 @@ int main(void)
     TestDiagonalEdgeTakesEnoughSegments();
     TestSamplesKeepHalfASampleFromTheEdges();
     TestLongEdgeTakesTheMostSamples();
+    TestSharedCoarseEdgeCountsOnce();
     TestNoHeightsFallBackAndCount();
     TestSearchTakesTheHeightNearestTheMean();
     TestLevelDetailIsSound();

@@ -23,23 +23,23 @@
 // Sixteenths of a cell per cell.
 #define SUBCELLS 16
 // The most points on one edge: its two ends and the samples between.
-#define EDGE_POINTS    (MNAV_DETAIL_EDGE_SAMPLES + 2)
-#define PART_TRIANGLES (2 * MNAV_DETAIL_VERTICES)
+#define EDGE_POINTS    (MNAV_MAX_DETAIL_EDGE_SAMPLES + 2)
+#define PART_TRIANGLES (2 * MNAV_MAX_DETAIL_VERTICES)
 
 // One polygon's detail while it is built, and the triangulation's scratch.
 typedef struct Part
 {
-    mnavDetailVertex vertices[MNAV_DETAIL_VERTICES];
+    mnavDetailVertex vertices[MNAV_MAX_DETAIL_VERTICES];
     int32_t vertexCount;
     // The outline, as indices into vertices in polygon order.
-    uint8_t hull[MNAV_DETAIL_VERTICES];
+    uint8_t hull[MNAV_MAX_DETAIL_VERTICES];
     int32_t hullCount;
     mnavDetailTriangle triangles[PART_TRIANGLES];
     int32_t triangleCount;
-    mnavContourVertex ring[MNAV_DETAIL_VERTICES];
-    int32_t indices[MNAV_DETAIL_VERTICES];
-    uint8_t ears[MNAV_DETAIL_VERTICES];
-    int32_t corners[3 * MNAV_DETAIL_VERTICES];
+    mnavContourVertex ring[MNAV_MAX_DETAIL_VERTICES];
+    int32_t indices[MNAV_MAX_DETAIL_VERTICES];
+    uint8_t ears[MNAV_MAX_DETAIL_VERTICES];
+    int32_t corners[3 * MNAV_MAX_DETAIL_VERTICES];
     // An edge's points and those kept.
     mnavDetailVertex points[EDGE_POINTS];
     int32_t kept[EDGE_POINTS];
@@ -126,13 +126,15 @@ static int64_t Divisor(int64_t a, int64_t b)
 }
 
 // Places the points of the edge from a to b at most a sample distance
-// apart, at most MNAV_DETAIL_EDGE_SAMPLES between the ends, with their
+// apart, at most MNAV_MAX_DETAIL_EDGE_SAMPLES between the ends, with their
 // heights. Each point is the whole sixteenth on the edge nearest its even
 // place, so the outline runs exactly along the polygon's edges and stays
 // a simple ring however sharp a corner is; an edge with fewer such
 // sixteenths than segments takes each of them.
-// Returns the number of segments.
-static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mnavDetailVertex* b)
+// Returns the number of segments, and whether they are fewer than the
+// sample distance asks, so that the edge is sampled more widely.
+static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mnavDetailVertex* b,
+                           bool* coarse)
 {
     Part* part = builder->part;
     int64_t dx = b->x - a->x;
@@ -148,6 +150,7 @@ static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mn
     // still see a positive count there.
     steps = steps > 0 ? steps : 1;
     int64_t segments = 1;
+    *coarse = false;
     int64_t sample = builder->settings.sample;
     if (sample > 0)
     {
@@ -157,8 +160,10 @@ static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mn
         segments = (SquareRoot(length2) + sample - 1) / sample;
         segments += segments * sample * segments * sample < length2 ? 1 : 0;
         segments = segments < 1 ? 1 : segments;
+        int64_t wanted = segments;
         segments = segments > EDGE_POINTS - 1 ? EDGE_POINTS - 1 : segments;
         segments = segments > steps ? steps : segments;
+        *coarse = segments < wanted;
     }
     for (int64_t k = 0; k <= segments; ++k)
     {
@@ -220,11 +225,14 @@ static bool After(const mnavDetailVertex* a, const mnavDetailVertex* b)
     return a->x != b->x ? a->x > b->x : a->z > b->z;
 }
 
-// Adds the polygon's vertices and, edge by edge, the samples kept on it,
+// Adds polygon p's vertices and, edge by edge, the samples kept on it,
 // building the outline in polygon order. Each edge is sampled from its
-// lexically first end, so both polygons sharing it get the same points.
-static void BuildOutline(Builder* builder, const mnavPolygon* polygon)
+// lexically first end, so both polygons sharing it get the same points;
+// an edge sampled more widely than the sample distance is counted by the
+// lower of the two.
+static void BuildOutline(Builder* builder, int32_t p)
 {
+    const mnavPolygon* polygon = &builder->mesh->polygons[p];
     Part* part = builder->part;
     int32_t n = polygon->count;
     for (int32_t k = 0; k < n; ++k)
@@ -240,7 +248,13 @@ static void BuildOutline(Builder* builder, const mnavPolygon* polygon)
         bool swapped = After(&part->vertices[j], &part->vertices[i]);
         const mnavDetailVertex* a = &part->vertices[swapped ? i : j];
         const mnavDetailVertex* b = &part->vertices[swapped ? j : i];
-        int32_t segments = PlacePoints(builder, a, b);
+        bool coarse = false;
+        int32_t segments = PlacePoints(builder, a, b, &coarse);
+        uint16_t across = polygon->neighbors[j];
+        if (coarse && (across == MNAV_NO_INDEX || across > p))
+        {
+            builder->detail->coarseEdges += 1;
+        }
         int32_t kept = Simplify(part, segments, builder->settings.error, part->kept);
         part->hull[part->hullCount++] = (uint8_t)j;
         for (int32_t k = 1; k < kept - 1; ++k)
@@ -421,7 +435,7 @@ static void AddInterior(Builder* builder)
     }
     for (int32_t s = Worst(builder); s >= 0; s = Worst(builder))
     {
-        if (part->vertexCount >= MNAV_DETAIL_VERTICES)
+        if (part->vertexCount >= MNAV_MAX_DETAIL_VERTICES)
         {
             builder->detail->cappedPolygons += 1;
             break;
@@ -486,7 +500,7 @@ static mnavResult BuildPart(Builder* builder, int32_t p)
     {
         return result;
     }
-    BuildOutline(builder, &builder->mesh->polygons[p]);
+    BuildOutline(builder, p);
     TriangulateOutline(builder);
     result = Collect(builder, builder->mesh->polygons[p].count);
     if (result != mnav_success)
@@ -499,7 +513,7 @@ static mnavResult BuildPart(Builder* builder, int32_t p)
 
 // One part per polygon, the parts end to end over the vertices and the
 // triangles, each with its polygon's vertices and at most
-// MNAV_DETAIL_VERTICES, and every triangle's corners three distinct
+// MNAV_MAX_DETAIL_VERTICES, and every triangle's corners three distinct
 // vertices of its part.
 static void CheckDetailMesh(const mnavPolyMesh* mesh, const mnavDetailMesh* detail)
 {
@@ -511,7 +525,7 @@ static void CheckDetailMesh(const mnavPolyMesh* mesh, const mnavDetailMesh* deta
         const mnavDetailPart* part = &detail->parts[p];
         MNAV_ASSERT(part->firstVertex == vertices && part->firstTriangle == triangles);
         MNAV_ASSERT(part->vertexCount >= mesh->polygons[p].count &&
-                    part->vertexCount <= MNAV_DETAIL_VERTICES);
+                    part->vertexCount <= MNAV_MAX_DETAIL_VERTICES);
         for (int32_t t = 0; t < part->triangleCount; ++t)
         {
             const uint8_t* c = detail->triangles[part->firstTriangle + t].corners;
