@@ -13,6 +13,7 @@
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/hierarchy.h"
+#include "maul-nav/navflow.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
@@ -263,11 +264,21 @@ static void TestUnreachableIsNone(void)
     mnavDestroyNavmesh(navmesh);
 }
 
-// Calls every call that takes a polygon id with the stale one, as a
-// start and, where there is one, as an end, the other end current, and
-// counts those that do not refuse it with mnav_errorStale.
+// What holds ids across the commit that made a stale: corridors from
+// it and to it, a flow field and a hierarchy built after the commit.
+typedef struct Holders
+{
+    mnavCorridor* from;
+    mnavCorridor* to;
+    mnavNavFlow* field;
+    const mnavHierarchy* hierarchy;
+} Holders;
+
+// Calls every call that takes or holds a polygon id with the stale one,
+// as a start and, where there is one, as an end, the other end current,
+// and counts those that do not refuse it with mnav_errorStale.
 static int32_t StaleEverywhere(mnavQuery* query, mnavNavmesh* navmesh, mnavNearest stale,
-                               mnavNearest current)
+                               mnavNearest current, const Holders* h)
 {
     const mnavPolygonId a = stale.polygon;
     const mnavPolygonId b = current.polygon;
@@ -283,7 +294,17 @@ static int32_t StaleEverywhere(mnavQuery* query, mnavNavmesh* navmesh, mnavNeare
     mnavPathEnd end;
     double height = 0.0;
     mnavAreaType area = 0;
+    mnavCorners corners;
+    mnavAreaRun runs[4];
+    int32_t runCount = 0;
+    bool shortened = false;
+    mnavPolygonFlow flow;
+    const mnavNavFlowGoal goal = {a, p};
+    // Read before the field is refused a build, which leaves it empty;
+    // the table's calls are not ordered among themselves.
+    const mnavResult read = mnavNavFlow_GetFlow(h->field, navmesh, a, &flow);
     const mnavResult got[] = {
+        read,
         mnavQuery_FindPath(query, navmesh, a, p, b, q, nullptr, &path),
         mnavQuery_FindPath(query, navmesh, b, q, a, p, nullptr, &path),
         mnavQuery_FindShortestPath(query, navmesh, a, p, b, q, nullptr, &path),
@@ -292,6 +313,8 @@ static int32_t StaleEverywhere(mnavQuery* query, mnavNavmesh* navmesh, mnavNeare
         mnavQuery_BeginPath(query, navmesh, b, q, a, p, nullptr),
         mnavQuery_CheckReachable(query, navmesh, a, p, b, q, nullptr, &end),
         mnavQuery_CheckReachable(query, navmesh, b, q, a, p, nullptr, &end),
+        mnavQuery_FindHierarchicalPath(query, h->hierarchy, navmesh, a, p, b, q, &path),
+        mnavQuery_FindHierarchicalPath(query, h->hierarchy, navmesh, b, q, a, p, &path),
         mnavQuery_MoveAlongSurface(query, navmesh, a, p, q, nullptr, &move),
         mnavQuery_Raycast(query, navmesh, a, p, q, nullptr, &ray),
         mnavQuery_FindWallDistance(query, navmesh, a, p, 5.0, nullptr, &wall),
@@ -300,6 +323,13 @@ static int32_t StaleEverywhere(mnavQuery* query, mnavNavmesh* navmesh, mnavNeare
         mnavPolygon_GetHeight(navmesh, a, p.x, p.z, &height),
         mnavPolygon_GetArea(navmesh, a, &area),
         mnavPolygon_StageArea(navmesh, a, mnav_areaWalkable),
+        mnavQuery_FindCorridorCorners(query, h->from, navmesh, &corners),
+        mnavQuery_FindCorridorAreas(query, h->from, navmesh, &corners, runs, 4, &runCount),
+        mnavQuery_MoveCorridor(query, h->from, navmesh, q, nullptr, &move),
+        mnavQuery_MoveCorridorTarget(query, h->to, navmesh, q, nullptr, &move),
+        mnavQuery_ShortcutCorridor(query, h->from, navmesh, q, nullptr, &shortened),
+        mnavNavFlow_Build(h->field, navmesh, &goal, 1, nullptr),
+        mnavNavFlow_Begin(h->field, navmesh, &(mnavTileRange){0, 0, 1, 1}, &goal, 1, nullptr),
     };
     int32_t wrong = 0;
     for (int32_t i = 0; i < (int32_t)(sizeof(got) / sizeof(got[0])); ++i)
@@ -334,14 +364,50 @@ static void TestIdsAreChecked(void)
     CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, bad, a.point, nullptr, &path) ==
               mnav_errorInvalid,
           "no such polygon");
+    // Corridors from a and to b, and back, loaded before the replacement.
+    mnavNearest b = On(navmesh, 62.0, 0.0, 62.0);
+    mnavQuery* wide = MakeQuery(8192, 1000.0f);
+    static mnavPolygonId fromBuffer[256];
+    static mnavPolygonId toBuffer[256];
+    mnavCorridor from;
+    mnavCorridor to;
+    CHECK(mnavQuery_FindPath(wide, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
+              path.end == mnav_pathFound &&
+              mnavResetCorridor(&from, fromBuffer, 256, a.polygon, a.point) == mnav_success &&
+              mnavSetCorridor(&from, &path) == mnav_success &&
+              mnavQuery_FindPath(wide, navmesh, b.polygon, b.point, a.polygon, a.point, nullptr,
+                                 &path) == mnav_success &&
+              path.end == mnav_pathFound &&
+              mnavResetCorridor(&to, toBuffer, 256, b.polygon, b.point) == mnav_success &&
+              mnavSetCorridor(&to, &path) == mnav_success,
+          "corridors both ways");
     CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[0], s_sizes[0]).result == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "tile (0, 0) replaced");
     CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, a.polygon, a.point, nullptr,
                              &path) == mnav_errorStale,
           "stale");
-    CHECK(StaleEverywhere(query, navmesh, a, On(navmesh, 62.0, 0.0, 62.0)) == 0,
-          "stale in every call that takes an id, as a start and as an end");
+    // A flow field and a hierarchy made after it, so that only the ids
+    // are stale.
+    mnavNavFlowDef fieldDef = mnavDefaultNavFlowDef();
+    fieldDef.limits = (mnavNavFlowLimits){1024, 16, 16};
+    mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
+    hierarchyDef.limits = (mnavHierarchyLimits){128, 1024, 8192};
+    mnavNavFlowGoal goal = {b.polygon, b.point};
+    Holders holders = {&from, &to, nullptr, nullptr};
+    mnavHierarchy* hierarchy = nullptr;
+    CHECK(mnavCreateNavFlow(&fieldDef, &holders.field) == mnav_success &&
+              mnavNavFlow_Build(holders.field, navmesh, &goal, 1, nullptr) == mnav_success &&
+              mnavCreateHierarchy(&hierarchyDef, &hierarchy) == mnav_success &&
+              mnavHierarchy_Build(hierarchy, wide, navmesh, nullptr, nullptr) == mnav_success,
+          "a field and a hierarchy over the navmesh as it is");
+    holders.hierarchy = hierarchy;
+    CHECK(StaleEverywhere(wide, navmesh, a, b, &holders) == 0,
+          "stale in every call that takes or holds an id, as a start and as an end");
+    mnavDestroyHierarchy(hierarchy);
+    mnavDestroyNavFlow(holders.field);
+    mnavDestroyQuery(wide);
     mnavPos3 nan = {(double)NAN, 0.0, 0.0};
     a = On(navmesh, 2.0, 0.0, 2.0);
     CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, nan, a.polygon, a.point, nullptr, &path) ==
