@@ -4,8 +4,9 @@
 // Tracing and simplifying region contours, read from the baked tile's
 // polygon edges: walls follow the outlines and holes as simplified, area
 // borders are simplified alike from both sides, long walls are split,
-// corners take the highest floor around them, and the tile's sides split
-// where what lies inside or beyond them changes.
+// corners take the highest floor around them, the tile's sides split
+// where what lies inside or beyond them changes, and a region one cell
+// thin keeps its cells' outline, on a tile's side too.
 
 #include "defs_for.h"
 #include "ramp_level.h"
@@ -14,6 +15,8 @@
 
 #include "maul-nav/bake.h"
 #include "maul-nav/debug.h"
+#include "maul-nav/navmesh.h"
+#include "maul-nav/query.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -458,6 +461,104 @@ static void TestRegionsOfOneAreaMeetOnTheSide(void)
           "one edge across where the regions meet");
 }
 
+static void TestThinRegionKeepsItsCells(void)
+{
+    // A strip one cell thin, across the square and then along it, every
+    // other cell unwalkable at the floor's level. Simplified within two
+    // cells, no wall strays far enough to keep a vertex beyond the two
+    // the strip starts from: it keeps the outline of its cells.
+    for (int32_t pass = 0; pass < 2; ++pass)
+    {
+        mnavBakeDef def = Exact();
+        def.maxEdgeError = 0.5f;
+        UseDef(&def);
+        Scene scene = Flat(0, false);
+        for (int32_t z = 1; z < 8; ++z)
+        {
+            for (int32_t x = 1; x < 8; ++x)
+            {
+                bool strip = pass == 0 ? z == 4 : x == 4;
+                scene.area[z][x] = strip ? mnav_areaWalkable : mnav_areaNone;
+            }
+        }
+        Load(&scene);
+        int32_t walls = Lines(mnav_debugWall);
+        bool cells = true;
+        for (int32_t k = 1; k < 8; ++k)
+        {
+            cells = cells && (pass == 0 ? At(k, 4, 0) : At(4, k, 0)) == mnav_areaWalkable;
+        }
+        CHECK(s_report.regionCount == 1 && s_report.polygonCount == 1 && cells,
+              "the strip's region, one polygon over its cells");
+        CHECK(walls == 4 &&
+                  (pass == 0 ? HasLine(walls, 1, 4, 8, 4) && HasLine(walls, 8, 4, 8, 5) &&
+                                   HasLine(walls, 8, 5, 1, 5) && HasLine(walls, 1, 5, 1, 4)
+                             : HasLine(walls, 4, 1, 5, 1) && HasLine(walls, 5, 1, 5, 8) &&
+                                   HasLine(walls, 5, 8, 4, 8) && HasLine(walls, 4, 8, 4, 1)),
+              "its four walls on the cells' corners");
+    }
+}
+
+static void TestThinStripOnASideMeetsItsNeighbor(void)
+{
+    // A box 1.5 m high on a flat floor two tiles deep, across the side at
+    // z = 32 m. Eroded by the default agent, its top in tile (1, 0) is one
+    // row of cells, z 31.75 to 32 m, which tile (1, 1) sees through its
+    // border and keeps in its wider part of the top. Both keep it, so a
+    // ray along the top crosses the side into the row.
+    const mnavVec3 vertices[12] = {{0, 0, 0},
+                                   {64, 0, 0},
+                                   {64, 0, 64},
+                                   {0, 0, 64},
+                                   {48.79f, 0, 31.2f},
+                                   {52.27f, 0, 31.2f},
+                                   {48.79f, 0, 38.2f},
+                                   {52.27f, 0, 38.2f},
+                                   {48.79f, 1.5f, 31.2f},
+                                   {52.27f, 1.5f, 31.2f},
+                                   {48.79f, 1.5f, 38.2f},
+                                   {52.27f, 1.5f, 38.2f}};
+    const int32_t indices[42] = {0,  3, 2, 0, 2,  1,  8,  10, 11, 8, 11, 9, 4,  5,
+                                 9,  4, 9, 8, 6,  10, 11, 6,  11, 7, 4,  8, 10, 4,
+                                 10, 6, 5, 7, 11, 5,  11, 9,  4,  6, 7,  4, 7,  5};
+    const mnavTriangleMesh mesh = {vertices, 12, indices, 14, nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    mnavBakeDef def = mnavDefaultBakeDef();
+    UseDef(&def);
+    mnavNavmeshDef meshDef = NavmeshDefFor(&s_def);
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success, "a navmesh");
+    for (int32_t z = 0; z < 2; ++z)
+    {
+        size_t size = 0;
+        CHECK(mnavBaker_BakeTile(s_baker, &input, 1, z, &s_report) == mnav_success &&
+                  mnavBaker_CopyTile(s_baker, s_tile, TILE_ROOM, &size) == mnav_success &&
+                  mnavNavmesh_StageTile(navmesh, s_tile, size).result == mnav_success,
+              "a tile baked and staged");
+    }
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
+    mnavNearest row;
+    mnavNearest top;
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){50.625, 1.5, 31.875},
+                                  (mnavVec3){0.01f, 0.5f, 0.01f}, nullptr, &row) == mnav_success &&
+              row.polygon.slot != 0 && row.over &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){50.625, 1.5, 34.0},
+                                      (mnavVec3){0.01f, 0.5f, 0.01f}, nullptr,
+                                      &top) == mnav_success &&
+              top.polygon.slot != 0 && top.over && row.polygon.slot != top.polygon.slot,
+          "the row in tile (1, 0), the rest of the top in tile (1, 1)");
+    mnavQueryDef queryDef = mnavDefaultQueryDef();
+    mnavQuery* query = nullptr;
+    mnavRay ray;
+    CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success &&
+              mnavQuery_Raycast(query, navmesh, top.polygon, top.point,
+                                (mnavPos3){50.625, 1.5, 31.875}, nullptr, &ray) == mnav_success &&
+              ray.end == mnav_rayReached && ray.t == 1.0,
+          "a ray along the top crosses the side into the row");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     mnavBakeDef def = Exact();
@@ -473,6 +574,8 @@ int main(void)
     TestCornersTakeTheHighestFloorAround();
     TestTileSides();
     TestRegionsOfOneAreaMeetOnTheSide();
+    TestThinRegionKeepsItsCells();
+    TestThinStripOnASideMeetsItsNeighbor();
     Done();
     return s_failures == 0 ? 0 : 1;
 }

@@ -147,7 +147,8 @@ extern "C"
         // meters, 0 to MNAV_MAX_EDGE_ERROR. Walls simplified a cell or more
         // can cross themselves or each other, and a ring that then does not
         // triangulate whole loses the area it did not triangulate; the
-        // report counts it in partialRingCount.
+        // report counts it in partialRingCount. A region too thin for any
+        // wall to stray that far keeps the outline of its cells.
         float maxEdgeError;
         // The longest wall edge, in meters, from 0 to 2^30 cells; 0 for no
         // limit, and a length below a cell limits walls to one cell.
@@ -529,7 +530,7 @@ extern "C"
 // other tile bytes for the same def and input, and only then, so a tile a
 // host keeps by its fingerprint goes stale exactly when a bake would
 // differ, not at every release.
-#define MNAV_BAKE_GENERATOR 4
+#define MNAV_BAKE_GENERATOR 5
 
     // A baker: the def it was made with, its memory, and the last tile it
     // baked. Made by mnavCreateBaker.

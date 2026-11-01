@@ -370,6 +370,26 @@ static int32_t Farthest(const Work* work, int32_t i, float* distanceOut)
     return farthest;
 }
 
+// Twice the signed area of the raw contour on the ground: positive for a
+// region's outline, negative for a hole.
+static int64_t RawArea(const Work* work)
+{
+    int64_t area = 0;
+    for (int32_t i = 0, j = work->rawCount - 1; i < work->rawCount; j = i++)
+    {
+        const RawVertex* a = &work->raw[i];
+        const RawVertex* b = &work->raw[j];
+        area += (int64_t)a->x * b->z - (int64_t)b->x * a->z;
+    }
+    return area;
+}
+
+// Keeps the raw vertices the walls need to stay within edgeError of their
+// cells. An outline so thin that no wall strays that far would keep two
+// vertices and its region be lost, though it is walkable and a
+// neighboring tile keeps the same cells in a wider region up to the
+// shared side: it keeps the outline of its cells instead. A hole that thin
+// goes, and the region covers it.
 static mnavResult Simplify(mnavMemory* memory, Work* work, float edgeError)
 {
     mnavResult result = Seed(memory, work);
@@ -385,6 +405,11 @@ static mnavResult Simplify(mnavMemory* memory, Work* work, float edgeError)
         {
             ++i;
         }
+    }
+    if (result == mnav_success && work->keptCount < 3 && edgeError > 0.0f && RawArea(work) > 0)
+    {
+        work->keptCount = 0;
+        return Simplify(memory, work, 0.0f);
     }
     return result;
 }
