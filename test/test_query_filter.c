@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Query filters: area costs and inclusion in the nearest point, the
-// path search and the raycast. Hand cells are 0.25 m.
+// path search and the raycast, and a bad filter refused by every call
+// that takes one. Hand cells are 0.25 m.
 
 #include "defs_for.h"
 #include "hand_tiles.h"
@@ -10,11 +11,17 @@
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/flow.h"
+#include "maul-nav/hierarchy.h"
+#include "maul-nav/linkgen.h"
+#include "maul-nav/navflow.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
 // s_handBridge: a bridge of area 2 from (10, 5) to (15, 10) between two
 // squares, and a way round it above, three squares of area 1, all clear of
@@ -220,11 +227,163 @@ static void TestFiltersAreChecked(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// What every call that takes a filter is called on: a navmesh with a
+// corridor from a to b, the objects that build over it, and a grid.
+typedef struct Callees
+{
+    mnavQuery* query;
+    const mnavNavmesh* navmesh;
+    mnavCorridor* corridor;
+    mnavNearest a;
+    mnavNearest b;
+    mnavHierarchy* hierarchy;
+    mnavNavFlow* navFlow;
+    mnavGridFlow* gridFlow;
+    mnavGrid grid;
+} Callees;
+
+enum
+{
+    FILTER_CALLS = 24
+};
+
+// Calls every call that takes a filter with this one and counts those
+// that do not refuse it with the status wanted. The corridor calls refuse
+// before they change the corridor.
+static int32_t Refusing(const Callees* c, const mnavQueryFilter* f, mnavResult wanted)
+{
+    const mnavVec3 box = {1.0f, 1.0f, 1.0f};
+    mnavQuery* query = c->query;
+    const mnavNavmesh* navmesh = c->navmesh;
+    mnavCorridor* corridor = c->corridor;
+    const mnavNearest a = c->a;
+    const mnavNearest b = c->b;
+    mnavPolygonId ids[8];
+    mnavFound found;
+    mnavNearest n;
+    mnavPath path;
+    mnavMove move;
+    mnavWall walls[4];
+    mnavWallsFound wallsFound;
+    mnavNearestWall wall;
+    mnavRandomPoint point;
+    mnavPathEnd end;
+    mnavRay ray;
+    int32_t valid = 0;
+    bool shortened = false;
+    mnavLinkGenDef gen = mnavDefaultLinkGenDef();
+    mnavLinkDef links[4];
+    int32_t count = 0;
+    mnavGridPath gridPath;
+    const mnavNavFlowGoal goal = {b.polygon, b.point};
+    const mnavCell cells[2] = {{0, 0}, {3, 3}};
+    const mnavResult got[FILTER_CALLS] = {
+        mnavNavmesh_FindPolygons(navmesh, a.point, box, f, ids, 8, &found),
+        mnavNavmesh_FindNearest(navmesh, a.point, box, f, &n),
+        mnavNavmesh_FindRandomPoint(navmesh, 7, f, &point),
+        mnavNavmesh_CheckCorridor(navmesh, corridor, f, &valid),
+        mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, f, &path),
+        mnavQuery_FindShortestPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, f,
+                                   &path),
+        mnavQuery_BeginPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, f),
+        mnavQuery_CheckReachable(query, navmesh, a.polygon, a.point, b.polygon, b.point, f, &end),
+        mnavQuery_Raycast(query, navmesh, a.polygon, a.point, b.point, f, &ray),
+        mnavQuery_MoveAlongSurface(query, navmesh, a.polygon, a.point, b.point, f, &move),
+        mnavQuery_MoveCorridor(query, corridor, navmesh, b.point, f, &move),
+        mnavQuery_MoveCorridorTarget(query, corridor, navmesh, a.point, f, &move),
+        mnavQuery_ShortcutCorridor(query, corridor, navmesh, b.point, f, &shortened),
+        mnavQuery_ReplanCorridor(query, corridor, navmesh, box, f, &path),
+        mnavQuery_FindWallDistance(query, navmesh, a.polygon, a.point, 5.0, f, &wall),
+        mnavQuery_FindWalls(query, navmesh, a.polygon, a.point, 5.0, f, walls, 4, &wallsFound),
+        mnavQuery_FindRandomPointAround(query, navmesh, a.polygon, a.point, 5.0, 7, f, &point),
+        mnavQuery_GenerateLinks(query, navmesh, &gen, nullptr, f, links, 4, &count),
+        mnavQuery_FindGridPath(query, &c->grid, cells[0], cells[1], f, &gridPath),
+        mnavHierarchy_Build(c->hierarchy, query, navmesh, f, nullptr),
+        mnavNavFlow_Build(c->navFlow, navmesh, &goal, 1, f),
+        mnavNavFlow_Begin(c->navFlow, navmesh, &(mnavTileRange){0, 0, 0, 0}, &goal, 1, f),
+        mnavGridFlow_Build(c->gridFlow, &c->grid, &cells[1], 1, f),
+        mnavGridFlow_Begin(c->gridFlow, &c->grid, &(mnavCellRange){0, 0, 3, 3}, &cells[1], 1, f),
+    };
+    int32_t wrong = 0;
+    for (int32_t i = 0; i < FILTER_CALLS; ++i)
+    {
+        if (got[i] != wanted)
+        {
+            printf("call %d: %d, not %d\n", i, got[i], wanted);
+            wrong += 1;
+        }
+    }
+    return wrong;
+}
+
+static void TestEveryCallChecksItsFilter(void)
+{
+    mnavNavmesh* navmesh = MakeBridge();
+    mnavQuery* query = MakeQuery();
+    mnavNearest a = On(navmesh, nullptr, 7.5, 7.5);
+    mnavNearest b = On(navmesh, nullptr, 17.5, 7.5);
+    mnavPath path = Walk(query, navmesh, nullptr);
+    static mnavPolygonId buffer[64];
+    mnavCorridor corridor;
+    CHECK(mnavResetCorridor(&corridor, buffer, 64, a.polygon, a.point) == mnav_success &&
+              mnavSetCorridor(&corridor, &path) == mnav_success,
+          "a corridor");
+    const mnavCorridor before = corridor;
+    static mnavPolygonId kept[64];
+    memcpy(kept, buffer, sizeof(kept));
+    static const mnavAreaType areas[16] = {
+        mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable,
+        mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable,
+        mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable,
+        mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable};
+    Callees c = {query, navmesh, &corridor, a, b, nullptr, nullptr, nullptr, {areas, 4, 4, 1.0f}};
+    mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
+    hierarchyDef.limits = (mnavHierarchyLimits){128, 1024, 8192};
+    mnavNavFlowDef navFlowDef = mnavDefaultNavFlowDef();
+    navFlowDef.limits.polygons = 1024;
+    navFlowDef.limits.tiles = 16;
+    navFlowDef.limits.links = 16;
+    mnavGridFlowDef gridFlowDef = mnavDefaultGridFlowDef();
+    gridFlowDef.cells = 16;
+    CHECK(mnavCreateHierarchy(&hierarchyDef, &c.hierarchy) == mnav_success &&
+              mnavCreateNavFlow(&navFlowDef, &c.navFlow) == mnav_success &&
+              mnavCreateGridFlow(&gridFlowDef, &c.gridFlow) == mnav_success,
+          "the objects built over the navmesh and the grid");
+    // Area 5 is on no polygon of the bridge nor cell of the grid: its cost
+    // is checked all the same.
+    mnavQueryFilter filter = mnavDefaultQueryFilter();
+    filter.costs[5] = 0.0f;
+    CHECK(Refusing(&c, &filter, mnav_errorLimit) == 0,
+          "a cost of 0: past the bound, in every call");
+    filter.costs[5] = (float)INFINITY;
+    CHECK(Refusing(&c, &filter, mnav_errorLimit) == 0,
+          "an infinite cost: past the bound, in every call");
+    filter.costs[5] = (float)NAN;
+    CHECK(Refusing(&c, &filter, mnav_errorInvalid) == 0, "a NaN cost: invalid, in every call");
+    filter = (mnavQueryFilter){0};
+    CHECK(Refusing(&c, &filter, mnav_errorInvalid) == 0,
+          "not from the default: invalid, in every call");
+    CHECK(corridor.polygonCount == before.polygonCount &&
+              memcmp(&corridor.position, &before.position, sizeof(before.position)) == 0 &&
+              memcmp(&corridor.target, &before.target, sizeof(before.target)) == 0 &&
+              memcmp(buffer, kept, sizeof(kept)) == 0,
+          "the corridor kept");
+    // The same calls with no filter are made: the refusals above are the
+    // filters'.
+    CHECK(Refusing(&c, nullptr, mnav_success) == 0, "no filter: every call made");
+    mnavDestroyGridFlow(c.gridFlow);
+    mnavDestroyNavFlow(c.navFlow);
+    mnavDestroyHierarchy(c.hierarchy);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 int main(void)
 {
     TestCostsChooseTheWay();
     TestCheapAreasKeepTheSearchExact();
     TestExcludedAreasElsewhere();
     TestFiltersAreChecked();
+    TestEveryCallChecksItsFilter();
     return s_failures == 0 ? 0 : 1;
 }
