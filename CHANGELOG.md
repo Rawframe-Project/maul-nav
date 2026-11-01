@@ -7,19 +7,52 @@ may change the API, the ABI and the tile formats.
 
 ## [0.7.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.6.0...v0.7.0) (2026-11-01)
 
+This release fixes what an audit of the status codes and a differential
+check of tile sides found. A walkable region one cell thin is no longer
+dropped by the bake, so neighboring tiles agree on their shared side;
+this raises the bake generation to 5. A debug buffer counts triangles
+and lines, not indices, and link generation gives a measuring call room
+at the link limit instead of a refusal.
 
-### ⚠ BREAKING CHANGES
-
-* **bake:** a walkable region one cell thin, which simplification within maxEdgeError would leave two vertices, keeps the outline of its cells instead of being dropped, so tiles with such a region bake other polygons; MNAV_BAKE_GENERATOR rises to 5, which changes every tile's bytes and fingerprint.
-* **links:** mnavQuery_GenerateLinks with a buffer too short gives mnav_errorCapacity and a count of MNAV_MAX_LINKS where its count past the buffer reaches MNAV_MAX_LINKS, where it gave mnav_errorLimit; mnav_errorLimit for the link bound now comes only with a buffer that holds every link counted.
-* **debug:** mnavDebugBuffer's triangleCapacity and triangleCount are in triangles, and lineCapacity and lineCount in lines, where they were in indices; a host gives room for 3 * triangleCapacity and 2 * lineCapacity indices and draws 3 * triangleCount and 2 * lineCount.
+No tile format rises, so tiles baked by 0.6.0 load as they are. Every
+tile's fingerprint differs from a new bake's, so a host that keeps
+tiles by fingerprint rebakes them once. Paths, corridors, flow fields,
+links and velocities are unchanged, except on tiles with a walkable
+region one cell thin, which now gets a polygon where it had none.
 
 ### Fixed
 
-* **bake:** keep one-cell-thin regions so tiles agree on shared sides ([#254](https://github.com/Rawframe-Project/maul-nav/issues/254)) ([5f5b648](https://github.com/Rawframe-Project/maul-nav/commit/5f5b6482e4ce5dc8892200fa65095c6f79c5f0e5)), closes [#253](https://github.com/Rawframe-Project/maul-nav/issues/253)
-* **debug:** count a debug buffer's triangles and lines, not indices ([#237](https://github.com/Rawframe-Project/maul-nav/issues/237)) ([e849b67](https://github.com/Rawframe-Project/maul-nav/commit/e849b6724bb117fdde2a22733910e044ed5cfc0d)), closes [#236](https://github.com/Rawframe-Project/maul-nav/issues/236)
-* **links:** give a measuring call room at the link limit, not a refusal ([#248](https://github.com/Rawframe-Project/maul-nav/issues/248)) ([c86bbd0](https://github.com/Rawframe-Project/maul-nav/commit/c86bbd06a264c64fc533b0e045d442e9d02f969a)), closes [#246](https://github.com/Rawframe-Project/maul-nav/issues/246)
-* **links:** say what GenerateLinks counts past a short buffer ([#239](https://github.com/Rawframe-Project/maul-nav/issues/239)) ([8dbe057](https://github.com/Rawframe-Project/maul-nav/commit/8dbe0576412249111e2a848b04b6d834dd4d33b8)), closes [#238](https://github.com/Rawframe-Project/maul-nav/issues/238)
+- **Breaking:** a walkable region one cell thin, which simplification
+  within `maxEdgeError` left with two vertices, was dropped by the
+  contour stage without a count. On a tile side, the neighboring tile
+  kept the same cells in a wider region, so its side edge faced nothing
+  and acted as a wall. Now such a region keeps the outline of its
+  cells, and the walls round it are simplified within 0 where they meet
+  it. `MNAV_BAKE_GENERATOR` is 5, so every tile's bytes and fingerprint
+  change.
+  ([#254](https://github.com/Rawframe-Project/maul-nav/pull/254))
+- **Breaking:** `mnavDebugBuffer`'s `triangleCapacity` and
+  `triangleCount` counted indices, three a triangle, and `lineCapacity`
+  and `lineCount` two a line, while their names and
+  `mnavTriangleMesh.triangleCount` count triangles. Now they count
+  triangles and lines: a host gives room for `3 * triangleCapacity` and
+  `2 * lineCapacity` indices and draws `3 * triangleCount` and
+  `2 * lineCount`. The geometry drawn is unchanged.
+  ([#237](https://github.com/Rawframe-Project/maul-nav/pull/237))
+- **Breaking:** `mnavQuery_GenerateLinks` with a buffer too short could
+  stop with `mnav_errorLimit` at `MNAV_MAX_LINKS` while a call with room
+  for every link succeeds, since the count past a short buffer also
+  holds near duplicates. Now such a call gives `mnav_errorCapacity` with
+  a count of `MNAV_MAX_LINKS`, and `mnav_errorLimit` comes only with a
+  buffer that holds every link counted.
+  ([#248](https://github.com/Rawframe-Project/maul-nav/pull/248))
+- `mnavQuery_GenerateLinks` promised its count past a short buffer was
+  the number of links generated. The `filterDistance` rule compares a
+  link only with those held in the buffer, so that count may be more
+  than a long enough buffer keeps. `linkgen.h` and the navmesh guide
+  now say the count is room enough for a second call, which then holds
+  every link a long buffer keeps.
+  ([#239](https://github.com/Rawframe-Project/maul-nav/pull/239))
 
 ## [0.6.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.5.0...v0.6.0) (2026-11-01)
 
