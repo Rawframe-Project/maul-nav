@@ -26,7 +26,7 @@
 #define VERTEX_BYTES   6
 #define POLYGON_BYTES  2
 #define EDGE_BYTES     5
-#define PART_BYTES     2
+#define PART_BYTES     3
 #define TRIANGLE_BYTES 3
 #define INFO_BYTES     48
 
@@ -97,7 +97,7 @@ static void WriteField(mnavByteWriter* w, int32_t field, const mnavTileInfo* inf
         for (int32_t p = 0; p < mesh->polygonCount; ++p)
         {
             mnavPutU8(w, (uint64_t)(detail->parts[p].vertexCount - mesh->polygons[p].count));
-            mnavPutU8(w, detail->parts[p].triangleCount);
+            mnavPutU16(w, detail->parts[p].triangleCount);
         }
         break;
     case FIELD_TRIANGLES:
@@ -550,14 +550,14 @@ static mnavTileResult ReadParts(mnavByteReader* r, const mnavPolyMesh* mesh, con
     for (int32_t p = 0; p < mesh->polygonCount; ++p)
     {
         int64_t count = mesh->polygons[p].count + (int64_t)mnavGetU8(r);
-        int64_t parts = (int64_t)mnavGetU8(r);
+        int64_t parts = (int64_t)mnavGetU16(r);
         if (r->exhausted || count > MNAV_MAX_DETAIL_VERTICES || parts < 1 ||
             parts > 2 * MNAV_MAX_DETAIL_VERTICES)
         {
             return Refuse(mnav_errorFormat, mnav_tileDetailParts, p);
         }
-        detail->parts[p] =
-            (mnavDetailPart){(int32_t)vertices, (int32_t)triangles, (uint8_t)count, (uint8_t)parts};
+        detail->parts[p] = (mnavDetailPart){(int32_t)vertices, (int32_t)triangles, (uint8_t)count,
+                                            (uint16_t)parts};
         vertices += count;
         extra += count - mesh->polygons[p].count;
         triangles += parts;

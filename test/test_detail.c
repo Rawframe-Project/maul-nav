@@ -389,46 +389,78 @@ static void TestSamplesKeepHalfASampleFromTheEdges(void)
 
 static void TestLongEdgeTakesTheMostSamples(void)
 {
-    // Cells of a quarter of the scene's, on a tile of 256 to reach it:
-    // the ledge ring is one cell wide, and the quad's edges run 34 cells.
-    // Sampled every cell, an edge would take 34 segments; it takes the
-    // most, 21. On the -X edge, the cell (0, 1) one level up holds the 3rd
-    // and 4th samples, and the 4th and 5th, 30 and 36.5 sixteenths of a
-    // scene cell along z, are kept.
+    // Cells of an eighth of the scene's, on a tile of 512 to reach it: the
+    // ledge ring is one cell wide, and the quad's edges run 70 cells, 1120
+    // sixteenths. Sampled every cell, an edge would take 70 segments; it
+    // takes the most, 42, a sample every 26.67 sixteenths. On the -X edge,
+    // the cell (0, 1) one level up, 128 to 256 sixteenths past the edge's
+    // start at 16, holds samples 5 to 9: the 4th and 5th, at 107 and 133,
+    // and the 8th and 9th, at 213 and 240, are kept. In scene sixteenths,
+    // half as many, they lie at 15.375, 18.625, 28.625 and 32.
     mnavBakeDef def = Exact();
-    def.cellSize = 0.0625f;
-    def.tileCells = 256;
-    def.detailSampleDistance = 0.0625f;
+    def.cellSize = 0.03125f;
+    def.tileCells = 512;
+    def.detailSampleDistance = 0.03125f;
     def.detailMaxError = 0.0f;
     UseDef(&def);
     Scene scene = Bumped(0, 1, 1);
     Load(&scene);
     mnavPolygonId polygon = Over(4, 4, 0);
-    CHECK(HasCorner(polygon, 4, 2, 30) && HasCorner(polygon, 4, 1, 36),
-          "21 segments on an edge of 34 cells");
+    CHECK(HasCorner(polygon, 2, 1, 15) && HasCorner(polygon, 2, 2, 18) &&
+              HasCorner(polygon, 2, 2, 28) && HasCorner(polygon, 2, 1, 32),
+          "42 segments on an edge of 70 cells");
     CHECK(s_report.coarseEdgeCount == 4, "the quad's four edges, sampled more widely, counted");
-    // Every 26 sixteenths an edge of 544 wants 21 segments, the most, and
-    // is not counted; every 25 it wants 22.
-    def.detailSampleDistance = 0.0625f * 26.0f / 16.0f;
+    // Every 27 sixteenths an edge of 1120 wants 42 segments, the most, and
+    // is not counted; every 26 it wants 44.
+    def.detailSampleDistance = 0.03125f * 27.0f / 16.0f;
     UseDef(&def);
     Load(&scene);
-    CHECK(s_report.coarseEdgeCount == 0, "21 segments wanted, none counted");
-    def.detailSampleDistance = 0.0625f * 25.0f / 16.0f;
+    CHECK(s_report.coarseEdgeCount == 0, "42 segments wanted, none counted");
+    def.detailSampleDistance = 0.03125f * 26.0f / 16.0f;
     UseDef(&def);
     Load(&scene);
-    CHECK(s_report.coarseEdgeCount == 4, "22 segments wanted, all four counted");
+    CHECK(s_report.coarseEdgeCount == 4, "44 segments wanted, all four counted");
+}
+
+static void TestTileSidesTakeTheirSamples(void)
+{
+    // A floor past every side of tile (0, 0) at the default def: one
+    // polygon whose four edges lie on the tile's sides, 128 cells long.
+    // Sampled every 6 cells, a side wants 22 segments, past the 21 an
+    // edge took when parts held 127 vertices; it now takes them. Every
+    // 49 sixteenths it wants 42, the most, and every 48 it wants 43.
+    const mnavVec3 vertices[4] = {
+        {-4.0f, 0.0f, -4.0f}, {36.0f, 0.0f, -4.0f}, {36.0f, 0.0f, 36.0f}, {-4.0f, 0.0f, 36.0f}};
+    const int32_t indices[6] = {0, 3, 2, 0, 2, 1};
+    const mnavTriangleMesh mesh = {vertices, 4, indices, 2, nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    const float samples[3] = {1.5f, 0.25f * 49.0f / 16.0f, 0.25f * 48.0f / 16.0f};
+    const int32_t counted[3] = {0, 0, 4};
+    for (int32_t k = 0; k < 3; ++k)
+    {
+        mnavBakeDef def = mnavDefaultBakeDef();
+        def.detailSampleDistance = samples[k];
+        mnavBaker* baker = nullptr;
+        mnavBakeReport report;
+        CHECK(mnavCreateBaker(&def, &baker).result == mnav_success &&
+                  mnavBaker_BakeTile(baker, &input, 0, 0, &report) == mnav_success,
+              "baked");
+        mnavDestroyBaker(baker);
+        CHECK(report.polygonCount == 1 && report.vertexCount == 4, "one polygon, on the sides");
+        CHECK(report.coarseEdgeCount == counted[k], "the sides counted past 42 segments only");
+    }
 }
 
 static void TestSharedCoarseEdgeCountsOnce(void)
 {
     // The long edges' def, and area 7 from x = 4 on: two quads share the
-    // edge x = 4, which runs 34 cells like the quads' -X and +X edges,
-    // while their -Z and +Z edges run under 21. The shared edge is
+    // edge x = 4, which runs 70 cells like the quads' -X and +X edges,
+    // while their -Z and +Z edges run 31 and 39. The shared edge is
     // counted once.
     mnavBakeDef def = Exact();
-    def.cellSize = 0.0625f;
-    def.tileCells = 256;
-    def.detailSampleDistance = 0.0625f;
+    def.cellSize = 0.03125f;
+    def.tileCells = 512;
+    def.detailSampleDistance = 0.03125f;
     def.detailMaxError = 0.0f;
     UseDef(&def);
     Scene scene = Flat(0, false);
@@ -669,15 +701,15 @@ static void TestEdgeTakesEachOfItsSixteenths(void)
     CHECK(s_report.coarseEdgeCount == 2, "the two long sides, sampled more widely, counted");
 }
 
-static void TestSnappedGapIsCounted(void)
+static void TestSnappedGapTakesASegment(void)
 {
     // Found by a search of small floors: a flat triangle whose one
     // polygon is a triangle with an edge 3 by 2 cells, 48 by 32
     // sixteenths, 57.7 long, through 16 whole sixteenths. Sampled every
-    // 20, it takes 3 segments, whose points snap to steps 0, 5, 11 and 16
-    // along it: the middle gap is 6 steps, 21.6 sixteenths, past the
-    // distance, and the edge is counted. Its other edges run 3 and 2
-    // cells straight, their points 16 apart. Every 22, no gap is past it.
+    // 20, 3 segments would snap to steps 0, 5, 11 and 16 along it, the
+    // middle gap 6 steps, 21.6 sixteenths, past the distance; it takes a
+    // 4th, its points 4 steps, 14.4, apart, and is not counted. Its other
+    // edges run 3 and 2 cells straight, their points 16 apart.
     const mnavVec3 vertices[3] = {{5.25f, 0.0f, 1.5f}, {7.0f, 0.0f, 1.5f}, {6.75f, 0.0f, 2.5f}};
     const int32_t indices[3] = {0, 2, 1};
     const mnavTriangleMesh mesh = {vertices, 3, indices, 1, nullptr};
@@ -690,11 +722,7 @@ static void TestSnappedGapIsCounted(void)
     UseDef(&def);
     LoadInput(&input);
     CHECK(s_report.polygonCount == 1 && s_report.vertexCount == 3, "one triangle");
-    CHECK(s_report.coarseEdgeCount == 1, "the slanted edge, its middle gap past the distance");
-    def.detailSampleDistance = 0.25f * 22.0f / 16.0f;
-    UseDef(&def);
-    LoadInput(&input);
-    CHECK(s_report.coarseEdgeCount == 0, "every gap within 22");
+    CHECK(s_report.coarseEdgeCount == 0, "the slanted edge takes a 4th segment, every gap within");
 }
 
 int main(void)
@@ -711,13 +739,14 @@ int main(void)
     TestSamplesKeepHalfASampleFromTheEdges();
     TestLongEdgeTakesTheMostSamples();
     TestSharedCoarseEdgeCountsOnce();
+    TestTileSidesTakeTheirSamples();
     TestNoHeightsFallBackAndCount();
     TestSearchTakesTheHeightNearestTheMean();
     TestLevelDetailIsSound();
     TestBumpyGroundReachesTheCap();
     TestSliverOutlinesTriangulateWhole();
     TestEdgeTakesEachOfItsSixteenths();
-    TestSnappedGapIsCounted();
+    TestSnappedGapTakesASegment();
     Done();
     return s_failures == 0 ? 0 : 1;
 }
