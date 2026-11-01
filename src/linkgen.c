@@ -202,7 +202,9 @@ static void Keep(Gen* g, Spot from, Spot to, bool drop)
     }
     if (g->count == g->total)
     {
-        g->result = mnav_errorLimit;
+        // Past the buffer the count is room, not links kept: a buffer of
+        // the total either holds them all or reaches the limit itself.
+        g->result = g->count > g->capacity ? mnav_errorCapacity : mnav_errorLimit;
         return;
     }
     bool twoWay = drop && from.point.y - to.point.y <= (double)d->climbMax;

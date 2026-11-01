@@ -3,7 +3,9 @@
 //
 // Where link generation stops: at a link past its total, and at a
 // landing's search box meeting more polygons than it may, each with
-// mnav_errorLimit and the links found so far.
+// mnav_errorLimit and the links found so far; and a call measuring with a
+// short buffer, whose count past the buffer is room rather than links,
+// which stops at the total with mnav_errorCapacity instead.
 //
 // White-box: the limits are MNAV_MAX_LINKS and MNAV_MAX_LINK_LANDINGS,
 // which no scene of a test's size reaches, so the generation runs here
@@ -75,6 +77,30 @@ static void TestLimits(void)
                                   (mnavLinkGenLimits){MNAV_MAX_LINKS, 0}) == mnav_errorLimit &&
               count == 0,
           "a landing box meeting a polygon past no room stops generation");
+    // A total of exactly the links found: a short buffer counts near
+    // duplicates past it and reaches the total, which is room enough.
+    const int32_t shortCapacities[2] = {0, 3};
+    for (int32_t k = 0; k < 2; ++k)
+    {
+        count = -1;
+        CHECK(mnavGenerateLinksWithin(
+                  query, navmesh, nullptr, &def, range, shortCapacities[k] > 0 ? s_links : nullptr,
+                  shortCapacities[k], &count,
+                  (mnavLinkGenLimits){all, MNAV_MAX_LINK_LANDINGS}) == mnav_errorCapacity &&
+                  count == all,
+              "a measuring call stops at the total, room for the call that holds them");
+    }
+    // Past a buffer of one, the total of two is reached: room, not a
+    // refusal; a buffer of two then holds two links and meets a third.
+    CHECK(mnavGenerateLinksWithin(query, navmesh, nullptr, &def, range, s_links, 1, &count,
+                                  (mnavLinkGenLimits){2, MNAV_MAX_LINK_LANDINGS}) ==
+                  mnav_errorCapacity &&
+              count == 2 &&
+              mnavGenerateLinksWithin(query, navmesh, nullptr, &def, range, s_links, 2, &count,
+                                      (mnavLinkGenLimits){2, MNAV_MAX_LINK_LANDINGS}) ==
+                  mnav_errorLimit &&
+              count == 2,
+          "measured as two, refused at a third in a buffer of two");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }

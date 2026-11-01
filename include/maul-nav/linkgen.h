@@ -151,11 +151,14 @@ extern "C"
     /// bound, an infinity included, or a filter cost past MNAV_MIN_AREA_COST or
     /// MNAV_MAX_AREA_COST, an infinity included; `mnav_errorCapacity` when more
     /// links were generated than the buffer holds, the first capacity written
-    /// and the count room enough for every link; `mnav_errorLimit` when
-    /// generation stops, the links found so far counted and the first capacity
-    /// written: at a link counted past MNAV_MAX_LINKS, the most a navmesh
-    /// holds, or at a landing's search box meeting more than
-    /// MNAV_MAX_LINK_LANDINGS polygons. Also `mnav_errorBusy` when called back
+    /// and the count room enough for every link, generation stopping once the
+    /// count reaches MNAV_MAX_LINKS, which is then the count; `mnav_errorLimit`
+    /// when generation stops, the links found so far counted and the first
+    /// capacity written: at a link past MNAV_MAX_LINKS, the most a navmesh
+    /// holds, in a buffer holding that many, or at a landing's search box
+    /// meeting more than MNAV_MAX_LINK_LANDINGS polygons. A call that measures
+    /// with a short buffer is refused with mnav_errorLimit only where one with
+    /// room for the count would be too. Also `mnav_errorBusy` when called back
     /// in from host code a call using the context runs (a link generation's
     /// clearance test, a hierarchy's allocator as it builds), one misuse
     /// counted.
