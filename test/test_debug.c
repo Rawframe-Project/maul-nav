@@ -43,6 +43,51 @@ static mnavDebugBuffer Buffer(mnavPos3 origin)
         0,      s_debugLines,    INDEX_ROOM / 2, 0};
 }
 
+// A buffer in heap arrays of exactly a full draw's counts less some, so
+// that AddressSanitizer sees a write past them.
+static mnavDebugBuffer Short(const mnavDebugBuffer* full, int32_t vertices, int32_t triangles,
+                             int32_t lines)
+{
+    mnavDebugBuffer b = {full->origin,
+                         nullptr,
+                         full->vertexCount - vertices,
+                         0,
+                         nullptr,
+                         full->triangleCount - triangles,
+                         0,
+                         nullptr,
+                         full->lineCount - lines,
+                         0};
+    b.vertices =
+        b.vertexCapacity > 0 ? malloc((size_t)b.vertexCapacity * sizeof(mnavDebugVertex)) : nullptr;
+    b.triangles = b.triangleCapacity > 0 ? malloc((size_t)b.triangleCapacity * 3 * sizeof(uint32_t))
+                                         : nullptr;
+    b.lines = b.lineCapacity > 0 ? malloc((size_t)b.lineCapacity * 2 * sizeof(uint32_t)) : nullptr;
+    return b;
+}
+
+// Whether a draw short of room counted what the full one did and holds
+// its first items.
+static bool SameStart(const mnavDebugBuffer* full, const mnavDebugBuffer* s)
+{
+    size_t v = (size_t)s->vertexCapacity * sizeof(mnavDebugVertex);
+    size_t t = (size_t)s->triangleCapacity * 3 * sizeof(uint32_t);
+    size_t l = (size_t)s->lineCapacity * 2 * sizeof(uint32_t);
+    bool same = s->vertexCount == full->vertexCount && s->triangleCount == full->triangleCount &&
+                s->lineCount == full->lineCount &&
+                (v == 0 || memcmp(s->vertices, full->vertices, v) == 0) &&
+                (t == 0 || memcmp(s->triangles, full->triangles, t) == 0) &&
+                (l == 0 || memcmp(s->lines, full->lines, l) == 0);
+    return same;
+}
+
+static void Release(mnavDebugBuffer* b)
+{
+    free(b->vertices);
+    free(b->triangles);
+    free(b->lines);
+}
+
 static mnavNavmesh* Load(void)
 {
     LoadWorldTiles();
@@ -191,6 +236,10 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
               Count(&b, mnav_debugLinkBothWays, mnav_linkJump) == 16 &&
               Count(&b, mnav_debugLink, mnav_linkDrop + 256) == 16,
           "an arc each, the detached one marked");
+    mnavDebugBuffer tight = Short(&b, 1, 0, 1);
+    CHECK(mnavNavmesh_DebugLinks(navmesh, &tight) == mnav_errorCapacity && SameStart(&b, &tight),
+          "a line and a vertex short: the first drawn, the whole counted");
+    Release(&tight);
     // The arc rises a quarter of the link's length at its middle.
     float top = -1e9f;
     for (int32_t i = 0; i < b.vertexCount; ++i)
@@ -229,12 +278,22 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
     CHECK(mnavDebugPath(&path, &b) == mnav_success && b.lineCount == path.pointCount - 1 &&
               Count(&b, mnav_debugPath, -1) == b.vertexCount,
           "the path's lines");
+    tight = Short(&b, 1, 0, 1);
+    CHECK(mnavDebugPath(&path, &tight) == mnav_errorCapacity && SameStart(&b, &tight),
+          "a path short of room: the first drawn, the whole counted");
+    Release(&tight);
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
     CHECK(mnavNavmesh_DebugCorridor(navmesh, path.polygons, path.polygonCount, &b) ==
                   mnav_success &&
               b.triangleCount >= path.polygonCount &&
               Count(&b, mnav_debugCorridor, path.polygonCount - 1) > 0,
           "the corridor's fills, tagged by place");
+    tight = Short(&b, 1, 1, 0);
+    CHECK(mnavNavmesh_DebugCorridor(navmesh, path.polygons, path.polygonCount, &tight) ==
+                  mnav_errorCapacity &&
+              SameStart(&b, &tight),
+          "a corridor short of room: the first drawn, the whole counted");
+    Release(&tight);
     // With a tile of the corridor removed, its polygons are skipped.
     int32_t whole = b.triangleCount;
     CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 1) == mnav_success &&
@@ -279,6 +338,10 @@ static void TestFlowAndAvoidance(void)
     CHECK(mnavGridFlow_Debug(field, 0.5, &b) == mnav_success && b.lineCount == 11 * 3 &&
               Count(&b, mnav_debugFlow, -1) == b.vertexCount,
           "eleven arrows");
+    mnavDebugBuffer tight = Short(&b, 1, 0, 1);
+    CHECK(mnavGridFlow_Debug(field, 0.5, &tight) == mnav_errorCapacity && SameStart(&b, &tight),
+          "arrows short of room: the first drawn, the whole counted");
+    Release(&tight);
     // The arrow of cell (1, 0) points along -X at its center, height 0.5.
     CHECK(b.vertices[0].x == 3.8f && b.vertices[1].x == 2.2f && b.vertices[0].y == 0.5f &&
               b.vertices[0].z == 1.0f,
