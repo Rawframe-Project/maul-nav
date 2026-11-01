@@ -111,8 +111,8 @@ static uint64_t Drawn(Reader* reader, mnavResult result, const mnavDebugBuffer* 
     }
     if (result == mnav_success)
     {
-        hash = Mix(hash, reader->triangles, (size_t)buffer->triangleCount * sizeof(uint32_t));
-        hash = Mix(hash, reader->lines, (size_t)buffer->lineCount * sizeof(uint32_t));
+        hash = Mix(hash, reader->triangles, (size_t)buffer->triangleCount * 3 * sizeof(uint32_t));
+        hash = Mix(hash, reader->lines, (size_t)buffer->lineCount * 2 * sizeof(uint32_t));
     }
     return hash;
 }
@@ -124,10 +124,10 @@ static mnavDebugBuffer Buffer(Reader* reader)
                              DRAW_VERTICES,
                              0,
                              reader->triangles,
-                             DRAW_INDICES,
+                             DRAW_INDICES / 3,
                              0,
                              reader->lines,
-                             DRAW_INDICES,
+                             DRAW_INDICES / 2,
                              0};
 }
 

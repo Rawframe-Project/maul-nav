@@ -225,7 +225,7 @@ static void Space(Reader* r, mnavAvoidance* avoidance)
     Expect(Typed(result));
     // Drawing refuses what the call refuses, given a good step.
     mnavDebugBuffer buffer = {{0.0, 0.0, 0.0}, s_vertices, 1 << 14, 0, nullptr, 0, 0,
-                              s_lines,         1 << 14,    0};
+                              s_lines,         1 << 13,    0};
     mnavResult drawn =
         mnavAvoidance_Debug3D(avoidance, s_fliers, agents, s_spheres, spheres, &buffer);
     Expect(Typed(drawn));
@@ -311,7 +311,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         }
     }
     mnavDebugBuffer buffer = {{0.0, 0.0, 0.0}, s_vertices, 1 << 14, 0, nullptr, 0, 0,
-                              s_lines,         1 << 14,    0};
+                              s_lines,         1 << 13,    0};
     mnavResult drawn = mnavAvoidance_Debug(avoidance, s_agents, agents, Value(&r), &buffer);
     Expect(Typed(drawn));
     if (r.at < r.size)

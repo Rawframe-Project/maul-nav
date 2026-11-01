@@ -99,13 +99,13 @@ static void TestFloorAndRampMeetOnEachSide(void)
         }
         CHECK(follows, "the surface on the floor, the ramp and the deck");
         mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
-                             s_drawLines,     DRAW_ROOM,      0};
+                             s_drawLines,     DRAW_ROOM / 2,  0};
         // Polygon fills go uncounted into a buffer with no triangle room.
         (void)mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
-        CHECK(b.vertexCount <= DRAW_ROOM && b.lineCount <= DRAW_ROOM, "the edges fit");
+        CHECK(b.vertexCount <= DRAW_ROOM && b.lineCount <= DRAW_ROOM / 2, "the edges fit");
         Side sides[16];
         int32_t count = 0;
-        for (int32_t l = 0; l < b.lineCount / 2; ++l)
+        for (int32_t l = 0; l < b.lineCount; ++l)
         {
             const mnavDebugVertex* p = &s_drawVertices[s_drawLines[2 * l]];
             const mnavDebugVertex* q = &s_drawVertices[s_drawLines[2 * l + 1]];
@@ -133,7 +133,7 @@ static void TestFloorAndRampMeetOnEachSide(void)
         // Every vertex left is a corner of some polygon: the one removed
         // is gone from the tile, not only from its polygons.
         int32_t corners = 0;
-        for (int32_t l = 0; l < b.lineCount; ++l)
+        for (int32_t l = 0; l < 2 * b.lineCount; ++l)
         {
             const mnavDebugVertex* v = &s_drawVertices[s_drawLines[l]];
             bool first = v->kind != mnav_debugTileBounds;

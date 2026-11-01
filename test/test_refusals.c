@@ -184,7 +184,7 @@ static void TestQueries(mnavNavmesh* navmesh)
 
 static void TestDebug(mnavNavmesh* navmesh)
 {
-    mnavDebugBuffer buffer = {{0, 0, 0}, s_vertices2, 4096, 0, nullptr, 0, 0, s_lines, 4096, 0};
+    mnavDebugBuffer buffer = {{0, 0, 0}, s_vertices2, 4096, 0, nullptr, 0, 0, s_lines, 2048, 0};
     CHECK(mnavNavmesh_DebugLinks(nullptr, &buffer) == mnav_errorInvalid &&
               mnavDebugPath(nullptr, &buffer) == mnav_errorInvalid &&
               mnavNavmesh_DebugCorridor(nullptr, nullptr, 0, &buffer) == mnav_errorInvalid,
@@ -199,7 +199,7 @@ static void TestDebug(mnavNavmesh* navmesh)
               mnavStageLinkRemoval(navmesh, first) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "a link removed");
-    CHECK(mnavNavmesh_DebugLinks(navmesh, &buffer) == mnav_success && buffer.lineCount == 8 * 2,
+    CHECK(mnavNavmesh_DebugLinks(navmesh, &buffer) == mnav_success && buffer.lineCount == 8,
           "the other link's arc alone");
 }
 
@@ -210,7 +210,7 @@ static void TestAvoidance(void)
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "a set");
     const mnavAgent agent = {{(double)NAN, 0.0}, {0, 0}, {0, 0}, 0.5, 1.0, 1.0, 1, 0, 0};
     mnavVec2 velocity;
-    mnavDebugBuffer buffer = {{0, 0, 0}, s_vertices2, 4096, 0, nullptr, 0, 0, s_lines, 4096, 0};
+    mnavDebugBuffer buffer = {{0, 0, 0}, s_vertices2, 4096, 0, nullptr, 0, 0, s_lines, 2048, 0};
     CHECK(mnavAvoidance_Avoid(avoidance, &agent, 1, nullptr, 0, 0.1, &velocity) ==
                   mnav_errorInvalid &&
               mnavAvoidance_Debug(avoidance, &agent, 1, 0.0, &buffer) == mnav_errorInvalid,
