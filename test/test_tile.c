@@ -547,7 +547,8 @@ static void HandBegin(Hand* h, const int32_t* points, int32_t count)
             (mnavMeshVertex){(uint16_t)points[2 * v], BASE, (uint16_t)points[2 * v + 1]};
     }
     h->mesh = (mnavPolyMesh){h->vertices, nullptr, count, count, h->polygons, 0, 2, 32, 0};
-    h->detail = (mnavDetailMesh){h->parts, 0, h->detailVertices, 0, 24, h->triangles, 0, 16, 0, 0};
+    h->detail =
+        (mnavDetailMesh){h->parts, 0, h->detailVertices, 0, 24, h->triangles, 0, 16, 0, 0, 0};
     h->info = (mnavTileInfo){123, 7, 0, 0, 32, 0.25f, 0.125f, 16, 2, 6, (mnavPos3){0.0, 0.0, 0.0}};
 }
 
