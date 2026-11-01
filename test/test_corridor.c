@@ -672,6 +672,18 @@ static void TestReplanning(void)
               valid == corridor.polygonCount && corridor.position.x == a.point.x &&
               corridor.target.x == target.x && corridor.target.z == target.z,
           "planned again between the same points");
+    // A buffer of two polygons holding the corridor's ends: the path
+    // planned between them does not fit, and the corridor is kept.
+    mnavPolygonId ends[2] = {corridor.polygons[0], corridor.polygons[corridor.polygonCount - 1]};
+    mnavCorridor small = {corridor.position, corridor.target, ends, 2, 2};
+    CHECK(mnavQuery_ReplanCorridor(query, &small, navmesh, box, nullptr, &path) ==
+                  mnav_errorCapacity &&
+              path.polygonCount == 0 && path.polygons == nullptr && small.polygonCount == 2 &&
+              small.polygons == ends &&
+              memcmp(&ends[0], &corridor.polygons[0], sizeof(*ends)) == 0 &&
+              memcmp(&ends[1], &corridor.polygons[corridor.polygonCount - 1], sizeof(*ends)) == 0 &&
+              small.position.x == corridor.position.x && small.target.x == corridor.target.x,
+          "a path past the buffer: refused, the corridor kept");
     // The target's tile gone: no polygon to plan to, the corridor kept.
     int32_t count = corridor.polygonCount;
     CHECK(mnavNavmesh_StageTileRemoval(navmesh, 1, 1) == mnav_success &&
