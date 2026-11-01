@@ -17,7 +17,9 @@ live.
 No tile format rises, so tiles baked by 0.5.0 load as they are. Their
 fingerprints differ from a new bake's, so a host that keeps tiles by
 fingerprint rebakes them once. Paths, corridors, flow fields and
-velocities are unchanged.
+velocities are unchanged, except on tiles baked with a
+`maxEdgeLength` below one cell or a `detailSampleDistance` below a
+sixteenth of a cell, whose polygons or detail now differ.
 
 ### Changed
 
