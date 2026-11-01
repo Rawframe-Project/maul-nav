@@ -373,18 +373,16 @@ static void TestFlatTrianglesAreDropped(void)
 
 static void TestRingCutShortIsCounted(void)
 {
-    // Found by the same search: within 4 cells of edge error, a ring of
-    // this floor of 7 by 7 is simplified so far that one of its triangles
-    // turns the wrong way. It is dropped, and the bake counts the ring as
-    // cut short.
-    const Shape shapes[5] = {{{0, 0, 0, 7, 7, 7, 7, 0}, 4, mnav_areaWalkable},
-                             {{2, 3, 2, 4, 5, 4, 5, 3}, 4, mnav_areaNone},
-                             {{2, 2, 2, 5, 4, 5, 4, 2}, 4, 9},
-                             {{2, 1, 2, 4, 4, 4, 4, 1}, 4, 9},
-                             {{4, 0, 4, 2, 5, 2, 5, 0}, 4, 7}};
+    // Found by a search of floors with blocks of other areas: within 3
+    // cells of edge error, the ring of this floor of 9 by 9 round an L of
+    // area 7 is simplified so far that it does not triangulate whole. What
+    // is left is dropped, and the bake counts the ring as cut short.
+    const Shape shapes[3] = {{{0, 0, 0, 9, 9, 9, 9, 0}, 4, mnav_areaWalkable},
+                             {{6, 3, 6, 4, 8, 4, 8, 3}, 4, 7},
+                             {{5, 0, 5, 3, 7, 3, 7, 0}, 4, 7}};
     mnavBakeDef def = Exact();
-    def.maxEdgeError = 1.0f;
-    CHECK(Load(&def, shapes, 5) == mnav_success, "baked and loaded");
+    def.maxEdgeError = 0.75f;
+    CHECK(Load(&def, shapes, 3) == mnav_success, "baked and loaded");
     CHECK(s_report.partialRingCount == 1, "one ring cut short, counted");
 }
 
