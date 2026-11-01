@@ -682,7 +682,8 @@ static void TestReplanning(void)
               small.polygons == ends &&
               memcmp(&ends[0], &corridor.polygons[0], sizeof(*ends)) == 0 &&
               memcmp(&ends[1], &corridor.polygons[corridor.polygonCount - 1], sizeof(*ends)) == 0 &&
-              small.position.x == corridor.position.x && small.target.x == corridor.target.x,
+              memcmp(&small.position, &corridor.position, sizeof(small.position)) == 0 &&
+              memcmp(&small.target, &corridor.target, sizeof(small.target)) == 0,
           "a path past the buffer: refused, the corridor kept");
     // The target's tile gone: no polygon to plan to, the corridor kept.
     int32_t count = corridor.polygonCount;
