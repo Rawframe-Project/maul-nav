@@ -627,6 +627,16 @@ static void TestCheck(const mnavFlightVolume* volume)
               mnavFlightVolume_CheckPath(volume, bad, -1, &step, nullptr) == mnav_errorInvalid &&
               mnavFlightVolume_CheckPath(volume, bad, 1, nullptr, nullptr) == mnav_errorInvalid,
           "refusals");
+    // Past MNAV_MAX_FLIGHT_VOXELS voxels, an infinity included, is a bound,
+    // refused before any step is cast.
+    mnavPos3 far[3] = {from, {1e12, from.y, from.z}, {from.x, from.y, (double)INFINITY}};
+    step = 7;
+    CHECK(mnavFlightVolume_CheckPath(volume, far, 2, &step, nullptr) == mnav_errorLimit &&
+              step == 0 &&
+              mnavFlightVolume_CheckPath(volume, (mnavPos3[2]){from, far[2]}, 2, &step, nullptr) ==
+                  mnav_errorLimit &&
+              step == 0,
+          "points past the bound");
     CHECK(mnavFlightVolume_CheckPath(volume, nullptr, 0, &step, nullptr) == mnav_success &&
               step == -1 &&
               mnavFlightVolume_CheckPath(volume, &from, 1, &step, nullptr) == mnav_success &&
@@ -927,16 +937,22 @@ static void RandomSolid(int32_t v[3])
     } while (Open(v[0], v[1], v[2]));
 }
 
-// Path searches refused: points not finite, points below or above the
-// volume, which are outside it, and NULL arguments.
+// Path searches refused: NaN points, points below or above the volume,
+// which are outside it, points past MNAV_MAX_FLIGHT_VOXELS voxels, an
+// infinity included, and NULL arguments.
 static void Refusals(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 open)
 {
     mnavFlightPath path;
-    const mnavPos3 bad[3] = {{(double)NAN, 5.0, 5.0}, {5.0, -5.0, 5.0}, {5.0, 40.0, 5.0}};
-    const mnavResult expected[3] = {mnav_errorInvalid, mnav_errorOutside, mnav_errorOutside};
+    const mnavPos3 bad[5] = {{(double)NAN, 5.0, 5.0},
+                             {5.0, -5.0, 5.0},
+                             {5.0, 40.0, 5.0},
+                             {1e12, 5.0, 5.0},
+                             {5.0, 5.0, -(double)INFINITY}};
+    const mnavResult expected[5] = {mnav_errorInvalid, mnav_errorOutside, mnav_errorOutside,
+                                    mnav_errorLimit, mnav_errorLimit};
     const uint64_t before = mnavQuery_GetMisuse(query);
     int32_t wrong = 0;
-    for (int32_t k = 0; k < 3; ++k)
+    for (int32_t k = 0; k < 5; ++k)
     {
         wrong +=
             mnavQuery_FindFlightPath(query, volume, bad[k], open, &path) == expected[k] ? 0 : 1;
@@ -944,8 +960,8 @@ static void Refusals(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3 
             mnavQuery_FindFlightPath(query, volume, open, bad[k], &path) == expected[k] ? 0 : 1;
         wrong += mnavQuery_BeginFlightPath(query, volume, bad[k], open) == expected[k] ? 0 : 1;
     }
-    CHECK(wrong == 0, "points not finite, below or above the volume");
-    CHECK(mnavQuery_GetMisuse(query) - before == 3, "only the points not finite are misuse");
+    CHECK(wrong == 0, "points NaN, below or above the volume, or past its bound");
+    CHECK(mnavQuery_GetMisuse(query) - before == 3, "only the NaN points are misuse");
     CHECK(mnavQuery_FindFlightPath(nullptr, volume, open, open, &path) == mnav_errorInvalid &&
               mnavQuery_FindFlightPath(query, nullptr, open, open, &path) == mnav_errorInvalid &&
               mnavQuery_FindFlightPath(query, volume, open, open, nullptr) == mnav_errorInvalid,
@@ -1066,7 +1082,11 @@ static void TestRefusals(const mnavFlightVolume* volume)
               mnavFlightVolume_FindNearestPoint(volume, p, 1.0f, nullptr, &found) ==
                   mnav_errorInvalid &&
               mnavFlightVolume_FindNearestPoint(volume, p, 1.0f, &out, nullptr) ==
-                  mnav_errorInvalid,
+                  mnav_errorInvalid &&
+              mnavFlightVolume_FindNearestPoint(volume, (mnavPos3){1e12, p.y, p.z}, 1.0f, &out,
+                                                &found) == mnav_errorLimit &&
+              mnavFlightVolume_FindNearestPoint(volume, (mnavPos3){(double)INFINITY, p.y, p.z},
+                                                1.0f, &out, &found) == mnav_errorLimit,
           "nearest refusals");
 }
 
