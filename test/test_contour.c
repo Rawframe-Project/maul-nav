@@ -499,6 +499,39 @@ static void TestThinRegionKeepsItsCells(void)
     }
 }
 
+static void TestThinAreaStripMeetsItsRegion(void)
+{
+    // Area 7 on one row, x 2 to 6, inside the walkable floor: the strip's
+    // outline and the hole round it in the floor's region both keep the
+    // strip's cells within an error of two cells, so the two polygons meet
+    // edge for edge and nothing lies twice over a cell.
+    mnavBakeDef def = Exact();
+    def.maxEdgeError = 0.5f;
+    UseDef(&def);
+    Scene scene = Flat(0, false);
+    for (int32_t x = 2; x <= 6; ++x)
+    {
+        scene.area[4][x] = 7;
+    }
+    Load(&scene);
+    bool cells = true;
+    for (int32_t x = 2; x <= 6; ++x)
+    {
+        cells = cells && At(x, 4, 0) == 7;
+    }
+    CHECK(cells && At(1, 4, 0) == mnav_areaWalkable && At(7, 4, 0) == mnav_areaWalkable &&
+              At(4, 3, 0) == mnav_areaWalkable && At(4, 5, 0) == mnav_areaWalkable,
+          "the strip's cells of area 7, the floor's round them walkable");
+    int32_t walls = Lines(mnav_debugWall);
+    CHECK(walls == 4 && HasLine(walls, 1, 1, 8, 1) && HasLine(walls, 8, 1, 8, 8) &&
+              HasLine(walls, 8, 8, 1, 8) && HasLine(walls, 1, 8, 1, 1),
+          "the square's walls alone: the strip's edges all join the floor");
+    int32_t inner = Lines(mnav_debugInnerEdge);
+    CHECK(HasLine(inner, 2, 4, 7, 4) && HasLine(inner, 7, 4, 7, 5) && HasLine(inner, 7, 5, 2, 5) &&
+              HasLine(inner, 2, 5, 2, 4),
+          "the strip's four edges joined to the floor");
+}
+
 static void TestThinStripOnASideMeetsItsNeighbor(void)
 {
     // A box 1.5 m high on a flat floor two tiles deep, across the side at
@@ -575,6 +608,7 @@ int main(void)
     TestTileSides();
     TestRegionsOfOneAreaMeetOnTheSide();
     TestThinRegionKeepsItsCells();
+    TestThinAreaStripMeetsItsRegion();
     TestThinStripOnASideMeetsItsNeighbor();
     Done();
     return s_failures == 0 ? 0 : 1;

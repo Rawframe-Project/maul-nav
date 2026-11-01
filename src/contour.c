@@ -384,12 +384,32 @@ static int64_t RawArea(const Work* work)
     return area;
 }
 
+// Whether a contour may go when it simplifies to fewer than three vertices:
+// a hole all of whose edges are walls, which its region then covers.
+static bool MayGo(const Work* work)
+{
+    if (RawArea(work) > 0)
+    {
+        return false;
+    }
+    for (int32_t i = 0; i < work->rawCount; ++i)
+    {
+        if (work->raw[i].neighbor != 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 // Keeps the raw vertices the walls need to stay within edgeError of their
 // cells. An outline so thin that no wall strays that far would keep two
 // vertices and its region be lost, though it is walkable and a
 // neighboring tile keeps the same cells in a wider region up to the
-// shared side: it keeps the outline of its cells instead. A hole that thin
-// goes, and the region covers it.
+// shared side: it keeps the outline of its cells instead. So does a hole
+// round such a region, which traces the same cells from the same two
+// vertices, so that the two meet edge for edge. A hole of walls that thin
+// goes, and its region covers it.
 static mnavResult Simplify(mnavMemory* memory, Work* work, float edgeError)
 {
     mnavResult result = Seed(memory, work);
@@ -406,7 +426,7 @@ static mnavResult Simplify(mnavMemory* memory, Work* work, float edgeError)
             ++i;
         }
     }
-    if (result == mnav_success && work->keptCount < 3 && edgeError > 0.0f && RawArea(work) > 0)
+    if (result == mnav_success && work->keptCount < 3 && edgeError > 0.0f && !MayGo(work))
     {
         work->keptCount = 0;
         return Simplify(memory, work, 0.0f);
