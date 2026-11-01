@@ -115,9 +115,13 @@ extern "C"
     /// the radius, step height and cell size being the navmesh's. A link is
     /// kept when the clearance test, if any, passes it, when the navmesh
     /// does not already walk from its start to its landing within `detour`
-    /// times the straight distance, and when no earlier link has both ends
-    /// within `filterDistance` of its own. The order is tile place,
-    /// polygon, edge, sample; the same navmesh gives the same links.
+    /// times the straight distance, and when no earlier link in the buffer
+    /// has both ends within `filterDistance` of its own. The order is tile
+    /// place, polygon, edge, sample; the same navmesh gives the same links.
+    /// A buffer too short holds the same first links as a longer one, but
+    /// links past it are not filtered against each other, since the
+    /// context holds no more than the buffer does: the count may then
+    /// exceed what a long enough buffer keeps, and is always room enough.
     ///
     /// @param query     A context for the walking searches; its last search
     ///                  ends.
@@ -133,10 +137,11 @@ extern "C"
     ///                  as it was.
     /// @param capacity  The buffer's size in links, at least 0.
     /// @param countOut  Receives the number of links generated, also beyond the
-    ///                  capacity. Zeroed on any failure but those that count the
-    ///                  links found: mnav_errorCapacity, and mnav_errorLimit when
-    ///                  generation stops at a bound; mnav_errorBusy leaves it as
-    ///                  it was.
+    ///                  capacity, where it is room enough for a second call
+    ///                  and may be more than that call keeps. Zeroed on any
+    ///                  failure but those that count the links found:
+    ///                  mnav_errorCapacity, and mnav_errorLimit when generation
+    ///                  stops at a bound; mnav_errorBusy leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a def
     /// not from mnavDefaultLinkGenDef, a def value NaN or below 0, a spacing of
     /// 0 or below the navmesh's cell size, a detour other than 0 below 1 or
@@ -145,10 +150,11 @@ extern "C"
     /// with a NaN cost; `mnav_errorLimit` for a def value past its MNAV_MAX_
     /// bound, an infinity included, or a filter cost past MNAV_MIN_AREA_COST or
     /// MNAV_MAX_AREA_COST, an infinity included; `mnav_errorCapacity` when more
-    /// links were generated than the buffer holds, the first capacity written;
-    /// `mnav_errorLimit` when generation stops, the links found so far counted
-    /// and the first capacity written: at a link past MNAV_MAX_LINKS, the most
-    /// a navmesh holds, or at a landing's search box meeting more than
+    /// links were generated than the buffer holds, the first capacity written
+    /// and the count room enough for every link; `mnav_errorLimit` when
+    /// generation stops, the links found so far counted and the first capacity
+    /// written: at a link counted past MNAV_MAX_LINKS, the most a navmesh
+    /// holds, or at a landing's search box meeting more than
     /// MNAV_MAX_LINK_LANDINGS polygons. Also `mnav_errorBusy` when called back
     /// in from host code a call using the context runs (a link generation's
     /// clearance test, a hierarchy's allocator as it builds), one misuse

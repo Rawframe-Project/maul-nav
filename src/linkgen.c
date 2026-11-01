@@ -156,7 +156,8 @@ static bool Walks(const Gen* g, Spot from, Spot to)
     return length <= (double)g->def->detour * Distance(from.point, to.point);
 }
 
-// Whether both ends of a link lie near an earlier link's.
+// Whether both ends of a link lie near an earlier link's in the buffer;
+// links past it are not held anywhere to compare with.
 static bool Near(const Gen* g, mnavPos3 start, mnavPos3 end)
 {
     double d = (double)g->def->filterDistance;
