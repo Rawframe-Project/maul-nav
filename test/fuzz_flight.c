@@ -365,8 +365,8 @@ static void CheckPath(mnavQuery* query, const mnavFlightVolume* volume, mnavPos3
     static mnavDebugVertex vertices[1 << 15];
     static uint32_t lines[1 << 15];
     mnavDebugBuffer buffer = {{0.0, 0.0, 0.0}, vertices, 1 << 15, 0, nullptr, 0, 0,
-                              lines,           1 << 15,  0};
-    Expect(mnavDebugFlightPath(&path, &buffer) == mnav_success && buffer.lineCount == 2 * last);
+                              lines,           1 << 14,  0};
+    Expect(mnavDebugFlightPath(&path, &buffer) == mnav_success && buffer.lineCount == last);
     mnavResult drawn = mnavFlightVolume_Debug(volume, (mnavPos3){a.x - 4.0, a.y - 4.0, a.z - 4.0},
                                               (mnavPos3){a.x + 4.0, a.y + 4.0, a.z + 4.0}, &buffer);
     Expect(drawn == mnav_success || drawn == mnav_errorCapacity || drawn == mnav_errorLimit);

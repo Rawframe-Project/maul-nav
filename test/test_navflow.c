@@ -454,7 +454,7 @@ static mnavPos3 At(const mnavDebugBuffer* b, uint32_t i)
 static void TestDebug(mnavNavFlow* field, const mnavNavmesh* other)
 {
     mnavNavmesh* navmesh = LoadSmall();
-    mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_vertices3, 8192, 0, nullptr, 0, 0, s_lines, 8192, 0};
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_vertices3, 8192, 0, nullptr, 0, 0, s_lines, 4096, 0};
     CHECK(mnavNavFlow_Build(field, other, nullptr, 0, nullptr) == mnav_success &&
               mnavNavFlow_Debug(field, navmesh, &b) == mnav_errorInvalid && b.lineCount == 0,
           "a field of another navmesh");
@@ -479,7 +479,7 @@ static void TestDebug(mnavNavFlow* field, const mnavNavmesh* other)
         }
         ways += 1;
         mnavPos3 m = Middle(&f);
-        for (int32_t a = 0; a < b.lineCount / 6; ++a)
+        for (int32_t a = 0; a < b.lineCount / 3; ++a)
         {
             const mnavDebugVertex* head = &b.vertices[b.lines[6 * a + 1]];
             matched += fabs((double)head->x - m.x) < 1e-4 && fabs((double)head->y - m.y) < 1e-4 &&
@@ -491,7 +491,7 @@ static void TestDebug(mnavNavFlow* field, const mnavNavmesh* other)
     // Barbs a quarter of their arrow, at most half a meter.
     int32_t capped = 0;
     bool barbs = true;
-    for (int32_t a = 0; a < b.lineCount / 6; ++a)
+    for (int32_t a = 0; a < b.lineCount / 3; ++a)
     {
         const uint32_t* l = &b.lines[6 * a];
         double arrow = Distance(At(&b, l[0]), At(&b, l[1]));
@@ -502,13 +502,13 @@ static void TestDebug(mnavNavFlow* field, const mnavNavmesh* other)
         capped += 0.25 * arrow > 0.5 ? 1 : 0;
     }
     CHECK(barbs && capped > 0, "barbs a quarter of their arrow, capped at half a meter");
-    printf("navflow debug: %d ways, %d lines\n", ways, b.lineCount / 2);
-    CHECK(ways > 100 && b.lineCount == 6 * ways && matched >= ways,
+    printf("navflow debug: %d ways, %d lines\n", ways, b.lineCount);
+    CHECK(ways > 100 && b.lineCount == 3 * ways && matched >= ways,
           "an arrow of three lines for each way, heads at the portals");
-    // Too small a buffer: counted past full (two indices a line).
-    mnavDebugBuffer small = {{0.0, 0.0, 0.0}, s_vertices3, 4, 0, nullptr, 0, 0, s_lines, 4, 0};
+    // Too small a buffer: counted past full.
+    mnavDebugBuffer small = {{0.0, 0.0, 0.0}, s_vertices3, 4, 0, nullptr, 0, 0, s_lines, 2, 0};
     CHECK(mnavNavFlow_Debug(field, navmesh, &small) == mnav_errorCapacity &&
-              small.lineCount == 6 * ways,
+              small.lineCount == 3 * ways,
           "counted past full");
     CHECK(mnavNavFlow_Debug(nullptr, navmesh, &b) == mnav_errorInvalid &&
               mnavNavFlow_Debug(field, nullptr, &b) == mnav_errorInvalid &&
@@ -533,7 +533,7 @@ static void TestDebug(mnavNavFlow* field, const mnavNavmesh* other)
     CHECK(mnavNavFlow_Begin(field, navmesh, &part, &inside, 1, nullptr) == mnav_success &&
               mnavNavFlow_Continue(field, navmesh, INT32_MAX, &ended) == mnav_success && ended &&
               mnavNavFlow_Debug(field, navmesh, &b) == mnav_success && b.lineCount > 0 &&
-              b.lineCount < 6 * ways,
+              b.lineCount < 3 * ways,
           "a region's arrows alone");
     mnavDestroyNavmesh(navmesh);
     b.lineCount = 0;

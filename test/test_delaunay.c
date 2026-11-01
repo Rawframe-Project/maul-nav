@@ -133,9 +133,9 @@ typedef struct Shape
 static Shape Read(mnavPolygonId polygon)
 {
     mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_vertices, VERTEX_ROOM, 0, s_triangles,
-                         VERTEX_ROOM,     0,          nullptr,     0, 0};
+                         VERTEX_ROOM / 3, 0,          nullptr,     0, 0};
     CHECK(mnavNavmesh_DebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
-    Shape shape = {b.triangleCount / 3, 0, 0, true, true, true};
+    Shape shape = {b.triangleCount, 0, 0, true, true, true};
     for (int32_t i = 0; i < b.vertexCount; ++i)
     {
         bool first = true;

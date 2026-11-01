@@ -57,13 +57,13 @@ static int32_t Lines(mnavDebugKind kind)
                          0,
                          0,
                          s_lineIndices,
-                         2 * LINE_ROOM,
+                         LINE_ROOM,
                          0};
     // Polygon fills go uncounted into a buffer with no triangle room.
     (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
-    CHECK(b.vertexCount <= 2 * LINE_ROOM && b.lineCount <= 2 * LINE_ROOM, "the edges fit");
+    CHECK(b.vertexCount <= 2 * LINE_ROOM && b.lineCount <= LINE_ROOM, "the edges fit");
     int32_t count = 0;
-    for (int32_t l = 0; l < b.lineCount / 2; ++l)
+    for (int32_t l = 0; l < b.lineCount; ++l)
     {
         const mnavDebugVertex* a = &s_lineVertices[s_lineIndices[2 * l]];
         const mnavDebugVertex* c = &s_lineVertices[s_lineIndices[2 * l + 1]];

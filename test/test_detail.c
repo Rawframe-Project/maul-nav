@@ -63,13 +63,13 @@ static Part Read(mnavPolygonId polygon)
                          DRAW_ROOM,
                          0,
                          s_drawTriangles,
-                         DRAW_ROOM,
+                         DRAW_ROOM / 3,
                          0,
                          nullptr,
                          0,
                          0};
     CHECK(mnavNavmesh_DebugCorridor(s_navmesh, &polygon, 1, &b) == mnav_success, "drawn");
-    Part part = {b.triangleCount / 3, 0, 0, true, 0};
+    Part part = {b.triangleCount, 0, 0, true, 0};
     for (int32_t i = 0; i < b.vertexCount; ++i)
     {
         bool first = true;
@@ -120,7 +120,7 @@ static bool HasCorner(mnavPolygonId polygon, int64_t x, int64_t y, int64_t z)
                          DRAW_ROOM,
                          0,
                          s_drawTriangles,
-                         DRAW_ROOM,
+                         DRAW_ROOM / 3,
                          0,
                          nullptr,
                          0,
@@ -146,7 +146,7 @@ static int32_t OnLine(mnavPolygonId polygon, int64_t lineX, int64_t lineZ)
                          DRAW_ROOM,
                          0,
                          s_drawTriangles,
-                         DRAW_ROOM,
+                         DRAW_ROOM / 3,
                          0,
                          nullptr,
                          0,
@@ -441,7 +441,7 @@ static void TestNoHeightsFallBackAndCount(void)
                          DRAW_ROOM,
                          0,
                          s_drawTriangles,
-                         DRAW_ROOM,
+                         DRAW_ROOM / 3,
                          0,
                          nullptr,
                          0,
@@ -571,16 +571,16 @@ static bool EveryTriangleHasArea(void)
                          DRAW_ROOM,
                          0,
                          s_drawTriangles,
-                         DRAW_ROOM,
+                         DRAW_ROOM / 3,
                          0,
                          nullptr,
                          0,
                          0};
     // Polygon edges go uncounted into a buffer with no line room.
     (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
-    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the triangles fit");
+    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM / 3, "the triangles fit");
     bool area = b.triangleCount > 0;
-    for (int32_t t = 0; t + 2 < b.triangleCount; t += 3)
+    for (int32_t t = 0; t < 3 * b.triangleCount; t += 3)
     {
         Corner a = At16(s_drawTriangles[t]);
         Corner p = At16(s_drawTriangles[t + 1]);

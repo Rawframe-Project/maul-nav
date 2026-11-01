@@ -640,7 +640,7 @@ static uint32_t s_debugLines[1 << 20];
 static mnavDebugBuffer DebugBuffer(void)
 {
     return (mnavDebugBuffer){{0.0, 0.0, 0.0}, s_debugVertices, 1 << 20, 0, nullptr, 0, 0,
-                             s_debugLines,    1 << 20,         0};
+                             s_debugLines,    1 << 19,         0};
 }
 
 // The open blocks drawn in a box, clipped to it, fill exactly its open
@@ -652,7 +652,7 @@ static void TestDebugBlocks(const mnavFlightVolume* volume, const int32_t lo[3],
     bool drawn =
         mnavFlightVolume_Debug(volume, At(lo[0] + 0.5, lo[1] + 0.5, lo[2] + 0.5),
                                At(hi[0] + 0.5, hi[1] + 0.5, hi[2] + 0.5), &b) == mnav_success &&
-        b.vertexCount % 24 == 0 && b.lineCount == b.vertexCount;
+        b.vertexCount % 24 == 0 && 2 * b.lineCount == b.vertexCount;
     CHECK(drawn, "blocks drawn");
     int64_t filled = 0;
     int32_t overSolid = 0;
@@ -731,15 +731,15 @@ static void TestDebug(const mnavFlightVolume* volume)
     CHECK(mnavQuery_FindFlightPath(query, volume, At(a[0] + 0.5, a[1] + 0.5, a[2] + 0.5),
                                    At(c[0] + 0.5, c[1] + 0.5, c[2] + 0.5), &path) == mnav_success &&
               mnavDebugFlightPath(&path, &b) == mnav_success &&
-              b.lineCount == 2 * (path.pointCount - 1) && b.vertices[0].kind == mnav_debugPath,
+              b.lineCount == path.pointCount - 1 && b.vertices[0].kind == mnav_debugPath,
           "a path's steps");
     mnavDestroyQuery(query);
     mnavPos3 low = At(0.5, 0.5, 0.5);
     mnavPos3 high = At(10.5, 10.5, 10.5);
     mnavDebugBuffer small = DebugBuffer();
-    small.lineCapacity = 4;
+    small.lineCapacity = 2;
     CHECK(mnavFlightVolume_Debug(volume, low, high, &small) == mnav_errorCapacity &&
-              small.lineCount > 4,
+              small.lineCount > 2,
           "a full buffer counts what the whole needs");
     CHECK(mnavFlightVolume_Debug(nullptr, low, high, &b) == mnav_errorInvalid &&
               mnavFlightVolume_Debug(volume, high, low, &b) == mnav_errorInvalid &&

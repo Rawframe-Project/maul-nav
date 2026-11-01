@@ -378,7 +378,7 @@ static void TestRegion(void)
     static mnavDebugVertex vertices[WIDTH * HEIGHT * 6];
     static uint32_t lines[WIDTH * HEIGHT * 6];
     mnavDebugBuffer buffer = {{0, 0, 0}, vertices, WIDTH * HEIGHT * 6, 0, nullptr, 0,
-                              0,         lines,    WIDTH * HEIGHT * 6, 0};
+                              0,         lines,    WIDTH * HEIGHT * 3, 0};
     float least = 1e9f;
     CHECK(mnavGridFlow_Debug(field, 0.0, &buffer) == mnav_success, "drawn");
     for (int32_t i = 0; i < buffer.vertexCount; ++i)
@@ -461,8 +461,8 @@ static void TestSteps(void)
     // Debug output waits for the end too, and draws nothing when nothing
     // was begun.
     mnavDebugVertex vertex;
-    uint32_t index;
-    mnavDebugBuffer buffer = {{0, 0, 0}, &vertex, 1, 0, nullptr, 0, 0, &index, 1, 0};
+    uint32_t ends[2];
+    mnavDebugBuffer buffer = {{0, 0, 0}, &vertex, 1, 0, nullptr, 0, 0, ends, 1, 0};
     CHECK(mnavGridFlow_Begin(field, &grid, nullptr, goals, 3, &filter) == mnav_success &&
               mnavGridFlow_Debug(field, 0.0, &buffer) == mnav_errorState,
           "no debug output while working");

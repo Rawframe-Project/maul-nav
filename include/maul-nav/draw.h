@@ -66,6 +66,8 @@ extern "C"
     // A caller's debug buffer: vertices, and triangle and line lists of
     // indices into them. Debug calls append, counting past a capacity
     // without writing there, so the counts say what a full draw needs.
+    // Capacities and counts are of vertices, triangles and lines, as in
+    // mnavTriangleMesh, not of indices.
     typedef struct mnavDebugBuffer
     {
         // Subtracted from every position before it becomes a float.
@@ -73,11 +75,11 @@ extern "C"
         mnavDebugVertex* vertices;
         int32_t vertexCapacity;
         int32_t vertexCount;
-        // Three indices a triangle.
+        // Three indices a triangle: room for 3 * triangleCapacity.
         uint32_t* triangles;
         int32_t triangleCapacity;
         int32_t triangleCount;
-        // Two indices a line.
+        // Two indices a line: room for 2 * lineCapacity.
         uint32_t* lines;
         int32_t lineCapacity;
         int32_t lineCount;

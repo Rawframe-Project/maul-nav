@@ -123,16 +123,16 @@ static int64_t TwiceArea(void)
                          DRAW_ROOM,
                          0,
                          s_drawTriangles,
-                         DRAW_ROOM,
+                         DRAW_ROOM / 3,
                          0,
                          nullptr,
                          0,
                          0};
     // The edges go uncounted into a buffer with no line room.
     (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
-    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the polygons fit");
+    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM / 3, "the polygons fit");
     int64_t area = 0;
-    for (int32_t t = 0; t < b.triangleCount / 3; ++t)
+    for (int32_t t = 0; t < b.triangleCount; ++t)
     {
         const mnavDebugVertex* p = &s_drawVertices[s_drawTriangles[3 * t]];
         const mnavDebugVertex* q = &s_drawVertices[s_drawTriangles[3 * t + 1]];

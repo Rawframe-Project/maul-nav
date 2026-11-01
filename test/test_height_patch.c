@@ -38,14 +38,14 @@ static int32_t Draw(void)
                          DRAW_ROOM,
                          0,
                          s_drawTriangles,
-                         DRAW_ROOM,
+                         DRAW_ROOM / 3,
                          0,
                          nullptr,
                          0,
                          0};
     // Polygon edges go uncounted into a buffer with no line room.
     (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
-    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the triangles fit");
+    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM / 3, "the triangles fit");
     return b.vertexCount;
 }
 

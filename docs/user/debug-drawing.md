@@ -1,6 +1,6 @@
 # Debug drawing
 
-The library never draws. It fills an `mnavDebugBuffer` the host owns with vertices and two index lists, triangles and lines, which any renderer can draw.
+The library never draws. It fills an `mnavDebugBuffer` the host owns with vertices and two index lists, triangles and lines, which any renderer can draw. Its capacities and counts are of vertices, triangles and lines, as in `mnavTriangleMesh`: the triangle list holds three indices for each triangle and the line list two for each line, so a renderer draws `3 * triangleCount` and `2 * lineCount` indices.
 
 - **Vertices** are three floats relative to the buffer's `origin`, a world position in doubles, so the precision is kept where the camera is. Set the origin near what is being looked at.
 - **Kinds, not colors.** Each vertex carries what it shows (`mnavDebugKind`) and a value: the area type of a polygon's fill, whether tile links join a tile side, a link's kind with 256 added when it is detached or disabled, a polygon's place in a corridor, an open flight block's side. The host picks the colors.

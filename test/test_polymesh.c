@@ -130,13 +130,21 @@ static bool Reaches(int32_t x0, int32_t z0, int32_t x1, int32_t z1)
 // Twice the area of the tile's polygons, in square cells.
 static int64_t TwiceArea(void)
 {
-    mnavDebugBuffer b = {
-        {0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, s_drawIndices, DRAW_ROOM, 0, nullptr, 0, 0};
+    mnavDebugBuffer b = {{0.0, 0.0, 0.0},
+                         s_drawVertices,
+                         DRAW_ROOM,
+                         0,
+                         s_drawIndices,
+                         DRAW_ROOM / 3,
+                         0,
+                         nullptr,
+                         0,
+                         0};
     // The edges go uncounted into a buffer with no line room.
     (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
-    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM, "the polygons fit");
+    CHECK(b.vertexCount <= DRAW_ROOM && b.triangleCount <= DRAW_ROOM / 3, "the polygons fit");
     int64_t area = 0;
-    for (int32_t t = 0; t < b.triangleCount / 3; ++t)
+    for (int32_t t = 0; t < b.triangleCount; ++t)
     {
         const mnavDebugVertex* p = &s_drawVertices[s_drawIndices[3 * t]];
         const mnavDebugVertex* q = &s_drawVertices[s_drawIndices[3 * t + 1]];
@@ -163,15 +171,15 @@ static int64_t TwiceArea(void)
 static bool CornersMeet(void)
 {
     mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
-                         s_drawIndices,   DRAW_ROOM,      0};
+                         s_drawIndices,   DRAW_ROOM / 2,  0};
     // Polygon fills go uncounted into a buffer with no triangle room.
     (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     bool meet = true;
-    for (int32_t l = 0; l < b.lineCount / 2; ++l)
+    for (int32_t l = 0; l < b.lineCount; ++l)
     {
         const mnavDebugVertex* p = &s_drawVertices[s_drawIndices[2 * l]];
         const mnavDebugVertex* q = &s_drawVertices[s_drawIndices[2 * l + 1]];
-        for (int32_t m = 0; m < b.lineCount && p->kind != mnav_debugTileBounds; ++m)
+        for (int32_t m = 0; m < 2 * b.lineCount && p->kind != mnav_debugTileBounds; ++m)
         {
             const mnavDebugVertex* v = &s_drawVertices[s_drawIndices[m]];
             // Sixteenths of a cell, so 64 to the meter.
@@ -196,11 +204,11 @@ static int32_t s_sides[16][4];
 static int32_t Sides(void)
 {
     mnavDebugBuffer b = {{0.0, 0.0, 0.0}, s_drawVertices, DRAW_ROOM, 0, nullptr, 0, 0,
-                         s_drawIndices,   DRAW_ROOM,      0};
+                         s_drawIndices,   DRAW_ROOM / 2,  0};
     // Polygon fills go uncounted into a buffer with no triangle room.
     (void)mnavNavmesh_Debug(s_navmesh, &(mnavTileRange){0, 0, 0, 0}, &b);
     int32_t count = 0;
-    for (int32_t l = 0; l < b.lineCount / 2; ++l)
+    for (int32_t l = 0; l < b.lineCount; ++l)
     {
         const mnavDebugVertex* p = &s_drawVertices[s_drawIndices[2 * l]];
         const mnavDebugVertex* q = &s_drawVertices[s_drawIndices[2 * l + 1]];

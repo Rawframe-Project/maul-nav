@@ -38,8 +38,9 @@ static uint32_t s_debugLines[INDEX_ROOM];
 
 static mnavDebugBuffer Buffer(mnavPos3 origin)
 {
-    return (mnavDebugBuffer){origin, s_debugVertices, VERTEX_ROOM, 0, s_debugTriangles, INDEX_ROOM,
-                             0,      s_debugLines,    INDEX_ROOM,  0};
+    return (mnavDebugBuffer){
+        origin, s_debugVertices, VERTEX_ROOM,    0, s_debugTriangles, INDEX_ROOM / 3,
+        0,      s_debugLines,    INDEX_ROOM / 2, 0};
 }
 
 static mnavNavmesh* Load(void)
@@ -76,12 +77,11 @@ static void TestNavmesh(const mnavNavmesh* navmesh)
 {
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
     CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &b) == mnav_success, "drawn");
-    printf("navmesh: %d vertices, %d triangle and %d line indices\n", b.vertexCount,
-           b.triangleCount, b.lineCount);
-    CHECK(b.triangleCount > 0 && b.triangleCount % 3 == 0 && b.lineCount % 2 == 0 &&
-              b.vertexCount == b.triangleCount + b.lineCount,
+    printf("navmesh: %d vertices, %d triangles and %d lines\n", b.vertexCount, b.triangleCount,
+           b.lineCount);
+    CHECK(b.triangleCount > 0 && b.vertexCount == 3 * b.triangleCount + 2 * b.lineCount,
           "triangles and lines, each with vertices of its own");
-    CHECK(Count(&b, mnav_debugPolygon, mnav_areaWalkable) == b.triangleCount &&
+    CHECK(Count(&b, mnav_debugPolygon, mnav_areaWalkable) == 3 * b.triangleCount &&
               Count(&b, mnav_debugInnerEdge, -1) > 0 && Count(&b, mnav_debugWall, -1) > 0 &&
               Count(&b, mnav_debugTileSide, 1) > 0 && Count(&b, mnav_debugTileSide, 0) > 0 &&
               Count(&b, mnav_debugTileBounds, -1) == 4 * 4 * 2,
@@ -106,10 +106,32 @@ static void TestNavmesh(const mnavNavmesh* navmesh)
     }
     uint64_t hash = mnavHash64(MNAV_HASH_INIT, packed, (int64_t)b.vertexCount * 16);
     free(packed);
-    hash = mnavHash64(hash, b.triangles, (int64_t)((size_t)b.triangleCount * sizeof(uint32_t)));
-    hash = mnavHash64(hash, b.lines, (int64_t)((size_t)b.lineCount * sizeof(uint32_t)));
+    hash = mnavHash64(hash, b.triangles, (int64_t)b.triangleCount * 3 * (int64_t)sizeof(uint32_t));
+    hash = mnavHash64(hash, b.lines, (int64_t)b.lineCount * 2 * (int64_t)sizeof(uint32_t));
     printf("NAVMESH_HASH=%016llx\n", (unsigned long long)hash);
     CHECK(hash == NAVMESH_HASH, "the pinned hash");
+    // The counts are of triangles and lines: arrays of exactly three and
+    // two indices for each, on the heap, hold the whole draw.
+    mnavDebugBuffer exact = {{0.0, 0.0, 0.0},
+                             malloc((size_t)b.vertexCount * sizeof(mnavDebugVertex)),
+                             b.vertexCount,
+                             0,
+                             malloc((size_t)b.triangleCount * 3 * sizeof(uint32_t)),
+                             b.triangleCount,
+                             0,
+                             malloc((size_t)b.lineCount * 2 * sizeof(uint32_t)),
+                             b.lineCount,
+                             0};
+    CHECK(exact.vertices != nullptr && exact.triangles != nullptr && exact.lines != nullptr &&
+              mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &exact) == mnav_success &&
+              exact.triangleCount == b.triangleCount && exact.lineCount == b.lineCount &&
+              memcmp(exact.triangles, b.triangles,
+                     (size_t)b.triangleCount * 3 * sizeof(uint32_t)) == 0 &&
+              memcmp(exact.lines, b.lines, (size_t)b.lineCount * 2 * sizeof(uint32_t)) == 0,
+          "three indices a triangle, two a line, within the counts");
+    free(exact.vertices);
+    free(exact.triangles);
+    free(exact.lines);
     // An empty buffer counts what the whole needs.
     mnavDebugBuffer none = {{0.0, 0.0, 0.0}, nullptr, 0, 0, nullptr, 0, 0, nullptr, 0, 0};
     CHECK(mnavNavmesh_Debug(navmesh, &(mnavTileRange){0, 0, 1, 1}, &none) == mnav_errorCapacity &&
@@ -165,7 +187,7 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "linked");
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavNavmesh_DebugLinks(navmesh, &b) == mnav_success && b.lineCount == 2 * 2 * 8 &&
+    CHECK(mnavNavmesh_DebugLinks(navmesh, &b) == mnav_success && b.lineCount == 2 * 8 &&
               Count(&b, mnav_debugLinkBothWays, mnav_linkJump) == 16 &&
               Count(&b, mnav_debugLink, mnav_linkDrop + 256) == 16,
           "an arc each, the detached one marked");
@@ -185,7 +207,7 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
     // A removal staged and not committed: still drawn.
     CHECK(mnavStageLinkRemoval(navmesh, c) == mnav_success, "removal staged");
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavNavmesh_DebugLinks(navmesh, &b) == mnav_success && b.lineCount == 2 * 2 * 8,
+    CHECK(mnavNavmesh_DebugLinks(navmesh, &b) == mnav_success && b.lineCount == 2 * 8,
           "a link going at the next commit");
     CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
     mnavQueryDef queryDef = mnavDefaultQueryDef();
@@ -204,13 +226,13 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
               path.pointCount >= 2,
           "a path");
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavDebugPath(&path, &b) == mnav_success && b.lineCount == 2 * (path.pointCount - 1) &&
+    CHECK(mnavDebugPath(&path, &b) == mnav_success && b.lineCount == path.pointCount - 1 &&
               Count(&b, mnav_debugPath, -1) == b.vertexCount,
           "the path's lines");
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
     CHECK(mnavNavmesh_DebugCorridor(navmesh, path.polygons, path.polygonCount, &b) ==
                   mnav_success &&
-              b.triangleCount >= 3 * path.polygonCount &&
+              b.triangleCount >= path.polygonCount &&
               Count(&b, mnav_debugCorridor, path.polygonCount - 1) > 0,
           "the corridor's fills, tagged by place");
     // With a tile of the corridor removed, its polygons are skipped.
@@ -254,7 +276,7 @@ static void TestFlowAndAvoidance(void)
               mnavGridFlow_Build(field, &grid, &goal, 1, nullptr) == mnav_success,
           "a field");
     mnavDebugBuffer b = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    CHECK(mnavGridFlow_Debug(field, 0.5, &b) == mnav_success && b.lineCount == 11 * 3 * 2 &&
+    CHECK(mnavGridFlow_Debug(field, 0.5, &b) == mnav_success && b.lineCount == 11 * 3 &&
               Count(&b, mnav_debugFlow, -1) == b.vertexCount,
           "eleven arrows");
     // The arrow of cell (1, 0) points along -X at its center, height 0.5.
@@ -309,7 +331,7 @@ static void TestFliers(void)
     CHECK(mnavAvoidance_Debug3D(avoidance, agents, 3, &sphere, 1, &b) == mnav_success &&
               Count(&b, mnav_debugAgent, -1) == 3 * 48 * 2 &&
               Count(&b, mnav_debugNeighbor, -1) == 2 * 2 &&
-              Count(&b, mnav_debugObstacle, -1) == 48 * 2 && b.lineCount == b.vertexCount,
+              Count(&b, mnav_debugObstacle, -1) == 48 * 2 && 2 * b.lineCount == b.vertexCount,
           "rings, the near pair's lines and the sphere's rings");
     // The first ring of the first flier starts at +X on its radius; the
     // sphere's at +X on its own.
@@ -333,7 +355,7 @@ static void TestFliers(void)
               mnavAvoidance_Debug3D(nullptr, agents, 3, nullptr, 0, &b) == mnav_errorInvalid,
           "refused as mnavAvoidance_Avoid3D refuses");
     mnavDebugBuffer small = Buffer((mnavPos3){0.0, 0.0, 0.0});
-    small.lineCapacity = 10;
+    small.lineCapacity = 5;
     CHECK(mnavAvoidance_Debug3D(avoidance, agents, 3, &sphere, 1, &small) == mnav_errorCapacity &&
               small.lineCount == b.lineCount,
           "a full buffer counts what the whole needs");
