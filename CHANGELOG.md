@@ -5,25 +5,79 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
-## [0.6.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.5.0...v0.6.0) (2026-10-31)
+## [0.6.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.5.0...v0.6.0) (2026-11-01)
 
+This release brings maul-nav in line with the family rulings of the
+1.0.0 reviews. Every enumeration typedef is a 32-bit integer, and every
+counter is named for what it counts. A bake now keeps a very short edge
+length or sample distance in force, which raises the bake generation to
+4. A commit or destroy no longer frees a tile while its ids are still
+live.
 
-### ⚠ BREAKING CHANGES
-
-* the counters of mnavBakeReport, mnavFlightBakeReport, mnavHierarchyReport and mnavLinkState, and the totals of mnavFound, mnavWallsFound and mnavCorridor, are renamed to thingCount or thingDropped, as listed above.
-* every enumeration typedef but mnavAreaType is int32_t, which changes the layout of the structs that hold one; mnavDebugVertex.value is uint32_t, a corridor polygon's value is its place without modulo 65536, and a flight block's value is its side without a cap at 65535.
-* **bake:** MNAV_BAKE_GENERATOR is 4, so every tile's fingerprint changes and hosts rebake; a def with a maxEdgeLength below one cell or a detailSampleDistance below a sixteenth of a cell bakes other tile bytes.
-
-### Fixed
-
-* **bake:** keep small edge lengths and sample distances in force ([#218](https://github.com/Rawframe-Project/maul-nav/issues/218)) ([ae3daa0](https://github.com/Rawframe-Project/maul-nav/commit/ae3daa0e32efb9e35373baf8d338a62c5c575acb)), closes [#215](https://github.com/Rawframe-Project/maul-nav/issues/215)
-* **navmesh:** free removed tiles only once their ids are stale ([#227](https://github.com/Rawframe-Project/maul-nav/issues/227)) ([777b27a](https://github.com/Rawframe-Project/maul-nav/commit/777b27ae8a86f6878e7ce4f2955bb4cee0789eda)), closes [#225](https://github.com/Rawframe-Project/maul-nav/issues/225)
-
+No tile format rises, so tiles baked by 0.5.0 load as they are. Their
+fingerprints differ from a new bake's, so a host that keeps tiles by
+fingerprint rebakes them once. Paths, corridors, flow fields and
+velocities are unchanged.
 
 ### Changed
 
-* make every enumeration typedef int32_t ([#230](https://github.com/Rawframe-Project/maul-nav/issues/230)) ([9d38058](https://github.com/Rawframe-Project/maul-nav/commit/9d38058b15b934b12d3f0a83d1bb8ebb4ad9c6f8)), closes [#223](https://github.com/Rawframe-Project/maul-nav/issues/223)
-* name the counters thingCount and thingDropped ([#231](https://github.com/Rawframe-Project/maul-nav/issues/231)) ([9588326](https://github.com/Rawframe-Project/maul-nav/commit/95883266ddb5524bcf8d9d44a2ca360a0a1b42c9)), closes [#224](https://github.com/Rawframe-Project/maul-nav/issues/224)
+- **Breaking:** every enumeration typedef but `mnavAreaType` is
+  `int32_t`, where it was `uint8_t` (`mnavDebugKind` was `uint16_t`).
+  This changes the layout of every struct that holds one.
+  ([#230](https://github.com/Rawframe-Project/maul-nav/pull/230))
+  - The 17 typedefs are `mnavDebugKind`; `mnavBakeSetting`,
+    `mnavVolumeKind`, `mnavInputElement`, `mnavInputKind` and
+    `mnavBakeStage`; `mnavFlightSetting`, `mnavFlightVolumeSetting` and
+    `mnavFlightStop`; `mnavTier`, `mnavNavmeshSetting`,
+    `mnavTileSection` and `mnavLinkKind`; and `mnavPathEnd`,
+    `mnavMoveEnd`, `mnavSteerState` and `mnavRayEnd`.
+  - A negative kind or tier is refused with `mnav_errorInvalid`, like
+    one past the last: the navmesh def's `tier`, `mnavLinkDef.kind`, the
+    link generation def's `dropKind` and `jumpKind`, and
+    `mnavBakeVolume.kind`. A query filter never lets a negative link
+    kind through.
+  - `mnavDebugVertex.value` is `uint32_t`, and the vertex is 20 bytes. A
+    corridor polygon's value is its place, no longer modulo 65536, and a
+    flight block's value is its side, no longer capped at 65535.
+  - `mnavAreaType` stays `uint8_t`: it is a number the host chooses,
+    from 0 to `MNAV_AREA_TYPES - 1`.
+- **Breaking:** the counters of the reports and results are named
+  `thingCount` or `thingDropped`. Measures (`tileBytes`, `memoryPeak`,
+  `stageTicks`, `stageMemory`) and the def limits keep their names.
+  ([#231](https://github.com/Rawframe-Project/maul-nav/pull/231))
+  - `mnavBakeReport`: `triangleCount`, `spanCount`, `regionCount`,
+    `polygonCount`, `vertexCount`, `detailVertexCount`,
+    `detailTriangleCount`, `holesDropped`, `regionsDropped`,
+    `partialRingCount`, `fallbackHeightCount` and `cappedDetailCount`.
+  - `mnavFlightBakeReport`: `triangleCount`, `spanCount`, `cubeCount`,
+    `nodeCount` and `leafCount`.
+  - `mnavHierarchyReport`: `clusterCount`, `transitionCount`,
+    `edgeCount` and `searchCount`.
+  - `mnavLinkState.crossings` is `crossingCount`.
+  - `mnavFound.count`, `mnavWallsFound.count` and `mnavCorridor.count`
+    are `polygonCount`, `wallCount` and `polygonCount`.
+
+### Fixed
+
+- **Breaking:** a positive `maxEdgeLength` below one cell, or a positive
+  `detailSampleDistance` below a sixteenth of a cell, rounded down to 0
+  and turned the setting off. Now such a length limits walls to one
+  cell, and such a distance samples every cell. `MNAV_BAKE_GENERATOR` is
+  4, so every tile's fingerprint changes.
+  ([#218](https://github.com/Rawframe-Project/maul-nav/pull/218))
+  - `MNAV_MAX_EDGE_ERROR` names the bound on `maxEdgeError`, which was
+    checked without a name.
+  - Each field of `mnavBakeDef` states its range. `limits.tileTriangles`
+    names `MNAV_MAX_INPUT_TRIANGLES` as its bound.
+  - Apart from the generator byte, tile bytes change only for a def
+    with such a setting.
+- A navmesh commit freed the tiles it removed or replaced while their
+  ids were still live, so an allocator's free hook that read one back
+  read released memory. `mnavDestroyNavmesh`, and a flight volume's
+  commit and destroy, did the same. Now each makes the ids stale first:
+  a free hook reads `mnav_errorStale` for a navmesh polygon, and
+  `mnav_errorNotLoaded` for a flight tile that is gone.
+  ([#227](https://github.com/Rawframe-Project/maul-nav/pull/227))
 
 ## [0.5.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.4.0...v0.5.0) (2026-10-30)
 
