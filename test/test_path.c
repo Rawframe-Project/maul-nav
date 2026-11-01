@@ -263,6 +263,56 @@ static void TestUnreachableIsNone(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// Calls every call that takes a polygon id with the stale one, as a
+// start and, where there is one, as an end, the other end current, and
+// counts those that do not refuse it with mnav_errorStale.
+static int32_t StaleEverywhere(mnavQuery* query, mnavNavmesh* navmesh, mnavNearest stale,
+                               mnavNearest current)
+{
+    const mnavPolygonId a = stale.polygon;
+    const mnavPolygonId b = current.polygon;
+    const mnavPos3 p = stale.point;
+    const mnavPos3 q = current.point;
+    mnavPath path;
+    mnavMove move;
+    mnavRay ray;
+    mnavNearestWall wall;
+    mnavWall walls[4];
+    mnavWallsFound found;
+    mnavRandomPoint point;
+    mnavPathEnd end;
+    double height = 0.0;
+    mnavAreaType area = 0;
+    const mnavResult got[] = {
+        mnavQuery_FindPath(query, navmesh, a, p, b, q, nullptr, &path),
+        mnavQuery_FindPath(query, navmesh, b, q, a, p, nullptr, &path),
+        mnavQuery_FindShortestPath(query, navmesh, a, p, b, q, nullptr, &path),
+        mnavQuery_FindShortestPath(query, navmesh, b, q, a, p, nullptr, &path),
+        mnavQuery_BeginPath(query, navmesh, a, p, b, q, nullptr),
+        mnavQuery_BeginPath(query, navmesh, b, q, a, p, nullptr),
+        mnavQuery_CheckReachable(query, navmesh, a, p, b, q, nullptr, &end),
+        mnavQuery_CheckReachable(query, navmesh, b, q, a, p, nullptr, &end),
+        mnavQuery_MoveAlongSurface(query, navmesh, a, p, q, nullptr, &move),
+        mnavQuery_Raycast(query, navmesh, a, p, q, nullptr, &ray),
+        mnavQuery_FindWallDistance(query, navmesh, a, p, 5.0, nullptr, &wall),
+        mnavQuery_FindWalls(query, navmesh, a, p, 5.0, nullptr, walls, 4, &found),
+        mnavQuery_FindRandomPointAround(query, navmesh, a, p, 5.0, 7, nullptr, &point),
+        mnavPolygon_GetHeight(navmesh, a, p.x, p.z, &height),
+        mnavPolygon_GetArea(navmesh, a, &area),
+        mnavPolygon_StageArea(navmesh, a, mnav_areaWalkable),
+    };
+    int32_t wrong = 0;
+    for (int32_t i = 0; i < (int32_t)(sizeof(got) / sizeof(got[0])); ++i)
+    {
+        if (got[i] != mnav_errorStale)
+        {
+            printf("call %d: %d\n", i, got[i]);
+            wrong += 1;
+        }
+    }
+    return wrong;
+}
+
 static void TestIdsAreChecked(void)
 {
     mnavNavmesh* navmesh = LoadAll();
@@ -290,6 +340,8 @@ static void TestIdsAreChecked(void)
     CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, a.polygon, a.point, nullptr,
                              &path) == mnav_errorStale,
           "stale");
+    CHECK(StaleEverywhere(query, navmesh, a, On(navmesh, 62.0, 0.0, 62.0)) == 0,
+          "stale in every call that takes an id, as a start and as an end");
     mnavPos3 nan = {(double)NAN, 0.0, 0.0};
     a = On(navmesh, 2.0, 0.0, 2.0);
     CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, nan, a.polygon, a.point, nullptr, &path) ==
