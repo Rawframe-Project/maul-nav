@@ -490,6 +490,7 @@ static void Count(const Stages* s, mnavBakeReport* report)
     report->partialRingCount = s->mesh.failedRings;
     report->fallbackHeightCount = s->detail.fallbackHeights;
     report->cappedDetailCount = s->detail.cappedPolygons;
+    report->coarseEdgeCount = s->detail.coarseEdges;
 }
 
 // Encodes the tile from the stages.

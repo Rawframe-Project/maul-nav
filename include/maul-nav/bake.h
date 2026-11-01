@@ -53,6 +53,12 @@ extern "C"
 // The most tiles a tile cache may hold.
 #define MNAV_MAX_CACHED_TILES 1048576
 
+// The most detail vertices one polygon holds, its own corners included,
+// and the most detail samples inside one of its edges: six edges of
+// MNAV_MAX_DETAIL_EDGE_SAMPLES samples and their corners always fit.
+#define MNAV_MAX_DETAIL_VERTICES     127
+#define MNAV_MAX_DETAIL_EDGE_SAMPLES 20
+
     // An area type: a number from 0 to MNAV_AREA_TYPES - 1 that the host
     // chooses, which a query filter's costs index. It is a value, not an
     // enumeration; the two constants below name common values.
@@ -156,10 +162,21 @@ extern "C"
         // How far apart the detail mesh samples the floor's height along
         // polygon edges and inside polygons, in meters, from 0 to 2^26
         // cells; 0 for none, and any other distance below a cell samples
-        // every cell.
+        // every cell. An edge takes at most MNAV_MAX_DETAIL_EDGE_SAMPLES
+        // samples inside it, each on the whole sixteenth of a cell along
+        // it nearest its even place, so an edge may be sampled more
+        // widely: a long one, one whose ends lie a number of cells apart
+        // along X and Z that share no factor, which has only 15 such
+        // places inside it, or a slanted one whose snapped samples leave a
+        // gap past the distance. The report counts every edge with two
+        // neighboring samples farther apart than the distance in
+        // coarseEdgeCount. maxEdgeLength shortens walls, but not edges
+        // between polygons or along a tile's side.
         float detailSampleDistance;
         // How far the detail surface may stray from a sampled height, in
-        // meters, from 0 to 2^26 cell heights.
+        // meters, from 0 to 2^26 cell heights. A polygon whose detail
+        // reaches MNAV_MAX_DETAIL_VERTICES keeps the samples that stray
+        // most, and the report counts it in cappedDetailCount.
         float detailMaxError;
         // The limits on the work.
         mnavBakeLimits limits;
@@ -593,13 +610,16 @@ extern "C"
         uint64_t stageMemory[MNAV_BAKE_STAGES];
         // Holes that no bridge could join to their outline, polygon rings
         // whose triangulation stopped short, detail samples that found no
-        // height and took the polygon's, and polygons whose detail reached
-        // its vertex cap. Rings cut short usually come from a large
-        // maxEdgeError.
+        // height and took the polygon's, polygons whose detail reached
+        // MNAV_MAX_DETAIL_VERTICES with samples still beyond the maximum
+        // error, and polygon edges, each counted once, sampled more widely
+        // than detailSampleDistance (see there). Rings cut short usually
+        // come from a large maxEdgeError.
         int32_t holesDropped;
         int32_t partialRingCount;
         int32_t fallbackHeightCount;
         int32_t cappedDetailCount;
+        int32_t coarseEdgeCount;
         // Islands of walkable space smaller than the minimum region area
         // and away from the tile's border, dropped.
         int32_t regionsDropped;

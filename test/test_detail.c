@@ -216,6 +216,7 @@ static void TestFlatSquare(void)
     part = Read(Over(4, 4, 0));
     CHECK(part.vertices == 4, "flat samples are dropped");
     CHECK(s_report.fallbackHeightCount == 0, "every sample found a height");
+    CHECK(s_report.coarseEdgeCount == 0, "every edge sampled every cell");
 }
 
 static void TestBumpOnAnEdgeIsSampled(void)
@@ -405,6 +406,42 @@ static void TestLongEdgeTakesTheMostSamples(void)
     mnavPolygonId polygon = Over(4, 4, 0);
     CHECK(HasCorner(polygon, 4, 2, 30) && HasCorner(polygon, 4, 1, 36),
           "21 segments on an edge of 34 cells");
+    CHECK(s_report.coarseEdgeCount == 4, "the quad's four edges, sampled more widely, counted");
+    // Every 26 sixteenths an edge of 544 wants 21 segments, the most, and
+    // is not counted; every 25 it wants 22.
+    def.detailSampleDistance = 0.0625f * 26.0f / 16.0f;
+    UseDef(&def);
+    Load(&scene);
+    CHECK(s_report.coarseEdgeCount == 0, "21 segments wanted, none counted");
+    def.detailSampleDistance = 0.0625f * 25.0f / 16.0f;
+    UseDef(&def);
+    Load(&scene);
+    CHECK(s_report.coarseEdgeCount == 4, "22 segments wanted, all four counted");
+}
+
+static void TestSharedCoarseEdgeCountsOnce(void)
+{
+    // The long edges' def, and area 7 from x = 4 on: two quads share the
+    // edge x = 4, which runs 34 cells like the quads' -X and +X edges,
+    // while their -Z and +Z edges run under 21. The shared edge is
+    // counted once.
+    mnavBakeDef def = Exact();
+    def.cellSize = 0.0625f;
+    def.tileCells = 256;
+    def.detailSampleDistance = 0.0625f;
+    def.detailMaxError = 0.0f;
+    UseDef(&def);
+    Scene scene = Flat(0, false);
+    for (int32_t z = 0; z < SIDE; ++z)
+    {
+        for (int32_t x = 4; x < SIDE; ++x)
+        {
+            scene.area[z][x] = 7;
+        }
+    }
+    Load(&scene);
+    CHECK(s_report.polygonCount == 2, "two quads");
+    CHECK(s_report.coarseEdgeCount == 3, "the -X, shared and +X edges, each once");
 }
 
 static void TestNoHeightsFallBackAndCount(void)
@@ -629,6 +666,35 @@ static void TestEdgeTakesEachOfItsSixteenths(void)
     LoadTriangle(vertices, 1);
     CHECK(s_report.polygonCount == 1 && s_report.partialRingCount == 0, "one polygon, whole");
     CHECK(EveryTriangleHasArea(), "every triangle with area");
+    CHECK(s_report.coarseEdgeCount == 2, "the two long sides, sampled more widely, counted");
+}
+
+static void TestSnappedGapIsCounted(void)
+{
+    // Found by a search of small floors: a flat triangle whose one
+    // polygon is a triangle with an edge 3 by 2 cells, 48 by 32
+    // sixteenths, 57.7 long, through 16 whole sixteenths. Sampled every
+    // 20, it takes 3 segments, whose points snap to steps 0, 5, 11 and 16
+    // along it: the middle gap is 6 steps, 21.6 sixteenths, past the
+    // distance, and the edge is counted. Its other edges run 3 and 2
+    // cells straight, their points 16 apart. Every 22, no gap is past it.
+    const mnavVec3 vertices[3] = {{5.25f, 0.0f, 1.5f}, {7.0f, 0.0f, 1.5f}, {6.75f, 0.0f, 2.5f}};
+    const int32_t indices[3] = {0, 2, 1};
+    const mnavTriangleMesh mesh = {vertices, 3, indices, 1, nullptr};
+    const mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    mnavBakeDef def = mnavDefaultBakeDef();
+    def.agent.radius = 0.0f;
+    def.minRegionArea = 0.0f;
+    def.detailMaxError = 0.0f;
+    def.detailSampleDistance = 0.25f * 20.0f / 16.0f;
+    UseDef(&def);
+    LoadInput(&input);
+    CHECK(s_report.polygonCount == 1 && s_report.vertexCount == 3, "one triangle");
+    CHECK(s_report.coarseEdgeCount == 1, "the slanted edge, its middle gap past the distance");
+    def.detailSampleDistance = 0.25f * 22.0f / 16.0f;
+    UseDef(&def);
+    LoadInput(&input);
+    CHECK(s_report.coarseEdgeCount == 0, "every gap within 22");
 }
 
 int main(void)
@@ -644,12 +710,14 @@ int main(void)
     TestDiagonalEdgeTakesEnoughSegments();
     TestSamplesKeepHalfASampleFromTheEdges();
     TestLongEdgeTakesTheMostSamples();
+    TestSharedCoarseEdgeCountsOnce();
     TestNoHeightsFallBackAndCount();
     TestSearchTakesTheHeightNearestTheMean();
     TestLevelDetailIsSound();
     TestBumpyGroundReachesTheCap();
     TestSliverOutlinesTriangulateWhole();
     TestEdgeTakesEachOfItsSixteenths();
+    TestSnappedGapIsCounted();
     Done();
     return s_failures == 0 ? 0 : 1;
 }
