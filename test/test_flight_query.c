@@ -6,7 +6,8 @@
 // exactly where the grid's 26-connected search finds one, every step in
 // sight, never much longer than the grid's shortest; raycasts against
 // fine sampling; nearest open points against every voxel; the ends,
-// limits and refusals; and an end in a closed space.
+// limits and refusals, on tiles of 16 voxels and of the default 32; an
+// end in a closed space; and cubes all open and all solid.
 
 #include "counting_allocator.h"
 #include "defs_for.h"
@@ -77,19 +78,22 @@ static mnavTriangleMesh Scene(void)
     return (mnavTriangleMesh){s_vertices, 4 + BOXES * 8, s_indices, 2 + BOXES * 12, nullptr};
 }
 
-// 1 m voxels, tiles of 16, from 1 m below the floor up 32 m.
+// The scene's tile side in voxels.
+static int32_t s_side = 16;
+
+// 1 m voxels, tiles of s_side, from 1 m below the floor up 32 m.
 static mnavFlightDef Def(void)
 {
     mnavFlightDef def = mnavDefaultFlightDef();
     def.allocator = CountingAllocator();
-    def.tileVoxels = 16;
+    def.tileVoxels = s_side;
     def.floor = -1.0f;
     def.ceiling = 31.0f;
     def.radius = 0.5f;
     return def;
 }
 
-// Bakes the scene's 16 tiles, all but those in skip, into a volume.
+// Bakes the scene's tiles, all but those in skip, into a volume.
 static mnavFlightVolume* Volume(int32_t skipX, int32_t skipZ)
 {
     mnavFlightDef def = Def();
@@ -103,14 +107,15 @@ static mnavFlightVolume* Volume(int32_t skipX, int32_t skipZ)
     mnavBakeInput input = {&scene, 1, nullptr, 0, nullptr, 0, nullptr};
     static uint8_t bytes[TILE_BYTES];
     int32_t wrong = 0;
-    for (int32_t t = 0; t < 16; ++t)
+    int32_t row = SIDE / s_side;
+    for (int32_t t = 0; t < row * row; ++t)
     {
-        if (t % 4 == skipX && t / 4 == skipZ)
+        if (t % row == skipX && t / row == skipZ)
         {
             continue;
         }
         size_t size = 0;
-        wrong += mnavFlightBaker_BakeTile(baker, &input, t % 4, t / 4, nullptr) != mnav_success;
+        wrong += mnavFlightBaker_BakeTile(baker, &input, t % row, t / row, nullptr) != mnav_success;
         wrong += mnavFlightBaker_CopyTile(baker, bytes, TILE_BYTES, &size) != mnav_success;
         wrong += mnavFlightVolume_StageTile(volume, bytes, size).result != mnav_success;
     }
@@ -607,13 +612,14 @@ static void TestCheck(const mnavFlightVolume* volume)
     static mnavPos3 kept[2 * 16384 + 2];
     int32_t count = path.pointCount;
     memcpy(kept, path.points, (size_t)count * sizeof(mnavPos3));
-    CHECK(mnavFlightVolume_StageTileRemoval(changed, 2, 1) == mnav_success &&
+    // The tile from x = 32 that the path crosses at z = 20.
+    CHECK(mnavFlightVolume_StageTileRemoval(changed, 32 / s_side, 20 / s_side) == mnav_success &&
               mnavFlightVolume_Commit(changed) == mnav_success,
           "a tile removed");
     mnavFlightHit hit;
     CHECK(mnavFlightVolume_CheckPath(changed, kept, count, &step, &hit) == mnav_success &&
               step >= 0 && hit.stop == mnav_flightNotLoaded && hit.point.x >= 32.0 &&
-              hit.point.x <= 48.0,
+              hit.point.x <= 32.0 + s_side,
           "stopped where the tile is gone");
     mnavDestroyQuery(query);
     mnavDestroyFlightVolume(changed);
@@ -1090,9 +1096,23 @@ static void TestRefusals(const mnavFlightVolume* volume)
           "nearest refusals");
 }
 
-// A volume of 2 by 2 tiles of 16 voxels, one cube high, over a floor,
-// with up to 8 boxes given as their lowest corner and sizes.
-static mnavFlightVolume* Small(const float boxes[][6], int32_t count, float radius)
+// The small volumes' def: tiles of 16 voxels, one cube high from the
+// floor, the ground below left open.
+static mnavFlightDef SmallDef(float radius)
+{
+    mnavFlightDef def = mnavDefaultFlightDef();
+    def.allocator = CountingAllocator();
+    def.tileVoxels = 16;
+    def.floor = 0.0f;
+    def.ceiling = 16.0f;
+    def.radius = radius;
+    def.enableGroundFill = false;
+    return def;
+}
+
+// A volume of 2 by 2 tiles of a def over a floor, with up to 8 boxes
+// given as their lowest corner and sizes.
+static mnavFlightVolume* SmallWith(const float boxes[][6], int32_t count, const mnavFlightDef* def)
 {
     static mnavVec3 vertices[4 + 8 * 8];
     static int32_t indices[6 + 8 * 36];
@@ -1117,17 +1137,10 @@ static mnavFlightVolume* Small(const float boxes[][6], int32_t count, float radi
     }
     mnavTriangleMesh mesh = {vertices, 4 + count * 8, indices, 2 + count * 12, nullptr};
     mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
-    mnavFlightDef def = mnavDefaultFlightDef();
-    def.allocator = CountingAllocator();
-    def.tileVoxels = 16;
-    def.floor = 0.0f;
-    def.ceiling = 16.0f;
-    def.radius = radius;
-    def.enableGroundFill = false;
     mnavFlightBaker* baker = nullptr;
     mnavFlightVolume* volume = nullptr;
-    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(&def);
-    CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success &&
+    mnavFlightVolumeDef volumeDef = FlightVolumeDefFor(def);
+    CHECK(mnavCreateFlightBaker(def, &baker).result == mnav_success &&
               mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_success,
           "a small volume");
     static uint8_t bytes[TILE_BYTES];
@@ -1142,6 +1155,13 @@ static mnavFlightVolume* Small(const float boxes[][6], int32_t count, float radi
     CHECK(wrong == 0 && mnavFlightVolume_Commit(volume) == mnav_success, "its tiles");
     mnavDestroyFlightBaker(baker);
     return volume;
+}
+
+// A volume of 2 by 2 tiles of 16 voxels, one cube high.
+static mnavFlightVolume* Small(const float boxes[][6], int32_t count, float radius)
+{
+    mnavFlightDef def = SmallDef(radius);
+    return SmallWith(boxes, count, &def);
 }
 
 static bool OpenAt(const mnavFlightVolume* volume, double x, double y, double z)
@@ -1282,12 +1302,74 @@ static void TestPocket(void)
     mnavDestroyFlightVolume(volume);
 }
 
-int main(int argc, char** argv)
+// Tiles three cubes high: the lowest below the ground, all solid with
+// the ground filled; the middle holding the ground and a box; the top
+// all open. Each query reaches into the whole cubes as into a mixed one.
+static void TestWholeCubes(void)
 {
-    if (!ReadDense(argc, argv))
-    {
-        return 2;
-    }
+    // Kept off the voxels' faces: one box low in the middle cube, one in
+    // its upper half under the open cube.
+    const float boxes[2][6] = {{4.25f, 2.25f, 4.25f, 3.5f, 3.5f, 3.5f},
+                               {20.25f, 9.25f, 20.25f, 3.5f, 5.5f, 3.5f}};
+    mnavFlightDef def = SmallDef(0.0f);
+    def.floor = -16.0f;
+    def.ceiling = 32.0f;
+    def.enableGroundFill = true;
+    mnavFlightVolume* volume = SmallWith(boxes, 2, &def);
+    CHECK(OpenAt(volume, 8.5, 24.5, 8.5) && OpenAt(volume, 30.5, 31.5, 1.5) &&
+              !OpenAt(volume, 8.5, -8.5, 8.5) && !OpenAt(volume, 30.5, -15.5, 30.5),
+          "the top cube open, the lowest solid");
+    // Down from the open cube, a ray stops on the ground, solid from the
+    // voxel below it up to 1 m.
+    mnavFlightHit hit;
+    CHECK(mnavFlightVolume_Raycast(volume, (mnavPos3){8.5, 24.5, 8.5}, (mnavPos3){8.5, -8.5, 8.5},
+                                   &hit) == mnav_success &&
+              hit.stop == mnav_flightBlocked && hit.point.x == 8.5 && hit.point.z == 8.5 &&
+              fabs(hit.point.y - 1.0) < 1e-9,
+          "a ray down stops on the ground");
+    CHECK(mnavFlightVolume_Raycast(volume, (mnavPos3){1.5, 24.5, 1.5}, (mnavPos3){30.5, 28.5, 30.5},
+                                   &hit) == mnav_success &&
+              hit.stop == mnav_flightClear,
+          "a ray across the open cube is clear");
+    // Across the open cube a path is the straight line; down into the
+    // middle cube it goes round the box.
+    mnavQuery* query = Query(16384, 1000.0f);
+    mnavFlightPath path;
+    CHECK(mnavQuery_FindFlightPath(query, volume, (mnavPos3){1.5, 24.5, 1.5},
+                                   (mnavPos3){30.5, 24.5, 30.5}, &path) == mnav_success &&
+              path.end == mnav_pathFound && path.pointCount == 2 &&
+              fabs(path.length - 29.0 * sqrt(2.0)) < 1e-9,
+          "straight across the open cube");
+    CHECK(mnavQuery_FindFlightPath(query, volume, (mnavPos3){8.5, 24.5, 8.5},
+                                   (mnavPos3){5.5, 1.5, 5.5}, &path) == mnav_success &&
+              path.end == mnav_pathFound && path.pointCount > 2 && StepsClear(volume, &path),
+          "down under the box");
+    CHECK(mnavQuery_FindFlightPath(query, volume, (mnavPos3){22.5, 24.5, 22.5},
+                                   (mnavPos3){22.5, 7.5, 22.5}, &path) == mnav_success &&
+              path.end == mnav_pathFound && path.pointCount > 2 && StepsClear(volume, &path),
+          "down under the high box");
+    // From inside the solid cube, the nearest open point is on the ground
+    // 9.5 m up, and none lies within 5 m.
+    mnavPos3 nearest;
+    bool found = false;
+    CHECK(mnavFlightVolume_FindNearestPoint(volume, (mnavPos3){8.5, -8.5, 8.5}, 12.0f, &nearest,
+                                            &found) == mnav_success &&
+              found && nearest.x == 8.5 && nearest.z == 8.5 && nearest.y >= 1.0 &&
+              nearest.y < 1.01 && OpenAt(volume, nearest.x, nearest.y, nearest.z),
+          "nearest from the solid cube");
+    CHECK(mnavFlightVolume_FindNearestPoint(volume, (mnavPos3){8.5, -8.5, 8.5}, 5.0f, &nearest,
+                                            &found) == mnav_success &&
+              !found,
+          "none near in the solid cube");
+    mnavDestroyQuery(query);
+    mnavDestroyFlightVolume(volume);
+}
+
+// Every check on the scene, baked in tiles of side voxels: 16 tiles of
+// 16, or 4 of the default 32, whose octrees go a level deeper.
+static void TestScene(int32_t side)
+{
+    s_side = side;
     mnavFlightVolume* volume = Volume(-1, -1);
     ReadOpen(volume);
     TestPaths(volume);
@@ -1300,11 +1382,22 @@ int main(int argc, char** argv)
     TestLimits(volume);
     TestRefusals(volume);
     mnavDestroyFlightVolume(volume);
+}
+
+int main(int argc, char** argv)
+{
+    if (!ReadDense(argc, argv))
+    {
+        return 2;
+    }
+    TestScene(16);
     TestHole();
     TestEdge();
     TestBendToTheEnd();
     TestFaceEdges();
     TestPocket();
+    TestWholeCubes();
+    TestScene(32);
     CHECK(s_held == 0, "every byte given back");
     return s_failures == 0 ? 0 : 1;
 }
