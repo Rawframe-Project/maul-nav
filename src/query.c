@@ -97,13 +97,9 @@ static mnavResult CheckLimits(const mnavQueryLimits* limits)
     return mnav_success;
 }
 
-static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQuery** queryOut)
+// The def's cookie, its version, then its allocator and its limits.
+static mnavResult CheckDef(const mnavQueryDef* def)
 {
-    if (queryOut == nullptr)
-    {
-        return mnav_errorInvalid;
-    }
-    *queryOut = nullptr;
     if (def == nullptr || def->cookie != MNAV_QUERY_DEF_COOKIE)
     {
         return mnav_errorInvalid;
@@ -112,12 +108,26 @@ static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQue
     {
         return mnav_errorVersion;
     }
-    const mnavQueryLimits* limits = &def->limits;
-    mnavResult checked = CheckLimits(limits);
+    if ((def->allocator.alloc == nullptr) != (def->allocator.free == nullptr))
+    {
+        return mnav_errorInvalid;
+    }
+    return CheckLimits(&def->limits);
+}
+
+static MNAV_NOINLINE mnavResult CreateQueryWork(const mnavQueryDef* def, mnavQuery** queryOut)
+{
+    if (queryOut == nullptr)
+    {
+        return mnav_errorInvalid;
+    }
+    *queryOut = nullptr;
+    mnavResult checked = CheckDef(def);
     if (checked != mnav_success)
     {
         return checked;
     }
+    const mnavQueryLimits* limits = &def->limits;
     mnavMemory memory = mnavMakeMemory(def->allocator, UINT64_MAX);
     mnavQuery* query = nullptr;
     mnavResult result =

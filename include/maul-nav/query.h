@@ -283,12 +283,13 @@ extern "C"
     /// @param queryOut Receives the context, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
     /// not from mnavDefaultQueryDef; `mnav_errorVersion` for one built against
-    /// another version of the headers; `mnav_errorInvalid` also for fewer than
-    /// 1 node, a path length not more than 0 or NaN, or fewer than 0
-    /// transitions; `mnav_errorLimit` for more nodes than MNAV_MAX_QUERY_NODES,
-    /// a path length past MNAV_MAX_PATH_LENGTH, an infinity included, or more
-    /// transitions than MNAV_MAX_HIERARCHY_TRANSITIONS; `mnav_errorCapacity`
-    /// when the allocator fails.
+    /// another version of the headers; `mnav_errorInvalid` also for an
+    /// allocator with one function, fewer than 1 node, a path length not more
+    /// than 0 or NaN, or fewer than 0 transitions; `mnav_errorLimit` for more
+    /// nodes than MNAV_MAX_QUERY_NODES, a path length past
+    /// MNAV_MAX_PATH_LENGTH, an infinity included, or more transitions than
+    /// MNAV_MAX_HIERARCHY_TRANSITIONS; `mnav_errorCapacity` when the
+    /// allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateQuery(const mnavQueryDef* def,
