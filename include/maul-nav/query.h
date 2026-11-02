@@ -863,14 +863,16 @@ extern "C"
     /// @param query       The context, for the search; it holds the path.
     /// @param corridor    The corridor.
     /// @param navmesh     The navmesh.
-    /// @param halfExtents The box's half sizes for finding polygons again.
+    /// @param halfExtents The box's half sizes for finding polygons again, in
+    ///                    meters, at least 0; checked on every call.
     /// @param filter      The areas usable and their costs, or NULL.
     /// @param pathOut     Receives the path, or an empty one ended
     ///                    mnav_pathNotLoaded or mnav_pathNone when an end found
     ///                    no polygon. Zeroed on any failure but mnav_errorBusy,
     ///                    which leaves it as it was.
     /// @return `mnav_success` whenever the corridor was looked at;
-    /// `mnav_errorInvalid` for a NULL argument or a corridor not well formed;
+    /// `mnav_errorInvalid` for a NULL argument, a corridor not well formed or a
+    /// half size below 0 or not finite;
     /// `mnav_errorCapacity` when the path has more polygons than the buffer,
     /// which leaves the corridor as it was; the errors of mnavNavmesh_FindNearest and
     /// mnavQuery_FindPath otherwise. Also `mnav_errorBusy` when called back in from

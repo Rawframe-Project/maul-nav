@@ -753,7 +753,10 @@ static MNAV_NOINLINE mnavResult ReplanCorridorWork(mnavQuery* query, const mnavN
     {
         return mnav_errorBusy;
     }
-    if (query == nullptr || navmesh == nullptr || pathOut == nullptr || !WellFormed(corridor))
+    // The box is checked though no end may need it, so that a bad one is
+    // refused whatever the state of the corridor's polygons.
+    if (query == nullptr || navmesh == nullptr || pathOut == nullptr || !WellFormed(corridor) ||
+        !mnavGoodHalfExtents(halfExtents))
     {
         return mnav_errorInvalid;
     }
