@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.8.4](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.3...v0.8.4) (2026-11-02)
+
+
+### Fixed
+
+* **query:** refuse an allocator with one function in mnavCreateQuery ([#283](https://github.com/Rawframe-Project/maul-nav/issues/283)) ([7eff371](https://github.com/Rawframe-Project/maul-nav/commit/7eff371012d8a05bb5e6061db64f0fa06a6949c6)), closes [#281](https://github.com/Rawframe-Project/maul-nav/issues/281)
+
 ## [0.8.3](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.2...v0.8.3) (2026-11-02)
 
 This release fixes what an audit of the steering code found: corners
