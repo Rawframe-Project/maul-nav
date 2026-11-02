@@ -25,7 +25,7 @@ typedef struct mnavDetailPart
     int32_t firstVertex;
     int32_t firstTriangle;
     uint8_t vertexCount;
-    uint8_t triangleCount;
+    uint16_t triangleCount;
 } mnavDetailPart;
 
 typedef struct mnavDetailMesh
@@ -45,9 +45,8 @@ typedef struct mnavDetailMesh
     // beyond the maximum error.
     int32_t cappedPolygons;
     // Edges, each counted once, with two neighboring points farther apart
-    // than the sample distance: past MNAV_MAX_DETAIL_EDGE_SAMPLES, with
-    // fewer whole sixteenths on them than the samples asked, or where
-    // snapping the points to whole sixteenths widened a gap.
+    // than the sample distance, which only MNAV_MAX_DETAIL_EDGE_SAMPLES or
+    // too few whole sixteenths on the edge leave.
     int32_t coarseEdges;
 } mnavDetailMesh;
 

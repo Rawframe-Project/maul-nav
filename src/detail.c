@@ -125,15 +125,32 @@ static int64_t Divisor(int64_t a, int64_t b)
     return a;
 }
 
+// The most steps of an edge's whole sixteenths between two neighboring
+// points when the edge's steps are cut in segments, each point at the
+// step nearest its even place.
+static int64_t WidestGap(int64_t steps, int64_t segments)
+{
+    int64_t widest = 0;
+    int64_t last = 0;
+    for (int64_t k = 1; k <= segments; ++k)
+    {
+        int64_t step = RoundDivide(steps * k, segments);
+        widest = step - last > widest ? step - last : widest;
+        last = step;
+    }
+    return widest;
+}
+
 // Places the points of the edge from a to b at most a sample distance
 // apart, at most MNAV_MAX_DETAIL_EDGE_SAMPLES between the ends, with their
 // heights. Each point is the whole sixteenth on the edge nearest its even
 // place, so the outline runs exactly along the polygon's edges and stays
-// a simple ring however sharp a corner is; an edge with fewer such
-// sixteenths than segments takes each of them.
-// Returns the number of segments, and whether two neighboring points lie
-// farther apart than the sample distance: past the cap, with fewer whole
-// sixteenths than segments, or where snapping to them widens a gap.
+// a simple ring however sharp a corner is; where snapping to them widens
+// a gap past the distance, the edge takes another segment, and an edge
+// with fewer such sixteenths than segments takes each of them.
+// Returns the number of segments, and whether two neighboring points still
+// lie farther apart than the sample distance, past the cap or for lack of
+// whole sixteenths.
 static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mnavDetailVertex* b,
                            bool* coarse)
 {
@@ -161,8 +178,20 @@ static int32_t PlacePoints(Builder* builder, const mnavDetailVertex* a, const mn
         segments = (SquareRoot(length2) + sample - 1) / sample;
         segments += segments * sample * segments * sample < length2 ? 1 : 0;
         segments = segments < 1 ? 1 : segments;
-        segments = segments > EDGE_POINTS - 1 ? EDGE_POINTS - 1 : segments;
-        segments = segments > steps ? steps : segments;
+        int64_t most = EDGE_POINTS - 1 < steps ? EDGE_POINTS - 1 : steps;
+        segments = segments > most ? most : segments;
+        // A step's length squared: the edge's run and rise over its steps
+        // are whole.
+        int64_t unit2 = (dx / steps) * (dx / steps) + (dz / steps) * (dz / steps);
+        while (segments < most)
+        {
+            int64_t widest = WidestGap(steps, segments);
+            if (widest * widest * unit2 <= sample * sample)
+            {
+                break;
+            }
+            segments += 1;
+        }
     }
     for (int64_t k = 0; k <= segments; ++k)
     {
@@ -483,7 +512,7 @@ static mnavResult Store(Builder* builder, int32_t p)
         return result;
     }
     detail->parts[p] = (mnavDetailPart){detail->vertexCount, detail->triangleCount,
-                                        (uint8_t)part->vertexCount, (uint8_t)part->triangleCount};
+                                        (uint8_t)part->vertexCount, (uint16_t)part->triangleCount};
     memcpy(detail->vertices + detail->vertexCount, part->vertices,
            (size_t)part->vertexCount * sizeof(mnavDetailVertex));
     memcpy(detail->triangles + detail->triangleCount, part->triangles,

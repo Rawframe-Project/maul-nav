@@ -54,10 +54,11 @@ extern "C"
 #define MNAV_MAX_CACHED_TILES 1048576
 
 // The most detail vertices one polygon holds, its own corners included,
-// and the most detail samples inside one of its edges: six edges of
-// MNAV_MAX_DETAIL_EDGE_SAMPLES samples and their corners always fit.
-#define MNAV_MAX_DETAIL_VERTICES     127
-#define MNAV_MAX_DETAIL_EDGE_SAMPLES 20
+// as many as a detail triangle's one-byte corners reach, and the most
+// detail samples inside one of its edges: six edges of
+// MNAV_MAX_DETAIL_EDGE_SAMPLES samples and their corners, 252, always fit.
+#define MNAV_MAX_DETAIL_VERTICES     255
+#define MNAV_MAX_DETAIL_EDGE_SAMPLES 41
 
     // An area type: a number from 0 to MNAV_AREA_TYPES - 1 that the host
     // chooses, which a query filter's costs index. It is a value, not an
@@ -162,16 +163,19 @@ extern "C"
         // How far apart the detail mesh samples the floor's height along
         // polygon edges and inside polygons, in meters, from 0 to 2^26
         // cells; 0 for none, and any other distance below a cell samples
-        // every cell. An edge takes at most MNAV_MAX_DETAIL_EDGE_SAMPLES
-        // samples inside it, each on the whole sixteenth of a cell along
-        // it nearest its even place, so an edge may be sampled more
-        // widely: a long one, one whose ends lie a number of cells apart
-        // along X and Z that share no factor, which has only 15 such
-        // places inside it, or a slanted one whose snapped samples leave a
-        // gap past the distance. The report counts every edge with two
+        // every cell. An edge's samples lie on whole sixteenths of a cell
+        // along it, and where snapping to them leaves a gap past the
+        // distance it takes another sample. It takes at most
+        // MNAV_MAX_DETAIL_EDGE_SAMPLES samples inside it, and no more
+        // than it has such places, so an edge may still be sampled more
+        // widely: a long one, or one whose ends lie a number of cells
+        // apart along X and Z that share no factor, which has only 15
+        // such places inside it. The report counts every edge with two
         // neighboring samples farther apart than the distance in
         // coarseEdgeCount. maxEdgeLength shortens walls, but not edges
-        // between polygons or along a tile's side.
+        // between polygons or along a tile's side. A smaller distance, and
+        // a detailMaxError near 0, grow the detail data steeply, up to
+        // MNAV_MAX_DETAIL_VERTICES vertices a polygon.
         float detailSampleDistance;
         // How far the detail surface may stray from a sampled height, in
         // meters, from 0 to 2^26 cell heights. A polygon whose detail
@@ -540,14 +544,14 @@ extern "C"
                                                                     const mnavBake2DInput* input);
 
 // The tile format version this library writes and reads.
-#define MNAV_TILE_FORMAT 3
+#define MNAV_TILE_FORMAT 4
 
 // The navmesh bake's generation, written into every tile and hashed into
 // its fingerprint. It rises with any change to the library that gives
 // other tile bytes for the same def and input, and only then, so a tile a
 // host keeps by its fingerprint goes stale exactly when a bake would
 // differ, not at every release.
-#define MNAV_BAKE_GENERATOR 5
+#define MNAV_BAKE_GENERATOR 6
 
     // A baker: the def it was made with, its memory, and the last tile it
     // baked. Made by mnavCreateBaker.
