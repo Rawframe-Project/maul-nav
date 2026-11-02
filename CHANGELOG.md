@@ -5,6 +5,20 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.8.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.7.0...v0.8.0) (2026-11-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **format:** MNAV_TILE_FORMAT rises to 4: DPRT stores each polygon's detail triangle count in 2 bytes, so a polygon's detail holds up to 255 vertices (MNAV_MAX_DETAIL_VERTICES) and an edge up to 41 samples (MNAV_MAX_DETAIL_EDGE_SAMPLES); tiles of format 3 are refused with mnav_errorVersion and are rebaked. MNAV_BAKE_GENERATOR rises to 6: an edge that wanted more than 21 segments now takes up to 42, and an edge whose snapped samples leave a gap past detailSampleDistance takes another sample.
+* **bake:** mnavBakeReport gains coarseEdgeCount, the polygon edges sampled more widely than detailSampleDistance, before regionsDropped, which changes the struct's layout; MNAV_MAX_DETAIL_VERTICES and MNAV_MAX_DETAIL_EDGE_SAMPLES name the detail caps in bake.h.
+
+### Fixed
+
+* **bake:** count detail edges sampled more widely than asked ([#259](https://github.com/Rawframe-Project/maul-nav/issues/259)) ([88f9ae8](https://github.com/Rawframe-Project/maul-nav/commit/88f9ae84cf27502856ea45980e3e93f91b7b6b92)), closes [#255](https://github.com/Rawframe-Project/maul-nav/issues/255)
+* **flight:** refuse a flight tile at a place the bake never writes ([#263](https://github.com/Rawframe-Project/maul-nav/issues/263)) ([75aea6a](https://github.com/Rawframe-Project/maul-nav/commit/75aea6a50f409719af6bd2f6d67269d63cacc9a3)), closes [#262](https://github.com/Rawframe-Project/maul-nav/issues/262)
+* **format:** hold up to 41 samples on a detail edge ([#261](https://github.com/Rawframe-Project/maul-nav/issues/261)) ([9f59b37](https://github.com/Rawframe-Project/maul-nav/commit/9f59b3770cad3099a86fa061900e9af7dd67d1e4)), closes [#256](https://github.com/Rawframe-Project/maul-nav/issues/256)
+
 ## [0.7.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.6.0...v0.7.0) (2026-11-01)
 
 This release fixes what an audit of the status codes and a differential
