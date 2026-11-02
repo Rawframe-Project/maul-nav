@@ -651,6 +651,18 @@ static void TestReplanning(void)
               mnavResetCorridor(&corridor, buffer, 256, a.polygon, a.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success,
           "loaded");
+    // A box below 0 or not finite is refused, though both ends are
+    // current and no polygon is looked for, and the corridor is kept.
+    const mnavVec3 bad[3] = {{-1.0f, 2.0f, 1.0f}, {1.0f, NAN, 1.0f}, {1.0f, 2.0f, INFINITY}};
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        int32_t kept = corridor.polygonCount;
+        CHECK(mnavQuery_ReplanCorridor(query, &corridor, navmesh, bad[i], nullptr, &path) ==
+                      mnav_errorInvalid &&
+                  path.polygonCount == 0 && path.polygons == nullptr &&
+                  corridor.polygonCount == kept,
+              "a bad box refused");
+    }
     mnavVec3 box = {1.0f, 2.0f, 1.0f};
     // Every tile replaced, the start's and the target's too: the ends
     // are found again and the corridor planned anew.

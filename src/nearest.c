@@ -328,12 +328,16 @@ static bool Finite(double v)
     return isfinite(v);
 }
 
+bool mnavGoodHalfExtents(mnavVec3 half)
+{
+    return half.x >= 0.0f && half.y >= 0.0f && half.z >= 0.0f && isfinite(half.x) &&
+           isfinite(half.y) && isfinite(half.z);
+}
+
 // Whether a box is well formed: finite, with half sizes at least 0.
 static bool GoodBox(mnavPos3 point, mnavVec3 half)
 {
-    return Finite(point.x) && Finite(point.y) && Finite(point.z) && half.x >= 0.0f &&
-           half.y >= 0.0f && half.z >= 0.0f && isfinite(half.x) && isfinite(half.y) &&
-           isfinite(half.z);
+    return Finite(point.x) && Finite(point.y) && Finite(point.z) && mnavGoodHalfExtents(half);
 }
 
 mnavCover mnavCoverOf(const mnavNavmesh* navmesh, mnavPos3 point, mnavPos3 half)
