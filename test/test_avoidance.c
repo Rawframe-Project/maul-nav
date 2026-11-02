@@ -5,6 +5,7 @@
 // order, by priority, by layers, within the set's limits; and the same
 // velocities under every host floating-point setting, subnormals kept.
 
+#include "counting_allocator.h"
 #include "float_hosts.h"
 #include "test_harness.h"
 
@@ -309,6 +310,16 @@ static void TestChecks(void)
               mnavCreateAvoidance(nullptr, &avoidance) == mnav_errorInvalid &&
               mnavCreateAvoidance(&def, nullptr) == mnav_errorInvalid,
           "bad defs");
+    // An allocator with one function.
+    def = mnavDefaultAvoidanceDef();
+    def.allocator = CountingAllocator();
+    def.allocator.free = nullptr;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid && avoidance == nullptr,
+          "an allocator without free");
+    def.allocator = CountingAllocator();
+    def.allocator.alloc = nullptr;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid && avoidance == nullptr,
+          "an allocator without alloc");
     avoidance = Make(2, 4, 2.0);
     mnavAgent agents[3] = {Agent(0.0, 0.0, 1), Agent(3.0, 0.0, 2), Agent(6.0, 0.0, 3)};
     mnavVec2 velocities[3];

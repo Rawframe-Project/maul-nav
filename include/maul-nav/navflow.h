@@ -114,9 +114,10 @@ extern "C"
     /// @param fieldOut Receives the field, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
     /// not from mnavDefaultNavFlowDef; `mnav_errorVersion` for one built
-    /// against another version of the headers; `mnav_errorInvalid` also for a
-    /// limit below 1; `mnav_errorLimit` for a limit past its MNAV_MAX_NAV_FLOW_
-    /// value; `mnav_errorCapacity` when the allocator fails.
+    /// against another version of the headers; `mnav_errorInvalid` also for an
+    /// allocator with one function or a limit below 1; `mnav_errorLimit` for a
+    /// limit past its MNAV_MAX_NAV_FLOW_ value; `mnav_errorCapacity` when the
+    /// allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateNavFlow(const mnavNavFlowDef* def,
