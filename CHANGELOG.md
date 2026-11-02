@@ -7,17 +7,49 @@ may change the API, the ABI and the tile formats.
 
 ## [0.8.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.7.0...v0.8.0) (2026-11-02)
 
+This release fixes what an audit of the detail mesh and of the flight
+tile loader found. A polygon edge took at most 20 height samples, and
+a slanted edge's samples could snap to a gap wider than
+`detailSampleDistance`, so long edges and tile sides were sampled more
+widely than asked, silently. Now an edge takes up to 41 samples and a
+segment more where snapping leaves a gap, and every edge still sampled
+more widely is counted in the bake report. The flight loader refuses a
+tile at a place no bake writes.
 
-### ⚠ BREAKING CHANGES
-
-* **format:** MNAV_TILE_FORMAT rises to 4: DPRT stores each polygon's detail triangle count in 2 bytes, so a polygon's detail holds up to 255 vertices (MNAV_MAX_DETAIL_VERTICES) and an edge up to 41 samples (MNAV_MAX_DETAIL_EDGE_SAMPLES); tiles of format 3 are refused with mnav_errorVersion and are rebaked. MNAV_BAKE_GENERATOR rises to 6: an edge that wanted more than 21 segments now takes up to 42, and an edge whose snapped samples leave a gap past detailSampleDistance takes another sample.
-* **bake:** mnavBakeReport gains coarseEdgeCount, the polygon edges sampled more widely than detailSampleDistance, before regionsDropped, which changes the struct's layout; MNAV_MAX_DETAIL_VERTICES and MNAV_MAX_DETAIL_EDGE_SAMPLES name the detail caps in bake.h.
+The tile format rises to 4, so tiles baked by 0.7.0 are refused with
+`mnav_errorVersion` and must be rebaked. The bake generation rises to
+6. Polygons and their links are unchanged, so paths cross the same
+polygons; heights read from the detail surface change along edges that
+now carry more samples. Tiles grow by about 4% at the default def, and
+more with a small `detailSampleDistance` and a `detailMaxError` near 0.
+Flight tiles and their format are unchanged.
 
 ### Fixed
 
-* **bake:** count detail edges sampled more widely than asked ([#259](https://github.com/Rawframe-Project/maul-nav/issues/259)) ([88f9ae8](https://github.com/Rawframe-Project/maul-nav/commit/88f9ae84cf27502856ea45980e3e93f91b7b6b92)), closes [#255](https://github.com/Rawframe-Project/maul-nav/issues/255)
-* **flight:** refuse a flight tile at a place the bake never writes ([#263](https://github.com/Rawframe-Project/maul-nav/issues/263)) ([75aea6a](https://github.com/Rawframe-Project/maul-nav/commit/75aea6a50f409719af6bd2f6d67269d63cacc9a3)), closes [#262](https://github.com/Rawframe-Project/maul-nav/issues/262)
-* **format:** hold up to 41 samples on a detail edge ([#261](https://github.com/Rawframe-Project/maul-nav/issues/261)) ([9f59b37](https://github.com/Rawframe-Project/maul-nav/commit/9f59b3770cad3099a86fa061900e9af7dd67d1e4)), closes [#256](https://github.com/Rawframe-Project/maul-nav/issues/256)
+- **Breaking:** an edge's detail samples were capped at 20, because
+  DPRT stored a polygon's detail triangle count in one byte, and the
+  samples snapped to whole sixteenths of a cell could leave a gap
+  wider than `detailSampleDistance`. `maxEdgeLength` cuts walls but
+  not edges between polygons or along a tile side, so even the default
+  def sampled a tile side of 128 cells more widely than asked. DPRT
+  now stores the triangle count in 2 bytes, so a polygon's detail
+  holds up to 255 vertices (`MNAV_MAX_DETAIL_VERTICES`) and an edge up
+  to 41 samples (`MNAV_MAX_DETAIL_EDGE_SAMPLES`), and an edge takes a
+  segment more while its widest snapped gap passes the distance.
+  `MNAV_TILE_FORMAT` is 4 and `MNAV_BAKE_GENERATOR` is 6.
+  ([#261](https://github.com/Rawframe-Project/maul-nav/pull/261))
+- **Breaking:** an edge sampled more widely than `detailSampleDistance`
+  went unreported. `mnavBakeReport.coarseEdgeCount` now counts each
+  such edge once, before `regionsDropped`, which changes the struct's
+  layout. `bake.h` names the detail caps, and `detailSampleDistance`
+  says what an edge takes and what is counted.
+  ([#259](https://github.com/Rawframe-Project/maul-nav/pull/259))
+- `mnavFlightVolume_StageTile` took a flight tile's place as any 32-bit
+  value, and `mnavFlightVolume_FindNearestPoint` then overflowed a
+  32-bit product for a tile placed far enough. The loader now refuses,
+  with `mnav_errorFormat` in the header, a place whose frame the bake
+  refuses, as a navmesh tile's place is checked.
+  ([#263](https://github.com/Rawframe-Project/maul-nav/pull/263))
 
 ## [0.7.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.6.0...v0.7.0) (2026-11-01)
 
