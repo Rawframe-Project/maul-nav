@@ -7,10 +7,20 @@ may change the API, the ABI and the tile formats.
 
 ## [0.8.2](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.1...v0.8.2) (2026-11-02)
 
+This release fixes what an audit of the flow fields found: a repair
+given two very long lists skipped its check that their cells lie in
+the grid. Paths, flow fields, tiles and their formats are unchanged.
 
 ### Fixed
 
-* **flow:** check a repair's goals and changed cells by their own counts ([#274](https://github.com/Rawframe-Project/maul-nav/issues/274)) ([2779b23](https://github.com/Rawframe-Project/maul-nav/commit/2779b232a308c1748bbd2aa8f6e6a826adb6dd87)), closes [#273](https://github.com/Rawframe-Project/maul-nav/issues/273)
+- `mnavGridFlow_Update` checked its goals and changed cells in one
+  loop bounded by `goalCount + changedCount`, a sum taken in 32 bits.
+  When the two counts summed past `INT32_MAX`, a sanitizer build
+  trapped on the overflow and a Release build checked no cell, so a
+  cell outside the grid was accepted instead of refused with
+  `mnav_errorInvalid` as `flow.h` promises. Each list is now checked
+  by its own count. Counts whose sum fits behave as before.
+  ([#274](https://github.com/Rawframe-Project/maul-nav/pull/274))
 
 ## [0.8.1](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.0...v0.8.1) (2026-11-02)
 
