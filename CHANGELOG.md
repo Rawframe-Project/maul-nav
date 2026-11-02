@@ -19,8 +19,8 @@ unchanged.
   gave blocks from the host's `alloc` to the C library's `free`, or
   blocks from `malloc` to the host's `free`, which corrupts the host's
   heap. Such a def is now refused with `mnav_errorInvalid` before
-  anything is allocated, and `queryOut` is set to NULL. A def with
-  both functions or neither works as before.
+  anything is allocated. A def with both functions or neither works
+  as before.
   ([#283](https://github.com/Rawframe-Project/maul-nav/pull/283))
 
 ## [0.8.3](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.2...v0.8.3) (2026-11-02)
