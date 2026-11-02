@@ -381,9 +381,9 @@ static void TestCrossesLinks(void)
 }
 
 // Two links in a row: the jump of TestCrossesLinks, then a teleport from
-// beside its landing to the end, cheaper than the walk there. The search
-// meets them last first, and the path names them in the order they are
-// taken, each at its takeoff point.
+// beside its landing to beside the end, cheaper than the walk there. The
+// search meets them last first, and the path names them in the order
+// they are taken, each at its takeoff point.
 static void TestCrossesTwoLinks(void)
 {
     mnavNavmesh* navmesh = Make(s_handApartPair, sizeof(s_handApartPair), nullptr, 0);
@@ -398,17 +398,17 @@ static void TestCrossesTwoLinks(void)
               mnavStageLink(navmesh, &portDef, &port) == mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
           "links added");
-    mnavPath path = Shortest(query, navmesh, nullptr, 6.0, 6.0, 19.5, 9.5);
-    CHECK(path.end == mnav_pathFound && path.pointCount == 5 && At(&path, 0, 6.0, 6.0) &&
+    mnavPath path = Shortest(query, navmesh, nullptr, 6.0, 6.0, 19.5, 9.0);
+    CHECK(path.end == mnav_pathFound && path.pointCount == 6 && At(&path, 0, 6.0, 6.0) &&
               At(&path, 1, 9.0, 7.5) && At(&path, 2, 16.0, 7.5) && At(&path, 3, 16.5, 7.5) &&
-              At(&path, 4, 19.5, 9.5),
-          "start, both takeoffs and landings, the last landing the end");
+              At(&path, 4, 19.5, 9.5) && At(&path, 5, 19.5, 9.0),
+          "start, both takeoffs and landings, end");
     CHECK(path.linkCount == 2 && path.links[0].link.slot == jump.slot &&
               path.links[0].kind == mnav_linkJump && path.links[0].point == 1 &&
               path.links[1].link.slot == port.slot && path.links[1].kind == mnav_linkTeleport &&
               path.links[1].point == 3,
           "the jump, then the teleport");
-    double walk = sqrt(9.0 + 2.25) + 0.5;
+    double walk = sqrt(9.0 + 2.25) + 0.5 + 0.5;
     CHECK(fabs(path.cost - (walk + 4.25)) < 1e-12 &&
               fabs(path.length - (walk + 7.0 + sqrt(13.0))) < 1e-12,
           "both links' costs, their spans in the length");
