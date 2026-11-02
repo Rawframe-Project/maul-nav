@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.8.1](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.0...v0.8.1) (2026-11-02)
+
+
+### Fixed
+
+* **corridor:** check ReplanCorridor's box on every call ([#269](https://github.com/Rawframe-Project/maul-nav/issues/269)) ([4d8eb77](https://github.com/Rawframe-Project/maul-nav/commit/4d8eb771a1d1a3b12384711bfa2aeb38c1d27531)), closes [#268](https://github.com/Rawframe-Project/maul-nav/issues/268)
+
 ## [0.8.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.7.0...v0.8.0) (2026-11-02)
 
 This release fixes what an audit of the detail mesh and of the flight
