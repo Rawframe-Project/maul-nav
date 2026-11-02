@@ -741,6 +741,69 @@ static void InputRefusals(mnavFlightBaker* baker, const mnavBakeInput* input)
           "a tile past the extent");
 }
 
+static void PutLittle32(uint8_t* at, size_t value)
+{
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        at[k] = (uint8_t)(value >> (8 * k));
+    }
+}
+
+static bool Is(mnavTileResult r, mnavResult result, mnavTileSection section)
+{
+    return r.result == result && r.section == section;
+}
+
+// Writes a place into FLHT of the tile in s_bad and seals it again.
+static void PlaceAt(size_t size, int32_t tileX, int32_t tileZ)
+{
+    size_t length = 0;
+    size_t flight = FlightFieldAt(s_bad, "FLHT", &length);
+    CHECK(flight > 0, "FLHT");
+    PutLittle32(s_bad + flight, (uint32_t)tileX);
+    PutLittle32(s_bad + flight + 4, (uint32_t)tileZ);
+    uint64_t hash =
+        mnavHash64(MNAV_HASH_INIT, s_bad + FIELDS_START, (int64_t)(size - FIELDS_START));
+    for (int32_t k = 0; k < 8; ++k)
+    {
+        s_bad[AT_HASH + k] = (uint8_t)(hash >> (8 * k));
+    }
+}
+
+// The last tile along an axis loads, and nearest points are found from
+// it; its bytes placed a tile further, or at 2^30 tiles, are refused, as
+// the bake never writes them. Places that far would take a tile's voxels
+// past 32 bits.
+static void LoadsToTheExtent(mnavFlightBaker* baker, int32_t tileX, int32_t tileZ)
+{
+    const mnavBakeInput none = {nullptr, 0, nullptr, 0, nullptr, 0, nullptr};
+    size_t size = 0;
+    CHECK(mnavFlightBaker_BakeTile(baker, &none, tileX, tileZ, nullptr) == mnav_success &&
+              mnavFlightBaker_CopyTile(baker, s_bad, TILE_MOST, &size) == mnav_success,
+          "the last tile");
+    mnavFlightDef def = Def();
+    mnavFlightVolume* volume = Volume(&def);
+    CHECK(mnavFlightVolume_StageTile(volume, s_bad, size).result == mnav_success &&
+              mnavFlightVolume_Commit(volume) == mnav_success,
+          "the last tile loads");
+    mnavPos3 nearest = {0.0, 0.0, 0.0};
+    bool found = true;
+    CHECK(mnavFlightVolume_FindNearestPoint(volume, (mnavPos3){0.0, 1.0, 0.0}, 1.0f, &nearest,
+                                            &found) == mnav_success &&
+              !found,
+          "searched beside it");
+    mnavDestroyFlightVolume(volume);
+    int32_t stepX = tileX > 0 ? 1 : (tileX < 0 ? -1 : 0);
+    int32_t stepZ = tileZ > 0 ? 1 : (tileZ < 0 ? -1 : 0);
+    PlaceAt(size, tileX + stepX, tileZ + stepZ);
+    mnavTileResult further = StageBad(size);
+    PlaceAt(size, stepX * (1 << 30), stepZ * (1 << 30));
+    mnavTileResult far = StageBad(size);
+    CHECK(Is(further, mnav_errorFormat, mnav_tileHeader) &&
+              Is(far, mnav_errorFormat, mnav_tileHeader),
+          "a place past the extent refused");
+}
+
 // Along each axis from tile (0, 0), the last tile within the input's
 // extent, found by bisection: it bakes, and the next one is refused. Each
 // bake's heightfield makes the same tile frame the baker checked first.
@@ -768,6 +831,7 @@ static void TilesToTheExtent(mnavFlightBaker* baker)
         // 4,194,304 cells of extent and a tile's most, 1,024, in tiles of
         // 64 voxels less the border.
         CHECK(in == (dx[d] + dz[d] > 0 ? 65552 : 65551), "the last tile within the extent");
+        LoadsToTheExtent(baker, in * dx[d], in * dz[d]);
     }
 }
 
@@ -816,14 +880,6 @@ typedef struct Piece
     size_t size;
 } Piece;
 
-static void PutLittle32(uint8_t* at, size_t value)
-{
-    for (int32_t k = 0; k < 4; ++k)
-    {
-        at[k] = (uint8_t)(value >> (8 * k));
-    }
-}
-
 // Writes tile 1's header and the pieces as fields into s_bad, each padded
 // with pad bytes, seals it and stages it.
 static mnavTileResult Fields(const Piece* pieces, int32_t count, uint8_t pad)
@@ -849,11 +905,6 @@ static mnavTileResult Fields(const Piece* pieces, int32_t count, uint8_t pad)
         s_bad[AT_HASH + k] = (uint8_t)(hash >> (8 * k));
     }
     return StageBad(at);
-}
-
-static bool Is(mnavTileResult r, mnavResult result, mnavTileSection section)
-{
-    return r.result == result && r.section == section;
 }
 
 static void TestFields(void)

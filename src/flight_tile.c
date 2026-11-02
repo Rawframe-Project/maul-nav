@@ -219,7 +219,9 @@ static mnavTileResult ReadHeader(const uint8_t* bytes, size_t size, const mnavFl
     r = (mnavByteReader){flight->bytes, flight->size, false};
     tile->tileX = (int32_t)(uint32_t)mnavGetU32(&r);
     tile->tileZ = (int32_t)(uint32_t)mnavGetU32(&r);
-    if (!SameSettings(&r, def, shape))
+    // A place the bake never writes is refused, which also keeps each
+    // tile's voxels within 32 bits.
+    if (!SameSettings(&r, def, shape) || !mnavFlightTileInExtent(def, tile->tileX, tile->tileZ))
     {
         return Refuse(mnav_errorFormat, mnav_tileHeader, -1);
     }

@@ -504,6 +504,15 @@ mnavResult mnavBuildFlightTile(mnavMemory* memory, const mnavFlightDef* def,
     return r;
 }
 
+bool mnavFlightTileInExtent(const mnavFlightDef* def, int32_t tileX, int32_t tileZ)
+{
+    mnavBakeDef voxels = mnavFlightBakeDef(def);
+    mnavBakeCells cells;
+    mnavTileFrame frame;
+    return mnavValidateBakeDef(&voxels, &cells).result == mnav_success &&
+           mnavMakeTileFrame(&voxels, &cells, tileX, tileZ, &frame);
+}
+
 // The bits set in a mask.
 static uint32_t Ones(uint32_t mask)
 {
