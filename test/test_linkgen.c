@@ -290,6 +290,22 @@ static void TestChecksAndBuffer(const mnavNavmesh* navmesh)
     CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0}, nullptr,
                                   s_links, LINKS, &count) == mnav_errorLimit,
           "an infinite drop");
+    // A NaN or a value below 0 in each distance and cost.
+    bool refused = true;
+    for (int32_t k = 0; k < 8; ++k)
+    {
+        for (int32_t bad = 0; bad < 2; ++bad)
+        {
+            def = Def();
+            float* values[8] = {&def.spacing,        &def.dropMax, &def.jumpMax,  &def.climbMax,
+                                &def.filterDistance, &def.radius,  &def.dropCost, &def.jumpCost};
+            *values[k] = bad == 0 ? NAN : -1.0f;
+            refused = refused &&
+                      mnavQuery_GenerateLinks(query, navmesh, &def, &(mnavTileRange){0, 0, 1, 0},
+                                              nullptr, s_links, LINKS, &count) == mnav_errorInvalid;
+        }
+    }
+    CHECK(refused, "a def value NaN or below 0");
     // Kinds past the last, and negative ones, which a signed comparison
     // would let through.
     const mnavLinkKind kinds[3] = {MNAV_LINK_KINDS, -1, INT32_MIN};

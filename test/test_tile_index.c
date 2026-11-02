@@ -418,6 +418,14 @@ static void TestRefusals(void)
               mnavCreateTileIndex(&def, meshes, -1, &index, nullptr) == mnav_errorInvalid &&
               index == nullptr,
           "NULL and negative arguments refused");
+    CHECK(mnavCreateTileIndex2D(&def, s_outlines, OUTLINES, nullptr, &report) ==
+                  mnav_errorInvalid &&
+              mnavCreateTileIndex2D(nullptr, s_outlines, OUTLINES, &index, &report) ==
+                  mnav_errorInvalid &&
+              mnavCreateTileIndex2D(&def, nullptr, 1, &index, &report) == mnav_errorInvalid &&
+              mnavCreateTileIndex2D(&def, s_outlines, -1, &index, nullptr) == mnav_errorInvalid &&
+              index == nullptr,
+          "NULL and negative arguments refused, for outlines");
     mnavTriangleMesh bad[MESHES];
     memcpy(bad, meshes, sizeof(bad));
     int32_t wrong[3] = {0, 1, TRIANGLES * 3};
