@@ -768,7 +768,8 @@ extern "C"
     /// @param steeringOut Receives the velocity and state. Left as it was on
     ///                    failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, corners
-    /// with no points or a def not from mnavDefaultSteerDef;
+    /// with no points or a link count below 0, or a def not from
+    /// mnavDefaultSteerDef;
     /// `mnav_errorVersion` for one built against another version of the
     /// headers; `mnav_errorInvalid` also for a def value below 0 or NaN, or a
     /// corner not finite; `mnav_errorLimit` for a speed past

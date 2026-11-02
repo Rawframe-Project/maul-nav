@@ -138,6 +138,13 @@ static void TestRefusals(void)
               mnavSteer(&missing, &def, &s) == mnav_errorInvalid &&
               mnavSteer(&unlinked, &def, &s) == mnav_errorInvalid,
           "no points, points or links missing");
+    // A link count below 0, with links or without.
+    const mnavPathLink links[1] = {{{1, 1}, mnav_linkJump, 1}};
+    mnavCorners negative = {points, 2, links, -1};
+    mnavCorners negativeNull = {points, 2, nullptr, -1};
+    CHECK(mnavSteer(&negative, &def, &s) == mnav_errorInvalid &&
+              mnavSteer(&negativeNull, &def, &s) == mnav_errorInvalid,
+          "a link count below 0");
     mnavSteerDef bad = def;
     bad.cookie += 1;
     CHECK(mnavSteer(&c, &bad, &s) == mnav_errorInvalid, "a def not from the default");

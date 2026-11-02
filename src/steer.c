@@ -77,7 +77,8 @@ static MNAV_NOINLINE mnavResult SteerWork(const mnavCorners* corners, const mnav
                                           mnavSteering* steeringOut)
 {
     if (corners == nullptr || def == nullptr || steeringOut == nullptr || corners->pointCount < 1 ||
-        corners->points == nullptr || (corners->linkCount > 0 && corners->links == nullptr) ||
+        corners->points == nullptr || corners->linkCount < 0 ||
+        (corners->linkCount > 0 && corners->links == nullptr) ||
         def->cookie != MNAV_STEER_DEF_COOKIE)
     {
         return mnav_errorInvalid;
