@@ -562,6 +562,8 @@ static void TestNegativePlaces(void)
               here.clusterCount == 4,
           "built");
     mnavDestroyNavmesh(navmesh);
+    // This leaves s_outlines holding the moved world: a later test that
+    // bakes from them calls BakeWorld(0.0f, ...) first.
     BakeWorld(-128.0f, 4, back, backSizes);
     navmesh = LoadTiles(back, backSizes, 4, false);
     mnavHierarchyReport moved;
@@ -827,6 +829,9 @@ static void TestLimitsAndChecks(void)
     CHECK(mnavHierarchy_Build(hierarchy, query, navmesh, nullptr, nullptr) == mnav_success &&
               mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon,
                                              (mnavPos3){(double)NAN, 0.0, 0.0}, a.polygon, a.point,
+                                             &path) == mnav_errorInvalid &&
+              mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point,
+                                             a.polygon, (mnavPos3){0.0, 0.0, (double)-INFINITY},
                                              &path) == mnav_errorInvalid &&
               mnavQuery_FindHierarchicalPath(query, hierarchy, navmesh, a.polygon, a.point,
                                              a.polygon, a.point, nullptr) == mnav_errorInvalid,
