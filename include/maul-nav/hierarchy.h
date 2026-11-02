@@ -214,7 +214,7 @@ extern "C"
     /// @param pathOut      Receives the path. Zeroed on any failure but
     ///                     mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
-    /// with a NaN coordinate, or a hierarchy built for another navmesh;
+    /// that is not finite, or a hierarchy built for another navmesh;
     /// `mnav_errorState` for a hierarchy with no graph, or a navmesh committed
     /// since the build; `mnav_errorCapacity` for a hierarchy of more
     /// transitions than the context's transitions limit; the errors of
