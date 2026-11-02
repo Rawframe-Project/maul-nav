@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.8.2](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.1...v0.8.2) (2026-11-02)
+
+
+### Fixed
+
+* **flow:** check a repair's goals and changed cells by their own counts ([#274](https://github.com/Rawframe-Project/maul-nav/issues/274)) ([2779b23](https://github.com/Rawframe-Project/maul-nav/commit/2779b232a308c1748bbd2aa8f6e6a826adb6dd87)), closes [#273](https://github.com/Rawframe-Project/maul-nav/issues/273)
+
 ## [0.8.1](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.0...v0.8.1) (2026-11-02)
 
 This release fixes what an audit of the corridor calls found: a
