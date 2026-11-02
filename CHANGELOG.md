@@ -7,10 +7,18 @@ may change the API, the ABI and the tile formats.
 
 ## [0.8.3](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.2...v0.8.3) (2026-11-02)
 
+This release fixes what an audit of the steering code found: corners
+with a link count below 0 were steered instead of refused. Paths,
+velocities, tiles and their formats are unchanged.
 
 ### Fixed
 
-* **corridor:** refuse corners with a link count below 0 in mnavSteer ([#277](https://github.com/Rawframe-Project/maul-nav/issues/277)) ([7713834](https://github.com/Rawframe-Project/maul-nav/commit/7713834e249ce1b0f88a3cdc734ccccd9cbc6a2a)), closes [#276](https://github.com/Rawframe-Project/maul-nav/issues/276)
+- `mnavSteer` refused corners with no points, or with links counted
+  but no `links` pointer, but steered corners whose `linkCount` is
+  below 0 as if they had no links and returned `mnav_success`. Such
+  corners are now refused with `mnav_errorInvalid`, and `steeringOut`
+  is left as it was, as for its other refusals.
+  ([#277](https://github.com/Rawframe-Project/maul-nav/pull/277))
 
 ## [0.8.2](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.1...v0.8.2) (2026-11-02)
 
