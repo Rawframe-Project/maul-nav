@@ -7,6 +7,7 @@
 // so its results have exact checks only; the paths pinned by hash run on
 // the stored test world.
 
+#include "counting_allocator.h"
 #include "defs_for.h"
 #include "dense.h"
 #include "stored_tiles.h"
@@ -869,6 +870,16 @@ static void TestLimitsAndChecks(void)
     def = mnavDefaultHierarchyDef();
     def.cookie = 0;
     CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_errorInvalid, "not a def");
+    // An allocator with one function.
+    def = mnavDefaultHierarchyDef();
+    def.allocator = CountingAllocator();
+    def.allocator.free = nullptr;
+    CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_errorInvalid && hierarchy == nullptr,
+          "an allocator without free");
+    def.allocator = CountingAllocator();
+    def.allocator.alloc = nullptr;
+    CHECK(mnavCreateHierarchy(&def, &hierarchy) == mnav_errorInvalid && hierarchy == nullptr,
+          "an allocator without alloc");
     mnavDestroyHierarchy(nullptr);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);

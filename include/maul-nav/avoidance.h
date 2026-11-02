@@ -201,12 +201,12 @@ extern "C"
     /// @param avoidanceOut Receives the set, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
     /// not from mnavDefaultAvoidanceDef; `mnav_errorVersion` for one built
-    /// against another version of the headers; `mnav_errorInvalid` also for a
-    /// limit below 1 (below 0 for obstacle vertices), a neighbor distance not
-    /// more than 0 or not finite, or a horizon that is NaN or plus infinity;
-    /// `mnav_errorLimit` for a limit past its MNAV_MAX_AVOIDANCE_ value or a
-    /// horizon shorter than MNAV_MIN_AVOIDANCE_TIME; `mnav_errorCapacity` when
-    /// the allocator fails.
+    /// against another version of the headers; `mnav_errorInvalid` also for an
+    /// allocator with one function, a limit below 1 (below 0 for obstacle
+    /// vertices), a neighbor distance not more than 0 or not finite, or a
+    /// horizon that is NaN or plus infinity; `mnav_errorLimit` for a limit past
+    /// its MNAV_MAX_AVOIDANCE_ value or a horizon shorter than
+    /// MNAV_MIN_AVOIDANCE_TIME; `mnav_errorCapacity` when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateAvoidance(const mnavAvoidanceDef* def,

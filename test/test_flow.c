@@ -4,6 +4,7 @@
 // Flow fields: their costs against grid paths, the ways they
 // give, several goals, blocked cells and corners, limits and checks.
 
+#include "counting_allocator.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
@@ -293,6 +294,16 @@ static void TestChecks(void)
     def = mnavDefaultGridFlowDef();
     def.cookie = 0;
     CHECK(mnavCreateGridFlow(&def, &none) == mnav_errorInvalid, "not a def");
+    // An allocator with one function.
+    def = mnavDefaultGridFlowDef();
+    def.allocator = CountingAllocator();
+    def.allocator.free = nullptr;
+    CHECK(mnavCreateGridFlow(&def, &none) == mnav_errorInvalid && none == nullptr,
+          "an allocator without free");
+    def.allocator = CountingAllocator();
+    def.allocator.alloc = nullptr;
+    CHECK(mnavCreateGridFlow(&def, &none) == mnav_errorInvalid && none == nullptr,
+          "an allocator without alloc");
     mnavDestroyGridFlow(nullptr);
 }
 

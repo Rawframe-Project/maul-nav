@@ -253,6 +253,16 @@ static void TestLinks(mnavNavFlow* field, mnavNavmesh* navmesh)
           "within it, a build allocating nothing");
     mnavDestroyNavFlow(few);
     CHECK(s_held == 0, "every byte given back");
+    // An allocator with one function.
+    mnavNavFlowDef halfDef = mnavDefaultNavFlowDef();
+    halfDef.allocator = CountingAllocator();
+    halfDef.allocator.free = nullptr;
+    CHECK(mnavCreateNavFlow(&halfDef, &few) == mnav_errorInvalid && few == nullptr,
+          "an allocator without free");
+    halfDef.allocator = CountingAllocator();
+    halfDef.allocator.alloc = nullptr;
+    CHECK(mnavCreateNavFlow(&halfDef, &few) == mnav_errorInvalid && few == nullptr,
+          "an allocator without alloc");
     CHECK(mnavStageLinkRemoval(navmesh, both) == mnav_success, "removed");
     // A commit makes the field stale.
     CHECK(mnavStageLinkRemoval(navmesh, link) == mnav_success &&

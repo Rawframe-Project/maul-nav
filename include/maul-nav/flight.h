@@ -305,11 +305,12 @@ extern "C"
     /// Checks a flight def.
     ///
     /// @param def  The def.
-    /// @return `mnav_success`; `mnav_errorInvalid` for a NULL def, or with the
-    /// first setting refused for a NaN, a value (an infinity included) outside
-    /// the range its field gives with no named constant, or not a power of two
-    /// where one is needed; `mnav_errorLimit` with the setting for a value past
-    /// an MNAV_MIN_ or MNAV_MAX_ bound its field names, an infinity included;
+    /// @return `mnav_success`; `mnav_errorInvalid` with the setting for a NULL
+    /// def, a def without its cookie, an allocator with one function, a NaN, a
+    /// value (an infinity included) outside the range its field gives with no
+    /// named constant, or not a power of two where one is needed;
+    /// `mnav_errorLimit` with the setting for a value past an MNAV_MIN_ or
+    /// MNAV_MAX_ bound its field names, an infinity included;
     /// `mnav_errorVersion` with no setting for a def built against another
     /// version of the headers.
     /// @par Thread safety

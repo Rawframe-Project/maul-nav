@@ -97,9 +97,10 @@ extern "C"
     /// @param hierarchyOut Receives the hierarchy, or NULL on failure.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument or a def
     /// not from mnavDefaultHierarchyDef; `mnav_errorVersion` for one built
-    /// against another version of the headers; `mnav_errorInvalid` also for a
-    /// limit or cluster side below 1; `mnav_errorLimit` for one past its
-    /// MNAV_MAX_ value; `mnav_errorCapacity` when the allocator fails.
+    /// against another version of the headers; `mnav_errorInvalid` also for an
+    /// allocator with one function, or a limit or cluster side below 1;
+    /// `mnav_errorLimit` for one past its MNAV_MAX_ value; `mnav_errorCapacity`
+    /// when the allocator fails.
     /// @par Thread safety
     /// Safe from any thread.
     MNAV_NODISCARD MNAV_API mnavResult mnavCreateHierarchy(const mnavHierarchyDef* def,
