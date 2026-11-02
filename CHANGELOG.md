@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.8.3](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.2...v0.8.3) (2026-11-02)
+
+
+### Fixed
+
+* **corridor:** refuse corners with a link count below 0 in mnavSteer ([#277](https://github.com/Rawframe-Project/maul-nav/issues/277)) ([7713834](https://github.com/Rawframe-Project/maul-nav/commit/7713834e249ce1b0f88a3cdc734ccccd9cbc6a2a)), closes [#276](https://github.com/Rawframe-Project/maul-nav/issues/276)
+
 ## [0.8.2](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.1...v0.8.2) (2026-11-02)
 
 This release fixes what an audit of the flow fields found: a repair
