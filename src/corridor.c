@@ -33,12 +33,13 @@ static bool SameId(mnavPolygonId a, mnavPolygonId b)
     return a.slot == b.slot && a.generation == b.generation && a.polygon == b.polygon;
 }
 
-// Whether a corridor is well formed: a buffer, room for a polygon at
-// least, and from one polygon to its room. Its fields are the caller's,
-// so every call checks them before it reads the buffer.
+// Whether a corridor is well formed: finite ends, a buffer, room for a
+// polygon at least, and from one polygon to its room. Its fields are the
+// caller's, so every call checks them before it reads the buffer.
 static bool WellFormed(const mnavCorridor* corridor)
 {
-    return corridor != nullptr && corridor->polygons != nullptr && corridor->capacity >= 1 &&
+    return corridor != nullptr && Finite(corridor->position) && Finite(corridor->target) &&
+           corridor->polygons != nullptr && corridor->capacity >= 1 &&
            corridor->polygonCount >= 1 && corridor->polygonCount <= corridor->capacity;
 }
 

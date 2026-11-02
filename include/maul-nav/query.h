@@ -538,8 +538,9 @@ extern "C"
     // A path corridor: the polygons from the agent's to its
     // target's, in a buffer the caller owns, with the agent's position on
     // the first and the target on the last. It is well formed with a
-    // buffer, a capacity of at least 1, and from 1 to capacity polygons;
-    // every corridor call refuses one that is not.
+    // finite position and target, a buffer, a capacity of at least 1, and
+    // from 1 to capacity polygons; every corridor call refuses one that is
+    // not.
     typedef struct mnavCorridor
     {
         mnavPos3 position;
