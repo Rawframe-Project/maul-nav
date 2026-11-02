@@ -7,10 +7,20 @@ may change the API, the ABI and the tile formats.
 
 ## [0.8.1](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.0...v0.8.1) (2026-11-02)
 
+This release fixes what an audit of the corridor calls found: a
+replan took a broken search box whenever it did not need the box.
+Paths, tiles and their formats are unchanged.
 
 ### Fixed
 
-* **corridor:** check ReplanCorridor's box on every call ([#269](https://github.com/Rawframe-Project/maul-nav/issues/269)) ([4d8eb77](https://github.com/Rawframe-Project/maul-nav/commit/4d8eb771a1d1a3b12384711bfa2aeb38c1d27531)), closes [#268](https://github.com/Rawframe-Project/maul-nav/issues/268)
+- `mnavQuery_ReplanCorridor` checked its `halfExtents` box only when an
+  end's polygon was no longer current and had to be found again, so
+  while both ends were current a box with a half size below 0, a NaN
+  or an infinity was accepted, and refused only once a commit replaced
+  the tile under an end. The box is now checked on every call, as
+  `mnavNavmesh_FindNearest` checks it, and a bad one is refused with
+  `mnav_errorInvalid`, the corridor left as it was.
+  ([#269](https://github.com/Rawframe-Project/maul-nav/pull/269))
 
 ## [0.8.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.7.0...v0.8.0) (2026-11-02)
 
