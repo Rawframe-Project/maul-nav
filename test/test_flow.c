@@ -595,6 +595,10 @@ static void TestRepairChecks(void)
               mnavGridFlow_Update(nullptr, &grid, &goal, 1, nullptr, 0) == mnav_errorInvalid &&
               mnavGridFlow_Update(field, nullptr, &goal, 1, nullptr, 0) == mnav_errorInvalid,
           "the checks");
+    // Counts whose sum passes 32 bits: the goal outside the grid is
+    // refused first, so nothing past it is read.
+    CHECK(mnavGridFlow_Update(field, &grid, &off, 1, &goal, INT32_MAX) == mnav_errorInvalid,
+          "counts summing past 32 bits");
     mnavCellFlow flow;
     CHECK(mnavGridFlow_GetFlow(field, goal, &flow) == mnav_success,
           "a refused repair keeps the field");

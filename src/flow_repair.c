@@ -148,6 +148,20 @@ static void OfferAround(const mnavFlowSearch* s, int32_t x, int32_t y)
     }
 }
 
+// Whether every cell of a list lies in the grid.
+static bool InGrid(const mnavGrid* grid, const mnavCell* cells, int32_t count)
+{
+    for (int32_t i = 0; i < count; ++i)
+    {
+        mnavCell c = cells[i];
+        if (c.x < 0 || c.y < 0 || c.x >= grid->width || c.y >= grid->height)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 static mnavResult Check(const mnavGridFlow* field, const mnavGrid* grid, const mnavCell* goals,
                         int32_t goalCount, const mnavCell* changed, int32_t changedCount)
 {
@@ -165,13 +179,10 @@ static mnavResult Check(const mnavGridFlow* field, const mnavGrid* grid, const m
     {
         return mnav_errorInvalid;
     }
-    for (int32_t i = 0; i < goalCount + changedCount; ++i)
+    // Each list by its own count: the two may sum past 32 bits.
+    if (!InGrid(grid, goals, goalCount) || !InGrid(grid, changed, changedCount))
     {
-        mnavCell c = i < goalCount ? goals[i] : changed[i - goalCount];
-        if (c.x < 0 || c.y < 0 || c.x >= grid->width || c.y >= grid->height)
-        {
-            return mnav_errorInvalid;
-        }
+        return mnav_errorInvalid;
     }
     return field->state != mnav_flowEnded ? mnav_errorState : mnav_success;
 }
