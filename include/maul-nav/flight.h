@@ -450,9 +450,10 @@ extern "C"
     /// @param size    Their size in bytes.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument;
     /// `mnav_errorFormat` naming the section and element for malformed bytes, a
-    /// tile baked with other settings or past the def's node or leaf limit (the
-    /// header); `mnav_errorVersion` for another flight tile format version;
-    /// `mnav_errorCapacity` past the memory limit or when the allocator fails.
+    /// tile baked with other settings, past the def's node or leaf limit or at
+    /// a place past the extent the bake writes (the header); `mnav_errorVersion`
+    /// for another flight tile format version; `mnav_errorCapacity` past the
+    /// memory limit or when the allocator fails.
     /// Also `mnav_errorBusy` when called back in from the flight volume's
     /// allocator, one misuse counted.
     /// @par Thread safety

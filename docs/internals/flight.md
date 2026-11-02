@@ -40,7 +40,7 @@ A flight tile is an asset format in the family's sense, as the ground tile is ([
 
 Child and root indices are not stored, and the loader rebuilds them; the counts are the fields' lengths. A space with no mixed cube has no nodes or leaves, and the writer leaves `NODE` and `LEAF` out.
 
-The loader reads every byte as hostile: the payload's hash, the fields as the ground tile's are read (a tag this version does not know is `mnav_errorVersion`), counts against the def's limits before allocating, `FLHT`'s settings against the volume's def, and the canonical form (classes up to mixed, masks with no child both mixed and solid and never all empty or all solid, leaves neither empty nor full, every count used exactly). A tile has one canonical encoding, so two bakes of the same space are the same bytes, and a tile that is not canonical is refused, naming the section and element.
+The loader reads every byte as hostile: the payload's hash, the fields as the ground tile's are read (a tag this version does not know is `mnav_errorVersion`), counts against the def's limits before allocating, `FLHT`'s settings against the volume's def and its place against the extent the bake writes (`mnavMakeTileFrame`, so that no tile's voxels pass 32 bits), and the canonical form (classes up to mixed, masks with no child both mixed and solid and never all empty or all solid, leaves neither empty nor full, every count used exactly). A tile has one canonical encoding, so two bakes of the same space are the same bytes, and a tile that is not canonical is refused, naming the section and element.
 
 ## The search
 
