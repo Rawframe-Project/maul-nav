@@ -455,6 +455,17 @@ static void TestQueryDefsAreChecked(void)
     CHECK(mnavCreateQuery(nullptr, &query) == mnav_errorInvalid &&
               mnavCreateQuery(&def, nullptr) == mnav_errorInvalid,
           "NULL arguments");
+    // An allocator with one function: what one side took would be given
+    // back to the other.
+    def = mnavDefaultQueryDef();
+    def.allocator = CountingAllocator();
+    def.allocator.free = nullptr;
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid && query == nullptr && s_held == 0,
+          "an allocator without free");
+    def.allocator = CountingAllocator();
+    def.allocator.alloc = nullptr;
+    CHECK(mnavCreateQuery(&def, &query) == mnav_errorInvalid && query == nullptr,
+          "an allocator without alloc");
     def = mnavDefaultQueryDef();
     def.allocator = CountingAllocator();
     CHECK(mnavCreateQuery(&def, &query) == mnav_success && s_held > 0, "made");
