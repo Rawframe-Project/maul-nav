@@ -5,6 +5,23 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.8.6](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.5...v0.8.6) (2026-11-03)
+
+This release fixes what an audit of the debug draws found: a path with
+a point that is not finite was drawn instead of refused. No results
+change.
+
+### Fixed
+
+- `mnavDebugPath` and `mnavDebugFlightPath` checked a path's count and
+  its `points` pointer, but not the points themselves. A path with a
+  point that has a NaN or an infinity was drawn, and the call returned
+  `mnav_success` with NaN and infinite vertices in the buffer. Such a
+  path is now refused with `mnav_errorInvalid` before anything is
+  written, so the buffer is left as it was. Paths with finite points
+  draw as before.
+  ([#294](https://github.com/Rawframe-Project/maul-nav/pull/294))
+
 ## [0.8.5](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.4...v0.8.5) (2026-11-03)
 
 This release fixes what an audit of the corridor code found: a path
