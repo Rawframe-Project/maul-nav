@@ -5,6 +5,39 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.0.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.0.0...v1.0.1) (2026-11-03)
+
+This release fixes the corridor of a shortest path that ran straight
+through a corner where polygons meet. Only such a path's polygons
+change; its points, cost and length do not, and no other result
+changes.
+
+### Changed
+
+- The doc comments of `mnavAvoidance_Avoid` and
+  `mnavAvoidance_Avoid3D` state the fixed exit of an agent exactly on
+  an obstacle's center: along -Y (ground -Z) on a circle's center, and
+  along -Z on a sphere's. No velocities change.
+  ([#306](https://github.com/Rawframe-Project/maul-nav/pull/306))
+
+### Fixed
+
+- `mnavPath` promises its polygons as "The polygons from the start
+  polygon on, each visit once", but `mnavQuery_FindShortestPath`
+  could give a corridor that circled a corner before going on. On a
+  flat floor of the default def over four tiles, the way from
+  (28.8, 30.4) to (35.2, 33.6) through the corner (32, 32) had the
+  right points and length but listed 7 polygons, where
+  `mnavQuery_FindPath` gives 3. Rounding made the way that turns at
+  the corner a little cheaper than the straight one, and that way
+  reaches the end polygon again only by going round the corner. The
+  corridor now cuts a polygon visited again back to its first visit,
+  but never across an off-mesh link's landing, since a link may
+  genuinely land back in a polygon it left. Only such paths change:
+  their corridors drop the loop, and their points, cost and length
+  stay as they were.
+  ([#308](https://github.com/Rawframe-Project/maul-nav/pull/308))
+
 ## [1.0.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.6...v1.0.0) (2026-11-03)
 
 This release settles the API: from 1.0.0 there is no 2.0.0. Tile
