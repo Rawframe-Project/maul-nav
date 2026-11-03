@@ -304,6 +304,22 @@ static void TestAreaRuns(mnavQuery* query, const mnavNavmesh* navmesh, mnavCorri
               count == 2 && fabs(runs[1].start.x - 10.0) < 1e-9 &&
               fabs(runs[1].start.z - 7.5) < 1e-9 && runs[1].area == 2,
           "a slanting path crosses into area 2 at (10, 7.5)");
+    // From (10, 6) in the first square to (10, 9) in area 2: the path runs
+    // along their portal, so the run into area 2 starts where it starts.
+    from = On(navmesh, 7.0, 6.0, 0.1f);
+    to = On(navmesh, 12.0, 9.0, 0.1f);
+    from.point.x = 10.0;
+    to.point.x = 10.0;
+    CHECK(mnavQuery_FindPath(query, navmesh, from.polygon, from.point, to.polygon, to.point,
+                             nullptr, &path) == mnav_success &&
+              path.polygonCount == 2 &&
+              mnavResetCorridor(&slant, buffer, 8, from.polygon, from.point) == mnav_success &&
+              mnavSetCorridor(&slant, &path) == mnav_success &&
+              mnavQuery_FindCorridorAreas(query, &slant, navmesh, nullptr, runs, 8, &count) ==
+                  mnav_success &&
+              count == 2 && runs[1].start.x == 10.0 && runs[1].start.z == 6.0 &&
+              runs[1].corner == 0 && runs[1].area == 2,
+          "a path along the portal into area 2 enters it at its start");
 }
 
 // A U round a wall (s_handRoundAWall), the bottom middle square of area
@@ -739,6 +755,12 @@ static void TestReplanning(void)
               path.end == mnav_pathNotLoaded && path.polygonCount == 0 &&
               corridor.polygonCount == count,
           "nothing loaded at the target");
+    // The start's polygon still loaded and the target's gone: the target
+    // alone is found again, so the broken filter is refused there.
+    CHECK(mnavQuery_ReplanCorridor(query, &corridor, navmesh, box, &broken, &path) ==
+                  mnav_errorInvalid &&
+              path.polygonCount == 0 && corridor.polygonCount == count,
+          "a filter with a NaN cost refused finding the target");
     CHECK(mnavQuery_ReplanCorridor(query, nullptr, navmesh, box, nullptr, &path) ==
               mnav_errorInvalid,
           "no corridor");
