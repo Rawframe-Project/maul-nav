@@ -697,7 +697,8 @@ static double OneCost(const mnavQueryFilter* filter)
     return cost;
 }
 
-// Whether a point is one of a polygon's corners.
+// Whether a point lies on one of a polygon's edges, a corner included: on
+// a tile side, a corner of the tile across may be within an edge here.
 static bool Touches(const mnavNavmesh* navmesh, mnavPolygonId id, mnavPos3 p)
 {
     const mnavSlot* slot = &navmesh->slots[id.slot - 1];
@@ -705,8 +706,11 @@ static bool Touches(const mnavNavmesh* navmesh, mnavPolygonId id, mnavPos3 p)
     const mnavPolygon* polygon = &slot->tile->mesh.polygons[id.polygon];
     for (int32_t k = 0; k < polygon->count; ++k)
     {
-        mnavPos3 v = mnavVertexWorld(&f, &slot->tile->mesh.vertices[polygon->vertices[k]]);
-        if (v.x == p.x && v.z == p.z)
+        const mnavMeshVertex* vertices = slot->tile->mesh.vertices;
+        mnavPos3 a = mnavVertexWorld(&f, &vertices[polygon->vertices[k]]);
+        mnavPos3 b = mnavVertexWorld(&f, &vertices[polygon->vertices[(k + 1) % polygon->count]]);
+        if (Cross(a, b, p) == 0.0 && (p.x - a.x) * (p.x - b.x) <= 0.0 &&
+            (p.z - a.z) * (p.z - b.z) <= 0.0)
         {
             return true;
         }
@@ -720,7 +724,7 @@ static bool Touches(const mnavNavmesh* navmesh, mnavPolygonId id, mnavPos3 p)
 // without a link only touched the polygons between at a corner: from a
 // root on it, every polygon round it is entered at no cost, and rounding
 // may favor a way round. Such a loop is cut back to the first visit,
-// scanning only the polygons that have the root as a corner. Until then
+// scanning only the polygons whose edges hold the root. Until then
 // each visit holds the node that entered it in its generation's place.
 static int32_t Polygons(mnavQuery* query, const mnavNavmesh* navmesh, int32_t last)
 {
