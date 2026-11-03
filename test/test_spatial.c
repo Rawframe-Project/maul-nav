@@ -172,9 +172,9 @@ static void TestHeights(const mnavNavmesh* navmesh)
     // into the box's heights further along, but its nearest point, the
     // ground below, lies out of a box 0.3 m high (which holds only ground
     // from 0.4 m up), so none is found; one 1.0 m high (ground from -0.3 m
-    // up) finds it. The ground there is 0.218 m, the detail's height for
-    // the slope's 0.1 m, so it lies within 0.15 m of the slope, well
-    // inside both.
+    // up) finds it. The ground must lie from -0.2 to 0.3 m, 0.1 m clear of
+    // both boxes' edges; it is 0.218 m, the detail's height for the
+    // slope's 0.1 m.
     mnavPos3 over = {2.0, 2.0 * (double)SLOPE + 0.6, 20.0};
     mnavNearest low = {0};
     mnavNearest high = {0};
@@ -186,7 +186,7 @@ static void TestHeights(const mnavNavmesh* navmesh)
                                       &high) == mnav_success &&
               high.polygon.slot != 0 && high.point.x == 2.0 && high.point.z == 20.0 &&
               mnavPolygon_GetHeight(navmesh, high.polygon, 2.0, 20.0, &ground) == mnav_success &&
-              high.point.y == ground && fabs(ground - 2.0 * (double)SLOPE) < 0.15,
+              high.point.y == ground && ground > -0.2 && ground < 0.3,
           "a nearest point out of the box's heights is not found");
 }
 
