@@ -7,11 +7,31 @@ may change the API, the ABI and the tile formats.
 
 ## [0.8.5](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.4...v0.8.5) (2026-11-03)
 
+This release fixes what an audit of the corridor code found: a path
+with NULL arrays crashed `mnavSetCorridor`, and corridors with a
+position or target that is not finite were used instead of refused.
+No results change.
 
 ### Fixed
 
-* **corridor:** check a path's arrays and ends in mnavSetCorridor ([#290](https://github.com/Rawframe-Project/maul-nav/issues/290)) ([8035793](https://github.com/Rawframe-Project/maul-nav/commit/8035793db88e3ea551cd8e6f7970d8931d724d6a)), closes [#288](https://github.com/Rawframe-Project/maul-nav/issues/288)
-* **corridor:** refuse a corridor whose position or target is not finite ([#291](https://github.com/Rawframe-Project/maul-nav/issues/291)) ([9c6659f](https://github.com/Rawframe-Project/maul-nav/commit/9c6659f44c222146273765122962f541c17b9640)), closes [#289](https://github.com/Rawframe-Project/maul-nav/issues/289)
+- `mnavSetCorridor` checked that a path has a polygon and a point,
+  but never checked its `polygons` and `points` pointers or the points
+  it copies. A path with a count of 1 or more and a NULL `polygons` or
+  `points` crashed it. A path whose first or last point has a NaN was
+  loaded with `mnav_success`, leaving the corridor's position or
+  target NaN. Such a path is now refused with `mnav_errorInvalid`
+  before the corridor is touched. Paths from `mnavQuery_FindPath` and
+  `mnavQuery_FinishPath` load as before.
+  ([#290](https://github.com/Rawframe-Project/maul-nav/pull/290))
+- No corridor call checked a corridor's `position` and `target`. With
+  a NaN position or target, `mnavQuery_FindCorridorCorners` and
+  `mnavQuery_FindCorridorAreas` returned `mnav_success` with a NaN
+  corner and a NaN area run, and some moves and shortcuts succeeded and
+  kept the NaN. A well-formed corridor now has a finite position and
+  target, so every call that checks for a well-formed corridor refuses
+  one whose position or target is not finite with `mnav_errorInvalid`.
+  `mnavSetCorridor` replaces both ends, so it does not check them.
+  ([#291](https://github.com/Rawframe-Project/maul-nav/pull/291))
 
 ## [0.8.4](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.3...v0.8.4) (2026-11-02)
 
