@@ -502,6 +502,15 @@ static void TestRefusals(void)
     CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid,
           "another number of triangles refused");
     meshes[1].triangleCount += 1;
+    // The counts the index was made for, but a mesh's array gone: refused
+    // and named before any triangle is read.
+    const mnavVec3* vertices = meshes[1].vertices;
+    meshes[1].vertices = nullptr;
+    CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_errorInvalid &&
+              report.input.kind == mnav_inputMesh && report.input.index == 1 &&
+              report.input.element == mnav_elementNone,
+          "a mesh without its vertices refused, named");
+    meshes[1].vertices = vertices;
 
     // A triangle changed since is checked as it is read.
     CHECK(mnavBaker_BakeTile(baker, &input, 1, 1, &report) == mnav_success &&
