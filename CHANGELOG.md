@@ -5,6 +5,14 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [0.8.5](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.4...v0.8.5) (2026-11-03)
+
+
+### Fixed
+
+* **corridor:** check a path's arrays and ends in mnavSetCorridor ([#290](https://github.com/Rawframe-Project/maul-nav/issues/290)) ([8035793](https://github.com/Rawframe-Project/maul-nav/commit/8035793db88e3ea551cd8e6f7970d8931d724d6a)), closes [#288](https://github.com/Rawframe-Project/maul-nav/issues/288)
+* **corridor:** refuse a corridor whose position or target is not finite ([#291](https://github.com/Rawframe-Project/maul-nav/issues/291)) ([9c6659f](https://github.com/Rawframe-Project/maul-nav/commit/9c6659f44c222146273765122962f541c17b9640)), closes [#289](https://github.com/Rawframe-Project/maul-nav/issues/289)
+
 ## [0.8.4](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.3...v0.8.4) (2026-11-02)
 
 This release fixes what a coverage pass found: a query context made
