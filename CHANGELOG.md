@@ -7,10 +7,20 @@ may change the API, the ABI and the tile formats.
 
 ## [0.8.6](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.5...v0.8.6) (2026-11-03)
 
+This release fixes what an audit of the debug draws found: a path with
+a point that is not finite was drawn instead of refused. No results
+change.
 
 ### Fixed
 
-* **debug:** refuse a path with a point not finite in the path draws ([#294](https://github.com/Rawframe-Project/maul-nav/issues/294)) ([21f5d39](https://github.com/Rawframe-Project/maul-nav/commit/21f5d3960d0c29f452430cc9e28b8effc83cc895)), closes [#293](https://github.com/Rawframe-Project/maul-nav/issues/293)
+- `mnavDebugPath` and `mnavDebugFlightPath` checked a path's count and
+  its `points` pointer, but not the points themselves. A path with a
+  point that has a NaN or an infinity was drawn, and the call returned
+  `mnav_success` with NaN and infinite vertices in the buffer. Such a
+  path is now refused with `mnav_errorInvalid` before anything is
+  written, so the buffer is left as it was. Paths with finite points
+  draw as before.
+  ([#294](https://github.com/Rawframe-Project/maul-nav/pull/294))
 
 ## [0.8.5](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.4...v0.8.5) (2026-11-03)
 
