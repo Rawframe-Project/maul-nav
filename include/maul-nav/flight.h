@@ -743,9 +743,9 @@ extern "C"
     ///                the buffer filling (mnav_errorCapacity), which writes what
     ///                fits and counts what the whole needs.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// path with a negative count or no points, or a buffer as
-    /// mnavFlightVolume_Debug refuses it; `mnav_errorCapacity` when the buffer
-    /// filled.
+    /// path with a negative count, no points or a point that is not finite,
+    /// or a buffer as mnavFlightVolume_Debug refuses it; `mnav_errorCapacity`
+    /// when the buffer filled.
     /// @par Thread safety
     /// Safe from any thread; the buffer is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavDebugFlightPath(const mnavFlightPath* path,
