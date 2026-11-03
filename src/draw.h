@@ -17,6 +17,9 @@
 // arrays present where a capacity asks for them, an origin finite.
 bool mnavGoodBuffer(const mnavDebugBuffer* buffer);
 
+// Whether every one of count points is finite.
+bool mnavGoodPoints(const mnavPos3* points, int32_t count);
+
 // Appends a vertex and returns its index.
 uint32_t mnavDrawVertex(mnavDebugBuffer* buffer, mnavPos3 p, mnavDebugKind kind, uint32_t value);
 

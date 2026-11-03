@@ -30,6 +30,18 @@ bool mnavGoodBuffer(const mnavDebugBuffer* buffer)
            GoodList(buffer->lines, buffer->lineCapacity, buffer->lineCount);
 }
 
+bool mnavGoodPoints(const mnavPos3* points, int32_t count)
+{
+    for (int32_t i = 0; i < count; ++i)
+    {
+        if (!isfinite(points[i].x) || !isfinite(points[i].y) || !isfinite(points[i].z))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 uint32_t mnavDrawVertex(mnavDebugBuffer* buffer, mnavPos3 p, mnavDebugKind kind, uint32_t value)
 {
     int32_t at = buffer->vertexCount;

@@ -282,6 +282,23 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
     CHECK(mnavDebugPath(&path, &tight) == mnav_errorCapacity && SameStart(&b, &tight),
           "a path short of room: the first drawn, the whole counted");
     Release(&tight);
+    // A point that is not finite refuses the whole path, the buffer as it
+    // was.
+    mnavPos3* bent = malloc((size_t)path.pointCount * sizeof(mnavPos3));
+    CHECK(bent != nullptr, "a copy of the path's points");
+    memcpy(bent, path.points, (size_t)path.pointCount * sizeof(mnavPos3));
+    bent[path.pointCount - 1].z = (double)INFINITY;
+    mnavPath bad = path;
+    bad.points = bent;
+    mnavDebugBuffer fresh = Buffer((mnavPos3){0.0, 0.0, 0.0});
+    CHECK(mnavDebugPath(&bad, &fresh) == mnav_errorInvalid && fresh.vertexCount == 0 &&
+              fresh.lineCount == 0,
+          "a path with an infinite point refused, nothing drawn");
+    bent[path.pointCount - 1].z = path.points[path.pointCount - 1].z;
+    bent[0].y = (double)NAN;
+    CHECK(mnavDebugPath(&bad, &fresh) == mnav_errorInvalid && fresh.vertexCount == 0,
+          "a path with a NaN point refused");
+    free(bent);
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
     CHECK(mnavNavmesh_DebugCorridor(navmesh, path.polygons, path.polygonCount, &b) ==
                   mnav_success &&

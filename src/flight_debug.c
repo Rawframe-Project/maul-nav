@@ -125,7 +125,8 @@ static MNAV_NOINLINE mnavResult DebugFlightPathWork(const mnavFlightPath* path,
                                                     mnavDebugBuffer* buffer)
 {
     if (path == nullptr || !mnavGoodBuffer(buffer) || path->pointCount < 0 ||
-        (path->pointCount > 0 && path->points == nullptr))
+        (path->pointCount > 0 && path->points == nullptr) ||
+        !mnavGoodPoints(path->points, path->pointCount))
     {
         return mnav_errorInvalid;
     }

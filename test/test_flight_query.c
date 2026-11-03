@@ -768,6 +768,16 @@ static void TestDebug(const mnavFlightVolume* volume)
                                      (mnavPos3){4000.0, 100.0, 4000.0}, &b) == mnav_errorLimit &&
               mnavDebugFlightPath(nullptr, &b) == mnav_errorInvalid,
           "refusals");
+    mnavPos3* bent = malloc(2 * sizeof(mnavPos3));
+    CHECK(bent != nullptr, "two points");
+    bent[0] = low;
+    bent[1] = (mnavPos3){(double)NAN, 1.0, (double)INFINITY};
+    mnavFlightPath bad = {.points = bent, .pointCount = 2};
+    mnavDebugBuffer untouched = DebugBuffer();
+    CHECK(mnavDebugFlightPath(&bad, &untouched) == mnav_errorInvalid &&
+              untouched.vertexCount == 0 && untouched.lineCount == 0,
+          "a flight path with a point not finite refused, nothing drawn");
+    free(bent);
     // A box's voxels count within the floor and ceiling: a column to far
     // above the ceiling is a few voxels.
     b = DebugBuffer();
