@@ -238,7 +238,8 @@ extern "C"
     /// neighbours within the time horizon if they do their share (ORCA);
     /// when none does, the one that keeps clear of the obstacles and breaks
     /// the agents' constraints least. An agent sees an obstacle edge only
-    /// from outside it.
+    /// from outside it. An agent exactly on a circle's center leaves along
+    /// -Y (ground -Z).
     /// An agent its neighbours or obstacles hold back from its preferred
     /// velocity aims 1% of its speed to the right of it; one held back
     /// only by its maximum speed does not. So agents meeting in perfect
@@ -288,7 +289,8 @@ extern "C"
     /// An agent its neighbours or spheres hold back from its preferred
     /// velocity aims 1% of its speed to the right of it, +Y being up;
     /// rising vertically it turns toward +X, falling toward -X. One held
-    /// back only by its maximum speed does not.
+    /// back only by its maximum speed does not. A flier exactly on a
+    /// sphere's center leaves along -Z.
     /// The same agents give the same velocities in any order, on every
     /// platform.
     ///
