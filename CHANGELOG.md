@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.0.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.0.0...v1.0.1) (2026-11-03)
+
+
+### Fixed
+
+* **query:** cut a shortest path's corridor that circles a corner ([#308](https://github.com/Rawframe-Project/maul-nav/issues/308)) ([d97e9a8](https://github.com/Rawframe-Project/maul-nav/commit/d97e9a89503ba95a267bc5b437aa9e2c0ec3d75f)), closes [#307](https://github.com/Rawframe-Project/maul-nav/issues/307)
+
 ## [1.0.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.6...v1.0.0) (2026-11-03)
 
 This release settles the API: from 1.0.0 there is no 2.0.0. Tile
