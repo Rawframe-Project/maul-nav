@@ -699,6 +699,15 @@ static void TestReplanning(void)
     CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
               valid == 0,
           "nothing valid");
+    // The ends must be found again, so a filter with a NaN cost is
+    // refused there, and the corridor kept.
+    mnavQueryFilter broken = mnavDefaultQueryFilter();
+    broken.costs[mnav_areaWalkable] = NAN;
+    int32_t held = corridor.polygonCount;
+    CHECK(mnavQuery_ReplanCorridor(query, &corridor, navmesh, box, &broken, &path) ==
+                  mnav_errorInvalid &&
+              path.polygonCount == 0 && corridor.polygonCount == held,
+          "a filter with a NaN cost refused finding the ends");
     mnavPos3 target = corridor.target;
     CHECK(mnavQuery_ReplanCorridor(query, &corridor, navmesh, box, nullptr, &path) ==
                   mnav_success &&

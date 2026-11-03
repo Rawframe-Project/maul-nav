@@ -688,6 +688,12 @@ static void TestDefIsChecked(void)
               mnavCreateFlightVolume(&volumeDef, &volume).result == mnav_errorInvalid &&
               volume == nullptr,
           "a bad def makes nothing");
+    mnavFlightDef cramped = good;
+    cramped.limits.memoryBytes = 1;
+    mnavFlightDefResult made = mnavCreateFlightBaker(&cramped, &baker);
+    CHECK(made.result == mnav_errorCapacity && made.setting == mnav_flightSettingNone &&
+              baker == nullptr,
+          "a memory limit too small for the baker makes nothing");
     mnavFlightVolumeDef volumeDef2 = FlightVolumeDefFor(&good);
     CHECK(mnavCreateFlightBaker(&good, nullptr).result == mnav_errorInvalid &&
               mnavCreateFlightVolume(&volumeDef2, nullptr).result == mnav_errorInvalid,
