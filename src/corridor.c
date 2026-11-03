@@ -68,7 +68,9 @@ static MNAV_NOINLINE mnavResult SetCorridorWork(mnavCorridor* corridor, const mn
 {
     // The count is replaced, so only the buffer and its room are read.
     if (corridor == nullptr || path == nullptr || corridor->polygons == nullptr ||
-        corridor->capacity < 1 || path->polygonCount < 1 || path->pointCount < 1)
+        corridor->capacity < 1 || path->polygonCount < 1 || path->polygons == nullptr ||
+        path->pointCount < 1 || path->points == nullptr || !Finite(path->points[0]) ||
+        !Finite(path->points[path->pointCount - 1]))
     {
         return mnav_errorInvalid;
     }
