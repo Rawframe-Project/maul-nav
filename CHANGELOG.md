@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.0.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.6...v1.0.0) (2026-11-03)
+
+
+### Documentation
+
+* state the 1.y tile format rule and release 1.0.0 ([#301](https://github.com/Rawframe-Project/maul-nav/issues/301)) ([46febdd](https://github.com/Rawframe-Project/maul-nav/commit/46febddeef09aaa54c562cb1e6271d836cc652d6)), closes [#300](https://github.com/Rawframe-Project/maul-nav/issues/300)
+
 ## [0.8.6](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.5...v0.8.6) (2026-11-03)
 
 This release fixes what an audit of the debug draws found: a path with
