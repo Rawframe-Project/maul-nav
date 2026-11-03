@@ -697,8 +697,35 @@ static double OneCost(const mnavQueryFilter* filter)
     return cost;
 }
 
+// Whether a point lies on one of a polygon's edges, a corner included: on
+// a tile side, a corner of the tile across may be within an edge here.
+static bool Touches(const mnavNavmesh* navmesh, mnavPolygonId id, mnavPos3 p)
+{
+    const mnavSlot* slot = &navmesh->slots[id.slot - 1];
+    const mnavFrame f = mnavFrameOf(navmesh, slot->x, slot->z);
+    const mnavPolygon* polygon = &slot->tile->mesh.polygons[id.polygon];
+    for (int32_t k = 0; k < polygon->count; ++k)
+    {
+        const mnavMeshVertex* vertices = slot->tile->mesh.vertices;
+        mnavPos3 a = mnavVertexWorld(&f, &vertices[polygon->vertices[k]]);
+        mnavPos3 b = mnavVertexWorld(&f, &vertices[polygon->vertices[(k + 1) % polygon->count]]);
+        if (Cross(a, b, p) == 0.0 && (p.x - a.x) * (p.x - b.x) <= 0.0 &&
+            (p.z - a.z) * (p.z - b.z) <= 0.0)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Writes the polygons from the start to node last into the corridor:
 // nodes in one polygon are one visit, except across an off-mesh link.
+// Polygons are convex, so a shortest way that leaves one and comes back
+// without a link only touched the polygons between at a corner: from a
+// root on it, every polygon round it is entered at no cost, and rounding
+// may favor a way round. Such a loop is cut back to the first visit,
+// scanning only the polygons whose edges hold the root. Until then
+// each visit holds the node that entered it in its generation's place.
 static int32_t Polygons(mnavQuery* query, const mnavNavmesh* navmesh, int32_t last)
 {
     int32_t count = 0;
@@ -706,16 +733,16 @@ static int32_t Polygons(mnavQuery* query, const mnavNavmesh* navmesh, int32_t la
     for (int32_t n = last; n != MNAV_NO_NODE; n = query->nodes[n].parent)
     {
         const mnavSearchNode* node = &query->nodes[n];
-        mnavPolygonId id = {(uint32_t)node->slot + 1, navmesh->slots[node->slot].generation,
-                            (uint32_t)node->polygon};
         const mnavPolygonId* previous = count > 0 ? &query->corridor[count - 1] : nullptr;
-        if (previous == nullptr || crossed || previous->slot != id.slot ||
-            previous->polygon != id.polygon)
+        if (previous == nullptr || crossed || previous->slot != (uint32_t)node->slot + 1 ||
+            previous->polygon != (uint32_t)node->polygon)
         {
             // A visit per node at most, and the nodes fit the corridor.
             MNAV_ASSERT(count < query->limits.nodes);
-            query->corridor[count++] = id;
+            query->corridor[count++] =
+                (mnavPolygonId){(uint32_t)node->slot + 1, 0, (uint32_t)node->polygon};
         }
+        query->corridor[count - 1].generation = (uint32_t)n;
         crossed = node->tag == KIND_LANDING;
     }
     for (int32_t i = 0; i < count / 2; ++i)
@@ -724,7 +751,38 @@ static int32_t Polygons(mnavQuery* query, const mnavNavmesh* navmesh, int32_t la
         query->corridor[i] = query->corridor[count - 1 - i];
         query->corridor[count - 1 - i] = swap;
     }
-    return count;
+    int32_t kept = 0;
+    int32_t landed = 0;
+    for (int32_t i = 0; i < count; ++i)
+    {
+        mnavPolygonId visit = query->corridor[i];
+        const mnavSearchNode* node = &query->nodes[visit.generation];
+        landed = node->tag == KIND_LANDING ? kept : landed;
+        int32_t back = kept - 1;
+        while (back >= landed && node->tag != KIND_LANDING &&
+               (query->corridor[back].slot != visit.slot ||
+                query->corridor[back].polygon != visit.polygon) &&
+               Touches(navmesh, query->corridor[back], node->at))
+        {
+            back -= 1;
+        }
+        bool again = back >= landed && node->tag != KIND_LANDING &&
+                     query->corridor[back].slot == visit.slot &&
+                     query->corridor[back].polygon == visit.polygon;
+        if (again)
+        {
+            kept = back + 1;
+        }
+        else
+        {
+            query->corridor[kept++] = visit;
+        }
+    }
+    for (int32_t i = 0; i < kept; ++i)
+    {
+        query->corridor[i].generation = navmesh->slots[query->corridor[i].slot - 1].generation;
+    }
+    return kept;
 }
 
 static void Push(mnavQuery* query, int32_t* count, mnavPos3 p)

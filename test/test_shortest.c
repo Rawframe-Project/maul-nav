@@ -416,6 +416,80 @@ static void TestCrossesTwoLinks(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+// A jump from the first square back into it, cheaper than the walk: the
+// square is visited twice, before the link and after it, and no loop is
+// cut across a link.
+static void TestKeepsAVisitBackOverALink(void)
+{
+    mnavNavmesh* navmesh = Make(s_handApartPair, sizeof(s_handApartPair), nullptr, 0);
+    mnavQuery* query = MakeQuery(64, 1000.0f);
+    mnavLinkDef def = {{6.0, 0.0, 6.0}, {9.5, 0.0, 9.5}, 0.5f, 0.25f, mnav_linkJump, false, 0.0f};
+    mnavLinkId jump = {0, 0};
+    CHECK(mnavStageLink(navmesh, &def, &jump) == mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success,
+          "link added");
+    mnavPath path = Shortest(query, navmesh, nullptr, 5.5, 5.5, 9.5, 9.0);
+    CHECK(path.end == mnav_pathFound && path.linkCount == 1 && path.polygonCount == 2 &&
+              path.polygons[0].slot == path.polygons[1].slot &&
+              path.polygons[0].polygon == path.polygons[1].polygon,
+          "the square before the jump and after it");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
+// A flat floor over the four tiles round (32, 32), and a way straight
+// through the corner they share. From a root there every polygon round it
+// is entered at no cost, and rounding favors the way that turns there,
+// found only by going round the corner: the corridor still crosses three
+// polygons, as the straight way does, each once.
+static void TestCutsTheWayRoundACorner(void)
+{
+    mnavBakeDef bakeDef = mnavDefaultBakeDef();
+    const mnavVec3 floor[4] = {{-1, 0, -1}, {-1, 0, 65}, {65, 0, 65}, {65, 0, -1}};
+    const int32_t quad[6] = {0, 1, 2, 0, 2, 3};
+    mnavTriangleMesh mesh = {floor, 4, quad, 2, nullptr};
+    mnavBakeInput input = {&mesh, 1, nullptr, 0, nullptr, 0, nullptr};
+    mnavBaker* baker = nullptr;
+    mnavNavmesh* navmesh = nullptr;
+    mnavNavmeshDef meshDef = NavmeshDefFor(&bakeDef);
+    CHECK(mnavCreateBaker(&bakeDef, &baker).result == mnav_success &&
+              mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success,
+          "baker and navmesh");
+    static uint8_t bytes[4][1 << 16];
+    int32_t wrong = 0;
+    for (int32_t t = 0; t < 4; ++t)
+    {
+        size_t size = 0;
+        wrong += mnavBaker_BakeTile(baker, &input, t % 2, t / 2, nullptr) != mnav_success;
+        wrong += mnavBaker_CopyTile(baker, bytes[t], sizeof(bytes[t]), &size) != mnav_success;
+        wrong += mnavNavmesh_StageTile(navmesh, bytes[t], size).result != mnav_success;
+    }
+    CHECK(wrong == 0 && mnavNavmesh_Commit(navmesh) == mnav_success, "the four tiles");
+    mnavDestroyBaker(baker);
+    mnavQuery* query = MakeQuery(64, 1000.0f);
+    mnavPath path = Shortest(query, navmesh, nullptr, 28.8, 30.4, 35.2, 33.6);
+    bool once = path.polygonCount == 3;
+    for (int32_t i = 0; once && i < path.polygonCount; ++i)
+    {
+        for (int32_t j = 0; j < i; ++j)
+        {
+            once = once && (path.polygons[i].slot != path.polygons[j].slot ||
+                            path.polygons[i].polygon != path.polygons[j].polygon);
+        }
+    }
+    mnavTileId first = {0, 0};
+    mnavTileId last = {0, 0};
+    CHECK(path.end == mnav_pathFound && path.pointCount == 3 && path.points[1].x == 32.0 &&
+              path.points[1].z == 32.0 && fabs(path.length - hypot(6.4, 3.2)) < 1e-12 &&
+              mnavNavmesh_GetTile(navmesh, 0, 0, &first) == mnav_success &&
+              mnavNavmesh_GetTile(navmesh, 1, 1, &last) == mnav_success,
+          "through the corner");
+    CHECK(once && path.polygons[0].slot == first.slot && path.polygons[2].slot == last.slot,
+          "three polygons, each once");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 // Whether a path stays on the navmesh, sampled every 0.25 m, to within a
 // nanometer on the ground.
 static bool OnTheNavmesh(const mnavNavmesh* navmesh, const mnavPath* path)
@@ -544,6 +618,8 @@ int main(void)
     TestCostsAndRefusals();
     TestCrossesLinks();
     TestCrossesTwoLinks();
+    TestKeepsAVisitBackOverALink();
+    TestCutsTheWayRoundACorner();
     TestTheWorldBesideTheAStarSearch();
     return s_failures == 0 ? 0 : 1;
 }
