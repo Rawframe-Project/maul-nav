@@ -596,8 +596,9 @@ extern "C"
     /// @param path     A path from mnavQuery_FindPath or mnavQuery_FinishPath.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor with no buffer or a capacity below 1, or a path with no
-    /// polygon or point; `mnav_errorCapacity` when the path
-    /// has more polygons than the corridor's buffer, which is unchanged.
+    /// polygon or point, a NULL `polygons` or `points`, or a first or last
+    /// point that is not finite; `mnav_errorCapacity` when the path has more
+    /// polygons than the corridor's buffer, which is unchanged.
     /// @par Thread safety
     /// Safe from any thread; the corridor is used by one thread at a time.
     MNAV_NODISCARD MNAV_API mnavResult mnavSetCorridor(mnavCorridor* corridor,

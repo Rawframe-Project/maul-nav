@@ -175,8 +175,9 @@ static void TestChecksAndLimits(void)
 // reads none of its buffer: one polygon more than its capacity, a
 // capacity of 0, no polygon, a NaN position and an infinite target. The
 // buffer holds exactly its capacity, so AddressSanitizer would see a read
-// past it. mnavSetCorridor replaces the count and the ends, so it refuses
-// only the capacity.
+// past it. mnavSetCorridor replaces the count and the ends, so it checks
+// only the capacity of the corridor; of the path, it refuses NULL arrays
+// and ends that are not finite.
 static void TestMalformedCorridors(void)
 {
     mnavNavmesh* navmesh = LoadWorld();
@@ -186,13 +187,13 @@ static void TestMalformedCorridors(void)
     CHECK(buffer != nullptr, "a buffer of two polygons");
     buffer[0] = a.polygon;
     buffer[1] = a.polygon;
-    mnavPos3 notFinite = {a.point.x, (double)INFINITY, a.point.z};
+    mnavPos3 infinite = {a.point.x, (double)INFINITY, a.point.z};
     mnavPos3 nan = {(double)NAN, a.point.y, a.point.z};
     const mnavCorridor bad[5] = {{a.point, a.point, buffer, 3, 2},
                                  {a.point, a.point, buffer, 1, 0},
                                  {a.point, a.point, buffer, 0, 2},
                                  {nan, a.point, buffer, 1, 2},
-                                 {a.point, notFinite, buffer, 1, 2}};
+                                 {a.point, infinite, buffer, 1, 2}};
     for (int32_t k = 0; k < 5; ++k)
     {
         mnavCorridor c = bad[k];
@@ -230,6 +231,23 @@ static void TestMalformedCorridors(void)
     CHECK(mnavSetCorridor(&noRoom, &path) == mnav_errorInvalid &&
               mnavSetCorridor(&stale, &path) == mnav_success && stale.polygonCount == 1,
           "loading refuses no room, and replaces any count");
+    // A path's arrays and ends are the caller's fields too.
+    mnavPos3 notFinite[3] = {a.point, {a.point.x, (double)NAN, a.point.z}, a.point};
+    mnavPath forged[4] = {path, path, path, path};
+    forged[0].polygons = nullptr;
+    forged[1].points = nullptr;
+    forged[2].points = notFinite;
+    forged[2].pointCount = 2;
+    forged[3].points = &notFinite[1];
+    forged[3].pointCount = 2;
+    bool loaded = false;
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        mnavCorridor c = {a.point, a.point, buffer, 1, 2};
+        loaded = loaded || mnavSetCorridor(&c, &forged[k]) != mnav_errorInvalid ||
+                 c.polygonCount != 1 || c.position.y != a.point.y || c.target.y != a.point.y;
+    }
+    CHECK(!loaded, "loading refuses NULL arrays and ends not finite, the corridor unchanged");
     free(buffer);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
