@@ -168,6 +168,26 @@ static void TestHeights(const mnavNavmesh* navmesh)
               mnavPolygon_GetHeight(nullptr, n.polygon, 5.0, 5.0, &height) == mnav_errorInvalid &&
               mnavPolygon_GetHeight(navmesh, n.polygon, 5.0, 5.0, nullptr) == mnav_errorInvalid,
           "bad arguments");
+    // 0.6 m over the slope at x = 2, at 0.7 m: the polygon under it rises
+    // into the box's heights further along, but its nearest point, the
+    // ground below, lies out of a box 0.3 m high (which holds only ground
+    // from 0.4 m up), so none is found; one 1.0 m high (ground from -0.3 m
+    // up) finds it. The ground must lie from -0.2 to 0.3 m, 0.1 m clear of
+    // both boxes' edges; it is 0.218 m, the detail's height for the
+    // slope's 0.1 m.
+    mnavPos3 over = {2.0, 2.0 * (double)SLOPE + 0.6, 20.0};
+    mnavNearest low = {0};
+    mnavNearest high = {0};
+    double ground = -1.0;
+    CHECK(mnavNavmesh_FindNearest(navmesh, over, (mnavVec3){0.5f, 0.3f, 0.5f}, nullptr, &low) ==
+                  mnav_success &&
+              low.polygon.slot == 0 &&
+              mnavNavmesh_FindNearest(navmesh, over, (mnavVec3){0.5f, 1.0f, 0.5f}, nullptr,
+                                      &high) == mnav_success &&
+              high.polygon.slot != 0 && high.point.x == 2.0 && high.point.z == 20.0 &&
+              mnavPolygon_GetHeight(navmesh, high.polygon, 2.0, 20.0, &ground) == mnav_success &&
+              high.point.y == ground && ground > -0.2 && ground < 0.3,
+          "a nearest point out of the box's heights is not found");
 }
 
 // Whether two walls are the same, field by field: a wall's binary32
