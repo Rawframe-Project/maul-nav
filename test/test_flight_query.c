@@ -1373,6 +1373,17 @@ static void TestWholeCubes(void)
           "none near in the solid cube");
     mnavDestroyQuery(query);
     mnavDestroyFlightVolume(volume);
+    // With nothing over the ground and the cubes cut at 1 m, the lowest
+    // cube is solid and the one above it open whole: from under the
+    // ground, the nearest open point is that cube's, straight up.
+    def.floor = -15.0f;
+    def.ceiling = 17.0f;
+    volume = SmallWith(boxes, 0, &def);
+    CHECK(mnavFlightVolume_FindNearestPoint(volume, (mnavPos3){8.5, -0.5, 8.5}, 4.0f, &nearest,
+                                            &found) == mnav_success &&
+              found && nearest.x == 8.5 && nearest.y == 1.0 + 1.0 / 1024.0 && nearest.z == 8.5,
+          "nearest in the open cube over the solid one");
+    mnavDestroyFlightVolume(volume);
 }
 
 // Every check on the scene, baked in tiles of side voxels: 16 tiles of
