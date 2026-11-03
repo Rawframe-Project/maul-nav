@@ -405,6 +405,13 @@ static void TestSpheres(void)
     s = (Scene){avoidance, agents, stay, 1, spheres, 1, 0.0, 0.0, 0.0};
     Run(&s, 30);
     CHECK(ClosestSphere(agents, 1, spheres, 1) > -1e-9, "it leaves");
+    // On the center itself no way is out, and it leaves by the fixed one,
+    // along -Z at full speed.
+    agents[0] = Agent(0.0, 0.0, 0.0, 1);
+    mnavVec3 velocity;
+    CHECK(mnavAvoidance_Avoid3D(avoidance, agents, 1, spheres, 1, 0.1, &velocity) == mnav_success &&
+              velocity.x == 0.0f && velocity.y == 0.0f && velocity.z == -1.5f,
+          "out of the sphere's center along -Z");
     mnavDestroyAvoidance(avoidance);
 }
 
