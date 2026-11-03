@@ -325,8 +325,10 @@ void Along(const float start[3], const float b[3], double t, double out[2])
 // 0.6 m apart, and a ray may stop at one and pass the other's corner.
 // A pair both stop on is banded when, besides, the ray that went farther
 // stops within kWallBand past the other's stop; a pair one stops on and
-// the other passes is grazed. Each scene allows as many of each as
-// kRayCaps names, so a new one fails until it is explained.
+// the other passes is grazed. A pair passes only as kRayAllowed lists
+// it, by scene, index and kind, so a change in which pairs disagree
+// fails until it is explained; a listed pair that no longer disagrees is
+// printed.
 struct RayTally
 {
     int cast = 0;
@@ -336,31 +338,39 @@ struct RayTally
     int disagree = 0;
     int banded = 0;
     int grazed = 0;
+    int listed = 0;
 };
 
 constexpr double kRayClose = 0.25;
 constexpr double kWallBand = 0.6;
 
-// The banded and grazed pairs each scene allows, every one explained in
-// the pull request that set its cap; a scene not listed allows none.
-struct RayCap
+// The pairs that may disagree, each explained in the pull request that
+// listed it: by scene, the pair's index and whether it is grazed rather
+// than banded. A scene not listed allows none.
+struct RayAllowed
 {
     const char* scene;
-    int banded;
-    int grazed;
+    int pair;
+    bool grazed;
 };
-constexpr RayCap kRayCaps[] = {{"world", 10, 1}};
+constexpr RayAllowed kRayAllowed[] = {
+    {"world", 8, true},    {"world", 41, false},  {"world", 61, false},  {"world", 64, false},
+    {"world", 83, false},  {"world", 100, false}, {"world", 132, false}, {"world", 155, false},
+    {"world", 181, false}, {"world", 191, false}, {"world", 198, false},
+};
+constexpr int kRayAllowedCount = static_cast<int>(sizeof(kRayAllowed) / sizeof(kRayAllowed[0]));
 
-RayCap CapOf(const char* scene)
+// The index in kRayAllowed of a scene's pair, or -1.
+int AllowedOf(const char* scene, int pair)
 {
-    for (const RayCap& cap : kRayCaps)
+    for (int k = 0; k < kRayAllowedCount; ++k)
     {
-        if (std::strcmp(cap.scene, scene) == 0)
+        if (kRayAllowed[k].pair == pair && std::strcmp(kRayAllowed[k].scene, scene) == 0)
         {
-            return cap;
+            return k;
         }
     }
-    return RayCap{scene, 0, 0};
+    return -1;
 }
 
 // Whether one library has a wall within kWallBand of the point on the
@@ -446,6 +456,7 @@ double Ahead(const float a[3], const float b[3], const double p[2])
 
 void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t)
 {
+    bool seen[kRayAllowedCount] = {};
     for (int i = 0; i < kPairs; ++i)
     {
         float a[3];
@@ -493,11 +504,20 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
                 near && both &&
                 (mauler ? StopsNear(maul, d, true, a, b, dp) : StopsNear(maul, d, false, a, b, mp));
             bool grazed = near && !both;
+            int k = AllowedOf(scene, i);
+            bool listed =
+                k >= 0 && ((banded && !kRayAllowed[k].grazed) || (grazed && kRayAllowed[k].grazed));
+            if (k >= 0)
+            {
+                seen[k] = true;
+            }
             t.disagree += 1;
             t.banded += banded ? 1 : 0;
             t.grazed += grazed ? 1 : 0;
-            const char* verdict = banded   ? "banded"
-                                  : grazed ? "grazed"
+            t.listed += listed ? 1 : 0;
+            const char* verdict = listed   ? (banded ? "banded, listed" : "grazed, listed")
+                                  : banded ? "banded, not listed as banded"
+                                  : grazed ? "grazed, not listed as grazed"
                                   : near   ? "past the other's stop"
                                            : "no wall within 0.6 m";
             auto D = [](float v) { return static_cast<double>(v); };
@@ -505,6 +525,13 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
                 "t %.6f, detour %d at (%.4f %.4f) t %.6f, %.4f m apart, %s\n",
                 scene, i, D(a[0]), D(a[1]), D(a[2]), D(b[0]), D(b[1]), D(b[2]), m, mp[0], mp[1],
                 m == 1 ? mt : 1.0, r, dp[0], dp[1], r == 1 ? dt : 1.0, gap, verdict);
+        }
+    }
+    for (int k = 0; k < kRayAllowedCount; ++k)
+    {
+        if (!seen[k] && std::strcmp(kRayAllowed[k].scene, scene) == 0)
+        {
+            Say("ray %s %d: listed, and the rays no longer disagree\n", scene, kRayAllowed[k].pair);
         }
     }
 }
@@ -772,11 +799,11 @@ int main()
                std::fabs(sums) <= kSumBound;
     }
     Say(pass ? "agreement within the floors\n" : "agreement below a floor\n");
-    // Rays: each pair agrees, or is banded or grazed within its scene's
-    // caps.
+    // Rays: each pair agrees, or is banded or grazed as kRayAllowed lists
+    // it.
     bool rays = true;
-    Say("\n%-10s %6s %8s %6s %8s %8s %6s %6s\n", "scene", "rays", "ends", "hits", "close", "differ",
-        "banded", "grazed");
+    Say("\n%-10s %6s %8s %6s %8s %8s %6s %6s %6s\n", "scene", "rays", "ends", "hits", "close",
+        "differ", "banded", "grazed", "listed");
     for (int32_t i = 0; i < DiffSceneCount(); ++i)
     {
         DiffScene scene = DiffGetScene(i);
@@ -788,17 +815,15 @@ int main()
             CompareRays(scene.name, maul, d, t);
             double cast = t.cast > 0 ? static_cast<double>(t.cast) : 1.0;
             double hits = t.bothHit > 0 ? static_cast<double>(t.bothHit) : 1.0;
-            RayCap cap = CapOf(scene.name);
-            Say("%-10s %6d %7.1f%% %6d %7.1f%% %8d %3d/%-2d %3d/%-2d\n", scene.name, t.cast,
+            Say("%-10s %6d %7.1f%% %6d %7.1f%% %8d %6d %6d %6d\n", scene.name, t.cast,
                 100.0 * t.endAgree / cast, t.bothHit, 100.0 * t.hitClose / hits, t.disagree,
-                t.banded, cap.banded, t.grazed, cap.grazed);
-            rays = rays && t.banded + t.grazed == t.disagree && t.banded <= cap.banded &&
-                   t.grazed <= cap.grazed;
+                t.banded, t.grazed, t.listed);
+            rays = rays && t.listed == t.disagree;
         }
         DiffMaulDestroy(maul);
     }
-    Say(rays ? "rays agree, or differ within the wall band and the caps\n"
-             : "rays differ past the wall band or the caps\n");
+    Say(rays ? "rays agree, or differ as listed within the wall band\n"
+             : "rays differ past the wall band or the list\n");
     pass = pass && rays;
     Counter counter;
     Say("\ncosts, best of five, reported and not gated; Maul Nav in 32 m tiles, Recast "
