@@ -169,7 +169,7 @@ int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double*
 }
 
 int32_t DiffMaulRaycast(DiffMaul* maul, const float a[3], const float b[3], float start[3],
-                        double* t)
+                        double* t, float normal[3])
 {
     mnavNearest s;
     if (!Nearest(maul, a, &s))
@@ -187,5 +187,8 @@ int32_t DiffMaulRaycast(DiffMaul* maul, const float a[3], const float b[3], floa
         return 2;
     }
     *t = ray.t;
+    normal[0] = ray.normal.x;
+    normal[1] = ray.normal.y;
+    normal[2] = ray.normal.z;
     return ray.end == mnav_rayWall ? 1 : (ray.end == mnav_rayReached ? 0 : 2);
 }
