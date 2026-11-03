@@ -21,6 +21,7 @@
 #include "Recast.h"
 #include "diff.h"
 
+#include <cfloat>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -225,6 +226,102 @@ int DetourPath(const Detour& d, const float a[3], const float b[3], double* leng
     }
     *length = sum;
     return 1;
+}
+
+// Detour's ray, as DiffMaulRaycast gives Maul Nav's.
+int DetourRaycast(const Detour& d, const float a[3], const float b[3], float start[3], double* t)
+{
+    dtQueryFilter filter;
+    const float extents[3] = {0.5f, 2.0f, 0.5f};
+    dtPolyRef ref = 0;
+    d.query->findNearestPoly(a, extents, &filter, &ref, start);
+    if (ref == 0)
+    {
+        return -1;
+    }
+    float hit = 0.0f;
+    float normal[3];
+    static dtPolyRef path[4096];
+    int count = 0;
+    dtStatus status = d.query->raycast(ref, start, b, &filter, &hit, normal, path, &count, 4096);
+    if (dtStatusFailed(status) || (status & DT_BUFFER_TOO_SMALL) != 0)
+    {
+        return 2;
+    }
+    if (hit == FLT_MAX)
+    {
+        return 0;
+    }
+    *t = static_cast<double>(hit);
+    return 1;
+}
+
+// Where a ray from start toward b stopped on the ground, t of the way.
+void Along(const float start[3], const float b[3], double t, double out[2])
+{
+    double sx = static_cast<double>(start[0]);
+    double sz = static_cast<double>(start[2]);
+    out[0] = sx + t * (static_cast<double>(b[0]) - sx);
+    out[1] = sz + t * (static_cast<double>(b[2]) - sz);
+}
+
+// Rays both libraries cast from the same pair's first point toward its
+// second: whether both stop at a wall or both reach the end, and, when
+// both stop, whether the points they stop at lie within 0.25 m of each
+// other on the ground. Every pair they disagree on is printed.
+struct RayTally
+{
+    int cast = 0;
+    int endAgree = 0;
+    int bothHit = 0;
+    int hitClose = 0;
+};
+
+constexpr double kRayClose = 0.25;
+
+void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t)
+{
+    for (int i = 0; i < kPairs; ++i)
+    {
+        float a[3];
+        float b[3];
+        if (!DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 1u, a) ||
+            !DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 2u, b))
+        {
+            continue;
+        }
+        float ms[3];
+        float ds[3];
+        double mt = 0.0;
+        double dt = 0.0;
+        int m = DiffMaulRaycast(maul, a, b, ms, &mt);
+        int r = DetourRaycast(d, a, b, ds, &dt);
+        if (m < 0 || r < 0)
+        {
+            continue;
+        }
+        t.cast += 1;
+        double mp[2];
+        double dp[2];
+        Along(ms, b, m == 1 ? mt : 1.0, mp);
+        Along(ds, b, r == 1 ? dt : 1.0, dp);
+        double gap = std::hypot(mp[0] - dp[0], mp[1] - dp[1]);
+        bool agree = m == r;
+        t.endAgree += agree ? 1 : 0;
+        if (m == 1 && r == 1)
+        {
+            t.bothHit += 1;
+            t.hitClose += gap <= kRayClose ? 1 : 0;
+        }
+        if (!agree || (m == 1 && r == 1 && gap > kRayClose))
+        {
+            auto D = [](float v) { return static_cast<double>(v); };
+            std::printf("ray %s %d: (%.4f %.4f %.4f) to (%.4f %.4f %.4f): maul %d at (%.4f %.4f) "
+                        "t %.6f, detour %d at (%.4f %.4f) t %.6f, %.4f m apart\n",
+                        scene, i, D(a[0]), D(a[1]), D(a[2]), D(b[0]), D(b[1]), D(b[2]), m, mp[0],
+                        mp[1], m == 1 ? mt : 1.0, r, dp[0], dp[1], r == 1 ? dt : 1.0, gap);
+        }
+    }
 }
 
 struct Tally
@@ -489,6 +586,24 @@ int main()
                std::fabs(sums) <= kSumBound;
     }
     std::printf(pass ? "agreement within the floors\n" : "agreement below a floor\n");
+    // Rays, reported and not yet gated.
+    std::printf("\n%-10s %6s %8s %6s %8s\n", "scene", "rays", "ends", "hits", "close");
+    for (int32_t i = 0; i < DiffSceneCount(); ++i)
+    {
+        DiffScene scene = DiffGetScene(i);
+        Detour d;
+        DiffMaul* maul = DiffMaulBuild(&scene);
+        if (maul != nullptr && Build(scene, d))
+        {
+            RayTally t;
+            CompareRays(scene.name, maul, d, t);
+            double cast = t.cast > 0 ? static_cast<double>(t.cast) : 1.0;
+            double hits = t.bothHit > 0 ? static_cast<double>(t.bothHit) : 1.0;
+            std::printf("%-10s %6d %7.1f%% %6d %7.1f%%\n", scene.name, t.cast,
+                        100.0 * t.endAgree / cast, t.bothHit, 100.0 * t.hitClose / hits);
+        }
+        DiffMaulDestroy(maul);
+    }
     Counter counter;
     std::printf("\ncosts, best of five, reported and not gated; Maul Nav in 32 m tiles, Recast "
                 "untiled; %s; load average %.2f\n",

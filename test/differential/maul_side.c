@@ -167,3 +167,25 @@ int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double*
     *length = sum;
     return 1;
 }
+
+int32_t DiffMaulRaycast(DiffMaul* maul, const float a[3], const float b[3], float start[3],
+                        double* t)
+{
+    mnavNearest s;
+    if (!Nearest(maul, a, &s))
+    {
+        return -1;
+    }
+    start[0] = (float)s.point.x;
+    start[1] = (float)s.point.y;
+    start[2] = (float)s.point.z;
+    mnavRay ray;
+    if (mnavQuery_Raycast(maul->query, maul->navmesh, s.polygon, s.point,
+                          (mnavPos3){(double)b[0], (double)b[1], (double)b[2]}, nullptr,
+                          &ray) != mnav_success)
+    {
+        return 2;
+    }
+    *t = ray.t;
+    return ray.end == mnav_rayWall ? 1 : (ray.end == mnav_rayReached ? 0 : 2);
+}
