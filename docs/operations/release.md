@@ -6,7 +6,7 @@ Releases are made by release-please from the conventional commit titles on `main
 
 1. release-please keeps a draft pull request titled `chore: release X.Y.Z` open. It moves the version between the markers in `include/maul-nav/base.h`, where CMake reads it, updates `.release-please-manifest.json`, and adds an entry to `CHANGELOG.md` from the `feat`, `fix` and `perf` titles and the `BREAKING CHANGE:` footers.
 2. Rewrite that entry in user language, in `CHANGELOG.md` on the release pull request's branch (`release-please--branches--main--components--maul-nav`): what changed for someone using the library, grouped as Added, Changed, Fixed, Removed and Security.
-   - A breaking change comes first under Changed, prefixed **Breaking:**, and says what a caller must change.
+   - A change of results is listed under Changed and says what changes, for which inputs, and what a host that stores tiles or compares runs sees.
    - Name every change of results (tile bytes, fingerprints, paths, velocities), since hosts store tiles and compare runs, and every new tile or flight tile field, which earlier releases refuse.
    - User documentation (the README and `docs/user/`) gets one short line under Changed when it changes what a user can find or do.
    - Leave out refactors, tests, CI, and the internals and operations documentation.
