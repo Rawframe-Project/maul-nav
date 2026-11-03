@@ -18,6 +18,7 @@
 #include "maul-nav/avoidance.h"
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
+#include "maul-nav/flight.h"
 #include "maul-nav/flow.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/navflow.h"
@@ -58,6 +59,7 @@ static uint8_t s_expected[4][TILE_CAPACITY];
 static size_t s_expectedSizes[4];
 static uint8_t s_bytes[TILE_CAPACITY];
 static uint8_t s_rebuilt[TILE_CAPACITY];
+static uint8_t s_indexed[TILE_CAPACITY];
 
 // A terrain under the world's floor and a volume marking an area, so that
 // every bake stage and input path allocates.
@@ -158,7 +160,32 @@ static void TestBakes(void)
                                             nullptr) == mnav_errorCapacity;
     }
     CHECK(flat, "2D bakes refused alike");
+    // An indexed bake's path too, the index made with every call granted.
     FailAfter(-1);
+    mnavTileIndex* index = nullptr;
+    CHECK(mnavCreateTileIndex(&def, &world, 1, &index, nullptr) == mnav_success, "a tile index");
+    input.index = index;
+    size_t indexedSize = 0;
+    FailAfter(-1);
+    CHECK(mnavBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
+              mnavBaker_CopyTile(baker, s_indexed, TILE_CAPACITY, &indexedSize) == mnav_success,
+          "an indexed tile");
+    calls = s_calls;
+    bool indexed = calls > 0;
+    for (int32_t k = 0; k < calls; ++k)
+    {
+        FailAfter(k);
+        indexed = indexed && mnavBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_errorCapacity;
+        FailAfter(-1);
+        size_t size = 0;
+        indexed = indexed && mnavBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
+                  mnavBaker_CopyTile(baker, s_bytes, TILE_CAPACITY, &size) == mnav_success &&
+                  size == indexedSize && memcmp(s_bytes, s_indexed, size) == 0;
+    }
+    CHECK(indexed, "indexed bakes refused alike, and the same bytes after each");
+    input.index = nullptr;
+    FailAfter(-1);
+    mnavDestroyTileIndex(index);
     mnavDestroyBaker(baker);
     CHECK(s_held == 0, "every byte given back");
     // Making a baker.
@@ -174,6 +201,64 @@ static void TestBakes(void)
         mnavDestroyBaker(b);
     }
     CHECK(made && s_held == 0, "a baker refused whole");
+}
+
+// A flight tile of the world, 1 m voxels in a 32 m tile up to 10 m, on the
+// failing allocator: each failure refused, the next bake the same bytes.
+static void TestFlightBakes(void)
+{
+    mnavTriangleMesh world = World();
+    mnavBakeInput input = {&world, 1, nullptr, 0, nullptr, 0, nullptr};
+    mnavFlightDef def = mnavDefaultFlightDef();
+    def.allocator = Allocator();
+    def.voxelSize = 1.0f;
+    def.tileVoxels = 32;
+    def.floor = -2.0f;
+    def.ceiling = 10.0f;
+    FailAfter(-1);
+    mnavFlightBaker* baker = nullptr;
+    size_t expectedSize = 0;
+    CHECK(mnavCreateFlightBaker(&def, &baker).result == mnav_success &&
+              mnavFlightBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
+              mnavFlightBaker_CopyTile(baker, s_indexed, TILE_CAPACITY, &expectedSize) ==
+                  mnav_success,
+          "a flight tile, with every allocation granted");
+    FailAfter(-1);
+    CHECK(mnavFlightBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success, "counted");
+    int32_t calls = s_calls;
+    bool reported = calls > 0;
+    bool restored = true;
+    for (int32_t k = 0; k < calls; ++k)
+    {
+        FailAfter(k);
+        mnavFlightBakeReport report;
+        mnavResult result = mnavFlightBaker_BakeTile(baker, &input, 0, 0, &report);
+        reported = reported && result == mnav_errorCapacity && report.result == result;
+        FailAfter(-1);
+        size_t size = 0;
+        restored = restored &&
+                   mnavFlightBaker_BakeTile(baker, &input, 0, 0, nullptr) == mnav_success &&
+                   mnavFlightBaker_CopyTile(baker, s_bytes, TILE_CAPACITY, &size) == mnav_success &&
+                   size == expectedSize && memcmp(s_bytes, s_indexed, size) == 0;
+    }
+    printf("flight bakes: %d allocation failures refused\n", calls);
+    CHECK(reported, "every flight failure a capacity error, in the report too");
+    CHECK(restored, "the flight baker bakes the same bytes after each");
+    FailAfter(-1);
+    mnavDestroyFlightBaker(baker);
+    CHECK(s_held == 0, "every flight byte given back");
+    bool made = true;
+    for (int32_t k = 0; k < 4; ++k)
+    {
+        FailAfter(k);
+        mnavFlightBaker* b = nullptr;
+        mnavResult result = mnavCreateFlightBaker(&def, &b).result;
+        made = made && (result == mnav_errorCapacity ? b == nullptr && s_held == 0
+                                                     : result == mnav_success);
+        FailAfter(-1);
+        mnavDestroyFlightBaker(b);
+    }
+    CHECK(made && s_held == 0, "a flight baker refused whole");
 }
 
 // A tile cache's bakes and rebuilds, the baker and the cache each on the
@@ -515,6 +600,7 @@ int main(int argc, char** argv)
         return 2;
     }
     TestBakes();
+    TestFlightBakes();
     TestCache();
     TestHoles();
     TestBorderVertices();
