@@ -23,13 +23,13 @@ extern "C"
 // The library version. CMake reads it from here, and release-please
 // moves it between the markers.
 // x-release-please-start-major
-#define MNAV_VERSION_MAJOR 0
+#define MNAV_VERSION_MAJOR 1
 // x-release-please-end
 // x-release-please-start-minor
-#define MNAV_VERSION_MINOR 8
+#define MNAV_VERSION_MINOR 0
 // x-release-please-end
 // x-release-please-start-patch
-#define MNAV_VERSION_PATCH 6
+#define MNAV_VERSION_PATCH 0
 // x-release-please-end
 
 // The binary interface a program is built for: the whole version before

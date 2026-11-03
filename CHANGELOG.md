@@ -5,6 +5,31 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.0.0](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.6...v1.0.0) (2026-11-03)
+
+This release settles the API: from 1.0.0 there is no 2.0.0. Tile
+format 4 and flight tile format 3 keep their version, and a later
+1.z library reads every tile a 1.y wrote. No code, tile bytes,
+fingerprints or results change from 0.8.6.
+
+### Changed
+
+- From 1.0.0, `MNAV_ABI_VERSION` encodes the major and minor version,
+  and the shared library's SOVERSION is major.minor instead of the
+  whole version. The CMake package accepts any later 1.z of the same
+  major version (`SameMajorVersion`).
+  ([#301](https://github.com/Rawframe-Project/maul-nav/pull/301))
+- The tile and flight tile formats keep their version. New data is a
+  new field with a new tag, never required, and a reader gives an
+  absent field its default, so a later 1.z library reads every tile a
+  1.y wrote. A tag the reader does not know is refused with
+  `mnav_errorVersion`, and a field whose meaning changes gets a new
+  tag.
+  ([#301](https://github.com/Rawframe-Project/maul-nav/pull/301))
+- The troubleshooting page's `mnav_errorVersion` row covers a tile
+  carrying a field that a later 1.y release added.
+  ([#301](https://github.com/Rawframe-Project/maul-nav/pull/301))
+
 ## [0.8.6](https://github.com/Rawframe-Project/maul-nav/compare/v0.8.5...v0.8.6) (2026-11-03)
 
 This release fixes what an audit of the debug draws found: a path with
