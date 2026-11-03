@@ -24,8 +24,10 @@
 #include <cfloat>
 #include <chrono>
 #include <cmath>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -50,6 +52,52 @@ class Context : public rcContext
         }
     }
 };
+
+// GitHub's step summary when the run has one (GITHUB_STEP_SUMMARY, which
+// a job's container sees too), so that the report shows on the job's page
+// though the test passes and its log keeps no output; NULL otherwise.
+std::FILE* s_summary = nullptr;
+
+// Prints the report's text, and appends it to the step summary.
+#if defined(__GNUC__)
+__attribute__((format(printf, 1, 2)))
+#endif
+void Say(const char* format, ...)
+{
+    std::va_list args;
+    va_start(args, format);
+    if (s_summary != nullptr)
+    {
+        std::va_list again;
+        va_copy(again, args);
+        std::vfprintf(s_summary, format, again);
+        va_end(again);
+    }
+    std::vprintf(format, args);
+    va_end(args);
+}
+
+// Opens the step summary, the report in a block of fixed width.
+void OpenSummary()
+{
+    const char* path = std::getenv("GITHUB_STEP_SUMMARY");
+    s_summary = path != nullptr && path[0] != '\0' ? std::fopen(path, "a") : nullptr;
+    if (s_summary != nullptr)
+    {
+        std::fprintf(s_summary,
+                     "### The differential harness against Recast and Detour\n\n```text\n");
+    }
+}
+
+void CloseSummary()
+{
+    if (s_summary != nullptr)
+    {
+        std::fprintf(s_summary, "```\n");
+        std::fclose(s_summary);
+        s_summary = nullptr;
+    }
+}
 
 // The pairs per scene, and the floors the shares must reach: reachability
 // agreeing; lengths within 5% or 0.25 m of each other; Maul Nav's no
@@ -316,10 +364,10 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
         if (!agree || (m == 1 && r == 1 && gap > kRayClose))
         {
             auto D = [](float v) { return static_cast<double>(v); };
-            std::printf("ray %s %d: (%.4f %.4f %.4f) to (%.4f %.4f %.4f): maul %d at (%.4f %.4f) "
-                        "t %.6f, detour %d at (%.4f %.4f) t %.6f, %.4f m apart\n",
-                        scene, i, D(a[0]), D(a[1]), D(a[2]), D(b[0]), D(b[1]), D(b[2]), m, mp[0],
-                        mp[1], m == 1 ? mt : 1.0, r, dp[0], dp[1], r == 1 ? dt : 1.0, gap);
+            Say("ray %s %d: (%.4f %.4f %.4f) to (%.4f %.4f %.4f): maul %d at (%.4f %.4f) "
+                "t %.6f, detour %d at (%.4f %.4f) t %.6f, %.4f m apart\n",
+                scene, i, D(a[0]), D(a[1]), D(a[2]), D(b[0]), D(b[1]), D(b[2]), m, mp[0], mp[1],
+                m == 1 ? mt : 1.0, r, dp[0], dp[1], r == 1 ? dt : 1.0, gap);
         }
     }
 }
@@ -467,8 +515,8 @@ std::vector<std::vector<float>> Pairs(DiffMaul* maul, const Detour& d)
 void Row(const char* scene, const char* what, double maul, double detour, double scale,
          const char* unit)
 {
-    std::printf("%-10s %-12s %12.2f %12.2f %-6s %6.2f\n", scene, what, maul / scale, detour / scale,
-                unit, detour > 0.0 ? maul / detour : 0.0);
+    Say("%-10s %-12s %12.2f %12.2f %-6s %6.2f\n", scene, what, maul / scale, detour / scale, unit,
+        detour > 0.0 ? maul / detour : 0.0);
 }
 
 // Measures one scene's costs on both sides and prints them.
@@ -554,9 +602,10 @@ double Load()
 
 int main()
 {
+    OpenSummary();
     bool pass = true;
-    std::printf("%-10s %6s %6s %8s %6s %8s %9s %8s\n", "scene", "pairs", "fringe", "reach", "both",
-                "length", "notlonger", "sums");
+    Say("%-10s %6s %6s %8s %6s %8s %9s %8s\n", "scene", "pairs", "fringe", "reach", "both",
+        "length", "notlonger", "sums");
     for (int32_t i = 0; i < DiffSceneCount(); ++i)
     {
         DiffScene scene = DiffGetScene(i);
@@ -565,9 +614,9 @@ int main()
         bool built = maul != nullptr && Build(scene, d);
         if (!built)
         {
-            std::printf("%s: %s build failed\n", scene.name,
-                        maul == nullptr ? "Maul Nav's" : "Recast's");
+            Say("%s: %s build failed\n", scene.name, maul == nullptr ? "Maul Nav's" : "Recast's");
             DiffMaulDestroy(maul);
+            CloseSummary();
             return 1;
         }
         Tally t;
@@ -578,18 +627,18 @@ int main()
         double length = t.lengthAgree / both;
         double notLonger = t.notLonger / both;
         double sums = t.detourSum > 0.0 ? t.maulSum / t.detourSum - 1.0 : 0.0;
-        std::printf("%-10s %6d %6d %7.1f%% %6d %7.1f%% %8.1f%% %+7.2f%%\n", scene.name, t.snapped,
-                    t.unsnapped, 100.0 * reach, t.bothReached, 100.0 * length, 100.0 * notLonger,
-                    100.0 * sums);
+        Say("%-10s %6d %6d %7.1f%% %6d %7.1f%% %8.1f%% %+7.2f%%\n", scene.name, t.snapped,
+            t.unsnapped, 100.0 * reach, t.bothReached, 100.0 * length, 100.0 * notLonger,
+            100.0 * sums);
         pass = pass && t.snapped >= kPairs * 9 / 10 && reach >= kReachFloor &&
                length >= kLengthFloor && notLonger >= kNotLongerFloor &&
                std::fabs(sums) <= kSumBound;
     }
-    std::printf(pass ? "agreement within the floors\n" : "agreement below a floor\n");
+    Say(pass ? "agreement within the floors\n" : "agreement below a floor\n");
     // Rays, gated at full agreement until each disagreement is explained:
     // a failing run prints them all.
     bool rays = true;
-    std::printf("\n%-10s %6s %8s %6s %8s\n", "scene", "rays", "ends", "hits", "close");
+    Say("\n%-10s %6s %8s %6s %8s\n", "scene", "rays", "ends", "hits", "close");
     for (int32_t i = 0; i < DiffSceneCount(); ++i)
     {
         DiffScene scene = DiffGetScene(i);
@@ -601,22 +650,22 @@ int main()
             CompareRays(scene.name, maul, d, t);
             double cast = t.cast > 0 ? static_cast<double>(t.cast) : 1.0;
             double hits = t.bothHit > 0 ? static_cast<double>(t.bothHit) : 1.0;
-            std::printf("%-10s %6d %7.1f%% %6d %7.1f%%\n", scene.name, t.cast,
-                        100.0 * t.endAgree / cast, t.bothHit, 100.0 * t.hitClose / hits);
+            Say("%-10s %6d %7.1f%% %6d %7.1f%%\n", scene.name, t.cast, 100.0 * t.endAgree / cast,
+                t.bothHit, 100.0 * t.hitClose / hits);
             rays = rays && t.endAgree == t.cast && t.hitClose == t.bothHit;
         }
         DiffMaulDestroy(maul);
     }
-    std::printf(rays ? "rays agree\n" : "rays disagree\n");
+    Say(rays ? "rays agree\n" : "rays disagree\n");
     pass = pass && rays;
     Counter counter;
-    std::printf("\ncosts, best of five, reported and not gated; Maul Nav in 32 m tiles, Recast "
-                "untiled; %s; load average %.2f\n",
-                counter.available() ? "instructions are user space's, retired"
-                                    : "no instruction counter here, time only",
-                Load());
-    std::printf("%-10s %-12s %12s %12s %-6s %6s\n", "scene", "measure", "maul nav", "detour",
-                "unit", "ratio");
+    Say("\ncosts, best of five, reported and not gated; Maul Nav in 32 m tiles, Recast "
+        "untiled; %s; load average %.2f\n",
+        counter.available() ? "instructions are user space's, retired"
+                            : "no instruction counter here, time only",
+        Load());
+    Say("%-10s %-12s %12s %12s %-6s %6s\n", "scene", "measure", "maul nav", "detour", "unit",
+        "ratio");
     for (int32_t i = 0; i < DiffSceneCount(); ++i)
     {
         DiffScene scene = DiffGetScene(i);
@@ -628,5 +677,6 @@ int main()
         }
         DiffMaulDestroy(maul);
     }
+    CloseSummary();
     return pass ? 0 : 1;
 }
