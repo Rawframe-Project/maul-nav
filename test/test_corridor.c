@@ -173,10 +173,11 @@ static void TestChecksAndLimits(void)
 
 // Every corridor call refuses a corridor whose fields are malformed, and
 // reads none of its buffer: one polygon more than its capacity, a
-// capacity of 0, and no polygon. The buffer holds exactly its capacity,
-// so AddressSanitizer would see a read past it. mnavSetCorridor replaces
-// the count, so it refuses only the capacity, and a path with NULL
-// arrays or ends that are not finite.
+// capacity of 0, no polygon, a NaN position and an infinite target. The
+// buffer holds exactly its capacity, so AddressSanitizer would see a read
+// past it. mnavSetCorridor replaces the count and the ends, so it checks
+// only the capacity of the corridor; of the path, it refuses NULL arrays
+// and ends that are not finite.
 static void TestMalformedCorridors(void)
 {
     mnavNavmesh* navmesh = LoadWorld();
@@ -186,10 +187,14 @@ static void TestMalformedCorridors(void)
     CHECK(buffer != nullptr, "a buffer of two polygons");
     buffer[0] = a.polygon;
     buffer[1] = a.polygon;
-    const mnavCorridor bad[3] = {{a.point, a.point, buffer, 3, 2},
+    mnavPos3 infinite = {a.point.x, (double)INFINITY, a.point.z};
+    mnavPos3 nan = {(double)NAN, a.point.y, a.point.z};
+    const mnavCorridor bad[5] = {{a.point, a.point, buffer, 3, 2},
                                  {a.point, a.point, buffer, 1, 0},
-                                 {a.point, a.point, buffer, 0, 2}};
-    for (int32_t k = 0; k < 3; ++k)
+                                 {a.point, a.point, buffer, 0, 2},
+                                 {nan, a.point, buffer, 1, 2},
+                                 {a.point, infinite, buffer, 1, 2}};
+    for (int32_t k = 0; k < 5; ++k)
     {
         mnavCorridor c = bad[k];
         int32_t valid = -1;
