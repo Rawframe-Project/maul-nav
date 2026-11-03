@@ -520,6 +520,15 @@ static void TestMovingObstacles(void)
     }
     CHECK(closest > -0.01, "clear of the moving circle and door");
     CHECK(Miss(&agent, goal) < 0.05, "arrives");
+    // On a still circle's center no way is out, and it leaves by the fixed
+    // one, along -Y (ground -Z) at full speed.
+    mnavPos2 spot = {2.0, 2.0};
+    mnavObstacle circle = {&spot, 1, 1.0, {0.0, 0.0}, 9, 0};
+    agent = Agent(2.0, 2.0, 1);
+    mnavVec2 out;
+    CHECK(mnavAvoidance_Avoid(avoidance, &agent, 1, &circle, 1, 0.1, &out) == mnav_success &&
+              out.x == 0.0f && out.y == -1.5f,
+          "out of the circle's center along -Y");
     mnavDestroyAvoidance(avoidance);
 }
 
