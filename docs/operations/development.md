@@ -69,7 +69,7 @@ cmake --build out/differential --target differential
 ./out/differential/differential
 ```
 
-After the agreement table it prints what each library costs on the same scenes, the best of five runs, reported and never gated. The header says Maul Nav is measured in 32 m tiles and Recast untiled:
+After the agreement table it prints what each library costs on the same scenes, the best of five runs, reported and never gated. When `GITHUB_STEP_SUMMARY` names a file, as in a GitHub Actions job, it appends the whole report to it too: CI shows a passing test's output nowhere in the job's log, so the report is on the job's summary page. The header says Maul Nav is measured in 32 m tiles and Recast untiled:
 
 | Measure | What both sides do |
 |---|---|
