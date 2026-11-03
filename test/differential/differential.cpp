@@ -586,7 +586,9 @@ int main()
                std::fabs(sums) <= kSumBound;
     }
     std::printf(pass ? "agreement within the floors\n" : "agreement below a floor\n");
-    // Rays, reported and not yet gated.
+    // Rays, gated at full agreement until each disagreement is explained:
+    // a failing run prints them all.
+    bool rays = true;
     std::printf("\n%-10s %6s %8s %6s %8s\n", "scene", "rays", "ends", "hits", "close");
     for (int32_t i = 0; i < DiffSceneCount(); ++i)
     {
@@ -601,9 +603,12 @@ int main()
             double hits = t.bothHit > 0 ? static_cast<double>(t.bothHit) : 1.0;
             std::printf("%-10s %6d %7.1f%% %6d %7.1f%%\n", scene.name, t.cast,
                         100.0 * t.endAgree / cast, t.bothHit, 100.0 * t.hitClose / hits);
+            rays = rays && t.endAgree == t.cast && t.hitClose == t.bothHit;
         }
         DiffMaulDestroy(maul);
     }
+    std::printf(rays ? "rays agree\n" : "rays disagree\n");
+    pass = pass && rays;
     Counter counter;
     std::printf("\ncosts, best of five, reported and not gated; Maul Nav in 32 m tiles, Recast "
                 "untiled; %s; load average %.2f\n",
