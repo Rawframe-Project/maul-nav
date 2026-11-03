@@ -327,8 +327,8 @@ void Along(const float start[3], const float b[3], double t, double out[2])
 // stops within kWallBand past the other's stop; a pair one stops on and
 // the other passes is grazed. A pair passes only as kRayAllowed lists
 // it, by scene, index and kind, so a change in which pairs disagree
-// fails until it is explained; a listed pair that no longer disagrees is
-// printed.
+// fails until it is explained, and so does a listed pair that no longer
+// disagrees, so that the list stays the set of known disagreements.
 struct RayTally
 {
     int cast = 0;
@@ -339,6 +339,7 @@ struct RayTally
     int banded = 0;
     int grazed = 0;
     int listed = 0;
+    int stale = 0;
 };
 
 constexpr double kRayClose = 0.25;
@@ -531,7 +532,9 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
     {
         if (!seen[k] && std::strcmp(kRayAllowed[k].scene, scene) == 0)
         {
-            Say("ray %s %d: listed, and the rays no longer disagree\n", scene, kRayAllowed[k].pair);
+            Say("ray %s %d: the rays no longer disagree; remove it from kRayAllowed\n", scene,
+                kRayAllowed[k].pair);
+            t.stale += 1;
         }
     }
 }
@@ -818,7 +821,7 @@ int main()
             Say("%-10s %6d %7.1f%% %6d %7.1f%% %8d %6d %6d %6d\n", scene.name, t.cast,
                 100.0 * t.endAgree / cast, t.bothHit, 100.0 * t.hitClose / hits, t.disagree,
                 t.banded, t.grazed, t.listed);
-            rays = rays && t.listed == t.disagree;
+            rays = rays && t.listed == t.disagree && t.stale == 0;
         }
         DiffMaulDestroy(maul);
     }
