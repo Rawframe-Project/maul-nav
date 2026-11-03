@@ -3,15 +3,14 @@
 //
 // Stored tiles. Tiles in the current formats (stored_tiles.h) load, commit
 // and answer queries, and the answers are pinned. Tiles in an older format
-// (stored_format1.h) are refused with mnav_errorVersion: a library reads
-// only the formats it writes, and a host rebakes from source when the
-// format rises. The pinned answers hold under every host floating-point
+// (stored_format1.h) are refused with mnav_errorVersion, and a host rebakes
+// them from source. The pinned answers hold under every host floating-point
 // setting.
 //
-// stored_tiles.h is written by `test_stored --write > test/stored_tiles.h`
-// in the pull request that raises MNAV_TILE_FORMAT or MNAV_FLIGHT_FORMAT, or
-// that adds a scene's tiles while the existing tiles stay byte-identical,
-// and only then.
+// stored_tiles.h holds tiles in the formats 1.0.0 writes, which every 1.y
+// must load. `test_stored --write > test/stored_tiles.h` rewrites it only
+// in the pull request that adds a scene's tiles while the existing tiles
+// stay byte-identical.
 
 #include "defs_for.h"
 #include "doorway.h"
