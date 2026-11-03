@@ -332,10 +332,14 @@ static void TestChecks(void)
     CHECK(post != nullptr, "a post");
     *post = (mnavPos2){10.0, 0.0};
     mnavObstacle obstacle = {post, 1, 0.5, {0.0f, 0.0f}, 1, 1};
-    CHECK(mnavAvoidance_Avoid(avoidance, pair, 2, nullptr, 0, 0.1, moved) == mnav_success &&
-              mnavAvoidance_Avoid(avoidance, pair, 2, &obstacle, 1, 0.1, moved) ==
-                  mnav_errorCapacity,
-          "agents avoided, an obstacle past the limit");
+    CHECK(mnavAvoidance_Avoid(avoidance, pair, 2, nullptr, 0, 0.1, moved) == mnav_success,
+          "agents avoided");
+    // Marked first, so that the refusal is seen to zero the velocities.
+    moved[0] = (mnavVec2){9.0f, 9.0f};
+    moved[1] = (mnavVec2){9.0f, 9.0f};
+    CHECK(mnavAvoidance_Avoid(avoidance, pair, 2, &obstacle, 1, 0.1, moved) == mnav_errorCapacity &&
+              moved[0].x == 0.0f && moved[0].y == 0.0f && moved[1].x == 0.0f && moved[1].y == 0.0f,
+          "an obstacle past the limit, the velocities zeroed");
     free(post);
     mnavDestroyAvoidance(avoidance);
     avoidance = Make(2, 4, 2.0);
