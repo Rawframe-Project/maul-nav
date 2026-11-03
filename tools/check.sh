@@ -112,16 +112,22 @@ all_c_files() { git ls-files 'include/*.h' 'src/*.[ch]' 'test/*.[ch]' 'tools/*.[
 
 # clang-tidy on the library sources given, as CI's checks job runs it: on
 # the Release preset, where the assertions compile out, and with them live.
-# Each hides findings the other shows.
+# Each hides findings the other shows. The header filter is passed on the
+# command line, since clang-tidy-20 run from the root does not apply
+# .clang-tidy's HeaderFilterRegex and would drop a finding in a header,
+# and anchored at the checkout, so that headers fetched under out/ are not
+# reported as ours.
 tidy() { # files
-    local build f
+    local build f root
+    root=$(pwd | sed 's/[][\\.*^$+?(){}|]/\\&/g')
     for build in Release Debug; do
         step "clang-tidy, $build, on $# files"
         cmake --preset linux-clang-20 -B "$out/check-tidy-$build" -DCMAKE_BUILD_TYPE=$build \
             --no-warn-unused-cli -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DMAUL_NAV_BUILD_TESTS=OFF \
             -DMAUL_NAV_BUILD_BENCH=OFF -DMAUL_NAV_BUILD_SAMPLES=OFF >"$out/check-tidy-$build.log"
         for f in "$@"; do
-            clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' "$f" 2>/dev/null
+            clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' \
+                --header-filter="^$root/(src|include)/" "$f" 2>/dev/null
         done
     done
 }

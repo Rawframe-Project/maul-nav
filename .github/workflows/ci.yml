@@ -114,14 +114,20 @@ jobs:
       # shows: a value read only by an assertion is a dead store once it
       # compiles out, and the analyzer follows a path an assertion would
       # stop; a live assertion's branches count toward a function's
-      # complexity.
+      # complexity. The header filter is passed on the command line:
+      # clang-tidy-20 run from the root does not apply .clang-tidy's
+      # HeaderFilterRegex, so a finding in a header of src/ or include/
+      # would be dropped. It is anchored at the checkout, so that headers
+      # fetched under out/ are not reported as ours.
       - name: clang-tidy, assertions compiled out
         run: |
           cmake --preset linux-clang-20 -B out/tidy --no-warn-unused-cli -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -D${PREFIX}_BUILD_TESTS=OFF -D${PREFIX}_BUILD_BENCH=OFF -D${PREFIX}_BUILD_SAMPLES=OFF
           files=$(git ls-files 'src/*.c')
           [ -n "$files" ] || { echo "::error::no sources for clang-tidy"; exit 1; }
-          echo "$files" | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*'
+          root=$(pwd | sed 's/[][\\.*^$+?(){}|]/\\&/g')
+          echo "$files" | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*' \
+            --header-filter="^$root/(src|include)/"
       - name: clang-tidy, assertions live
         run: |
           cmake --preset linux-clang-20 -B out/tidy-asserts -DCMAKE_BUILD_TYPE=Debug --no-warn-unused-cli \
@@ -129,8 +135,9 @@ jobs:
             -D${PREFIX}_BUILD_SAMPLES=OFF
           files=$(git ls-files 'src/*.c')
           [ -n "$files" ] || { echo "::error::no sources for clang-tidy"; exit 1; }
+          root=$(pwd | sed 's/[][\\.*^$+?(){}|]/\\&/g')
           echo "$files" | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p out/tidy-asserts --quiet \
-            --warnings-as-errors='*'
+            --warnings-as-errors='*' --header-filter="^$root/(src|include)/"
 
   # Every cell builds with warnings as errors and runs the whole suite but
   # the large scenes, the golden values and the header tests included. GCC
