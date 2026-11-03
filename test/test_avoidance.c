@@ -14,6 +14,7 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 // The hash of the circle's final positions, the same on every platform.
@@ -320,6 +321,23 @@ static void TestChecks(void)
     def.allocator.alloc = nullptr;
     CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_errorInvalid && avoidance == nullptr,
           "an allocator without alloc");
+    // No room for obstacles: agents alone are avoided, and an obstacle
+    // is past the limit.
+    def = mnavDefaultAvoidanceDef();
+    def.limits.obstacleVertices = 0;
+    CHECK(mnavCreateAvoidance(&def, &avoidance) == mnav_success, "a set without obstacles");
+    mnavAgent pair[2] = {Agent(0.0, 0.0, 1), Agent(3.0, 0.0, 2)};
+    mnavVec2 moved[2];
+    mnavPos2* post = malloc(sizeof(mnavPos2));
+    CHECK(post != nullptr, "a post");
+    *post = (mnavPos2){10.0, 0.0};
+    mnavObstacle obstacle = {post, 1, 0.5, {0.0f, 0.0f}, 1, 1};
+    CHECK(mnavAvoidance_Avoid(avoidance, pair, 2, nullptr, 0, 0.1, moved) == mnav_success &&
+              mnavAvoidance_Avoid(avoidance, pair, 2, &obstacle, 1, 0.1, moved) ==
+                  mnav_errorCapacity,
+          "agents avoided, an obstacle past the limit");
+    free(post);
+    mnavDestroyAvoidance(avoidance);
     avoidance = Make(2, 4, 2.0);
     mnavAgent agents[3] = {Agent(0.0, 0.0, 1), Agent(3.0, 0.0, 2), Agent(6.0, 0.0, 3)};
     mnavVec2 velocities[3];

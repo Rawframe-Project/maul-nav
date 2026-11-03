@@ -459,6 +459,15 @@ static void TestRefusals(void)
     CHECK(mnavCreateTileIndex(&small, &apart, 1, &index, &report) == mnav_errorLimit &&
               index == nullptr,
           "a grid of more tiles than 2^31 - 1 refused");
+    // Four triangles over the same 25,000 tiles a side: a grid that fits,
+    // but more than 2^31 - 2 entries.
+    const mnavVec3 wide[3] = {
+        {-5.0e4f, 0.0f, -5.0e4f}, {5.0e4f, 0.0f, -5.0e4f}, {0.0f, 0.0f, 5.0e4f}};
+    const int32_t again[12] = {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
+    const mnavTriangleMesh stacked = {wide, 3, again, 4, nullptr};
+    CHECK(mnavCreateTileIndex(&small, &stacked, 1, &index, &report) == mnav_errorLimit &&
+              index == nullptr,
+          "more entries than 2^31 - 2 refused");
     CHECK(mnavCreateTileIndex(&def, meshes, 0, &index, &report) == mnav_success, "no meshes");
     mnavDestroyTileIndex(index);
     mnavDestroyTileIndex(nullptr);
