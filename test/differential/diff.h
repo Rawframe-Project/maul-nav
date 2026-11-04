@@ -80,6 +80,14 @@ extern "C"
     int32_t DiffMaulRayWalls(DiffMaul* maul, const float a[3], const float b[3], const double at[2],
                              double radius, float* segments, int32_t capacity);
 
+    // A move along the surface from the point on the polygon nearest a,
+    // as DiffMaulPath snaps it, toward the point to: 0 reached to; 1
+    // stopped by a wall; 2 any other end (a tile side unloaded, the node
+    // limit, a failure); -1 when a has no polygon near. start receives the
+    // snapped start point and end the point the move ended at.
+    int32_t DiffMaulMove(DiffMaul* maul, const float a[3], const float to[3], float start[3],
+                         float end[3]);
+
 #ifdef __cplusplus
 }
 #endif
