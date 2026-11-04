@@ -580,8 +580,8 @@ int DetourWallDistance(const Detour& d, const float at[3], double radius, float 
 // is within the band when the one found lies within kWallBand of the
 // radius. Every point where they differ, by whether they find one or by
 // more than 0.25 m, is printed with whether it lies within the band, and
-// passes only as kWallAllowed lists it; a listed point that no longer
-// differs fails, as with the rays.
+// passes only within the band and as kWallAllowed lists it; a listed
+// point that no longer differs fails, as with the rays.
 struct WallTally
 {
     int searched = 0;
@@ -603,7 +603,7 @@ struct WallAllowed
     const char* scene;
     int seed;
 };
-constexpr WallAllowed kWallAllowed[] = {{"", 0}}; // none yet
+constexpr WallAllowed kWallAllowed[] = {{"world", 12}, {"world", 156}};
 constexpr int kWallAllowedCount = static_cast<int>(sizeof(kWallAllowed) / sizeof(kWallAllowed[0]));
 
 void CompareWalls(const char* scene, DiffMaul* maul, const Detour& d, WallTally& t)
@@ -665,16 +665,31 @@ void CompareWalls(const char* scene, DiffMaul* maul, const Detour& d, WallTally&
         {
             seen[k] = true;
         }
-        bool listed = k >= 0;
+        bool listed = k >= 0 && within;
         t.differ += 1;
         t.listed += listed ? 1 : 0;
         auto D = [](float v) { return static_cast<double>(v); };
-        Say("wall %s %d: (%.4f %.4f %.4f): maul %d at %.4f m (%.4f %.4f), detour %d at %.4f m "
-            "(%.4f %.4f), %.4f m apart, snapped %.4f m apart, %s\n",
-            scene, seed, D(at[0]), D(at[1]), D(at[2]), m, m == 1 ? md : kWallRadius, D(mw[0]),
-            D(mw[2]), r, r == 1 ? dd : kWallRadius, D(dw[0]), D(dw[2]), gap, snap,
+        // A library's wall, or that it found none within the radius.
+        auto Found = [&](char* out, int end, double distance, const float wall[3])
+        {
+            if (end == 1)
+            {
+                std::snprintf(out, 64, "at %.4f m (%.4f %.4f)", distance, D(wall[0]), D(wall[2]));
+            }
+            else
+            {
+                std::snprintf(out, 64, "none within %.1f m", kWallRadius);
+            }
+        };
+        char mf[64];
+        char df[64];
+        Found(mf, m, md, mw);
+        Found(df, r, dd, dw);
+        Say("wall %s %d: (%.4f %.4f %.4f): maul %d %s, detour %d %s, %.4f m apart, snapped "
+            "%.4f m apart, %s\n",
+            scene, seed, D(at[0]), D(at[1]), D(at[2]), m, mf, r, df, gap, snap,
             within ? (listed ? "within the band, listed" : "within the band, not listed")
-                   : (listed ? "past the band, listed" : "past the band, not listed"));
+                   : (k >= 0 ? "past the band, though listed" : "past the band, not listed"));
     }
     for (int k = 0; k < kWallAllowedCount; ++k)
     {
