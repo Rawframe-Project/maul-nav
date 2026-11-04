@@ -5,6 +5,88 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.1.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.0.1...v1.1.0) (2026-11-04)
+
+This release changes which walls the wall queries report on a navmesh
+with floors over each other, and makes a query context keep the last
+path a search gave, so that `mnavSetCorridor` checks a path against it.
+A query context holds 76 bytes more per node. Wall distances and lists
+change only where a wall of another floor was reported, and steering
+changes only where a corner lies past 2^500 of the origin.
+
+### Added
+
+- `mnavPath` gains two fields at its end, which the search that gives
+  the path sets: `query`, the context that keeps it, and `generation`,
+  which of that context's paths it is.
+  ([#334](https://github.com/Rawframe-Project/maul-nav/pull/334))
+
+### Changed
+
+- `mnavQuery_FindWallDistance` and `mnavQuery_FindWalls` count a wall
+  only on the center's floor. They no longer report a wall whose
+  nearest point is more than the agent's step height below, or more
+  than the agent's height above, the center's height on its polygon,
+  for the agent the navmesh's tiles are baked for. There is no new
+  setting, and a center off its polygon is taken at its own height.
+  Both calls keep the whole radius and one search, so
+  `mnavQuery_FindWalls` still lists every wall it counts, nearest
+  first, and its first is `mnavQuery_FindWallDistance`'s. On a two-floor
+  building, a point on the ground under the upper floor's edge was
+  given that edge, 0.60 m away on the ground and 3 m overhead, where
+  its nearest ground wall is 1.38 m away; it now gets the ground wall.
+  ([#340](https://github.com/Rawframe-Project/maul-nav/pull/340))
+- A query context holds 76 bytes more per node of `limits.nodes`, plus
+  24 bytes, for the kept path's arrays: about 23% more than the 332
+  bytes per node it held, 623 KB more at the default 8192 nodes. Hosts
+  that size their contexts by memory should allow for it.
+  ([#334](https://github.com/Rawframe-Project/maul-nav/pull/334))
+- The headers of `mnavDebugPath`, `mnavDebugFlightPath` and `mnavSteer`
+  say the value they take may be the caller's own: its arrays are the
+  caller's memory, read only within the counts given, every point
+  checked; `mnavSteer` compares a link's `point` and never follows it.
+  ([#335](https://github.com/Rawframe-Project/maul-nav/pull/335))
+
+### Fixed
+
+- `mnavSetCorridor` trusted the pointers and counts of a path handed
+  back to it. A count copied from a longer path read past the
+  context's buffer: a path from a context of 4 nodes given the polygon
+  count of a 10-polygon path read 120 bytes past it. A path's arrays
+  also did not last until the context's next search as documented:
+  `mnavQuery_FindCorridorCorners` and `mnavQuery_FindCorridorAreas`
+  wrote their corners over a path's points and links, and
+  `mnavQuery_Raycast` and `mnavQuery_MoveAlongSurface` their polygons
+  over its corridor, so a path loaded after a raycast with the same
+  context gave `mnav_success` with the ray's polygons, and a flight
+  path's points changed when the same context then found a corridor's
+  corners. A query context now keeps the last path a search gave in
+  arrays only a search writes, and `mnavSetCorridor` checks the path
+  against its context before reading any array: `mnav_errorStale` when
+  a later search of the context has replaced it, and
+  `mnav_errorInvalid` for a path with no context, arrays other than the
+  ones the context keeps, or more polygons, points or links than it
+  kept. The corridor is unchanged on any failure.
+  ([#334](https://github.com/Rawframe-Project/maul-nav/pull/334))
+- `mnavDebugPath` and `mnavDebugFlightPath` are documented to refuse a
+  path with no points with `mnav_errorInvalid`, but a path whose
+  `pointCount` was 0 drew nothing and returned `mnav_success`. They
+  now refuse a path with fewer than one point, and with no array.
+  ([#335](https://github.com/Rawframe-Project/maul-nav/pull/335))
+- `mnavSteer` accepts any finite corner, but the ground distance
+  between two finite corners could overflow: with corners
+  `(-1e308, 0, 0)` then `(1e308, 0, 0)` it returned `mnav_steerMoving`
+  with a velocity whose x was NaN, and with corners around 1e200 a zero
+  velocity, still reported as moving. Each pair of corners is now
+  measured on its own, a far pair by half its difference scaled by a
+  power of two, so no two finite corners overflow. Every result where
+  all corners lie within 2^500 of the origin is bit for bit unchanged.
+  Distances between near corners no longer depend on a far corner
+  elsewhere in the list. Anticipating a turn toward a corner past about
+  1e154 m, where the turn was lost to the overflow, now swings wide as
+  it does for the same turn nearer.
+  ([#337](https://github.com/Rawframe-Project/maul-nav/pull/337))
+
 ## [1.0.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.0.0...v1.0.1) (2026-11-03)
 
 This release fixes the corridor of a shortest path that ran straight
