@@ -5,6 +5,20 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.1.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.0.1...v1.1.0) (2026-11-04)
+
+
+### Added
+
+* **query:** count only the walls on the center's floor ([#340](https://github.com/Rawframe-Project/maul-nav/issues/340)) ([b3aa463](https://github.com/Rawframe-Project/maul-nav/commit/b3aa4639a76be0e286c20832f9668b59531b40fc)), closes [#332](https://github.com/Rawframe-Project/maul-nav/issues/332)
+
+
+### Fixed
+
+* **corridor:** check a path against the context that gave it ([#334](https://github.com/Rawframe-Project/maul-nav/issues/334)) ([d925ac5](https://github.com/Rawframe-Project/maul-nav/commit/d925ac54af76a4b00abce3f5d65da3d12e4bb612)), closes [#329](https://github.com/Rawframe-Project/maul-nav/issues/329)
+* **corridor:** steer without overflow between far apart corners ([#337](https://github.com/Rawframe-Project/maul-nav/issues/337)) ([16bd3d1](https://github.com/Rawframe-Project/maul-nav/commit/16bd3d143c54837878843f5cfafce978a25e5b7f)), closes [#336](https://github.com/Rawframe-Project/maul-nav/issues/336)
+* **debug:** refuse a path with no points to draw ([#335](https://github.com/Rawframe-Project/maul-nav/issues/335)) ([5fde231](https://github.com/Rawframe-Project/maul-nav/commit/5fde2316a3870b8946dd27116c6476deae10896b)), closes [#330](https://github.com/Rawframe-Project/maul-nav/issues/330) [#331](https://github.com/Rawframe-Project/maul-nav/issues/331) [#333](https://github.com/Rawframe-Project/maul-nav/issues/333)
+
 ## [1.0.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.0.0...v1.0.1) (2026-11-03)
 
 This release fixes the corridor of a shortest path that ran straight
