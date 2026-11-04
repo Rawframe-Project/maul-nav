@@ -1022,9 +1022,14 @@ extern "C"
     /// radius, off-mesh links aside. An edge is a wall where no polygon the
     /// filter includes lies across it: a tile side with no tile loaded
     /// beyond, and the parts of a side no polygon of the tile beyond
-    /// covers, are walls. A wall exactly the radius away lies within it; of
-    /// walls at the same distance it gives one, the same on every
-    /// platform, but which one is not promised.
+    /// covers, are walls. A wall counts only on the center's floor: its
+    /// point nearest the center lies no more than the agent's step height
+    /// below the center's height on its polygon, and no more than the
+    /// agent's height above, for the agent the navmesh's tiles are baked
+    /// for; the walls of a floor over or under the center are left out. A
+    /// wall exactly the radius away lies within it; of walls at the same
+    /// distance it gives one, the same on every platform, but which one is
+    /// not promised.
     ///
     /// @param query      The context; its last search ends.
     /// @param navmesh    The navmesh.
@@ -1061,9 +1066,10 @@ extern "C"
 
     /// Lists the walls within a radius of a point on the ground, nearest
     /// first, for avoidance's segment obstacles: the search and the walls
-    /// of mnavQuery_FindWallDistance, whose wall is the first listed. Walls at
-    /// the same distance keep the order the search meets them in, the same
-    /// on every platform.
+    /// of mnavQuery_FindWallDistance, whose wall is the first listed: only
+    /// walls on the center's floor, as it counts them. Walls at the same
+    /// distance keep the order the search meets them in, the same on every
+    /// platform.
     ///
     /// @param query    The context; its last search ends.
     /// @param navmesh  The navmesh.
