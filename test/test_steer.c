@@ -166,11 +166,39 @@ static void TestRefusals(void)
     CHECK(mnavSteer(&c, &def, &s) == mnav_errorInvalid, "a corner not finite");
 }
 
+// Corners far apart but finite: the distance between them overflows no
+// double, so the velocity is the def's speed along them, never NaN or
+// zero.
+static void TestFarCorners(void)
+{
+    mnavSteerDef def = mnavDefaultSteerDef();
+    const mnavPos3 across[2] = {At(-1e308, 0), At(1e308, 0)};
+    mnavCorners c = Corners(across, 2);
+    mnavSteering s = Steer(&c, &def);
+    CHECK(s.state == mnav_steerMoving && Near((double)s.velocity.x, 3.5) &&
+              (double)s.velocity.z == 0.0,
+          "corners 2e308 apart: full speed along them");
+    const mnavPos3 far[2] = {At(0, 0), At(1e200, 0)};
+    c = Corners(far, 2);
+    s = Steer(&c, &def);
+    CHECK(s.state == mnav_steerMoving && Near((double)s.velocity.x, 3.5),
+          "corners 1e200 apart: full speed, not zero");
+    const mnavPos3 turn[3] = {At(1e300, 1e300), At(2e300, 1e300), At(2e300, 2e300)};
+    c = Corners(turn, 3);
+    s = Steer(&c, &def);
+    double speed = sqrt((double)s.velocity.x * (double)s.velocity.x +
+                        (double)s.velocity.z * (double)s.velocity.z);
+    CHECK(s.state == mnav_steerMoving && isfinite(speed) && Near(speed, 3.5) &&
+              (double)s.velocity.x > 0.0,
+          "a turn far out: anticipated, finite, at full speed");
+}
+
 int main(void)
 {
     TestMoving();
     TestArriving();
     TestLinks();
     TestRefusals();
+    TestFarCorners();
     return s_failures == 0 ? 0 : 1;
 }
