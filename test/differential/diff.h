@@ -61,6 +61,14 @@ extern "C"
     int32_t DiffMaulRaycast(DiffMaul* maul, const float a[3], const float b[3], float start[3],
                             double* t, float normal[3]);
 
+    // The nearest wall within radius of the point on the polygon nearest
+    // at, as DiffMaulPath snaps it: 1 found, with its distance on the
+    // ground; 0 none within the radius; 2 the search cut short by the node
+    // limit; -1 when at has no polygon near. center receives the snapped
+    // point and wall the wall's point nearest it.
+    int32_t DiffMaulWallDistance(DiffMaul* maul, const float at[3], double radius, float center[3],
+                                 double* distance, float wall[3]);
+
     // The walls within radius on the ground of the point at, on the first
     // polygon under it, or under the point 0.01 m back toward the start,
     // that the ray from a toward b, as DiffMaulRaycast casts it, crossed,
