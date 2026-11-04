@@ -4,7 +4,8 @@
 // The differential harness: bakes each scene with Recast and
 // with Maul Nav at the same settings, then for a fixed set of point pairs
 // on the navmesh compares whether each library reaches the end and how
-// long its straight path is. Recast builds one untiled mesh with layer
+// long its straight path is, and whether a ray from one point toward the
+// other stops at a wall, and where. Recast builds one untiled mesh with layer
 // regions, as Maul Nav partitions; Maul Nav bakes 32 m tiles. Test only:
 // neither Recast nor Detour is ever linked into the library.
 //
@@ -21,6 +22,7 @@
 #include "Recast.h"
 #include "diff.h"
 
+#include <cfloat>
 #include <chrono>
 #include <cmath>
 #include <cstdarg>
@@ -273,6 +275,268 @@ int DetourPath(const Detour& d, const float a[3], const float b[3], double* leng
     }
     *length = sum;
     return 1;
+}
+
+// Detour's ray, as DiffMaulRaycast gives Maul Nav's.
+int DetourRaycast(const Detour& d, const float a[3], const float b[3], float start[3], double* t,
+                  float normal[3])
+{
+    dtQueryFilter filter;
+    const float extents[3] = {0.5f, 2.0f, 0.5f};
+    dtPolyRef ref = 0;
+    d.query->findNearestPoly(a, extents, &filter, &ref, start);
+    if (ref == 0)
+    {
+        return -1;
+    }
+    float hit = 0.0f;
+    static dtPolyRef path[4096];
+    int count = 0;
+    dtStatus status = d.query->raycast(ref, start, b, &filter, &hit, normal, path, &count, 4096);
+    if (dtStatusFailed(status) || (status & DT_BUFFER_TOO_SMALL) != 0)
+    {
+        return 2;
+    }
+    if (hit == FLT_MAX)
+    {
+        return 0;
+    }
+    *t = static_cast<double>(hit);
+    return 1;
+}
+
+// Where a ray from start toward b stopped on the ground, t of the way.
+void Along(const float start[3], const float b[3], double t, double out[2])
+{
+    double sx = static_cast<double>(start[0]);
+    double sz = static_cast<double>(start[2]);
+    out[0] = sx + t * (static_cast<double>(b[0]) - sx);
+    out[1] = sz + t * (static_cast<double>(b[2]) - sz);
+}
+
+// Rays both libraries cast from the same pair's first point toward its
+// second: whether both stop at a wall or both reach the end, and, when
+// both stop, whether the points they stop at lie within 0.25 m of each
+// other on the ground. Every pair they disagree on is printed, with
+// whether the other library has a wall within kWallBand of each point a
+// ray stopped at: each simplifies its walls to within 0.3 m of the cells
+// they follow (Recast's maxSimplificationError of 1.2 cells, Maul Nav's
+// maxEdgeError), so the same wall of the two navmeshes may stand up to
+// 0.6 m apart, and a ray may stop at one and pass the other's corner.
+// A pair both stop on is banded when, besides, the ray that went farther
+// stops within kWallBand past the other's stop; a pair one stops on and
+// the other passes is grazed. A pair passes only as kRayAllowed lists
+// it, by scene, index and kind, so a change in which pairs disagree
+// fails until it is explained, and so does a listed pair that no longer
+// disagrees, so that the list stays the set of known disagreements.
+struct RayTally
+{
+    int cast = 0;
+    int endAgree = 0;
+    int bothHit = 0;
+    int hitClose = 0;
+    int disagree = 0;
+    int banded = 0;
+    int grazed = 0;
+    int listed = 0;
+    int stale = 0;
+};
+
+constexpr double kRayClose = 0.25;
+constexpr double kWallBand = 0.6;
+
+// The pairs that may disagree, each explained in the pull request that
+// listed it: by scene, the pair's index and whether it is grazed rather
+// than banded. A scene not listed allows none.
+struct RayAllowed
+{
+    const char* scene;
+    int pair;
+    bool grazed;
+};
+constexpr RayAllowed kRayAllowed[] = {
+    {"world", 8, true},    {"world", 41, false},  {"world", 61, false},  {"world", 64, false},
+    {"world", 83, false},  {"world", 100, false}, {"world", 132, false}, {"world", 155, false},
+    {"world", 181, false}, {"world", 191, false}, {"world", 198, false},
+};
+constexpr int kRayAllowedCount = static_cast<int>(sizeof(kRayAllowed) / sizeof(kRayAllowed[0]));
+
+// The index in kRayAllowed of a scene's pair, or -1.
+int AllowedOf(const char* scene, int pair)
+{
+    for (int k = 0; k < kRayAllowedCount; ++k)
+    {
+        if (kRayAllowed[k].pair == pair && std::strcmp(kRayAllowed[k].scene, scene) == 0)
+        {
+            return k;
+        }
+    }
+    return -1;
+}
+
+// Whether one library has a wall within kWallBand of the point on the
+// ground the other's ray from start toward b stopped at, t of the way,
+// against a wall of normal n: its ray from kWallBand out of that point
+// along the normal to kWallBand in stops within kWallBand of it.
+bool WallNear(DiffMaul* maul, const Detour& d, bool onMaul, const float start[3], const float b[3],
+              double t, const float n[3])
+{
+    double p[2];
+    Along(start, b, t, p);
+    double y = static_cast<double>(start[1]) +
+               t * (static_cast<double>(b[1]) - static_cast<double>(start[1]));
+    double nx = static_cast<double>(n[0]);
+    double nz = static_cast<double>(n[2]);
+    double length = std::hypot(nx, nz);
+    if (length == 0.0)
+    {
+        return false;
+    }
+    // Face the normal back to the ray's start, whichever way each library
+    // turns it.
+    double back =
+        (static_cast<double>(start[0]) - p[0]) * nx + (static_cast<double>(start[2]) - p[1]) * nz;
+    double sign = back < 0.0 ? -1.0 : 1.0;
+    nx = sign * nx / length;
+    nz = sign * nz / length;
+    auto F = [](double v) { return static_cast<float>(v); };
+    const float from[3] = {F(p[0] + kWallBand * nx), F(y), F(p[1] + kWallBand * nz)};
+    const float to[3] = {F(p[0] - kWallBand * nx), F(y), F(p[1] - kWallBand * nz)};
+    float probe[3];
+    float normal[3];
+    double at = 0.0;
+    int end = onMaul ? DiffMaulRaycast(maul, from, to, probe, &at, normal)
+                     : DetourRaycast(d, from, to, probe, &at, normal);
+    if (end != 1)
+    {
+        return false;
+    }
+    double h[2];
+    Along(probe, to, at, h);
+    return std::hypot(h[0] - p[0], h[1] - p[1]) <= kWallBand;
+}
+
+// Whether a library's ray from a toward b, which went past the point s
+// on the ground the other's stopped at, heeded the wall there: its ray
+// from a toward kWallBand past s stops at a wall within kWallBand of s. A
+// ray that went through a wall both navmeshes have goes on and fails.
+bool StopsNear(DiffMaul* maul, const Detour& d, bool onMaul, const float a[3], const float b[3],
+               const double s[2])
+{
+    double ux = static_cast<double>(b[0]) - static_cast<double>(a[0]);
+    double uz = static_cast<double>(b[2]) - static_cast<double>(a[2]);
+    double length = std::hypot(ux, uz);
+    if (length == 0.0)
+    {
+        return false;
+    }
+    auto F = [](double v) { return static_cast<float>(v); };
+    const float to[3] = {F(s[0] + kWallBand * ux / length), b[1],
+                         F(s[1] + kWallBand * uz / length)};
+    float start[3];
+    float normal[3];
+    double at = 0.0;
+    int end = onMaul ? DiffMaulRaycast(maul, a, to, start, &at, normal)
+                     : DetourRaycast(d, a, to, start, &at, normal);
+    if (end != 1)
+    {
+        return false;
+    }
+    double h[2];
+    Along(start, to, at, h);
+    return std::hypot(h[0] - s[0], h[1] - s[1]) <= kWallBand;
+}
+
+// How far along the pair's direction from a the point p on the ground lies.
+double Ahead(const float a[3], const float b[3], const double p[2])
+{
+    double ux = static_cast<double>(b[0]) - static_cast<double>(a[0]);
+    double uz = static_cast<double>(b[2]) - static_cast<double>(a[2]);
+    return (p[0] - static_cast<double>(a[0])) * ux + (p[1] - static_cast<double>(a[2])) * uz;
+}
+
+void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t)
+{
+    bool seen[kRayAllowedCount] = {};
+    for (int i = 0; i < kPairs; ++i)
+    {
+        float a[3];
+        float b[3];
+        if (!DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 1u, a) ||
+            !DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 2u, b))
+        {
+            continue;
+        }
+        float ms[3];
+        float ds[3];
+        float mn[3] = {0.0f, 0.0f, 0.0f};
+        float dn[3] = {0.0f, 0.0f, 0.0f};
+        double mt = 0.0;
+        double dt = 0.0;
+        int m = DiffMaulRaycast(maul, a, b, ms, &mt, mn);
+        int r = DetourRaycast(d, a, b, ds, &dt, dn);
+        if (m < 0 || r < 0)
+        {
+            continue;
+        }
+        t.cast += 1;
+        double mp[2];
+        double dp[2];
+        Along(ms, b, m == 1 ? mt : 1.0, mp);
+        Along(ds, b, r == 1 ? dt : 1.0, dp);
+        double gap = std::hypot(mp[0] - dp[0], mp[1] - dp[1]);
+        bool agree = m == r;
+        t.endAgree += agree ? 1 : 0;
+        if (m == 1 && r == 1)
+        {
+            t.bothHit += 1;
+            t.hitClose += gap <= kRayClose ? 1 : 0;
+        }
+        if (!agree || (m == 1 && r == 1 && gap > kRayClose))
+        {
+            // Every point a ray stopped at has the other library's wall
+            // near, and neither ended another way; when both stopped, the
+            // one that went farther stops within the band past the other.
+            bool near = m != 2 && r != 2 && (m != 1 || WallNear(maul, d, false, ms, b, mt, mn)) &&
+                        (r != 1 || WallNear(maul, d, true, ds, b, dt, dn));
+            bool both = m == 1 && r == 1;
+            bool mauler = Ahead(a, b, mp) > Ahead(a, b, dp);
+            bool banded =
+                near && both &&
+                (mauler ? StopsNear(maul, d, true, a, b, dp) : StopsNear(maul, d, false, a, b, mp));
+            bool grazed = near && !both;
+            int k = AllowedOf(scene, i);
+            bool listed =
+                k >= 0 && ((banded && !kRayAllowed[k].grazed) || (grazed && kRayAllowed[k].grazed));
+            if (k >= 0)
+            {
+                seen[k] = true;
+            }
+            t.disagree += 1;
+            t.banded += banded ? 1 : 0;
+            t.grazed += grazed ? 1 : 0;
+            t.listed += listed ? 1 : 0;
+            const char* verdict = listed   ? (banded ? "banded, listed" : "grazed, listed")
+                                  : banded ? "banded, not listed as banded"
+                                  : grazed ? "grazed, not listed as grazed"
+                                  : near   ? "past the other's stop"
+                                           : "no wall within 0.6 m";
+            auto D = [](float v) { return static_cast<double>(v); };
+            Say("ray %s %d: (%.4f %.4f %.4f) to (%.4f %.4f %.4f): maul %d at (%.4f %.4f) "
+                "t %.6f, detour %d at (%.4f %.4f) t %.6f, %.4f m apart, %s\n",
+                scene, i, D(a[0]), D(a[1]), D(a[2]), D(b[0]), D(b[1]), D(b[2]), m, mp[0], mp[1],
+                m == 1 ? mt : 1.0, r, dp[0], dp[1], r == 1 ? dt : 1.0, gap, verdict);
+        }
+    }
+    for (int k = 0; k < kRayAllowedCount; ++k)
+    {
+        if (!seen[k] && std::strcmp(kRayAllowed[k].scene, scene) == 0)
+        {
+            Say("ray %s %d: the rays no longer disagree; remove it from kRayAllowed\n", scene,
+                kRayAllowed[k].pair);
+            t.stale += 1;
+        }
+    }
 }
 
 struct Tally
@@ -538,6 +802,32 @@ int main()
                std::fabs(sums) <= kSumBound;
     }
     Say(pass ? "agreement within the floors\n" : "agreement below a floor\n");
+    // Rays: each pair agrees, or is banded or grazed as kRayAllowed lists
+    // it.
+    bool rays = true;
+    Say("\n%-10s %6s %8s %6s %8s %8s %6s %6s %6s\n", "scene", "rays", "ends", "hits", "close",
+        "differ", "banded", "grazed", "listed");
+    for (int32_t i = 0; i < DiffSceneCount(); ++i)
+    {
+        DiffScene scene = DiffGetScene(i);
+        Detour d;
+        DiffMaul* maul = DiffMaulBuild(&scene);
+        if (maul != nullptr && Build(scene, d))
+        {
+            RayTally t;
+            CompareRays(scene.name, maul, d, t);
+            double cast = t.cast > 0 ? static_cast<double>(t.cast) : 1.0;
+            double hits = t.bothHit > 0 ? static_cast<double>(t.bothHit) : 1.0;
+            Say("%-10s %6d %7.1f%% %6d %7.1f%% %8d %6d %6d %6d\n", scene.name, t.cast,
+                100.0 * t.endAgree / cast, t.bothHit, 100.0 * t.hitClose / hits, t.disagree,
+                t.banded, t.grazed, t.listed);
+            rays = rays && t.listed == t.disagree && t.stale == 0;
+        }
+        DiffMaulDestroy(maul);
+    }
+    Say(rays ? "rays agree, or differ as listed within the wall band\n"
+             : "rays differ past the wall band or the list\n");
+    pass = pass && rays;
     Counter counter;
     Say("\ncosts, best of five, reported and not gated; Maul Nav in 32 m tiles, Recast "
         "untiled; %s; load average %.2f\n",

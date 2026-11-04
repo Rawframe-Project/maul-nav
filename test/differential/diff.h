@@ -52,6 +52,15 @@ extern "C"
     int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double* length,
                          int32_t* nodes);
 
+    // A ray on the ground from the point on the polygon nearest a, as
+    // DiffMaulPath finds it, toward b: 1 stopped by a wall, with how far
+    // it went as a fraction of the way on the ground; 0 reached b; 2 any
+    // other end (a tile side unloaded, the node limit); -1 when a has no
+    // polygon near. start receives the snapped start point and, at a
+    // wall, normal the wall's normal on the ground.
+    int32_t DiffMaulRaycast(DiffMaul* maul, const float a[3], const float b[3], float start[3],
+                            double* t, float normal[3]);
+
 #ifdef __cplusplus
 }
 #endif
