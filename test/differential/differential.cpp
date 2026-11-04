@@ -372,10 +372,10 @@ void Along(const float start[3], const float b[3], double t, double out[2])
 // none of its own library's walls near the other's stop, so that it
 // passes a wall only the other has. So that this check is seen to work,
 // every ray that stopped must cross its own library's walls near its stop
-// when it goes on to the end. A pair passes only as kRayAllowed lists
-// it, by scene, index and kind, so a change in which pairs disagree
-// fails until it is explained, and so does a listed pair that no longer
-// disagrees, so that the list stays the set of known disagreements.
+// when it goes on to the end, and walls that cannot be read fail both. A pair passes only as
+// kRayAllowed lists it, by scene, index and kind, so a change in which pairs disagree fails until
+// it is explained, and so does a listed pair that no longer disagrees, so that the list stays the
+// set of known disagreements.
 struct RayTally
 {
     int cast = 0;
@@ -515,15 +515,28 @@ double SegmentDistance(const double s[2], const double p[2], const double q[2])
     return std::hypot(p[0] + t * ux - s[0], p[1] + t * uz - s[1]);
 }
 
+// What the way on the ground from a library's ray start to b meets
+// near the point s on it.
+enum class Crossing
+{
+    // None of its own walls within kWallBand of s lies across it.
+    none,
+    // One does.
+    wall,
+    // Its walls near s could not be read: no polygon of the ray under s
+    // or just behind it, the node limit, or more walls than the room.
+    unread,
+};
+
 // Whether the way on the ground from a library's ray start, cast from a,
-// to b crosses none of its own walls within kWallBand of the point s on
+// to b crosses one of its own walls within kWallBand of the point s on
 // it: Maul Nav's walls mnavQuery_FindWalls lists around s from the
 // polygon its ray crossed there, and Detour's of the polygons its ray went
 // through. A wall the way only touches does not count. A ray that reached
 // b through a wall of its own navmesh near the other's stop fails, though
 // the other's probe finds that wall near.
-bool Heeds(DiffMaul* maul, const Detour& d, bool onMaul, const float a[3], const float start[3],
-           const float b[3], const double s[2])
+Crossing Cross(DiffMaul* maul, const Detour& d, bool onMaul, const float a[3], const float start[3],
+               const float b[3], const double s[2])
 {
     constexpr int kRoom = 1024;
     static float walls[kRoom * 6];
@@ -531,7 +544,7 @@ bool Heeds(DiffMaul* maul, const Detour& d, bool onMaul, const float a[3], const
                        : DetourRayWalls(d, a, b, walls, kRoom);
     if (count < 0)
     {
-        return false;
+        return Crossing::unread;
     }
     auto D = [](float v) { return static_cast<double>(v); };
     const double from[2] = {D(start[0]), D(start[2])};
@@ -547,10 +560,10 @@ bool Heeds(DiffMaul* maul, const Detour& d, bool onMaul, const float a[3], const
         }
         if (Side(from, to, p) * Side(from, to, q) < 0 && Side(p, q, from) * Side(p, q, to) < 0)
         {
-            return false;
+            return Crossing::wall;
         }
     }
-    return true;
+    return Crossing::none;
 }
 
 // How far along the pair's direction from a the point p on the ground lies.
@@ -602,15 +615,17 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
             }
             const double* p = onMaul ? mp : dp;
             t.stops += 1;
-            if (Heeds(maul, d, onMaul, a, onMaul ? ms : ds, b, p))
+            Crossing c = Cross(maul, d, onMaul, a, onMaul ? ms : ds, b, p);
+            if (c == Crossing::wall)
             {
-                Say("ray %s %d: %s's ray stopped at (%.4f %.4f) but crosses none of its walls "
-                    "near there\n",
-                    scene, i, onMaul ? "maul" : "detour", p[0], p[1]);
+                t.crossed += 1;
             }
             else
             {
-                t.crossed += 1;
+                Say("ray %s %d: %s's ray stopped at (%.4f %.4f) but %s\n", scene, i,
+                    onMaul ? "maul" : "detour", p[0], p[1],
+                    c == Crossing::none ? "crosses none of its walls near there"
+                                        : "its walls near there could not be read");
             }
         }
         bool agree = m == r;
@@ -634,9 +649,10 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
                 (mauler ? StopsNear(maul, d, true, a, b, dp) : StopsNear(maul, d, false, a, b, mp));
             // When one stopped, the one that reached the end crossed none
             // of its own walls near the other's stop.
-            bool grazed =
-                near && !both &&
-                (m == 0 ? Heeds(maul, d, true, a, ms, b, dp) : Heeds(maul, d, false, a, ds, b, mp));
+            Crossing passed = !near || both ? Crossing::none
+                              : m == 0      ? Cross(maul, d, true, a, ms, b, dp)
+                                            : Cross(maul, d, false, a, ds, b, mp);
+            bool grazed = near && !both && passed == Crossing::none;
             int k = AllowedOf(scene, i);
             bool listed =
                 k >= 0 && ((banded && !kRayAllowed[k].grazed) || (grazed && kRayAllowed[k].grazed));
@@ -648,9 +664,11 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
             t.banded += banded ? 1 : 0;
             t.grazed += grazed ? 1 : 0;
             t.listed += listed ? 1 : 0;
-            const char* verdict = listed          ? (banded ? "banded, listed" : "grazed, listed")
-                                  : banded        ? "banded, not listed as banded"
-                                  : grazed        ? "grazed, not listed as grazed"
+            const char* verdict = listed   ? (banded ? "banded, listed" : "grazed, listed")
+                                  : banded ? "banded, not listed as banded"
+                                  : grazed ? "grazed, not listed as grazed"
+                                  : near && !both && passed == Crossing::unread
+                                      ? "its walls near the other's stop could not be read"
                                   : near && !both ? "through its own wall near the other's stop"
                                   : near          ? "past the other's stop"
                                                   : "no wall within 0.6 m";
