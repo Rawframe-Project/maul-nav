@@ -764,7 +764,10 @@ extern "C"
     /// corners over it; stopped within the arrival distance of the target
     /// or of the next link's takeoff. Keeps no state: call it each step
     /// with the corners mnavQuery_FindCorridorCorners gives, feed the velocity to
-    /// avoidance, and limit acceleration and move the agent yourself.
+    /// avoidance, and limit acceleration and move the agent yourself. The
+    /// corners may be the caller's own: their arrays are the caller's
+    /// memory, read only within `pointCount` and `linkCount`, every point
+    /// checked; a link's `point` is compared, never followed.
     ///
     /// @param corners     The corners, the agent's position first.
     /// @param def         The def, from mnavDefaultSteerDef.

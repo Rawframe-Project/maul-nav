@@ -777,6 +777,12 @@ static void TestDebug(const mnavFlightVolume* volume)
     CHECK(mnavDebugFlightPath(&bad, &untouched) == mnav_errorInvalid &&
               untouched.vertexCount == 0 && untouched.lineCount == 0,
           "a flight path with a point not finite refused, nothing drawn");
+    mnavFlightPath empty = {.points = bent, .pointCount = 0};
+    mnavFlightPath none = {.points = nullptr, .pointCount = 0};
+    CHECK(mnavDebugFlightPath(&empty, &untouched) == mnav_errorInvalid &&
+              mnavDebugFlightPath(&none, &untouched) == mnav_errorInvalid &&
+              untouched.vertexCount == 0 && untouched.lineCount == 0,
+          "a flight path with no points refused, nothing drawn");
     free(bent);
     // A box's voxels count within the floor and ceiling: a column to far
     // above the ceiling is a few voxels.

@@ -298,6 +298,16 @@ static void TestLinksPathsCorridors(mnavNavmesh* navmesh)
     bent[0].y = (double)NAN;
     CHECK(mnavDebugPath(&bad, &fresh) == mnav_errorInvalid && fresh.vertexCount == 0,
           "a path with a NaN point refused");
+    // A path with no points draws nothing and is refused, its points
+    // present or not.
+    mnavPath empty = path;
+    empty.pointCount = 0;
+    CHECK(mnavDebugPath(&empty, &fresh) == mnav_errorInvalid && fresh.vertexCount == 0 &&
+              fresh.lineCount == 0,
+          "a path with no points refused");
+    empty.points = nullptr;
+    CHECK(mnavDebugPath(&empty, &fresh) == mnav_errorInvalid && fresh.vertexCount == 0,
+          "a path with no points and no array refused");
     free(bent);
     b = Buffer((mnavPos3){0.0, 0.0, 0.0});
     CHECK(mnavNavmesh_DebugCorridor(navmesh, path.polygons, path.polygonCount, &b) ==
