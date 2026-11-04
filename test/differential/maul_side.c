@@ -192,3 +192,32 @@ int32_t DiffMaulRaycast(DiffMaul* maul, const float a[3], const float b[3], floa
     normal[2] = ray.normal.z;
     return ray.end == mnav_rayWall ? 1 : (ray.end == mnav_rayReached ? 0 : 2);
 }
+
+int32_t DiffMaulWallDistance(DiffMaul* maul, const float at[3], double radius, float center[3],
+                             double* distance, float wall[3])
+{
+    mnavNearest s;
+    if (!Nearest(maul, at, &s))
+    {
+        return -1;
+    }
+    center[0] = (float)s.point.x;
+    center[1] = (float)s.point.y;
+    center[2] = (float)s.point.z;
+    mnavNearestWall nearest;
+    if (mnavQuery_FindWallDistance(maul->query, maul->navmesh, s.polygon, s.point, radius, nullptr,
+                                   &nearest) != mnav_success ||
+        nearest.limited)
+    {
+        return 2;
+    }
+    if (!nearest.found)
+    {
+        return 0;
+    }
+    *distance = nearest.wall.distance;
+    wall[0] = (float)nearest.wall.point.x;
+    wall[1] = (float)nearest.wall.point.y;
+    wall[2] = (float)nearest.wall.point.z;
+    return 1;
+}
