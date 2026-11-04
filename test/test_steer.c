@@ -191,6 +191,32 @@ static void TestFarCorners(void)
     CHECK(s.state == mnav_steerMoving && isfinite(speed) && Near(speed, 3.5) &&
               (double)s.velocity.x > 0.0,
           "a turn far out: anticipated, finite, at full speed");
+    // A near corner before a far one is measured as it is: no distance
+    // between near corners vanishes because another lies far out.
+    const mnavPos3 nearThenFar[3] = {At(0, 0), At(10, 0), At(10, 1e200)};
+    c = Corners(nearThenFar, 3);
+    mnavSteerDef straight = def;
+    straight.enableTurnAnticipation = false;
+    s = Steer(&c, &straight);
+    CHECK(s.state == mnav_steerMoving && Near((double)s.velocity.x, 3.5) &&
+              (double)s.velocity.z == 0.0,
+          "a near corner before a far one: straight at it");
+    // Anticipating, it swings wide as it does with the far corner nearer.
+    const mnavPos3 nearThenNearer[3] = {At(0, 0), At(10, 0), At(10, 1e100)};
+    mnavCorners nearer = Corners(nearThenNearer, 3);
+    mnavSteering wide = Steer(&nearer, &def);
+    s = Steer(&c, &def);
+    CHECK(s.state == mnav_steerMoving && (double)s.velocity.x > 0.0 && (double)s.velocity.z < 0.0 &&
+              Near((double)s.velocity.x, (double)wide.velocity.x) &&
+              Near((double)s.velocity.z, (double)wide.velocity.z),
+          "a near corner before a far one, anticipated: as with the far corner at 1e100");
+    // A takeoff 10 m away is no arrival at the link.
+    const mnavPathLink takeoff[1] = {{{1, 1}, mnav_linkJump, 1}};
+    c = (mnavCorners){nearThenFar, 3, takeoff, 1};
+    s = Steer(&c, &def);
+    CHECK(s.state == mnav_steerMoving && s.link == -1 && Near((double)s.velocity.x, 3.5) &&
+              (double)s.velocity.z == 0.0,
+          "a takeoff 10 m away before a far corner: straight at it, not at the link");
 }
 
 int main(void)
