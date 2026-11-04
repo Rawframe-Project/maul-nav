@@ -178,6 +178,87 @@ static void TestChecksAndLimits(void)
 // past it. mnavSetCorridor replaces the count and the ends, so it checks
 // only the capacity of the corridor; of the path, it refuses NULL arrays
 // and ends that are not finite.
+// A path handed back is checked against the context that gave it:
+// loading reads only the path that context keeps, within the counts it
+// kept, so a count copied from a longer path and a path a later search
+// replaced are refused, the corridor unchanged. The context's calls that
+// are no search leave the path whole.
+static void TestPathsHandedBack(void)
+{
+    mnavNavmesh* navmesh = LoadWorld();
+    mnavQuery* query = MakeQuery(8192);
+    mnavQuery* small = MakeQuery(4);
+    mnavNearest a = On(navmesh, 2.0, 2.0, 2.0f);
+    mnavNearest b = On(navmesh, 62.0, 62.0, 2.0f);
+    mnavPath longer = {0};
+    mnavPath shorter = {0};
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &longer) == mnav_success &&
+              longer.polygonCount > 4 &&
+              mnavQuery_FindPath(small, navmesh, a.polygon, a.point, a.polygon, a.point, nullptr,
+                                 &shorter) == mnav_success &&
+              shorter.polygonCount == 1,
+          "a long path, and a short one from a context of four nodes");
+    static mnavPolygonId buffer[256];
+    mnavCorridor corridor;
+    // Its polygons lie in a buffer of four: the longer count reaches past
+    // it.
+    mnavPath copied = shorter;
+    copied.polygonCount = longer.polygonCount;
+    CHECK(mnavResetCorridor(&corridor, buffer, 256, b.polygon, b.point) == mnav_success &&
+              mnavSetCorridor(&corridor, &copied) == mnav_errorInvalid &&
+              corridor.polygonCount == 1 && corridor.position.x == b.point.x,
+          "a count copied from a longer path refused, the corridor unchanged");
+    // The same within the buffer: more than the call gave.
+    copied = shorter;
+    copied.pointCount = shorter.pointCount + 1;
+    CHECK(mnavSetCorridor(&corridor, &copied) == mnav_errorInvalid && corridor.polygonCount == 1,
+          "more points than the call gave refused");
+    // A path no call gave, its arrays the context's.
+    copied = shorter;
+    copied.query = nullptr;
+    CHECK(mnavSetCorridor(&corridor, &copied) == mnav_errorInvalid && corridor.polygonCount == 1,
+          "a path with no context refused");
+    // A raycast and corners with the same context write memory of their
+    // own: the path loads as it was found.
+    mnavPolygonId* polygons = malloc((size_t)longer.polygonCount * sizeof(mnavPolygonId));
+    CHECK(polygons != nullptr, "a copy of the path's polygons");
+    memcpy(polygons, longer.polygons, (size_t)longer.polygonCount * sizeof(mnavPolygonId));
+    mnavNearest c = On(navmesh, 10.0, 50.0, 2.0f);
+    mnavRay ray;
+    mnavCorners corners;
+    mnavPolygonId other[256];
+    mnavCorridor elsewhere;
+    CHECK(mnavQuery_Raycast(query, navmesh, c.polygon, c.point, a.point, nullptr, &ray) ==
+                  mnav_success &&
+              ray.polygonCount >= 1 &&
+              mnavResetCorridor(&elsewhere, other, 256, c.polygon, c.point) == mnav_success &&
+              mnavQuery_FindCorridorCorners(query, &elsewhere, navmesh, &corners) == mnav_success,
+          "a raycast and corners between");
+    CHECK(mnavSetCorridor(&corridor, &longer) == mnav_success &&
+              corridor.polygonCount == longer.polygonCount &&
+              memcmp(corridor.polygons, polygons,
+                     (size_t)longer.polygonCount * sizeof(mnavPolygonId)) == 0 &&
+              corridor.position.x == a.point.x && corridor.target.x == b.point.x,
+          "the path loads as found after a raycast and corners");
+    free(polygons);
+    // A later search replaces it.
+    mnavPath kept = longer;
+    mnavPath next = {0};
+    CHECK(mnavResetCorridor(&corridor, buffer, 256, b.polygon, b.point) == mnav_success &&
+              mnavQuery_FindPath(query, navmesh, c.polygon, c.point, a.polygon, a.point, nullptr,
+                                 &next) == mnav_success &&
+              mnavSetCorridor(&corridor, &kept) == mnav_errorStale && corridor.polygonCount == 1 &&
+              corridor.position.x == b.point.x,
+          "a path a later search replaced refused, the corridor unchanged");
+    CHECK(mnavSetCorridor(&corridor, &next) == mnav_success &&
+              corridor.polygonCount == next.polygonCount,
+          "the next call's path loads");
+    mnavDestroyQuery(small);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestMalformedCorridors(void)
 {
     mnavNavmesh* navmesh = LoadWorld();
@@ -799,6 +880,7 @@ int main(void)
     LoadWorldTiles();
     TestCornersAreThePathsStraightPath();
     TestChecksAndLimits();
+    TestPathsHandedBack();
     TestMalformedCorridors();
     TestFiltersAndLinks();
     TestMovingTheEnds();

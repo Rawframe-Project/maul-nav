@@ -249,6 +249,11 @@ extern "C"
         // until its next search.
         const mnavPathLink* links;
         int32_t linkCount;
+        // The context whose memory holds the arrays, and which of its paths
+        // this is, set by the search that gives it, so that mnavSetCorridor
+        // can tell the arrays are still this path's.
+        const mnavQuery* query;
+        uint64_t generation;
     } mnavPath;
 
 // The cookie mnavDefaultQueryDef sets and mnavCreateQuery checks.
@@ -593,14 +598,20 @@ extern "C"
     /// position and its last as the target.
     ///
     /// @param corridor The corridor.
-    /// @param path     A path from mnavQuery_FindPath or mnavQuery_FinishPath.
+    /// @param path     A path from mnavQuery_FindPath or mnavQuery_FinishPath,
+    ///                 as the search gave it, before its context's next search.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor with no buffer or a capacity below 1, or a path with no
     /// polygon or point, a NULL `polygons` or `points`, or a first or last
-    /// point that is not finite; `mnav_errorCapacity` when the path has more
-    /// polygons than the corridor's buffer, which is unchanged.
+    /// point that is not finite, or a path no search gave: arrays other than
+    /// its context's, or more polygons, points or links than the search
+    /// gave; `mnav_errorStale` for a path a later search of its context has
+    /// replaced; `mnav_errorCapacity`
+    /// when the path has more polygons than the corridor's buffer. The
+    /// corridor is unchanged on any failure.
     /// @par Thread safety
-    /// Safe from any thread; the corridor is used by one thread at a time.
+    /// Safe from any thread; the corridor is used by one thread at a time,
+    /// and the path's context, which it reads, by no other thread meanwhile.
     MNAV_NODISCARD MNAV_API mnavResult mnavSetCorridor(mnavCorridor* corridor,
                                                        const mnavPath* path);
 

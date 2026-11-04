@@ -860,9 +860,11 @@ static void Finish(Shortest* s, int32_t last, mnavPathEnd end, mnavPath* pathOut
         length += step;
         next += link ? 1 : 0;
     }
-    *pathOut = (mnavPath){
-        end,           cost,       length,       query->corridor, Polygons(query, s->navmesh, last),
-        query->points, pointCount, query->links, linkCount};
+    int32_t polygons = Polygons(query, s->navmesh, last);
+    *pathOut =
+        (mnavPath){end,        cost,         length,    query->corridor, polygons, query->points,
+                   pointCount, query->links, linkCount, nullptr,         0};
+    mnavKeepPath(query, pathOut);
 }
 
 // Checks the arguments and starts the search from its start node.

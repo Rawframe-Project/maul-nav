@@ -398,14 +398,15 @@ static mnavFlightPath PathTo(const Search* s, const mnavFlightFrame* frame, int3
         points[i] = points[count - 1 - i];
         points[count - 1 - i] = swap;
     }
-    return (mnavFlightPath){end, s->nodes[last].cost * frame->voxel, points, count};
+    return (mnavFlightPath){end, s->nodes[last].cost * frame->voxel,
+                            mnavKeepPoints(s->query, points, count), count};
 }
 
 // The path when the search cannot begin: the start alone.
 static mnavFlightPath StartOnly(mnavQuery* query, mnavPos3 start, mnavPathEnd end)
 {
     query->points[0] = start;
-    return (mnavFlightPath){end, 0.0, query->points, 1};
+    return (mnavFlightPath){end, 0.0, mnavKeepPoints(query, query->points, 1), 1};
 }
 
 static mnavPathEnd Refused(int32_t held)
@@ -714,7 +715,8 @@ static MNAV_NOINLINE mnavResult FinishFlightPathWork(mnavQuery* query,
     {
         query->points[0] = f->start;
         query->points[1] = f->endPoint;
-        *pathOut = (mnavFlightPath){mnav_pathFound, f->straightLength, query->points, 2};
+        *pathOut = (mnavFlightPath){mnav_pathFound, f->straightLength,
+                                    mnavKeepPoints(query, query->points, 2), 2};
         return mnav_success;
     }
     Search s = Load(query);
