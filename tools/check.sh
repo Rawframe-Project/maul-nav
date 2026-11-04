@@ -7,7 +7,9 @@
 #   tools/check.sh changed   the files changed against origin/main: the
 #                            source rules, formatting, the documentation
 #                            checks, clang-tidy on a Release and a Debug
-#                            configure on the changed sources, the
+#                            configure on the changed sources (on every
+#                            source when a header of the library
+#                            changed), the
 #                            linux-clang-20-asan preset (assertions on),
 #                            and the suites the changes reach. Under two
 #                            minutes; run it before every push.
@@ -115,19 +117,22 @@ all_c_files() { git ls-files 'include/*.h' 'src/*.[ch]' 'test/*.[ch]' 'tools/*.[
 # Each hides findings the other shows. The header filter is passed on the
 # command line, since clang-tidy-20 run from the root does not apply
 # .clang-tidy's HeaderFilterRegex and would drop a finding in a header,
-# and anchored at the checkout, so that headers fetched under out/ are not
-# reported as ours.
+# and the family's tools/tidy_filter.sh anchors it at the source directory
+# the build tree records, the path its compile commands name, regex-escaped,
+# so that headers fetched under out/ are not reported as ours. It is
+# assigned on a line of its own, so that its failure stops the run.
+
 tidy() { # files
-    local build f root
-    root=$(pwd | sed 's/[][\\.*^$+?(){}|]/\\&/g')
+    local build f filter
     for build in Release Debug; do
         step "clang-tidy, $build, on $# files"
         cmake --preset linux-clang-20 -B "$out/check-tidy-$build" -DCMAKE_BUILD_TYPE=$build \
             --no-warn-unused-cli -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DMAUL_NAV_BUILD_TESTS=OFF \
             -DMAUL_NAV_BUILD_BENCH=OFF -DMAUL_NAV_BUILD_SAMPLES=OFF >"$out/check-tidy-$build.log"
+        filter=$(tools/tidy_filter.sh "$out/check-tidy-$build")
         for f in "$@"; do
             clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' \
-                --header-filter="^$root/(src|include)/" "$f" 2>/dev/null
+                --header-filter="$filter" "$f" 2>/dev/null
         done
     done
 }
@@ -150,11 +155,20 @@ if [ "$tier" = changed ]; then
         step "clang-format on ${#present[@]} changed files"
         clang-format --dry-run -Werror "${present[@]}"
     fi
-    # The pr tier's set, src/*.c, of those still present.
+    # The pr tier's set, src/*.c, of those still present. A changed header
+    # of the library's reaches sources that did not change, so then the
+    # set is every source.
     sources=()
     for f in "${present[@]+"${present[@]}"}"; do
         [[ $f == src/*.c && $f != src/*/* ]] && sources+=("$f")
     done
+    headers=0
+    for f in "${changed[@]}"; do
+        [[ $f == src/*.h || $f == include/*.h ]] && headers=1
+    done
+    if [ $headers -eq 1 ]; then
+        sources=(src/*.c)
+    fi
     if [ ${#sources[@]} -gt 0 ]; then
         tidy "${sources[@]}"
     fi

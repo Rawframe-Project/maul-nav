@@ -12,11 +12,13 @@
 #include "counting_allocator.h"
 #include "defs_for.h"
 #include "dense.h"
+#include "hand_tiles.h"
 #include "test_harness.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/flight.h"
+#include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
 #include <math.h>
@@ -777,6 +779,12 @@ static void TestDebug(const mnavFlightVolume* volume)
     CHECK(mnavDebugFlightPath(&bad, &untouched) == mnav_errorInvalid &&
               untouched.vertexCount == 0 && untouched.lineCount == 0,
           "a flight path with a point not finite refused, nothing drawn");
+    mnavFlightPath empty = {.points = bent, .pointCount = 0};
+    mnavFlightPath none = {.points = nullptr, .pointCount = 0};
+    CHECK(mnavDebugFlightPath(&empty, &untouched) == mnav_errorInvalid &&
+              mnavDebugFlightPath(&none, &untouched) == mnav_errorInvalid &&
+              untouched.vertexCount == 0 && untouched.lineCount == 0,
+          "a flight path with no points refused, nothing drawn");
     free(bent);
     // A box's voxels count within the floor and ceiling: a column to far
     // above the ceiling is a few voxels.
@@ -1026,6 +1034,49 @@ static void FarEnds(int32_t a[3], int32_t b[3])
             return;
         }
     }
+}
+
+// A flight path's points stay whole until the context's next search: a
+// corridor's corners, which the same context finds next, take memory of
+// their own.
+static void TestFlightPathKept(const mnavFlightVolume* volume)
+{
+    mnavQuery* query = Query(16384, 1000.0f);
+    int32_t a[3];
+    int32_t b[3];
+    FarEnds(a, b);
+    mnavFlightPath path;
+    CHECK(mnavQuery_FindFlightPath(query, volume, At(a[0] + 0.5, a[1] + 0.5, a[2] + 0.5),
+                                   At(b[0] + 0.5, b[1] + 0.5, b[2] + 0.5), &path) == mnav_success &&
+              path.end == mnav_pathFound && path.pointCount >= 2,
+          "a flight path");
+    mnavPos3* kept = malloc((size_t)path.pointCount * sizeof(mnavPos3));
+    CHECK(kept != nullptr, "a copy of its points");
+    memcpy(kept, path.points, (size_t)path.pointCount * sizeof(mnavPos3));
+    mnavBakeDef def = mnavDefaultBakeDef();
+    mnavNavmeshDef meshDef = NavmeshDefFor(&def);
+    mnavNavmesh* navmesh = nullptr;
+    mnavNearest on;
+    CHECK(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success &&
+              mnavNavmesh_StageTile(navmesh, s_handSquare, sizeof(s_handSquare)).result ==
+                  mnav_success &&
+              mnavNavmesh_Commit(navmesh) == mnav_success &&
+              mnavNavmesh_FindNearest(navmesh, (mnavPos3){5.0, 0.0, 5.0},
+                                      (mnavVec3){1.0f, 2.0f, 1.0f}, nullptr, &on) == mnav_success &&
+              on.polygon.slot != 0,
+          "a square to stand on");
+    mnavPolygonId buffer[4];
+    mnavCorridor corridor;
+    mnavCorners corners;
+    CHECK(mnavResetCorridor(&corridor, buffer, 4, on.polygon, on.point) == mnav_success &&
+              mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &corners) == mnav_success &&
+              corners.pointCount == 1 && corners.points[0].x == on.point.x,
+          "the same context's corners");
+    CHECK(memcmp(path.points, kept, (size_t)path.pointCount * sizeof(mnavPos3)) == 0,
+          "the flight path's points whole after the corners");
+    free(kept);
+    mnavDestroyNavmesh(navmesh);
+    mnavDestroyQuery(query);
 }
 
 static void TestLimits(const mnavFlightVolume* volume)
@@ -1400,6 +1451,7 @@ static void TestScene(int32_t side)
     TestRaycasts(volume);
     TestNearest(volume);
     TestEnds(volume);
+    TestFlightPathKept(volume);
     TestLimits(volume);
     TestRefusals(volume);
     mnavDestroyFlightVolume(volume);

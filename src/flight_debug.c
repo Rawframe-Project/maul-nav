@@ -124,9 +124,9 @@ mnavResult mnavFlightVolume_Debug(const mnavFlightVolume* volume, mnavPos3 low, 
 static MNAV_NOINLINE mnavResult DebugFlightPathWork(const mnavFlightPath* path,
                                                     mnavDebugBuffer* buffer)
 {
-    if (path == nullptr || !mnavGoodBuffer(buffer) || path->pointCount < 0 ||
-        (path->pointCount > 0 && path->points == nullptr) ||
-        !mnavGoodPoints(path->points, path->pointCount))
+    // The points may be the caller's own: only the count given is read.
+    if (path == nullptr || !mnavGoodBuffer(buffer) || path->pointCount < 1 ||
+        path->points == nullptr || !mnavGoodPoints(path->points, path->pointCount))
     {
         return mnav_errorInvalid;
     }

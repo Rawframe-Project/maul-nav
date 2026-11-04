@@ -703,7 +703,10 @@ mnavResult mnavFinishPathWork(mnavQuery* query, const mnavNavmesh* navmesh, mnav
                           query->points,
                           pointCount,
                           query->links,
-                          linkCount};
+                          linkCount,
+                          nullptr,
+                          0};
+    mnavKeepPath(query, pathOut);
     s->active = false;
     return mnav_success;
 }

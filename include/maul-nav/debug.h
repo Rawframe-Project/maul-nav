@@ -57,7 +57,10 @@ extern "C"
     MNAV_NODISCARD MNAV_API mnavResult mnavNavmesh_DebugLinks(const mnavNavmesh* navmesh,
                                                               mnavDebugBuffer* buffer);
 
-    /// Appends a path's straight line, point to point.
+    /// Appends a path's straight line, point to point. The path may be the
+    /// caller's own: its points are the caller's memory, read only from
+    /// `points` for `pointCount` points, each checked, and nothing else of
+    /// it is read.
     ///
     /// @param path   The path.
     /// @param buffer The buffer appended to. Left as it was on any failure but

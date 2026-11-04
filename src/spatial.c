@@ -4,7 +4,8 @@
 // Spatial queries: heights, the nearest wall within a
 // radius, and random points from a seed. The walls search is Detour's
 // findDistanceToWall: Dijkstra over polygons from the center's, through
-// the edges within the radius; the random point near a center samples the
+// the edges within the radius, its radius kept whole and its walls those
+// of the center's floor; the random point near a center samples the
 // polygons it reaches by the area they share with the circle, an
 // inscribed 32-gon, so that, unlike findRandomPointAroundCircle, the point
 // lies in the circle.
@@ -263,6 +264,10 @@ typedef struct Ring
     mnavWall* walls;
     int32_t capacity;
     int32_t count;
+    // The heights a wall's nearest point may lie between to be on the
+    // center's floor; unbounded for a search that notes no wall.
+    double low;
+    double high;
 } Ring;
 
 // The open list, by cost, then by node index.
@@ -348,7 +353,8 @@ static void NoteWall(Ring* r, mnavPos3 a, mnavPos3 b)
 {
     mnavPos3 nearest;
     double distance = sqrt(SegmentDistance(r->center, a, b, &nearest));
-    if (distance > r->radius || (r->nearest.found && distance >= r->nearest.wall.distance))
+    if (distance > r->radius || nearest.y < r->low || nearest.y > r->high ||
+        (r->nearest.found && distance >= r->nearest.wall.distance))
     {
         return;
     }
@@ -362,7 +368,7 @@ static void ListWall(Ring* r, mnavPos3 a, mnavPos3 b)
 {
     mnavPos3 nearest;
     double distance = sqrt(SegmentDistance(r->center, a, b, &nearest));
-    if (distance > r->radius)
+    if (distance > r->radius || nearest.y < r->low || nearest.y > r->high)
     {
         return;
     }
@@ -574,6 +580,23 @@ static void Visit(Ring* r, int32_t n)
     }
 }
 
+// Bounds the walls to the center's floor: from the agent's step height
+// below its height on its polygon to the agent's height above, by the
+// agent the navmesh's tiles are baked for; its own height when it lies
+// off the polygon. A wall of another floor above or below is no wall here.
+static void Floor(Ring* r, mnavPolygonId polygon)
+{
+    double height = r->center.y;
+    double on = 0.0;
+    if (mnavGetHeightWork(r->navmesh, polygon, r->center.x, r->center.z, &on) == mnav_success)
+    {
+        height = on;
+    }
+    const mnavAgentProfile* agent = &r->navmesh->def.bake.agent;
+    r->low = height - (double)agent->stepHeight;
+    r->high = height + (double)agent->height;
+}
+
 static mnavResult BeginRing(Ring* r, mnavPolygonId polygon)
 {
     const mnavQueryFilter* usable = nullptr;
@@ -621,12 +644,15 @@ static MNAV_NOINLINE mnavResult FindWallDistanceWork(mnavQuery* query, const mna
     {
         return mnav_errorInvalid;
     }
-    Ring r = {query, navmesh, filter, center, radius, false, {0}, false, nullptr, 0, 0};
+    Ring r = {
+        query, navmesh,           filter,          center, radius, false, {0}, false, nullptr, 0,
+        0,     -(double)INFINITY, (double)INFINITY};
     mnavResult result = BeginRing(&r, polygon);
     if (result != mnav_success)
     {
         return result;
     }
+    Floor(&r, polygon);
     while (query->heapCount > 0)
     {
         Visit(&r, Pop(query));
@@ -676,12 +702,16 @@ static MNAV_NOINLINE mnavResult FindWallsWork(mnavQuery* query, const mnavNavmes
     {
         return mnav_errorInvalid;
     }
-    Ring r = {query, navmesh, filter, center, radius, false, {0}, true, wallsOut, capacity, 0};
+    Ring r = {query,           navmesh,  filter, center,
+              radius,          false,    {0},    true,
+              wallsOut,        capacity, 0,      -(double)INFINITY,
+              (double)INFINITY};
     mnavResult result = BeginRing(&r, polygon);
     if (result != mnav_success)
     {
         return result;
     }
+    Floor(&r, polygon);
     while (query->heapCount > 0)
     {
         Visit(&r, Pop(query));
@@ -729,7 +759,9 @@ static MNAV_NOINLINE mnavResult FindRandomPointAroundWork(
     {
         return mnav_errorInvalid;
     }
-    Ring r = {query, navmesh, filter, center, radius, false, {0}, false, nullptr, 0, 0};
+    Ring r = {
+        query, navmesh,           filter,          center, radius, false, {0}, false, nullptr, 0,
+        0,     -(double)INFINITY, (double)INFINITY};
     mnavResult result = BeginRing(&r, polygon);
     if (result != mnav_success)
     {

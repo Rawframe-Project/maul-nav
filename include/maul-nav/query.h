@@ -249,6 +249,11 @@ extern "C"
         // until its next search.
         const mnavPathLink* links;
         int32_t linkCount;
+        // The context whose memory holds the arrays, and which of its paths
+        // this is, set by the search that gives it, so that mnavSetCorridor
+        // can tell the arrays are still this path's.
+        const mnavQuery* query;
+        uint64_t generation;
     } mnavPath;
 
 // The cookie mnavDefaultQueryDef sets and mnavCreateQuery checks.
@@ -593,14 +598,20 @@ extern "C"
     /// position and its last as the target.
     ///
     /// @param corridor The corridor.
-    /// @param path     A path from mnavQuery_FindPath or mnavQuery_FinishPath.
+    /// @param path     A path from mnavQuery_FindPath or mnavQuery_FinishPath,
+    ///                 as the search gave it, before its context's next search.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor with no buffer or a capacity below 1, or a path with no
     /// polygon or point, a NULL `polygons` or `points`, or a first or last
-    /// point that is not finite; `mnav_errorCapacity` when the path has more
-    /// polygons than the corridor's buffer, which is unchanged.
+    /// point that is not finite, or a path no search gave: arrays other than
+    /// its context's, or more polygons, points or links than the search
+    /// gave; `mnav_errorStale` for a path a later search of its context has
+    /// replaced; `mnav_errorCapacity`
+    /// when the path has more polygons than the corridor's buffer. The
+    /// corridor is unchanged on any failure.
     /// @par Thread safety
-    /// Safe from any thread; the corridor is used by one thread at a time.
+    /// Safe from any thread; the corridor is used by one thread at a time,
+    /// and the path's context, which it reads, by no other thread meanwhile.
     MNAV_NODISCARD MNAV_API mnavResult mnavSetCorridor(mnavCorridor* corridor,
                                                        const mnavPath* path);
 
@@ -764,7 +775,10 @@ extern "C"
     /// corners over it; stopped within the arrival distance of the target
     /// or of the next link's takeoff. Keeps no state: call it each step
     /// with the corners mnavQuery_FindCorridorCorners gives, feed the velocity to
-    /// avoidance, and limit acceleration and move the agent yourself.
+    /// avoidance, and limit acceleration and move the agent yourself. The
+    /// corners may be the caller's own: their arrays are the caller's
+    /// memory, read only within `pointCount` and `linkCount`, every point
+    /// checked; a link's `point` is compared, never followed.
     ///
     /// @param corners     The corners, the agent's position first.
     /// @param def         The def, from mnavDefaultSteerDef.
@@ -1022,9 +1036,14 @@ extern "C"
     /// radius, off-mesh links aside. An edge is a wall where no polygon the
     /// filter includes lies across it: a tile side with no tile loaded
     /// beyond, and the parts of a side no polygon of the tile beyond
-    /// covers, are walls. A wall exactly the radius away lies within it; of
-    /// walls at the same distance it gives one, the same on every
-    /// platform, but which one is not promised.
+    /// covers, are walls. A wall counts only on the center's floor: its
+    /// point nearest the center lies no more than the agent's step height
+    /// below the center's height on its polygon, and no more than the
+    /// agent's height above, for the agent the navmesh's tiles are baked
+    /// for; the walls of a floor over or under the center are left out. A
+    /// wall exactly the radius away lies within it; of walls at the same
+    /// distance it gives one, the same on every platform, but which one is
+    /// not promised.
     ///
     /// @param query      The context; its last search ends.
     /// @param navmesh    The navmesh.
@@ -1061,9 +1080,10 @@ extern "C"
 
     /// Lists the walls within a radius of a point on the ground, nearest
     /// first, for avoidance's segment obstacles: the search and the walls
-    /// of mnavQuery_FindWallDistance, whose wall is the first listed. Walls at
-    /// the same distance keep the order the search meets them in, the same
-    /// on every platform.
+    /// of mnavQuery_FindWallDistance, whose wall is the first listed: only
+    /// walls on the center's floor, as it counts them. Walls at the same
+    /// distance keep the order the search meets them in, the same on every
+    /// platform.
     ///
     /// @param query    The context; its last search ends.
     /// @param navmesh  The navmesh.

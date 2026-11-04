@@ -240,7 +240,27 @@ struct mnavQuery
     mnavQueryFilter filter;
     mnavFlightSliced flight;
     mnavGraphSearch graph;
+    // The last path a search gave, in arrays of its own that no other call
+    // writes: its polygons, points and links, their counts, and which path
+    // it is, so that a path handed back can be checked to be this one and
+    // within it. A flight path's points are kept in the same points.
+    mnavPolygonId* pathPolygons;
+    mnavPos3* pathPoints;
+    mnavPathLink* pathLinks;
+    int32_t pathPolygonCount;
+    int32_t pathPointCount;
+    int32_t pathLinkCount;
+    uint64_t generation;
 };
+
+// Keeps the path a search made in the path arrays, which it then names,
+// so that a call that is no search leaves it whole; the path kept before
+// it is replaced.
+void mnavKeepPath(mnavQuery* query, mnavPath* path);
+
+// Keeps a flight path's points the same way, replacing the kept path, and
+// gives where they now lie.
+const mnavPos3* mnavKeepPoints(mnavQuery* query, const mnavPos3* points, int32_t count);
 
 // Empties the node table for a search, unless it is empty already.
 void mnavClearTable(mnavQuery* query);

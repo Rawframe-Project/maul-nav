@@ -37,7 +37,7 @@ env:
 jobs:
   # Whether anything beyond documentation changed; the builds skip when not.
   changes:
-    uses: Rawframe-Project/.github/.github/workflows/changes.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
+    uses: Rawframe-Project/.github/.github/workflows/changes.yml@972ea41c6abf2652d3b067e57bf0713f1661cf0e # v0.0.51
     permissions:
       pull-requests: read
 
@@ -52,10 +52,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Rawframe-Project/.github/.github/actions/docs-check@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
+      - uses: Rawframe-Project/.github/.github/actions/docs-check@972ea41c6abf2652d3b067e57bf0713f1661cf0e # v0.0.51
 
   zizmor:
-    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
+    uses: Rawframe-Project/.github/.github/workflows/zizmor.yml@972ea41c6abf2652d3b067e57bf0713f1661cf0e # v0.0.51
     permissions:
       contents: read
 
@@ -117,17 +117,20 @@ jobs:
       # complexity. The header filter is passed on the command line:
       # clang-tidy-20 run from the root does not apply .clang-tidy's
       # HeaderFilterRegex, so a finding in a header of src/ or include/
-      # would be dropped. It is anchored at the checkout, so that headers
-      # fetched under out/ are not reported as ours.
+      # would be dropped. The family's tools/tidy_filter.sh anchors it at the
+      # source directory the build tree records, the path its compile
+      # commands name, regex-escaped, so that headers fetched under out/ are
+      # not reported as ours; on a line of its own, its failure stops the
+      # step.
       - name: clang-tidy, assertions compiled out
         run: |
           cmake --preset linux-clang-20 -B out/tidy --no-warn-unused-cli -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -D${PREFIX}_BUILD_TESTS=OFF -D${PREFIX}_BUILD_BENCH=OFF -D${PREFIX}_BUILD_SAMPLES=OFF
           files=$(git ls-files 'src/*.c')
           [ -n "$files" ] || { echo "::error::no sources for clang-tidy"; exit 1; }
-          root=$(pwd | sed 's/[][\\.*^$+?(){}|]/\\&/g')
+          filter=$(tools/tidy_filter.sh out/tidy)
           echo "$files" | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p out/tidy --quiet --warnings-as-errors='*' \
-            --header-filter="^$root/(src|include)/"
+            --header-filter="$filter"
       - name: clang-tidy, assertions live
         run: |
           cmake --preset linux-clang-20 -B out/tidy-asserts -DCMAKE_BUILD_TYPE=Debug --no-warn-unused-cli \
@@ -135,9 +138,9 @@ jobs:
             -D${PREFIX}_BUILD_SAMPLES=OFF
           files=$(git ls-files 'src/*.c')
           [ -n "$files" ] || { echo "::error::no sources for clang-tidy"; exit 1; }
-          root=$(pwd | sed 's/[][\\.*^$+?(){}|]/\\&/g')
+          filter=$(tools/tidy_filter.sh out/tidy-asserts)
           echo "$files" | xargs -P "$(nproc)" -n 1 clang-tidy-20 -p out/tidy-asserts --quiet \
-            --warnings-as-errors='*' --header-filter="^$root/(src|include)/"
+            --warnings-as-errors='*' --header-filter="$filter"
 
   # Every cell builds with warnings as errors and runs the whole suite but
   # the large scenes, the golden values and the header tests included. GCC
@@ -159,7 +162,7 @@ jobs:
           - { preset: linux-arm64-gcc-14, runner: ubuntu-24.04-arm }
           - { preset: macos-clang, runner: macos-15 }
           - { preset: windows-clang-cl, runner: windows-2025 }
-    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
+    uses: Rawframe-Project/.github/.github/workflows/cpp.yml@972ea41c6abf2652d3b067e57bf0713f1661cf0e # v0.0.51
     permissions:
       contents: read
     with:
@@ -370,7 +373,7 @@ jobs:
   prune-caches:
     needs: [build, fuzz-night]
     if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    uses: Rawframe-Project/.github/.github/workflows/cache-prune.yml@8414d388d2116b581c5c5d8f6641e1da4d863244 # v0.0.42
+    uses: Rawframe-Project/.github/.github/workflows/cache-prune.yml@972ea41c6abf2652d3b067e57bf0713f1661cf0e # v0.0.51
     permissions:
       actions: write
 
