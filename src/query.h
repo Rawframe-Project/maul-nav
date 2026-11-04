@@ -240,7 +240,37 @@ struct mnavQuery
     mnavQueryFilter filter;
     mnavFlightSliced flight;
     mnavGraphSearch graph;
+    // The calls made with the context, each of which may write the arrays
+    // above, and the counts of the last path a call gave, so that a path
+    // handed back is checked to be that call's and within them.
+    uint64_t generation;
+    int32_t pathPolygons;
+    int32_t pathPoints;
+    int32_t pathLinks;
 };
+
+// Whether a call with the context came back in from host code, refused and
+// counted as mnavHostCalledBack does; otherwise the call is counted, so
+// that a path an earlier call gave is known to be gone.
+static inline bool mnavQueryCalledBack(mnavQuery* query)
+{
+    if (mnavHostCalledBack(&query->host))
+    {
+        return true;
+    }
+    query->generation += 1;
+    return false;
+}
+
+// Marks a path as the current call's, and notes its counts.
+static inline void mnavMarkPath(mnavQuery* query, mnavPath* path)
+{
+    path->query = query;
+    path->generation = query->generation;
+    query->pathPolygons = path->polygonCount;
+    query->pathPoints = path->pointCount;
+    query->pathLinks = path->linkCount;
+}
 
 // Empties the node table for a search, unless it is empty already.
 void mnavClearTable(mnavQuery* query);

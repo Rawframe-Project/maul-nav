@@ -413,7 +413,7 @@ mnavResult mnavBeginPathWork(mnavQuery* query, const mnavNavmesh* navmesh,
                              const mnavQueryFilter* filter, mnavPolygonId startPolygon,
                              mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }
@@ -614,7 +614,7 @@ static bool Ended(const mnavQuery* query)
 mnavResult mnavContinuePathWork(mnavQuery* query, const mnavNavmesh* navmesh, int32_t nodes,
                                 bool* endedOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }
@@ -675,7 +675,7 @@ mnavResult mnavQuery_ContinuePath(mnavQuery* query, const mnavNavmesh* navmesh, 
 
 mnavResult mnavFinishPathWork(mnavQuery* query, const mnavNavmesh* navmesh, mnavPath* pathOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }
@@ -703,7 +703,10 @@ mnavResult mnavFinishPathWork(mnavQuery* query, const mnavNavmesh* navmesh, mnav
                           query->points,
                           pointCount,
                           query->links,
-                          linkCount};
+                          linkCount,
+                          nullptr,
+                          0};
+    mnavMarkPath(query, pathOut);
     s->active = false;
     return mnav_success;
 }
@@ -732,7 +735,7 @@ mnavResult mnavFindPathWork(mnavQuery* query, const mnavNavmesh* navmesh,
                             mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
                             mnavPath* pathOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }
@@ -781,7 +784,7 @@ mnavResult mnavCheckReachableWork(mnavQuery* query, const mnavNavmesh* navmesh,
                                   mnavPos3 start, mnavPolygonId endPolygon, mnavPos3 end,
                                   mnavPathEnd* endOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }

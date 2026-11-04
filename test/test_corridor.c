@@ -129,7 +129,10 @@ static void TestChecksAndLimits(void)
     CHECK(mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &out) == mnav_success &&
               out.pointCount == 1 && out.points[0].x == a.point.x,
           "a fresh corridor's one point");
-    CHECK(mnavResetCorridor(&corridor, buffer, 256, a.polygon, a.point) == mnav_success &&
+    // The corners took the context's memory: the path is found again.
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &path) == mnav_success &&
+              mnavResetCorridor(&corridor, buffer, 256, a.polygon, a.point) == mnav_success &&
               mnavSetCorridor(&corridor, &path) == mnav_success,
           "loaded");
     mnavQuery* small = MakeQuery(4);
@@ -178,6 +181,63 @@ static void TestChecksAndLimits(void)
 // past it. mnavSetCorridor replaces the count and the ends, so it checks
 // only the capacity of the corridor; of the path, it refuses NULL arrays
 // and ends that are not finite.
+// A path handed back is checked against the context that gave it:
+// loading reads only arrays that context's last call wrote, within the
+// counts that call gave, so a count copied from a longer path and a path
+// kept past its context's next call are refused, the corridor unchanged.
+static void TestPathsHandedBack(void)
+{
+    mnavNavmesh* navmesh = LoadWorld();
+    mnavQuery* query = MakeQuery(8192);
+    mnavQuery* small = MakeQuery(4);
+    mnavNearest a = On(navmesh, 2.0, 2.0, 2.0f);
+    mnavNearest b = On(navmesh, 62.0, 62.0, 2.0f);
+    mnavPath longer = {0};
+    mnavPath shorter = {0};
+    CHECK(mnavQuery_FindPath(query, navmesh, a.polygon, a.point, b.polygon, b.point, nullptr,
+                             &longer) == mnav_success &&
+              longer.polygonCount > 4 &&
+              mnavQuery_FindPath(small, navmesh, a.polygon, a.point, a.polygon, a.point, nullptr,
+                                 &shorter) == mnav_success &&
+              shorter.polygonCount == 1,
+          "a long path, and a short one from a context of four nodes");
+    static mnavPolygonId buffer[256];
+    mnavCorridor corridor;
+    // Its polygons lie in a buffer of four: the longer count reaches past
+    // it.
+    mnavPath copied = shorter;
+    copied.polygonCount = longer.polygonCount;
+    CHECK(mnavResetCorridor(&corridor, buffer, 256, b.polygon, b.point) == mnav_success &&
+              mnavSetCorridor(&corridor, &copied) == mnav_errorInvalid &&
+              corridor.polygonCount == 1 && corridor.position.x == b.point.x,
+          "a count copied from a longer path refused, the corridor unchanged");
+    // The same within the buffer: more than the call gave.
+    copied = shorter;
+    copied.pointCount = shorter.pointCount + 1;
+    CHECK(mnavSetCorridor(&corridor, &copied) == mnav_errorInvalid && corridor.polygonCount == 1,
+          "more points than the call gave refused");
+    // A path no call gave, its arrays the context's.
+    copied = shorter;
+    copied.query = nullptr;
+    CHECK(mnavSetCorridor(&corridor, &copied) == mnav_errorInvalid && corridor.polygonCount == 1,
+          "a path with no context refused");
+    // Kept past the context's next call, the arrays are that call's.
+    mnavPath kept = longer;
+    mnavNearest c = On(navmesh, 10.0, 50.0, 2.0f);
+    mnavPath next = {0};
+    CHECK(mnavQuery_FindPath(query, navmesh, c.polygon, c.point, a.polygon, a.point, nullptr,
+                             &next) == mnav_success &&
+              mnavSetCorridor(&corridor, &kept) == mnav_errorStale && corridor.polygonCount == 1 &&
+              corridor.position.x == b.point.x,
+          "a path kept past its context's next call refused, the corridor unchanged");
+    CHECK(mnavSetCorridor(&corridor, &next) == mnav_success &&
+              corridor.polygonCount == next.polygonCount,
+          "the next call's path loads");
+    mnavDestroyQuery(small);
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 static void TestMalformedCorridors(void)
 {
     mnavNavmesh* navmesh = LoadWorld();
@@ -799,6 +859,7 @@ int main(void)
     LoadWorldTiles();
     TestCornersAreThePathsStraightPath();
     TestChecksAndLimits();
+    TestPathsHandedBack();
     TestMalformedCorridors();
     TestFiltersAndLinks();
     TestMovingTheEnds();

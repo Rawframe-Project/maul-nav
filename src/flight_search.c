@@ -554,7 +554,7 @@ static MNAV_NOINLINE mnavResult BeginFlightPathWork(mnavQuery* query,
                                                     const mnavFlightVolume* volume, mnavPos3 start,
                                                     mnavPos3 end)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }
@@ -648,7 +648,7 @@ static MNAV_NOINLINE mnavResult ContinueFlightPathWork(mnavQuery* query,
                                                        const mnavFlightVolume* volume,
                                                        int32_t nodes, bool* endedOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }
@@ -694,7 +694,7 @@ static MNAV_NOINLINE mnavResult FinishFlightPathWork(mnavQuery* query,
                                                      const mnavFlightVolume* volume,
                                                      mnavFlightPath* pathOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }
@@ -755,7 +755,7 @@ static MNAV_NOINLINE mnavResult FindFlightPathWork(mnavQuery* query, const mnavF
                                                    mnavPos3 start, mnavPos3 end,
                                                    mnavFlightPath* pathOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }

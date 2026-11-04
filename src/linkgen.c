@@ -395,7 +395,7 @@ static MNAV_NOINLINE mnavResult GenerateLinksWork(mnavQuery* query, const mnavNa
                                                   const mnavTileRange* tiles, mnavLinkDef* linksOut,
                                                   int32_t capacity, int32_t* countOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }
@@ -442,7 +442,7 @@ GenerateLinksWithinWork(mnavQuery* query, const mnavNavmesh* navmesh, const mnav
                         const mnavLinkGenDef* def, mnavTileRange range, mnavLinkDef* linksOut,
                         int32_t capacity, int32_t* countOut, mnavLinkGenLimits limits)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }

@@ -278,7 +278,7 @@ mnavResult mnavMoveAlongSurfaceWork(mnavQuery* query, const mnavNavmesh* navmesh
                                     const mnavQueryFilter* filter, mnavPolygonId startPolygon,
                                     mnavPos3 start, mnavPos3 end, mnavMove* moveOut)
 {
-    if (query != nullptr && mnavHostCalledBack(&query->host))
+    if (query != nullptr && mnavQueryCalledBack(query))
     {
         return mnav_errorBusy;
     }
