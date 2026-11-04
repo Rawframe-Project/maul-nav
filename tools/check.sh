@@ -117,14 +117,10 @@ all_c_files() { git ls-files 'include/*.h' 'src/*.[ch]' 'test/*.[ch]' 'tools/*.[
 # Each hides findings the other shows. The header filter is passed on the
 # command line, since clang-tidy-20 run from the root does not apply
 # .clang-tidy's HeaderFilterRegex and would drop a finding in a header,
-# and anchored at the source directory the build tree records, the path
-# its compile commands name, regex-escaped, so that headers fetched under
-# out/ are not reported as ours.
-header_filter() { # build directory
-    local root
-    root=$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$1/CMakeCache.txt")
-    printf '^%s/(src|include)/' "$(printf '%s' "$root" | sed 's/[][\\.*^$+?(){}|]/\\&/g')"
-}
+# and the family's tools/tidy_filter.sh anchors it at the source directory
+# the build tree records, the path its compile commands name, regex-escaped,
+# so that headers fetched under out/ are not reported as ours. It is
+# assigned on a line of its own, so that its failure stops the run.
 
 tidy() { # files
     local build f filter
@@ -133,7 +129,7 @@ tidy() { # files
         cmake --preset linux-clang-20 -B "$out/check-tidy-$build" -DCMAKE_BUILD_TYPE=$build \
             --no-warn-unused-cli -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DMAUL_NAV_BUILD_TESTS=OFF \
             -DMAUL_NAV_BUILD_BENCH=OFF -DMAUL_NAV_BUILD_SAMPLES=OFF >"$out/check-tidy-$build.log"
-        filter=$(header_filter "$out/check-tidy-$build")
+        filter=$(tools/tidy_filter.sh "$out/check-tidy-$build")
         for f in "$@"; do
             clang-tidy-20 -p "$out/check-tidy-$build" --quiet --warnings-as-errors='*' \
                 --header-filter="$filter" "$f" 2>/dev/null
