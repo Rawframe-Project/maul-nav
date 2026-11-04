@@ -192,3 +192,70 @@ int32_t DiffMaulRaycast(DiffMaul* maul, const float a[3], const float b[3], floa
     normal[2] = ray.normal.z;
     return ray.end == mnav_rayWall ? 1 : (ray.end == mnav_rayReached ? 0 : 2);
 }
+
+int32_t DiffMaulRayWalls(DiffMaul* maul, const float a[3], const float b[3], const double at[2],
+                         double radius, float* segments, int32_t capacity)
+{
+    mnavNearest s;
+    if (!Nearest(maul, a, &s))
+    {
+        return -1;
+    }
+    mnavRay ray;
+    if (mnavQuery_Raycast(maul->query, maul->navmesh, s.polygon, s.point,
+                          (mnavPos3){(double)b[0], (double)b[1], (double)b[2]}, nullptr,
+                          &ray) != mnav_success)
+    {
+        return -1;
+    }
+    // The first polygon the ray crossed that lies under at, before the
+    // walls' search ends the ray's query; a point on an edge, as a ray's
+    // stop is, may round outside each, so failing that the point 0.01 m
+    // back toward the start is the center.
+    double ux = s.point.x - at[0];
+    double uz = s.point.z - at[1];
+    double length = sqrt(ux * ux + uz * uz);
+    double back = length > 0.01 ? 0.01 / length : 0.0;
+    mnavPos3 center = {at[0], 0.0, at[1]};
+    mnavPolygonId polygon = {0};
+    for (int32_t k = 0; k < 2 && polygon.slot == 0; ++k)
+    {
+        center.x = at[0] + (double)k * back * ux;
+        center.z = at[1] + (double)k * back * uz;
+        for (int32_t i = 0; i < ray.polygonCount && polygon.slot == 0; ++i)
+        {
+            if (mnavPolygon_GetHeight(maul->navmesh, ray.polygons[i], center.x, center.z,
+                                      &center.y) == mnav_success)
+            {
+                polygon = ray.polygons[i];
+            }
+        }
+    }
+    if (polygon.slot == 0)
+    {
+        return -1;
+    }
+    enum
+    {
+        WALL_ROOM = 64
+    };
+    static mnavWall walls[WALL_ROOM];
+    mnavWallsFound found;
+    if (mnavQuery_FindWalls(maul->query, maul->navmesh, polygon, center, radius + 0.01, nullptr,
+                            walls, WALL_ROOM, &found) != mnav_success ||
+        found.limited || found.wallCount > capacity)
+    {
+        return -2;
+    }
+    for (int32_t i = 0; i < found.wallCount; ++i)
+    {
+        float* w = &segments[i * 6];
+        w[0] = (float)walls[i].start.x;
+        w[1] = (float)walls[i].start.y;
+        w[2] = (float)walls[i].start.z;
+        w[3] = (float)walls[i].end.x;
+        w[4] = (float)walls[i].end.y;
+        w[5] = (float)walls[i].end.z;
+    }
+    return found.wallCount;
+}

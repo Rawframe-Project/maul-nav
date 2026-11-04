@@ -61,6 +61,17 @@ extern "C"
     int32_t DiffMaulRaycast(DiffMaul* maul, const float a[3], const float b[3], float start[3],
                             double* t, float normal[3]);
 
+    // The walls within radius on the ground of the point at, on the first
+    // polygon under it, or under the point 0.01 m back toward the start,
+    // that the ray from a toward b, as DiffMaulRaycast casts it, crossed,
+    // as mnavQuery_FindWalls lists them, and some 0.01 m farther: their count,
+    // up to capacity, with each wall's two ends as six floats in segments;
+    // -1 when a has no polygon near, the ray failed or crossed no polygon
+    // under at; -2 when the search failed, ran into the node limit or found
+    // more than capacity.
+    int32_t DiffMaulRayWalls(DiffMaul* maul, const float a[3], const float b[3], const double at[2],
+                             double radius, float* segments, int32_t capacity);
+
 #ifdef __cplusplus
 }
 #endif

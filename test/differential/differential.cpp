@@ -305,6 +305,49 @@ int DetourRaycast(const Detour& d, const float a[3], const float b[3], float sta
     return 1;
 }
 
+// The walls of the polygons Detour's ray from a toward b went through,
+// as getPolyWallSegments gives them: their count, up to capacity, with
+// each wall's two ends as six floats in segments; -1 when a has no
+// polygon near or the ray ended another way; -2 when more lie there than
+// capacity holds.
+int DetourRayWalls(const Detour& d, const float a[3], const float b[3], float* segments,
+                   int capacity)
+{
+    dtQueryFilter filter;
+    const float extents[3] = {0.5f, 2.0f, 0.5f};
+    dtPolyRef ref = 0;
+    float start[3];
+    d.query->findNearestPoly(a, extents, &filter, &ref, start);
+    if (ref == 0)
+    {
+        return -1;
+    }
+    float hit = 0.0f;
+    float normal[3];
+    static dtPolyRef path[4096];
+    int count = 0;
+    dtStatus status = d.query->raycast(ref, start, b, &filter, &hit, normal, path, &count, 4096);
+    if (dtStatusFailed(status) || (status & DT_BUFFER_TOO_SMALL) != 0)
+    {
+        return -1;
+    }
+    int total = 0;
+    for (int i = 0; i < count; ++i)
+    {
+        float walls[DT_VERTS_PER_POLYGON * 6];
+        int n = 0;
+        status = d.query->getPolyWallSegments(path[i], &filter, walls, nullptr, &n,
+                                              DT_VERTS_PER_POLYGON);
+        if (dtStatusFailed(status) || total + n > capacity)
+        {
+            return -2;
+        }
+        std::memcpy(&segments[total * 6], walls, sizeof(float) * 6 * static_cast<std::size_t>(n));
+        total += n;
+    }
+    return total;
+}
+
 // Where a ray from start toward b stopped on the ground, t of the way.
 void Along(const float start[3], const float b[3], double t, double out[2])
 {
@@ -325,7 +368,11 @@ void Along(const float start[3], const float b[3], double t, double out[2])
 // 0.6 m apart, and a ray may stop at one and pass the other's corner.
 // A pair both stop on is banded when, besides, the ray that went farther
 // stops within kWallBand past the other's stop; a pair one stops on and
-// the other passes is grazed. A pair passes only as kRayAllowed lists
+// the other passes is grazed when, besides, the ray that passed crossed
+// none of its own library's walls near the other's stop, so that it
+// passes a wall only the other has. So that this check is seen to work,
+// every ray that stopped must cross its own library's walls near its stop
+// when it goes on to the end. A pair passes only as kRayAllowed lists
 // it, by scene, index and kind, so a change in which pairs disagree
 // fails until it is explained, and so does a listed pair that no longer
 // disagrees, so that the list stays the set of known disagreements.
@@ -340,6 +387,8 @@ struct RayTally
     int grazed = 0;
     int listed = 0;
     int stale = 0;
+    int stops = 0;
+    int crossed = 0;
 };
 
 constexpr double kRayClose = 0.25;
@@ -447,6 +496,63 @@ bool StopsNear(DiffMaul* maul, const Detour& d, bool onMaul, const float a[3], c
     return std::hypot(h[0] - s[0], h[1] - s[1]) <= kWallBand;
 }
 
+// Which side of the line on the ground from p through q the point r lies
+// on: 1 left, -1 right, 0 on it.
+int Side(const double p[2], const double q[2], const double r[2])
+{
+    double c = (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+    return c > 0.0 ? 1 : (c < 0.0 ? -1 : 0);
+}
+
+// The distance on the ground from s to the segment from p to q.
+double SegmentDistance(const double s[2], const double p[2], const double q[2])
+{
+    double ux = q[0] - p[0];
+    double uz = q[1] - p[1];
+    double length2 = ux * ux + uz * uz;
+    double t = length2 > 0.0 ? ((s[0] - p[0]) * ux + (s[1] - p[1]) * uz) / length2 : 0.0;
+    t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+    return std::hypot(p[0] + t * ux - s[0], p[1] + t * uz - s[1]);
+}
+
+// Whether the way on the ground from a library's ray start, cast from a,
+// to b crosses none of its own walls within kWallBand of the point s on
+// it: Maul Nav's walls mnavQuery_FindWalls lists around s from the
+// polygon its ray crossed there, and Detour's of the polygons its ray went
+// through. A wall the way only touches does not count. A ray that reached
+// b through a wall of its own navmesh near the other's stop fails, though
+// the other's probe finds that wall near.
+bool Heeds(DiffMaul* maul, const Detour& d, bool onMaul, const float a[3], const float start[3],
+           const float b[3], const double s[2])
+{
+    constexpr int kRoom = 1024;
+    static float walls[kRoom * 6];
+    int count = onMaul ? DiffMaulRayWalls(maul, a, b, s, kWallBand, walls, kRoom)
+                       : DetourRayWalls(d, a, b, walls, kRoom);
+    if (count < 0)
+    {
+        return false;
+    }
+    auto D = [](float v) { return static_cast<double>(v); };
+    const double from[2] = {D(start[0]), D(start[2])};
+    const double to[2] = {D(b[0]), D(b[2])};
+    for (int i = 0; i < count; ++i)
+    {
+        const float* w = &walls[i * 6];
+        const double p[2] = {D(w[0]), D(w[2])};
+        const double q[2] = {D(w[3]), D(w[5])};
+        if (SegmentDistance(s, p, q) > kWallBand)
+        {
+            continue;
+        }
+        if (Side(from, to, p) * Side(from, to, q) < 0 && Side(p, q, from) * Side(p, q, to) < 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 // How far along the pair's direction from a the point p on the ground lies.
 double Ahead(const float a[3], const float b[3], const double p[2])
 {
@@ -485,6 +591,28 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
         Along(ms, b, m == 1 ? mt : 1.0, mp);
         Along(ds, b, r == 1 ? dt : 1.0, dp);
         double gap = std::hypot(mp[0] - dp[0], mp[1] - dp[1]);
+        // A ray that stopped, gone on to the end, crosses a wall of its own
+        // near its stop.
+        for (int k = 0; k < 2; ++k)
+        {
+            bool onMaul = k == 0;
+            if ((onMaul ? m : r) != 1)
+            {
+                continue;
+            }
+            const double* p = onMaul ? mp : dp;
+            t.stops += 1;
+            if (Heeds(maul, d, onMaul, a, onMaul ? ms : ds, b, p))
+            {
+                Say("ray %s %d: %s's ray stopped at (%.4f %.4f) but crosses none of its walls "
+                    "near there\n",
+                    scene, i, onMaul ? "maul" : "detour", p[0], p[1]);
+            }
+            else
+            {
+                t.crossed += 1;
+            }
+        }
         bool agree = m == r;
         t.endAgree += agree ? 1 : 0;
         if (m == 1 && r == 1)
@@ -504,7 +632,11 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
             bool banded =
                 near && both &&
                 (mauler ? StopsNear(maul, d, true, a, b, dp) : StopsNear(maul, d, false, a, b, mp));
-            bool grazed = near && !both;
+            // When one stopped, the one that reached the end crossed none
+            // of its own walls near the other's stop.
+            bool grazed =
+                near && !both &&
+                (m == 0 ? Heeds(maul, d, true, a, ms, b, dp) : Heeds(maul, d, false, a, ds, b, mp));
             int k = AllowedOf(scene, i);
             bool listed =
                 k >= 0 && ((banded && !kRayAllowed[k].grazed) || (grazed && kRayAllowed[k].grazed));
@@ -516,11 +648,12 @@ void CompareRays(const char* scene, DiffMaul* maul, const Detour& d, RayTally& t
             t.banded += banded ? 1 : 0;
             t.grazed += grazed ? 1 : 0;
             t.listed += listed ? 1 : 0;
-            const char* verdict = listed   ? (banded ? "banded, listed" : "grazed, listed")
-                                  : banded ? "banded, not listed as banded"
-                                  : grazed ? "grazed, not listed as grazed"
-                                  : near   ? "past the other's stop"
-                                           : "no wall within 0.6 m";
+            const char* verdict = listed          ? (banded ? "banded, listed" : "grazed, listed")
+                                  : banded        ? "banded, not listed as banded"
+                                  : grazed        ? "grazed, not listed as grazed"
+                                  : near && !both ? "through its own wall near the other's stop"
+                                  : near          ? "past the other's stop"
+                                                  : "no wall within 0.6 m";
             auto D = [](float v) { return static_cast<double>(v); };
             Say("ray %s %d: (%.4f %.4f %.4f) to (%.4f %.4f %.4f): maul %d at (%.4f %.4f) "
                 "t %.6f, detour %d at (%.4f %.4f) t %.6f, %.4f m apart, %s\n",
@@ -803,10 +936,10 @@ int main()
     }
     Say(pass ? "agreement within the floors\n" : "agreement below a floor\n");
     // Rays: each pair agrees, or is banded or grazed as kRayAllowed lists
-    // it.
+    // it, and every ray that stopped crosses its own wall near its stop.
     bool rays = true;
-    Say("\n%-10s %6s %8s %6s %8s %8s %6s %6s %6s\n", "scene", "rays", "ends", "hits", "close",
-        "differ", "banded", "grazed", "listed");
+    Say("\n%-10s %6s %8s %6s %8s %8s %6s %6s %6s %6s %7s\n", "scene", "rays", "ends", "hits",
+        "close", "differ", "banded", "grazed", "listed", "stops", "crossed");
     for (int32_t i = 0; i < DiffSceneCount(); ++i)
     {
         DiffScene scene = DiffGetScene(i);
@@ -818,10 +951,10 @@ int main()
             CompareRays(scene.name, maul, d, t);
             double cast = t.cast > 0 ? static_cast<double>(t.cast) : 1.0;
             double hits = t.bothHit > 0 ? static_cast<double>(t.bothHit) : 1.0;
-            Say("%-10s %6d %7.1f%% %6d %7.1f%% %8d %6d %6d %6d\n", scene.name, t.cast,
+            Say("%-10s %6d %7.1f%% %6d %7.1f%% %8d %6d %6d %6d %6d %7d\n", scene.name, t.cast,
                 100.0 * t.endAgree / cast, t.bothHit, 100.0 * t.hitClose / hits, t.disagree,
-                t.banded, t.grazed, t.listed);
-            rays = rays && t.listed == t.disagree && t.stale == 0;
+                t.banded, t.grazed, t.listed, t.stops, t.crossed);
+            rays = rays && t.listed == t.disagree && t.stale == 0 && t.crossed == t.stops;
         }
         DiffMaulDestroy(maul);
     }
