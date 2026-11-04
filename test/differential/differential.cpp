@@ -899,12 +899,15 @@ int DetourMove(const Detour& d, const float a[3], const float to[3], float start
 // wanted point is at the first point's height. Each move ends at the
 // wanted point or at the point nearest it on the walls met, so how far
 // each ends from the wanted point moves by at most kWallBand plus how
-// far apart the two snap the start, as for the walls. Every pair whose
-// ends lie more than 0.25 m apart is printed with whether its two
-// distances from the wanted point lie within that band, and passes only
-// within the band and as kMoveAllowed lists it, with the point Maul
-// Nav's move ends at; a listed pair that no longer differs fails, as
-// with the rays.
+// far apart the two snap the start, as for the walls: the pair is
+// banded. Maul Nav's move searches a circle widened by a cell, where
+// Detour's is widened by 1 mm, so it may meet walls Detour's does not and
+// end nearer the wanted point by more than that: the pair is wider. A
+// move that ends farther than Detour's past the band missed a wall
+// Detour met, and fails. Every pair whose ends lie more than 0.25 m
+// apart is printed with its kind, and passes only as kMoveAllowed lists
+// it, with its kind and the point Maul Nav's move ends at; a listed pair
+// that no longer differs fails, as with the rays.
 struct MoveTally
 {
     int moved = 0;
@@ -912,6 +915,8 @@ struct MoveTally
     int bothStopped = 0;
     int close = 0;
     int differ = 0;
+    int banded = 0;
+    int wider = 0;
     int listed = 0;
     int stale = 0;
 };
@@ -919,19 +924,22 @@ struct MoveTally
 constexpr double kMoveLength = 5.0;
 
 // The pairs whose moves may end apart, each explained in the pull
-// request that listed it: by scene, the pair's index and the point Maul
-// Nav's move ends at, its x and z within kWallMatch, so that a change of
-// Maul Nav's end fails until it is explained. A scene not listed allows
-// none.
+// request that listed it: by scene, the pair's index, whether it is
+// wider rather than banded, and the point Maul Nav's move ends at, its x
+// and z within kWallMatch, so that a change of Maul Nav's end fails until
+// it is explained. A scene not listed allows none.
 struct MoveAllowed
 {
     const char* scene;
     int pair;
+    bool wider;
     double x;
     double z;
 };
-// An entry no scene names keeps the array from being empty.
-constexpr MoveAllowed kMoveAllowed[] = {{"", -1, 0.0, 0.0}};
+constexpr MoveAllowed kMoveAllowed[] = {{"world", 63, false, 33.75, 32.8863},
+                                        {"world", 66, true, 22.8721, 24.75},
+                                        {"building", 48, true, 12.827, 10.75},
+                                        {"plateaus", 134, false, 13.737, 27.25}};
 constexpr int kMoveAllowedCount = static_cast<int>(sizeof(kMoveAllowed) / sizeof(kMoveAllowed[0]));
 
 void CompareMoves(const char* scene, DiffMaul* maul, const Detour& d, MoveTally& t)
@@ -977,8 +985,11 @@ void CompareMoves(const char* scene, DiffMaul* maul, const Detour& d, MoveTally&
         }
         double snap = Apart(ms, ds);
         double band = kWallBand + snap;
-        double gap = m == 2 || r == 2 ? 0.0 : std::fabs(Apart(me, to) - Apart(de, to));
-        bool within = m != 2 && r != 2 && gap <= band;
+        double maulShort = Apart(me, to);
+        double detourShort = Apart(de, to);
+        bool ended = m != 2 && r != 2;
+        bool banded = ended && std::fabs(maulShort - detourShort) <= band;
+        bool wider = ended && maulShort < detourShort - band;
         int k = -1;
         for (int j = 0; j < kMoveAllowedCount; ++j)
         {
@@ -993,17 +1004,24 @@ void CompareMoves(const char* scene, DiffMaul* maul, const Detour& d, MoveTally&
         }
         bool matches = k >= 0 && std::fabs(D(me[0]) - kMoveAllowed[k].x) <= kWallMatch &&
                        std::fabs(D(me[2]) - kMoveAllowed[k].z) <= kWallMatch;
-        bool listed = within && matches;
+        bool listed =
+            matches && ((banded && !kMoveAllowed[k].wider) || (wider && kMoveAllowed[k].wider));
         t.differ += 1;
+        t.banded += banded ? 1 : 0;
+        t.wider += wider ? 1 : 0;
         t.listed += listed ? 1 : 0;
+        const char* verdict =
+            listed   ? (banded ? "banded, listed" : "wider, listed")
+            : banded ? (k >= 0 ? "banded, not listed as banded with this Maul Nav end"
+                               : "banded, not listed")
+            : wider  ? (k >= 0 ? "wider, not listed as wider with this Maul Nav end"
+                               : "wider, not listed")
+            : ended  ? "Detour's move ends nearer past the band"
+                     : "ended another way";
         Say("move %s %d: (%.4f %.4f) toward (%.4f %.4f): maul %d at (%.4f %.4f), detour %d at "
             "(%.4f %.4f), %.4f m apart, %.4f and %.4f m short, snapped %.4f m apart, %s\n",
             scene, i, D(a[0]), D(a[2]), D(to[0]), D(to[2]), m, D(me[0]), D(me[2]), r, D(de[0]),
-            D(de[2]), apart, Apart(me, to), Apart(de, to), snap,
-            within ? (listed   ? "within the band, listed"
-                      : k >= 0 ? "within the band, listed with another Maul Nav end"
-                               : "within the band, not listed")
-                   : (k >= 0 ? "past the band, though listed" : "past the band, not listed"));
+            D(de[2]), apart, maulShort, detourShort, snap, verdict);
     }
     for (int k = 0; k < kMoveAllowedCount; ++k)
     {
@@ -1332,8 +1350,8 @@ int main()
     // Moves: each pair's moves end together, or apart as kMoveAllowed
     // lists it.
     bool moves = true;
-    Say("\n%-10s %6s %8s %6s %8s %8s %6s\n", "scene", "moves", "ends", "stops", "close", "differ",
-        "listed");
+    Say("\n%-10s %6s %8s %6s %8s %8s %6s %6s %6s\n", "scene", "moves", "ends", "stops", "close",
+        "differ", "banded", "wider", "listed");
     for (int32_t i = 0; i < DiffSceneCount(); ++i)
     {
         DiffScene scene = DiffGetScene(i);
@@ -1345,9 +1363,9 @@ int main()
             CompareMoves(scene.name, maul, d, t);
             double moved = t.moved > 0 ? static_cast<double>(t.moved) : 1.0;
             double stops = t.bothStopped > 0 ? static_cast<double>(t.bothStopped) : 1.0;
-            Say("%-10s %6d %7.1f%% %6d %7.1f%% %8d %6d\n", scene.name, t.moved,
+            Say("%-10s %6d %7.1f%% %6d %7.1f%% %8d %6d %6d %6d\n", scene.name, t.moved,
                 100.0 * t.endAgree / moved, t.bothStopped, 100.0 * t.close / stops, t.differ,
-                t.listed);
+                t.banded, t.wider, t.listed);
             moves = moves && t.listed == t.differ && t.stale == 0;
         }
         DiffMaulDestroy(maul);
