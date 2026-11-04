@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// The version and result names.
+// The version and result names, and the result attribute.
 
 #include "test_harness.h"
 
@@ -9,6 +9,13 @@
 
 #include <stdint.h>
 #include <string.h>
+
+// The suites build as C23, where every compiler the family takes has
+// [[nodiscard]], so MNAV_NODISCARD expands to it and a dropped status
+// warns (GCC 14 reports its C23 as 202000L).
+#define TEXT(x)     #x
+#define EXPANDED(x) TEXT(x)
+static_assert(sizeof(EXPANDED(MNAV_NODISCARD)) > 1, "MNAV_NODISCARD is the attribute in C23");
 
 static void TestVersionMatchesHeader(void)
 {
