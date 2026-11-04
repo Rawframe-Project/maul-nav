@@ -65,11 +65,11 @@ mnavResult mnavResetCorridor(mnavCorridor* corridor, mnavPolygonId* buffer, int3
     return result;
 }
 
-// Whether a path's arrays are those the call of its context that gave it
-// wrote, within the counts that call noted: mnav_errorStale when a call
-// has been made with the context since, mnav_errorInvalid for a path no
-// call gave or one whose arrays or counts were changed. Only the context's
-// own fields are read, so no copied field reaches outside its arrays.
+// Whether a path is the one its context keeps, within the counts it
+// kept: mnav_errorStale when a later search's path has replaced it,
+// mnav_errorInvalid for a path no search gave or one whose arrays or
+// counts were changed. Only the context's own fields are read, so no
+// copied field reaches outside its arrays.
 static mnavResult CheckPath(const mnavPath* path)
 {
     const mnavQuery* query = path->query;
@@ -81,11 +81,11 @@ static mnavResult CheckPath(const mnavPath* path)
     {
         return mnav_errorStale;
     }
-    bool links = path->linkCount == 0 || path->links == query->links;
-    return path->polygons == query->corridor && path->points == query->points && links &&
-                   path->polygonCount >= 1 && path->polygonCount <= query->pathPolygons &&
-                   path->pointCount >= 1 && path->pointCount <= query->pathPoints &&
-                   path->linkCount >= 0 && path->linkCount <= query->pathLinks
+    bool links = path->linkCount == 0 || path->links == query->pathLinks;
+    return path->polygons == query->pathPolygons && path->points == query->pathPoints && links &&
+                   path->polygonCount >= 1 && path->polygonCount <= query->pathPolygonCount &&
+                   path->pointCount >= 1 && path->pointCount <= query->pathPointCount &&
+                   path->linkCount >= 0 && path->linkCount <= query->pathLinkCount
                ? mnav_success
                : mnav_errorInvalid;
 }
@@ -298,7 +298,7 @@ static MNAV_NOINLINE mnavResult CorridorCornersWork(mnavQuery* query, const mnav
                                                     const mnavCorridor* corridor,
                                                     mnavCorners* cornersOut)
 {
-    if (query != nullptr && mnavQueryCalledBack(query))
+    if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }
@@ -435,7 +435,7 @@ static MNAV_NOINLINE mnavResult CorridorAreasWork(mnavQuery* query, const mnavNa
                                                   mnavCorners* cornersOut, mnavAreaRun* runsOut,
                                                   int32_t capacity, int32_t* countOut)
 {
-    if (query != nullptr && mnavQueryCalledBack(query))
+    if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }
@@ -590,7 +590,7 @@ static MNAV_NOINLINE mnavResult MoveCorridorWork(mnavQuery* query, const mnavNav
                                                  mnavCorridor* corridor, mnavPos3 wanted,
                                                  mnavMove* moveOut)
 {
-    if (query != nullptr && mnavQueryCalledBack(query))
+    if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }
@@ -643,7 +643,7 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetWork(mnavQuery* query, const m
                                                        mnavCorridor* corridor, mnavPos3 wanted,
                                                        mnavMove* moveOut)
 {
-    if (query != nullptr && mnavQueryCalledBack(query))
+    if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }
@@ -699,7 +699,7 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorWork(mnavQuery* query, const mna
                                                      mnavCorridor* corridor, mnavPos3 toward,
                                                      bool* shortenedOut)
 {
-    if (query != nullptr && mnavQueryCalledBack(query))
+    if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }
@@ -785,7 +785,7 @@ static MNAV_NOINLINE mnavResult ReplanCorridorWork(mnavQuery* query, const mnavN
                                                    mnavCorridor* corridor, mnavVec3 halfExtents,
                                                    mnavPath* pathOut)
 {
-    if (query != nullptr && mnavQueryCalledBack(query))
+    if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }
@@ -826,7 +826,7 @@ static MNAV_NOINLINE mnavResult ReplanCorridorWork(mnavQuery* query, const mnavN
                               0,
                               nullptr,
                               0};
-        mnavMarkPath(query, pathOut);
+        mnavKeepPath(query, pathOut);
         return mnav_success;
     }
     result =

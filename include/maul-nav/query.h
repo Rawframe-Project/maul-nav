@@ -236,22 +236,22 @@ extern "C"
         double length;
         // The polygons from the start polygon on, each visit once: a polygon
         // an off-mesh link leaves and lands back on appears before the link
-        // and after it. In the context's memory until its next call.
+        // and after it. In the context's memory until its next search.
         const mnavPolygonId* polygons;
         int32_t polygonCount;
         // The straight path from the start point, the corridor pulled
         // tight: its corners and, last, the end point or, short of it, the
         // midpoint of the last edge crossed. In the context's memory until
-        // its next call; never cut short.
+        // its next search; never cut short.
         const mnavPos3* points;
         int32_t pointCount;
         // The off-mesh links crossed, in order, in the context's memory
-        // until its next call.
+        // until its next search.
         const mnavPathLink* links;
         int32_t linkCount;
-        // The context whose memory holds the arrays, and which of its calls
-        // gave them, set by the call that gives the path, so that
-        // mnavSetCorridor can tell the arrays are still that call's.
+        // The context whose memory holds the arrays, and which of its paths
+        // this is, set by the search that gives it, so that mnavSetCorridor
+        // can tell the arrays are still this path's.
         const mnavQuery* query;
         uint64_t generation;
     } mnavPath;
@@ -599,14 +599,14 @@ extern "C"
     ///
     /// @param corridor The corridor.
     /// @param path     A path from mnavQuery_FindPath or mnavQuery_FinishPath,
-    ///                 as the call gave it, before its context's next call.
+    ///                 as the search gave it, before its context's next search.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor with no buffer or a capacity below 1, or a path with no
     /// polygon or point, a NULL `polygons` or `points`, or a first or last
-    /// point that is not finite, or a path no call gave: arrays other than
-    /// its context's, or more polygons, points or links than the call gave;
-    /// `mnav_errorStale` for a path whose context has made another call
-    /// since, which may have written over its arrays; `mnav_errorCapacity`
+    /// point that is not finite, or a path no search gave: arrays other than
+    /// its context's, or more polygons, points or links than the search
+    /// gave; `mnav_errorStale` for a path a later search of its context has
+    /// replaced; `mnav_errorCapacity`
     /// when the path has more polygons than the corridor's buffer. The
     /// corridor is unchanged on any failure.
     /// @par Thread safety

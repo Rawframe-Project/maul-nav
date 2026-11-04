@@ -456,7 +456,7 @@ static MNAV_NOINLINE mnavResult FindGridPathWork(mnavQuery* query, const mnavGri
                                                  const mnavQueryFilter* filter, mnavCell start,
                                                  mnavCell end, mnavGridPath* pathOut)
 {
-    if (query != nullptr && mnavQueryCalledBack(query))
+    if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }

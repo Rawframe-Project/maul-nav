@@ -78,6 +78,6 @@ mnavResult moved = mnavQuery_MoveCorridor(query, &corridor, navmesh, wanted, NUL
 - The corners carry the off-mesh links ahead with their kinds. At a link, play the traversal, move the agent to the landing point, and move the corridor on with `mnavQuery_MoveCorridor`.
 - `mnavQuery_FindCorridorAreas` gives the corners with the runs of area along them: where the path enters mud, water or a road, and where it lands from a link, so the agent can change gait or sound there.
 
-A buffer too small for a path is refused, never cut: `mnavSetCorridor` returns `mnav_errorCapacity` and leaves the corridor as it was. A path's arrays live in its context's memory until that context's next call, so load it before the next call with the same context: a path kept past it is refused with `mnav_errorStale`, and a path whose arrays or counts were changed with `mnav_errorInvalid`.
+A buffer too small for a path is refused, never cut: `mnavSetCorridor` returns `mnav_errorCapacity` and leaves the corridor as it was. A path's arrays live in its context's memory until that context's next search; the context's other calls, such as corners, raycasts and moves, leave them whole. Load it before the next search with the same context: a path a later search has replaced is refused with `mnav_errorStale`, and a path whose arrays or counts were changed with `mnav_errorInvalid`.
 
 The library never moves an agent. It returns where to go, and the host applies it.

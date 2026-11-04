@@ -870,7 +870,7 @@ static MNAV_NOINLINE mnavResult BuildHierarchyWork(mnavHierarchy* hierarchy, mna
                                                    const mnavQueryFilter* filter,
                                                    mnavHierarchyReport* reportOut)
 {
-    if ((query != nullptr && mnavQueryCalledBack(query)) ||
+    if ((query != nullptr && mnavHostCalledBack(&query->host)) ||
         (hierarchy != nullptr && mnavHostCalledBack(&hierarchy->host)))
     {
         return mnav_errorBusy;
@@ -921,7 +921,7 @@ static MNAV_NOINLINE mnavResult UpdateHierarchyWork(mnavHierarchy* hierarchy, mn
                                                     const mnavNavmesh* navmesh,
                                                     mnavHierarchyReport* reportOut)
 {
-    if ((query != nullptr && mnavQueryCalledBack(query)) ||
+    if ((query != nullptr && mnavHostCalledBack(&query->host)) ||
         (hierarchy != nullptr && mnavHostCalledBack(&hierarchy->host)))
     {
         return mnav_errorBusy;

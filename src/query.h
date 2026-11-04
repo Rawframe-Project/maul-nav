@@ -240,37 +240,27 @@ struct mnavQuery
     mnavQueryFilter filter;
     mnavFlightSliced flight;
     mnavGraphSearch graph;
-    // The calls made with the context, each of which may write the arrays
-    // above, and the counts of the last path a call gave, so that a path
-    // handed back is checked to be that call's and within them.
+    // The last path a search gave, in arrays of its own that no other call
+    // writes: its polygons, points and links, their counts, and which path
+    // it is, so that a path handed back can be checked to be this one and
+    // within it. A flight path's points are kept in the same points.
+    mnavPolygonId* pathPolygons;
+    mnavPos3* pathPoints;
+    mnavPathLink* pathLinks;
+    int32_t pathPolygonCount;
+    int32_t pathPointCount;
+    int32_t pathLinkCount;
     uint64_t generation;
-    int32_t pathPolygons;
-    int32_t pathPoints;
-    int32_t pathLinks;
 };
 
-// Whether a call with the context came back in from host code, refused and
-// counted as mnavHostCalledBack does; otherwise the call is counted, so
-// that a path an earlier call gave is known to be gone.
-static inline bool mnavQueryCalledBack(mnavQuery* query)
-{
-    if (mnavHostCalledBack(&query->host))
-    {
-        return true;
-    }
-    query->generation += 1;
-    return false;
-}
+// Keeps the path a search made in the path arrays, which it then names,
+// so that a call that is no search leaves it whole; the path kept before
+// it is replaced.
+void mnavKeepPath(mnavQuery* query, mnavPath* path);
 
-// Marks a path as the current call's, and notes its counts.
-static inline void mnavMarkPath(mnavQuery* query, mnavPath* path)
-{
-    path->query = query;
-    path->generation = query->generation;
-    query->pathPolygons = path->polygonCount;
-    query->pathPoints = path->pointCount;
-    query->pathLinks = path->linkCount;
-}
+// Keeps a flight path's points the same way, replacing the kept path, and
+// gives where they now lie.
+const mnavPos3* mnavKeepPoints(mnavQuery* query, const mnavPos3* points, int32_t count);
 
 // Empties the node table for a search, unless it is empty already.
 void mnavClearTable(mnavQuery* query);

@@ -141,7 +141,7 @@ static mnavResult CheckRay(mnavQuery* query, const mnavNavmesh* navmesh,
                            mnavPos3 start, mnavPos3 end, const mnavRay* rayOut,
                            const mnavQueryFilter** usable)
 {
-    if (query != nullptr && mnavQueryCalledBack(query))
+    if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }

@@ -864,7 +864,7 @@ static void Finish(Shortest* s, int32_t last, mnavPathEnd end, mnavPath* pathOut
     *pathOut =
         (mnavPath){end,        cost,         length,    query->corridor, polygons, query->points,
                    pointCount, query->links, linkCount, nullptr,         0};
-    mnavMarkPath(query, pathOut);
+    mnavKeepPath(query, pathOut);
 }
 
 // Checks the arguments and starts the search from its start node.
@@ -925,7 +925,7 @@ static MNAV_NOINLINE mnavResult FindShortestPathWork(mnavQuery* query, const mna
                                                      mnavPolygonId endPolygon, mnavPos3 end,
                                                      mnavPath* pathOut)
 {
-    if (query != nullptr && mnavQueryCalledBack(query))
+    if (query != nullptr && mnavHostCalledBack(&query->host))
     {
         return mnav_errorBusy;
     }
