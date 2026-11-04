@@ -863,6 +863,177 @@ void CompareWalls(const char* scene, DiffMaul* maul, const Detour& d, WallTally&
     }
 }
 
+// Detour's move along the surface, as DiffMaulMove gives Maul Nav's.
+// Detour copies the wanted point when it reaches it, and a wall point
+// otherwise.
+int DetourMove(const Detour& d, const float a[3], const float to[3], float start[3], float end[3])
+{
+    dtQueryFilter filter;
+    const float extents[3] = {0.5f, 2.0f, 0.5f};
+    dtPolyRef ref = 0;
+    d.query->findNearestPoly(a, extents, &filter, &ref, start);
+    if (ref == 0)
+    {
+        return -1;
+    }
+    static dtPolyRef visited[256];
+    int count = 0;
+    dtStatus status = d.query->moveAlongSurface(ref, start, to, &filter, end, visited, &count, 256);
+    if (dtStatusFailed(status) || (status & DT_BUFFER_TOO_SMALL) != 0)
+    {
+        return 2;
+    }
+    return end[0] == to[0] && end[2] == to[2] ? 0 : 1;
+}
+
+// A move along the surface from each pair's first point toward its
+// second, at most kMoveLength on the ground, by both libraries from the
+// polygon nearest the first point: whether each reaches the wanted
+// point, and how far apart they end. Detour's move keeps at most 48
+// polygons to visit and 64 nodes, one for each neighbour of a polygon it
+// visits, and passes over the rest without a status, so a move is kept
+// short enough to stay within them: at 5 m, Maul Nav's walk visits at
+// most 10 polygons of up to 6 edges on these scenes, and Detour's
+// untiled navmesh splits none of its polygons at tile sides. Detour
+// searches round half the move's length in three dimensions, so the
+// wanted point is at the first point's height. Each move ends at the
+// wanted point or at the point nearest it on the walls met, so how far
+// each ends from the wanted point moves by at most kWallBand plus how
+// far apart the two snap the start, as for the walls: the pair is
+// banded. Maul Nav's move searches a circle widened by a cell, where
+// Detour's is widened by 1 mm, so it may meet walls Detour's does not and
+// end nearer the wanted point by more than that: the pair is wider. A
+// move that ends farther than Detour's past the band missed a wall
+// Detour met, and fails. Every pair whose ends lie more than 0.25 m
+// apart is printed with its kind, and passes only as kMoveAllowed lists
+// it, with its kind and the point Maul Nav's move ends at; a listed pair
+// that no longer differs fails, as with the rays.
+struct MoveTally
+{
+    int moved = 0;
+    int endAgree = 0;
+    int bothStopped = 0;
+    int close = 0;
+    int differ = 0;
+    int banded = 0;
+    int wider = 0;
+    int listed = 0;
+    int stale = 0;
+};
+
+constexpr double kMoveLength = 5.0;
+
+// The pairs whose moves may end apart, each explained in the pull
+// request that listed it: by scene, the pair's index, whether it is
+// wider rather than banded, and the point Maul Nav's move ends at, its x
+// and z within kWallMatch, so that a change of Maul Nav's end fails until
+// it is explained. A scene not listed allows none.
+struct MoveAllowed
+{
+    const char* scene;
+    int pair;
+    bool wider;
+    double x;
+    double z;
+};
+constexpr MoveAllowed kMoveAllowed[] = {{"world", 63, false, 33.75, 32.8863},
+                                        {"world", 66, true, 22.8721, 24.75},
+                                        {"building", 48, true, 12.827, 10.75},
+                                        {"plateaus", 134, false, 13.737, 27.25}};
+constexpr int kMoveAllowedCount = static_cast<int>(sizeof(kMoveAllowed) / sizeof(kMoveAllowed[0]));
+
+void CompareMoves(const char* scene, DiffMaul* maul, const Detour& d, MoveTally& t)
+{
+    bool seen[kMoveAllowedCount] = {};
+    auto D = [](float v) { return static_cast<double>(v); };
+    auto Apart = [&](const float p[3], const float q[3])
+    { return std::hypot(D(p[0]) - D(q[0]), D(p[2]) - D(q[2])); };
+    for (int i = 0; i < kPairs; ++i)
+    {
+        float a[3];
+        float b[3];
+        if (!DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 1u, a) ||
+            !DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 2u, b))
+        {
+            continue;
+        }
+        double length = Apart(a, b);
+        double scale = length > kMoveLength ? kMoveLength / length : 1.0;
+        float to[3] = {static_cast<float>(D(a[0]) + (D(b[0]) - D(a[0])) * scale), a[1],
+                       static_cast<float>(D(a[2]) + (D(b[2]) - D(a[2])) * scale)};
+        float ms[3];
+        float ds[3];
+        float me[3];
+        float de[3];
+        int m = DiffMaulMove(maul, a, to, ms, me);
+        int r = DetourMove(d, a, to, ds, de);
+        if (m < 0 || r < 0)
+        {
+            continue;
+        }
+        t.moved += 1;
+        t.endAgree += m == r ? 1 : 0;
+        double apart = m == 2 || r == 2 ? 0.0 : Apart(me, de);
+        if (m == 1 && r == 1)
+        {
+            t.bothStopped += 1;
+            t.close += apart <= kRayClose ? 1 : 0;
+        }
+        if (m != 2 && r != 2 && apart <= kRayClose)
+        {
+            continue;
+        }
+        double snap = Apart(ms, ds);
+        double band = kWallBand + snap;
+        double maulShort = Apart(me, to);
+        double detourShort = Apart(de, to);
+        bool ended = m != 2 && r != 2;
+        bool banded = ended && std::fabs(maulShort - detourShort) <= band;
+        bool wider = ended && maulShort < detourShort - band;
+        int k = -1;
+        for (int j = 0; j < kMoveAllowedCount; ++j)
+        {
+            if (kMoveAllowed[j].pair == i && std::strcmp(kMoveAllowed[j].scene, scene) == 0)
+            {
+                k = j;
+            }
+        }
+        if (k >= 0)
+        {
+            seen[k] = true;
+        }
+        bool matches = k >= 0 && std::fabs(D(me[0]) - kMoveAllowed[k].x) <= kWallMatch &&
+                       std::fabs(D(me[2]) - kMoveAllowed[k].z) <= kWallMatch;
+        bool listed =
+            matches && ((banded && !kMoveAllowed[k].wider) || (wider && kMoveAllowed[k].wider));
+        t.differ += 1;
+        t.banded += banded ? 1 : 0;
+        t.wider += wider ? 1 : 0;
+        t.listed += listed ? 1 : 0;
+        const char* verdict =
+            listed   ? (banded ? "banded, listed" : "wider, listed")
+            : banded ? (k >= 0 ? "banded, not listed as banded with this Maul Nav end"
+                               : "banded, not listed")
+            : wider  ? (k >= 0 ? "wider, not listed as wider with this Maul Nav end"
+                               : "wider, not listed")
+            : ended  ? "Detour's move ends nearer past the band"
+                     : "ended another way";
+        Say("move %s %d: (%.4f %.4f) toward (%.4f %.4f): maul %d at (%.4f %.4f), detour %d at "
+            "(%.4f %.4f), %.4f m apart, %.4f and %.4f m short, snapped %.4f m apart, %s\n",
+            scene, i, D(a[0]), D(a[2]), D(to[0]), D(to[2]), m, D(me[0]), D(me[2]), r, D(de[0]),
+            D(de[2]), apart, maulShort, detourShort, snap, verdict);
+    }
+    for (int k = 0; k < kMoveAllowedCount; ++k)
+    {
+        if (!seen[k] && std::strcmp(kMoveAllowed[k].scene, scene) == 0)
+        {
+            Say("move %s %d: the moves no longer differ; remove it from kMoveAllowed\n", scene,
+                kMoveAllowed[k].pair);
+            t.stale += 1;
+        }
+    }
+}
+
 struct Tally
 {
     int snapped = 0;
@@ -1176,6 +1347,31 @@ int main()
     }
     Say(walls ? "walls agree, or differ as listed\n" : "walls differ past the list\n");
     pass = pass && walls;
+    // Moves: each pair's moves end together, or apart as kMoveAllowed
+    // lists it.
+    bool moves = true;
+    Say("\n%-10s %6s %8s %6s %8s %8s %6s %6s %6s\n", "scene", "moves", "ends", "stops", "close",
+        "differ", "banded", "wider", "listed");
+    for (int32_t i = 0; i < DiffSceneCount(); ++i)
+    {
+        DiffScene scene = DiffGetScene(i);
+        Detour d;
+        DiffMaul* maul = DiffMaulBuild(&scene);
+        if (maul != nullptr && Build(scene, d))
+        {
+            MoveTally t;
+            CompareMoves(scene.name, maul, d, t);
+            double moved = t.moved > 0 ? static_cast<double>(t.moved) : 1.0;
+            double stops = t.bothStopped > 0 ? static_cast<double>(t.bothStopped) : 1.0;
+            Say("%-10s %6d %7.1f%% %6d %7.1f%% %8d %6d %6d %6d\n", scene.name, t.moved,
+                100.0 * t.endAgree / moved, t.bothStopped, 100.0 * t.close / stops, t.differ,
+                t.banded, t.wider, t.listed);
+            moves = moves && t.listed == t.differ && t.stale == 0;
+        }
+        DiffMaulDestroy(maul);
+    }
+    Say(moves ? "moves end together, or apart as listed\n" : "moves end apart past the list\n");
+    pass = pass && moves;
     Counter counter;
     Say("\ncosts, best of five, reported and not gated; Maul Nav in 32 m tiles, Recast "
         "untiled; %s; load average %.2f\n",

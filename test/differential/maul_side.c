@@ -288,3 +288,26 @@ int32_t DiffMaulWallDistance(DiffMaul* maul, const float at[3], double radius, f
     wall[2] = (float)nearest.wall.point.z;
     return 1;
 }
+
+int32_t DiffMaulMove(DiffMaul* maul, const float a[3], const float to[3], float start[3],
+                     float end[3])
+{
+    mnavNearest s;
+    if (!Nearest(maul, a, &s))
+    {
+        return -1;
+    }
+    start[0] = (float)s.point.x;
+    start[1] = (float)s.point.y;
+    start[2] = (float)s.point.z;
+    mnavMove move;
+    if (mnavQuery_MoveAlongSurface(maul->query, maul->navmesh, s.polygon, s.point,
+                                   (mnavPos3){to[0], to[1], to[2]}, nullptr, &move) != mnav_success)
+    {
+        return 2;
+    }
+    end[0] = (float)move.point.x;
+    end[1] = (float)move.point.y;
+    end[2] = (float)move.point.z;
+    return move.end == mnav_moveReached ? 0 : (move.end == mnav_moveWall ? 1 : 2);
+}
