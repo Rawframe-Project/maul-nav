@@ -157,6 +157,21 @@ static double Highest(const mnavPath* path)
     return top;
 }
 
+// Whether two walls are the same, field for field: a wall's bytes hold
+// padding after its normal.
+static bool SameWall(const mnavWall* a, const mnavWall* b)
+{
+    const mnavPos3* p[3] = {&a->start, &a->end, &a->point};
+    const mnavPos3* q[3] = {&b->start, &b->end, &b->point};
+    bool same = a->normal.x == b->normal.x && a->normal.y == b->normal.y &&
+                a->normal.z == b->normal.z && a->distance == b->distance;
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        same = same && p[i]->x == q[i]->x && p[i]->y == q[i]->y && p[i]->z == q[i]->z;
+    }
+    return same;
+}
+
 // A ground floor, an upper floor 3 m up over half of it, twelve stairs of
 // 0.25 m on one side and a ramp of 20.6 degrees on the other.
 static void Building(Quads* q, bool stairs)
@@ -227,7 +242,7 @@ static void TestBuilding(mnavQuery* query)
     mnavResult found = mnavQuery_FindWalls(query, navmesh, under.polygon, under.point, 5.0, nullptr,
                                            walls, 64, &listed);
     CHECK((found == mnav_success || found == mnav_errorCapacity) && listed.wallCount >= 1 &&
-              memcmp(&walls[0], &wall.wall, sizeof(mnavWall)) == 0,
+              SameWall(&walls[0], &wall.wall),
           "the walls listed under it, the nearest first");
     bool ground = true;
     for (int32_t i = 0; i < listed.wallCount && i < 64; ++i)
