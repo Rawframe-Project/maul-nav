@@ -736,7 +736,10 @@ extern "C"
                                                               mnavPos3 low, mnavPos3 high,
                                                               mnavDebugBuffer* buffer);
 
-    /// Appends a flight path's steps, point to point (mnav_debugPath).
+    /// Appends a flight path's steps, point to point (mnav_debugPath). The
+    /// path may be the caller's own: its points are the caller's memory,
+    /// read only from `points` for `pointCount` points, each checked, and
+    /// nothing else of it is read.
     ///
     /// @param path    The path.
     /// @param buffer  The buffer appended to. Left as it was on any failure but
