@@ -157,6 +157,21 @@ static double Highest(const mnavPath* path)
     return top;
 }
 
+// Whether two walls are the same, field for field: a wall's bytes hold
+// padding after its normal.
+static bool SameWall(const mnavWall* a, const mnavWall* b)
+{
+    const mnavPos3* p[3] = {&a->start, &a->end, &a->point};
+    const mnavPos3* q[3] = {&b->start, &b->end, &b->point};
+    bool same = a->normal.x == b->normal.x && a->normal.y == b->normal.y &&
+                a->normal.z == b->normal.z && a->distance == b->distance;
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        same = same && p[i]->x == q[i]->x && p[i]->y == q[i]->y && p[i]->z == q[i]->z;
+    }
+    return same;
+}
+
 // A ground floor, an upper floor 3 m up over half of it, twelve stairs of
 // 0.25 m on one side and a ramp of 20.6 degrees on the other.
 static void Building(Quads* q, bool stairs)
@@ -211,6 +226,38 @@ static void TestBuilding(mnavQuery* query)
     mnavNearest e = Nearest(navmesh, 10, 0, 18);
     path = Path(query, navmesh, a, e);
     CHECK(path.end == mnav_pathFound && Highest(&path) < 0.5, "along the ground under it");
+    // The walls near a point on the ground under the upper floor's edge,
+    // by the stairs, are the ground's (here the tile's west side): the
+    // upper floor's edge, nearer on the ground but 3 m up, is another
+    // floor's.
+    mnavNearest under = Nearest(navmesh, 0.99, 0, 10.15);
+    mnavNearestWall wall;
+    CHECK(under.polygon.slot != 0 && fabs(under.point.y) < 0.3 &&
+              mnavQuery_FindWallDistance(query, navmesh, under.polygon, under.point, 5.0, nullptr,
+                                         &wall) == mnav_success &&
+              wall.found && fabs(wall.wall.point.y - under.point.y) < 0.75,
+          "the nearest wall under the upper floor is the ground's");
+    mnavWall walls[64];
+    mnavWallsFound listed;
+    mnavResult found = mnavQuery_FindWalls(query, navmesh, under.polygon, under.point, 5.0, nullptr,
+                                           walls, 64, &listed);
+    CHECK((found == mnav_success || found == mnav_errorCapacity) && listed.wallCount >= 1 &&
+              SameWall(&walls[0], &wall.wall),
+          "the walls listed under it, the nearest first");
+    bool ground = true;
+    for (int32_t i = 0; i < listed.wallCount && i < 64; ++i)
+    {
+        ground = ground && walls[i].point.y < under.point.y + 2.0;
+    }
+    CHECK(ground, "none of the upper floor's walls listed under it");
+    // From the upper floor over it, its own edge is the nearest wall.
+    mnavNearest over = Nearest(navmesh, 0.99, 3, 11.2);
+    CHECK(over.polygon.slot != 0 && fabs(over.point.y - 3.0) < 0.3 &&
+              mnavQuery_FindWallDistance(query, navmesh, over.polygon, over.point, 5.0, nullptr,
+                                         &wall) == mnav_success &&
+              wall.found && fabs(wall.wall.point.y - over.point.y) < 0.75 &&
+              wall.wall.distance < 1.0,
+          "the nearest wall on the upper floor is its own edge");
     // Without the stairs, the way up runs by the ramp.
     Building(&q, false);
     Bake(&def, &q, 0, 0, 0, 0);
