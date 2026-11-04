@@ -731,8 +731,9 @@ int DetourWallDistance(const Detour& d, const float at[3], double radius, float 
 // is within the band when the one found lies within kWallBand of the
 // radius. Every point where they differ, by whether they find one or by
 // more than 0.25 m, is printed with whether it lies within the band, and
-// passes only within the band and as kWallAllowed lists it; a listed
-// point that no longer differs fails, as with the rays.
+// passes only within the band and as kWallAllowed lists it, with the
+// wall Maul Nav finds there; a listed point that no longer differs
+// fails, as with the rays.
 struct WallTally
 {
     int searched = 0;
@@ -747,15 +748,20 @@ struct WallTally
 constexpr double kWallRadius = 5.0;
 
 // The points whose walls may differ, each explained in the pull request
-// that listed it: by scene and the point's seed. A scene not listed
-// allows none.
+// that listed it: by scene, the point's seed and the wall Maul Nav finds
+// there, its distance and z within kWallMatch, so that a change of Maul
+// Nav's wall at a listed point fails until it is explained. A scene not
+// listed allows none.
 struct WallAllowed
 {
     const char* scene;
     int seed;
+    double distance;
+    double z;
 };
-constexpr WallAllowed kWallAllowed[] = {{"world", 12}, {"world", 156}};
+constexpr WallAllowed kWallAllowed[] = {{"world", 12, 4.9209, 30.5}, {"world", 156, 4.8772, 30.5}};
 constexpr int kWallAllowedCount = static_cast<int>(sizeof(kWallAllowed) / sizeof(kWallAllowed[0]));
+constexpr double kWallMatch = 0.001;
 
 void CompareWalls(const char* scene, DiffMaul* maul, const Detour& d, WallTally& t)
 {
@@ -816,10 +822,12 @@ void CompareWalls(const char* scene, DiffMaul* maul, const Detour& d, WallTally&
         {
             seen[k] = true;
         }
-        bool listed = k >= 0 && within;
+        auto D = [](float v) { return static_cast<double>(v); };
+        bool matches = k >= 0 && m == 1 && std::fabs(md - kWallAllowed[k].distance) <= kWallMatch &&
+                       std::fabs(D(mw[2]) - kWallAllowed[k].z) <= kWallMatch;
+        bool listed = within && matches;
         t.differ += 1;
         t.listed += listed ? 1 : 0;
-        auto D = [](float v) { return static_cast<double>(v); };
         // A library's wall, or that it found none within the radius.
         auto Found = [&](char* out, int end, double distance, const float wall[3])
         {
@@ -839,7 +847,9 @@ void CompareWalls(const char* scene, DiffMaul* maul, const Detour& d, WallTally&
         Say("wall %s %d: (%.4f %.4f %.4f): maul %d %s, detour %d %s, %.4f m apart, snapped "
             "%.4f m apart, %s\n",
             scene, seed, D(at[0]), D(at[1]), D(at[2]), m, mf, r, df, gap, snap,
-            within ? (listed ? "within the band, listed" : "within the band, not listed")
+            within ? (listed   ? "within the band, listed"
+                      : k >= 0 ? "within the band, listed with another Maul Nav wall"
+                               : "within the band, not listed")
                    : (k >= 0 ? "past the band, though listed" : "past the band, not listed"));
     }
     for (int k = 0; k < kWallAllowedCount; ++k)
