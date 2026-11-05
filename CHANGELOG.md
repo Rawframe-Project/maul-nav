@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.1.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.0...v1.1.1) (2026-11-05)
+
+
+### Fixed
+
+* make MNAV_NODISCARD the attribute under GCC 14's C23 too ([#346](https://github.com/Rawframe-Project/maul-nav/issues/346)) ([910d57e](https://github.com/Rawframe-Project/maul-nav/commit/910d57e950b9eb434d16bf038776ee43d31605f8)), closes [#345](https://github.com/Rawframe-Project/maul-nav/issues/345)
+
 ## [1.1.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.0.1...v1.1.0) (2026-11-04)
 
 This release changes which walls the wall queries report on a navmesh
