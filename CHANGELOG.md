@@ -5,6 +5,14 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.1.2](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.1...v1.1.2) (2026-11-05)
+
+
+### Fixed
+
+* mark every internal bool function nodiscard and check it ([#356](https://github.com/Rawframe-Project/maul-nav/issues/356)) ([a9d4c19](https://github.com/Rawframe-Project/maul-nav/commit/a9d4c19a9bc6bea6ea33497469d8ce29fddb9ff7)), closes [#355](https://github.com/Rawframe-Project/maul-nav/issues/355)
+* **query:** open no node past the length toward a far end ([#354](https://github.com/Rawframe-Project/maul-nav/issues/354)) ([99f04fa](https://github.com/Rawframe-Project/maul-nav/commit/99f04fa955f5c6a1a02f42e11010849bb0f4f1bc)), closes [#351](https://github.com/Rawframe-Project/maul-nav/issues/351)
+
 ## [1.1.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.0...v1.1.1) (2026-11-05)
 
 This release makes `MNAV_NODISCARD` the `[[nodiscard]]` attribute in
