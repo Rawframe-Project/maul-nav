@@ -39,7 +39,7 @@ static mnavBakeDefResult Refuse(mnavResult result, mnavBakeSetting setting)
 
 static const mnavBakeDefResult s_accept = {mnav_success, mnav_bakeSettingNone};
 
-static bool InRange(float value, float low, float high)
+MNAV_NODISCARD static bool InRange(float value, float low, float high)
 {
     // A NaN fails both comparisons.
     return value >= low && value <= high;

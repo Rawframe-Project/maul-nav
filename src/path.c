@@ -25,7 +25,7 @@
 
 // Whether entry a leaves the open list before entry b: the lower total,
 // then the node made first.
-static bool Sooner(mnavHeapEntry a, mnavHeapEntry b)
+MNAV_NODISCARD static bool Sooner(mnavHeapEntry a, mnavHeapEntry b)
 {
     return a.total != b.total ? a.total < b.total : a.node < b.node;
 }
@@ -365,14 +365,14 @@ static void Expand(mnavSearch* s, int32_t n)
     ExpandOffMesh(s, n);
 }
 
-static bool FinitePoint(mnavPos3 p)
+MNAV_NODISCARD static bool FinitePoint(mnavPos3 p)
 {
     return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
 }
 
 // Whether node a lies nearer the end than node b: less still to go, then
 // the lower cost, then made first.
-static bool Nearer(const mnavQuery* query, int32_t a, int32_t b)
+MNAV_NODISCARD static bool Nearer(const mnavQuery* query, int32_t a, int32_t b)
 {
     const mnavSearchNode* na = &query->nodes[a];
     const mnavSearchNode* nb = &query->nodes[b];
@@ -606,7 +606,7 @@ static mnavResult CheckSearch(const mnavQuery* query, const mnavNavmesh* navmesh
     return s->commits == navmesh->commits ? mnav_success : mnav_errorState;
 }
 
-static bool Ended(const mnavQuery* query)
+MNAV_NODISCARD static bool Ended(const mnavQuery* query)
 {
     return query->search.found != MNAV_NO_NODE || query->heapCount == 0;
 }

@@ -79,7 +79,7 @@ static inline double mnavLarger(double a, double b)
 // Whether a velocity no faster than about 2^-500 m/s, or one of any speed
 // at a maximum of 2^-500 or more, is within the speed circle: its squared
 // speed, scaled by mnavSpeedScale, is no more than the squared maximum.
-static inline bool mnavWithinSpeed2(mnavPos2 v, double maxSpeed)
+MNAV_NODISCARD static inline bool mnavWithinSpeed2(mnavPos2 v, double maxSpeed)
 {
     double k = mnavSpeedScale(maxSpeed);
     mnavPos2 s = mnavScale2(v, k);
@@ -87,7 +87,7 @@ static inline bool mnavWithinSpeed2(mnavPos2 v, double maxSpeed)
 }
 
 // The same for the speed sphere.
-static inline bool mnavWithinSpeed3(mnavPos3 v, double maxSpeed)
+MNAV_NODISCARD static inline bool mnavWithinSpeed3(mnavPos3 v, double maxSpeed)
 {
     double k = mnavSpeedScale(maxSpeed);
     mnavPos3 s = mnavScale3(v, k);
@@ -99,7 +99,7 @@ static inline bool mnavWithinSpeed3(mnavPos3 v, double maxSpeed)
 // and two units of the least subnormal on the speed, scaled, where the
 // components round absolutely. A velocity further out would take up to
 // 2^52 steps.
-static inline bool mnavNearSpeed2(mnavPos2 v, double maxSpeed)
+MNAV_NODISCARD static inline bool mnavNearSpeed2(mnavPos2 v, double maxSpeed)
 {
     double k = mnavSpeedScale(maxSpeed);
     mnavPos2 s = mnavScale2(v, k);
@@ -108,7 +108,7 @@ static inline bool mnavNearSpeed2(mnavPos2 v, double maxSpeed)
 }
 
 // The same for the speed sphere.
-static inline bool mnavNearSpeed3(mnavPos3 v, double maxSpeed)
+MNAV_NODISCARD static inline bool mnavNearSpeed3(mnavPos3 v, double maxSpeed)
 {
     double k = mnavSpeedScale(maxSpeed);
     mnavPos3 s = mnavScale3(v, k);
@@ -159,7 +159,7 @@ static inline mnavPos3 mnavKeepSpeed3(mnavPos3 v, double maxSpeed)
     return v;
 }
 
-static inline bool mnavAvoidPositive(double v)
+MNAV_NODISCARD static inline bool mnavAvoidPositive(double v)
 {
     return isfinite(v) && v > 0.0;
 }

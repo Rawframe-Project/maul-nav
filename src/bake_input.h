@@ -14,7 +14,7 @@
 
 // Whether input's counts are at least 0 and its arrays given where its
 // counts are positive.
-bool mnavCheckInputArrays(const mnavBakeInput* input);
+MNAV_NODISCARD bool mnavCheckInputArrays(const mnavBakeInput* input);
 
 // Checks input whose arrays are checked against a def that is already
 // valid: each mesh unless meshesChecked, each terrain, each volume, and

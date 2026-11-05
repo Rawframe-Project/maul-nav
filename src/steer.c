@@ -13,12 +13,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-static bool InRange(float v, float most)
+MNAV_NODISCARD static bool InRange(float v, float most)
 {
     return v >= 0.0f && v <= most;
 }
 
-static bool Finite(mnavPos3 p)
+MNAV_NODISCARD static bool Finite(mnavPos3 p)
 {
     return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
 }
@@ -32,7 +32,7 @@ static double Length(double x, double z)
 
 // Whether a lies within 2^500 of the origin on the ground, where the
 // difference from another such point and its square overflow no double.
-static bool Within(mnavPos3 a)
+MNAV_NODISCARD static bool Within(mnavPos3 a)
 {
     return fabs(a.x) <= 0x1p500 && fabs(a.z) <= 0x1p500;
 }

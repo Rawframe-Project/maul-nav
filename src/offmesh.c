@@ -49,7 +49,7 @@ mnavAttachment mnavAttachmentOf(uint64_t key)
                             (int32_t)(key >> 1 & ((1u << LINK_BITS) - 1)), (key & 1u) != 0};
 }
 
-static bool HasNaN(mnavPos3 p)
+MNAV_NODISCARD static bool HasNaN(mnavPos3 p)
 {
     return isnan(p.x) || isnan(p.y) || isnan(p.z);
 }
@@ -78,7 +78,7 @@ static mnavResult Find(const mnavNavmesh* navmesh, mnavLinkId id, int32_t* slotO
 
 // Whether a point lies within the extent bake input may have round the
 // navmesh's origin, so that the arithmetic on links stays finite.
-static bool InExtent(const mnavNavmesh* navmesh, mnavPos3 p)
+MNAV_NODISCARD static bool InExtent(const mnavNavmesh* navmesh, mnavPos3 p)
 {
     const mnavBakeDef* def = &navmesh->def.bake;
     double ground = (double)def->cellSize * (double)MNAV_MAX_EXTENT_CELLS;
@@ -443,13 +443,13 @@ static mnavPos3 SnapHalf(const mnavNavmesh* navmesh, float radius)
     return (mnavPos3){(double)radius, step, (double)radius};
 }
 
-static bool Covers(mnavCover c, int32_t x, int32_t z)
+MNAV_NODISCARD static bool Covers(mnavCover c, int32_t x, int32_t z)
 {
     return x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1;
 }
 
 // Whether the snap box round a point covers a place the commit changes.
-static bool Changed(const mnavNavmesh* navmesh, mnavPos3 p, float radius)
+MNAV_NODISCARD static bool Changed(const mnavNavmesh* navmesh, mnavPos3 p, float radius)
 {
     mnavCover c = mnavCoverOf(navmesh, p, SnapHalf(navmesh, radius));
     for (int32_t s = 0; s < navmesh->stagedCount; ++s)
@@ -527,8 +527,8 @@ void mnavDropAttachmentPlan(mnavNavmesh* navmesh, mnavAttachmentPlan* plan)
 
 // Snaps an end to the nearest polygon within the radius on the ground and
 // the agent's step in height.
-static bool Snap(const mnavNavmesh* navmesh, mnavPos3 p, float radius, mnavPolygonId* polygon,
-                 mnavPos3* at)
+MNAV_NODISCARD static bool Snap(const mnavNavmesh* navmesh, mnavPos3 p, float radius,
+                                mnavPolygonId* polygon, mnavPos3* at)
 {
     mnavPos3 half = SnapHalf(navmesh, radius);
     mnavNearest n;

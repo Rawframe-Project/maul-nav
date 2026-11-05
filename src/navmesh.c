@@ -212,7 +212,7 @@ void mnavDestroyNavmesh(mnavNavmesh* navmesh)
     mnavRelease(&last, navmesh, 1, sizeof(mnavNavmesh), alignof(mnavNavmesh));
 }
 
-static bool Before(int32_t ax, int32_t az, int32_t bx, int32_t bz)
+MNAV_NODISCARD static bool Before(int32_t ax, int32_t az, int32_t bx, int32_t bz)
 {
     return ax != bx ? ax < bx : az < bz;
 }
@@ -300,7 +300,7 @@ static uint64_t DoubleBits(double d)
 }
 
 // Whether a tile was baked with the navmesh's settings, bit for bit.
-static bool Matches(const mnavNavmesh* navmesh, const mnavTileInfo* info)
+MNAV_NODISCARD static bool Matches(const mnavNavmesh* navmesh, const mnavTileInfo* info)
 {
     const mnavBakeDef* def = &navmesh->def.bake;
     const mnavBakeCells* cells = &navmesh->cells;
@@ -441,7 +441,7 @@ static Span SpanOf(const mnavPolyMesh* mesh, const mnavPolygon* polygon, int32_t
 
 // Whether two edges' heights at u, each interpolated along its edge, lie
 // within step of each other, compared exactly.
-static bool CloseAt(const Span* a, const Span* b, int64_t u, int64_t step)
+MNAV_NODISCARD static bool CloseAt(const Span* a, const Span* b, int64_t u, int64_t step)
 {
     int64_t da = a->u1 - a->u0;
     int64_t db = b->u1 - b->u0;
@@ -456,7 +456,8 @@ static bool CloseAt(const Span* a, const Span* b, int64_t u, int64_t step)
 
 // The part of the side two facing edges share, with heights within the
 // agent's step at both its ends; false when they share none.
-static bool Overlap(const Span* a, const Span* b, int64_t step, int32_t* low, int32_t* high)
+MNAV_NODISCARD static bool Overlap(const Span* a, const Span* b, int64_t step, int32_t* low,
+                                   int32_t* high)
 {
     int64_t lo = a->u0 < a->u1 ? a->u0 : a->u1;
     int64_t hi = a->u0 < a->u1 ? a->u1 : a->u0;
@@ -740,7 +741,7 @@ static void ReleasePlan(mnavMemory* memory, mnavTilePlan* plan)
 }
 
 // Whether slot's tile lies next to, or at, a staged place.
-static bool NearChange(const mnavNavmesh* navmesh, const mnavSlot* slot)
+MNAV_NODISCARD static bool NearChange(const mnavNavmesh* navmesh, const mnavSlot* slot)
 {
     for (int32_t s = 0; s < navmesh->stagedCount; ++s)
     {

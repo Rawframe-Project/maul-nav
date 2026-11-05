@@ -67,8 +67,8 @@ static double Total(const mnavHierarchy* h, const mnavGraphSearch* g, int32_t u,
     return g->costs[u] + sqrt(dx * dx + dy * dy + dz * dz) * h->scale;
 }
 
-static bool Sooner(const mnavHierarchy* h, const mnavGraphSearch* g, int32_t a, int32_t b,
-                   mnavPos3 end)
+MNAV_NODISCARD static bool Sooner(const mnavHierarchy* h, const mnavGraphSearch* g, int32_t a,
+                                  int32_t b, mnavPos3 end)
 {
     double ta = Total(h, g, a, end);
     double tb = Total(h, g, b, end);
@@ -147,7 +147,7 @@ static void Relax(const mnavHierarchy* h, mnavGraphSearch* g, int32_t u, double 
 
 // A* over the transitions, opened with the start's costs, to the end,
 // reached from each transition with its join; whether it got there.
-static bool SearchGraph(const mnavHierarchy* h, mnavGraphSearch* g, mnavPos3 end)
+MNAV_NODISCARD static bool SearchGraph(const mnavHierarchy* h, mnavGraphSearch* g, mnavPos3 end)
 {
     int32_t goal = h->transitionCount;
     while (g->heapCount > 0)
@@ -332,7 +332,7 @@ static mnavResult Refine(const mnavHierarchy* h, mnavQuery* query, const mnavNav
     return Run(query, navmesh, foundOut);
 }
 
-static bool FinitePoint(mnavPos3 p)
+MNAV_NODISCARD static bool FinitePoint(mnavPos3 p)
 {
     return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
 }
@@ -364,7 +364,8 @@ static mnavResult CheckQuery(const mnavQuery* query, const mnavHierarchy* h,
 
 // Whether two points lie within a cluster's side of each other on the
 // ground.
-static bool Near(const mnavHierarchy* h, const mnavNavmesh* navmesh, mnavPos3 a, mnavPos3 b)
+MNAV_NODISCARD static bool Near(const mnavHierarchy* h, const mnavNavmesh* navmesh, mnavPos3 a,
+                                mnavPos3 b)
 {
     double side = (double)h->def.clusterTiles * (double)navmesh->def.bake.cellSize *
                   (double)navmesh->def.bake.tileCells;

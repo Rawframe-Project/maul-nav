@@ -53,12 +53,12 @@ static double Distance(const double a[3], const double b[3])
     return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-static bool SameBlock(const int32_t a[4], const int32_t b[4])
+MNAV_NODISCARD static bool SameBlock(const int32_t a[4], const int32_t b[4])
 {
     return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3];
 }
 
-static bool Sooner(const Node* nodes, int32_t a, int32_t b)
+MNAV_NODISCARD static bool Sooner(const Node* nodes, int32_t a, int32_t b)
 {
     double ta = nodes[a].cost + nodes[a].remaining;
     double tb = nodes[b].cost + nodes[b].remaining;
@@ -138,7 +138,7 @@ static uint32_t Slot(const Search* s, const int32_t block[4])
     }
 }
 
-static bool InSight(Search* s, const double a[3], const double b[3])
+MNAV_NODISCARD static bool InSight(Search* s, const double a[3], const double b[3])
 {
     return mnavFlightWalk(&s->cursor, a, b, nullptr) == MNAV_SPACE_OPEN;
 }
@@ -344,13 +344,13 @@ static void Settle(Search* s, int32_t node)
     Around(s, node, Repair);
 }
 
-static bool Nearer(const Node* nodes, int32_t a, int32_t b)
+MNAV_NODISCARD static bool Nearer(const Node* nodes, int32_t a, int32_t b)
 {
     return b == MNAV_NO_NODE || nodes[a].remaining < nodes[b].remaining;
 }
 
 // Closes up to budget nodes; returns whether the search has ended.
-static bool Run(Search* s, int32_t budget)
+MNAV_NODISCARD static bool Run(Search* s, int32_t budget)
 {
     mnavQuery* q = s->query;
     for (int32_t closed = 0; closed < budget && q->heapCount > 0; ++closed)
@@ -458,7 +458,7 @@ static void SpreadTo(void* context, mnavFlightBlock block)
 // POCKET_BLOCKS (and the node budget) without the start's block or a face
 // with no tile loaded. No path reaches the end from outside it. Uses the
 // search's nodes and table, which Begin clears.
-static bool Pocket(Search* s, const int32_t start[4])
+MNAV_NODISCARD static bool Pocket(Search* s, const int32_t start[4])
 {
     mnavQuery* q = s->query;
     mnavClearTable(q);

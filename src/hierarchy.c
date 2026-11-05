@@ -337,8 +337,8 @@ static mnavTransition Cross(const mnavHierarchy* h, const mnavNavmesh* navmesh, 
 }
 
 // Whether tile link l of a tile leaves the cluster across a side.
-static bool Leaves(const mnavHierarchy* h, const mnavTile* tile, int32_t slot, int32_t l,
-                   int32_t side)
+MNAV_NODISCARD static bool Leaves(const mnavHierarchy* h, const mnavTile* tile, int32_t slot,
+                                  int32_t l, int32_t side)
 {
     const mnavLink* link = &tile->links[l];
     int32_t target = (int32_t)link->target.slot - 1;
@@ -610,7 +610,7 @@ static uint64_t LinkHash(const mnavNavmesh* navmesh)
 }
 
 // Whether the hierarchy's filter includes the polygon transition u enters.
-static bool Included(const mnavHierarchy* h, const mnavNavmesh* navmesh, int32_t u)
+MNAV_NODISCARD static bool Included(const mnavHierarchy* h, const mnavNavmesh* navmesh, int32_t u)
 {
     const mnavTransition* t = &h->transitions[u];
     const mnavTile* tile = navmesh->slots[t->slot].tile;
@@ -637,7 +637,7 @@ static void Stamp(mnavHierarchy* h, const mnavNavmesh* navmesh)
 
 // Whether the tiles and links are those the graph was built from, so
 // that only areas may have changed.
-static bool SameShape(const mnavHierarchy* h, const mnavNavmesh* navmesh)
+MNAV_NODISCARD static bool SameShape(const mnavHierarchy* h, const mnavNavmesh* navmesh)
 {
     if (navmesh->slotCount > h->def.limits.tiles || h->linkHash != LinkHash(navmesh))
     {
@@ -665,7 +665,7 @@ static bool SameShape(const mnavHierarchy* h, const mnavNavmesh* navmesh)
 // leaves end there, opening the polygon entered but never walking it: its
 // area costs them nothing, so that cluster is marked only when the
 // filter has come to include or exclude it.
-static bool MarkDirty(mnavHierarchy* h, const mnavNavmesh* navmesh)
+MNAV_NODISCARD static bool MarkDirty(mnavHierarchy* h, const mnavNavmesh* navmesh)
 {
     memset(h->dirty, 0, (size_t)h->clusterCount);
     memset(h->changed, 0, (size_t)navmesh->slotCount);

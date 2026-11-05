@@ -89,6 +89,8 @@ jobs:
           python3 tools/check_float_env.py
           python3 tools/check_docs.py
           python3 tools/check_lengths.py
+          python3 tools/check_nodiscard.py --self-test
+          python3 tools/check_nodiscard.py
           python3 tools/check_guide.py
       # The tests themselves, then every test registration in the
       # configurations that add tests: the default one, with the samples,

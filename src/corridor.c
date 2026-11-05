@@ -23,12 +23,12 @@
 #include <stdint.h>
 #include <string.h>
 
-static bool Finite(mnavPos3 p)
+MNAV_NODISCARD static bool Finite(mnavPos3 p)
 {
     return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
 }
 
-static bool SameId(mnavPolygonId a, mnavPolygonId b)
+MNAV_NODISCARD static bool SameId(mnavPolygonId a, mnavPolygonId b)
 {
     return a.slot == b.slot && a.generation == b.generation && a.polygon == b.polygon;
 }
@@ -36,7 +36,7 @@ static bool SameId(mnavPolygonId a, mnavPolygonId b)
 // Whether a corridor is well formed: finite ends, a buffer, room for a
 // polygon at least, and from one polygon to its room. Its fields are the
 // caller's, so every call checks them before it reads the buffer.
-static bool WellFormed(const mnavCorridor* corridor)
+MNAV_NODISCARD static bool WellFormed(const mnavCorridor* corridor)
 {
     return corridor != nullptr && Finite(corridor->position) && Finite(corridor->target) &&
            corridor->polygons != nullptr && corridor->capacity >= 1 &&
@@ -133,9 +133,10 @@ static mnavPos3 AlongSide(mnavPos3 a, mnavPos3 b, double au, double bu, double u
 // The portal where edge j of polygon p (a to b) meets polygon q across a
 // tile side: the part of the side their link covers, in the edge's
 // direction. False when no link of the edge reaches q.
-static bool SidePortal(const mnavTile* tile, mnavPolygonId p, int32_t j, mnavPolygonId q,
-                       const mnavMeshVertex* va, const mnavMeshVertex* vb, mnavPos3 a, mnavPos3 b,
-                       mnavPortal* out)
+MNAV_NODISCARD static bool SidePortal(const mnavTile* tile, mnavPolygonId p, int32_t j,
+                                      mnavPolygonId q, const mnavMeshVertex* va,
+                                      const mnavMeshVertex* vb, mnavPos3 a, mnavPos3 b,
+                                      mnavPortal* out)
 {
     for (int32_t l = tile->firstLink[p.polygon]; l < tile->firstLink[p.polygon + 1]; ++l)
     {
@@ -157,8 +158,8 @@ static bool SidePortal(const mnavTile* tile, mnavPolygonId p, int32_t j, mnavPol
 
 // The portal from polygon p to polygon q across one of p's edges: the
 // shared edge, or the part of a tile side a link covers.
-static bool EdgePortal(const mnavNavmesh* navmesh, mnavPolygonId p, mnavPolygonId q,
-                       mnavPortal* out)
+MNAV_NODISCARD static bool EdgePortal(const mnavNavmesh* navmesh, mnavPolygonId p, mnavPolygonId q,
+                                      mnavPortal* out)
 {
     const mnavTile* tile = nullptr;
     const mnavPolygon* polygon = mnavPolygonOf(navmesh, p, &tile);
@@ -186,8 +187,8 @@ static bool EdgePortal(const mnavNavmesh* navmesh, mnavPolygonId p, mnavPolygonI
 
 // The portals from polygon p to polygon q over an off-mesh link of a kind
 // the filter allows: its takeoff point, then its landing point.
-static bool LinkPortals(const mnavNavmesh* navmesh, const mnavQueryFilter* filter, mnavPolygonId p,
-                        mnavPolygonId q, mnavPortal* out)
+MNAV_NODISCARD static bool LinkPortals(const mnavNavmesh* navmesh, const mnavQueryFilter* filter,
+                                       mnavPolygonId p, mnavPolygonId q, mnavPortal* out)
 {
     int32_t first = 0;
     int32_t count = mnavAttachmentsFrom(navmesh, (int32_t)p.slot - 1, (int32_t)p.polygon, &first);

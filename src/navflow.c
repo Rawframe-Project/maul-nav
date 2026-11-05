@@ -195,7 +195,7 @@ void mnavDestroyNavFlow(mnavNavFlow* field)
 }
 
 // The heap, by cost, then by number.
-static bool Sooner(const mnavNavFlow* f, int32_t a, int32_t b)
+MNAV_NODISCARD static bool Sooner(const mnavNavFlow* f, int32_t a, int32_t b)
 {
     return f->ways[a].cost != f->ways[b].cost ? f->ways[a].cost < f->ways[b].cost : a < b;
 }
@@ -326,7 +326,7 @@ static void Polygon(const mnavNavFlow* f, int32_t number, int32_t* slot, int32_t
 }
 
 // Whether a slot's tile lies in the region.
-static bool InRegion(const mnavNavFlow* f, const mnavNavmesh* navmesh, int32_t slot)
+MNAV_NODISCARD static bool InRegion(const mnavNavFlow* f, const mnavNavmesh* navmesh, int32_t slot)
 {
     const mnavSlot* s = &navmesh->slots[slot];
     const mnavTileRange* r = &f->region;
@@ -334,7 +334,7 @@ static bool InRegion(const mnavNavFlow* f, const mnavNavmesh* navmesh, int32_t s
 }
 
 // Whether a polygon may be walked: in the region, of an area included.
-static bool Usable(const mnavNavFlow* f, int32_t slot, int32_t polygon)
+MNAV_NODISCARD static bool Usable(const mnavNavFlow* f, int32_t slot, int32_t polygon)
 {
     return InRegion(f, f->navmesh, slot) &&
            mnavIncludes(&f->filter, f->navmesh->slots[slot].tile->mesh.polygons[polygon].area);

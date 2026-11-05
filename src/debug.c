@@ -43,7 +43,7 @@ static void Fill(mnavDebugBuffer* buffer, const mnavNavmesh* navmesh, int32_t sl
 }
 
 // Whether tile links join edge j of polygon p.
-static bool Linked(const mnavTile* tile, int32_t p, int32_t j)
+MNAV_NODISCARD static bool Linked(const mnavTile* tile, int32_t p, int32_t j)
 {
     for (int32_t l = tile->firstLink[p]; l < tile->firstLink[p + 1]; ++l)
     {

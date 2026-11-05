@@ -101,7 +101,7 @@ static double Distance(mnavPos3 a, mnavPos3 b)
     return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-static bool Same(mnavPos3 a, mnavPos3 b)
+MNAV_NODISCARD static bool Same(mnavPos3 a, mnavPos3 b)
 {
     return a.x == b.x && a.y == b.y && a.z == b.z;
 }
@@ -140,7 +140,7 @@ static uint64_t Mix(uint64_t h, double v)
     return h ^ (h >> 31);
 }
 
-static bool SameNode(const mnavSearchNode* a, const mnavSearchNode* b)
+MNAV_NODISCARD static bool SameNode(const mnavSearchNode* a, const mnavSearchNode* b)
 {
     return Same(a->at, b->at) && Same(a->a, b->a) && Same(a->b, b->b) && a->slot == b->slot &&
            a->polygon == b->polygon && a->tag == b->tag && a->low == b->low;
@@ -172,7 +172,7 @@ static uint32_t MadeCell(const Shortest* s, const mnavSearchNode* node)
 }
 
 // Whether a way to a root at a cost is no dearer than the best known.
-static bool Cheapest(const mnavQuery* query, uint32_t cell, double cost)
+MNAV_NODISCARD static bool Cheapest(const mnavQuery* query, uint32_t cell, double cost)
 {
     int32_t n = query->table[cell];
     return n == MNAV_NO_NODE || cost <= query->nodes[n].cost + 1e-9 * (1.0 + fabs(cost));
@@ -183,7 +183,8 @@ static bool Cheapest(const mnavQuery* query, uint32_t cell, double cost)
 // root, the polygons about it form a ring when no wall meets it. A root
 // on the interval's line but beyond the interval turns at its nearer
 // end, a way of its own.
-static bool Repeats(const mnavQuery* query, int32_t parent, const mnavSearchNode* made)
+MNAV_NODISCARD static bool Repeats(const mnavQuery* query, int32_t parent,
+                                   const mnavSearchNode* made)
 {
     double span = mnavFlat(made->a, made->b);
     if (made->tag < 0 || fabs(mnavCross(made->a, made->b, made->at)) > 1e-9 * (1.0 + span * span) ||
@@ -253,7 +254,8 @@ static void Open(Shortest* s, int32_t parent, mnavSearchNode made, double ahead)
 // interval: straight when the root sees p through the interval, else
 // turning at the interval's end on p's side, when that end is a corner.
 // With full, the root sees the whole polygon.
-static bool Toward(const Shortest* s, const mnavSearchNode* node, Seen* seen, bool full, mnavPos3 p)
+MNAV_NODISCARD static bool Toward(const Shortest* s, const mnavSearchNode* node, Seen* seen,
+                                  bool full, mnavPos3 p)
 {
     if (full)
     {
@@ -364,7 +366,7 @@ static void Land(Shortest* s, int32_t n)
 // at least 0; false when nothing of it remains. A crossing within 1e-9 of
 // either end is that end: a cone's side through a vertex, rounded, would
 // else make the vertex a point of no corner.
-static bool AtLeastZero(double f0, double f1, double* lo, double* hi)
+MNAV_NODISCARD static bool AtLeastZero(double f0, double f1, double* lo, double* hi)
 {
     if (f0 < 0.0 && f1 < 0.0)
     {
@@ -564,7 +566,7 @@ static void SpreadEdges(Shortest* s, int32_t n, Seen seen, bool full)
 // the interval's line sees it whole from the interval, or else from the
 // interval's nearer end, turning there when that end is a corner; false
 // when it cannot.
-static bool Facing(const Shortest* s, int32_t n, Seen* seen, bool* full)
+MNAV_NODISCARD static bool Facing(const Shortest* s, int32_t n, Seen* seen, bool* full)
 {
     const mnavSearchNode* node = &s->query->nodes[n];
     *full = node->tag == KIND_START || node->tag == KIND_LANDING;
@@ -646,7 +648,7 @@ static double OneCost(const mnavQueryFilter* filter)
 
 // Whether a point lies on one of a polygon's edges, a corner included: on
 // a tile side, a corner of the tile across may be within an edge here.
-static bool Touches(const mnavNavmesh* navmesh, mnavPolygonId id, mnavPos3 p)
+MNAV_NODISCARD static bool Touches(const mnavNavmesh* navmesh, mnavPolygonId id, mnavPos3 p)
 {
     const mnavSlot* slot = &navmesh->slots[id.slot - 1];
     const mnavFrame f = mnavFrameOf(navmesh, slot->x, slot->z);

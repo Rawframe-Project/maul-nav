@@ -66,7 +66,7 @@ typedef struct Tracer
     int32_t border;
 } Tracer;
 
-static bool IsRegion(uint32_t id)
+MNAV_NODISCARD static bool IsRegion(uint32_t id)
 {
     return id != 0 && (id & MNAV_BORDER_REGION) == 0;
 }
@@ -283,7 +283,7 @@ static float SegmentDistance(int32_t x, int32_t z, int32_t ax, int32_t az, int32
     return px * px + pz * pz;
 }
 
-static bool LexicallyAfter(const RawVertex* b, const RawVertex* a)
+MNAV_NODISCARD static bool LexicallyAfter(const RawVertex* b, const RawVertex* a)
 {
     return b->x > a->x || (b->x == a->x && b->z > a->z);
 }
@@ -351,7 +351,7 @@ static int32_t FirstOf(const Work* work, int32_t i)
 }
 
 // Whether a region fell back in the first pass.
-static bool Fell(const Work* work, uint32_t id)
+MNAV_NODISCARD static bool Fell(const Work* work, uint32_t id)
 {
     return work->fell != nullptr && IsRegion(id) && work->fell[id] != 0;
 }
@@ -360,7 +360,7 @@ static bool Fell(const Work* work, uint32_t id)
 // included, reach within the outline bounds of a region that fell back
 // other than its own: a wall simplified there could cut across the
 // region's cells, which it keeps.
-static bool NearFallen(const Work* work, int32_t i)
+MNAV_NODISCARD static bool NearFallen(const Work* work, int32_t i)
 {
     if (work->fallenCount == 0)
     {
@@ -459,7 +459,7 @@ static int64_t RawArea(const Work* work)
 // Whether a contour may go when it simplifies to fewer than three vertices:
 // a hole all of whose edges are walls, which its region then covers,
 // when it holds no other region (HoldsAnother).
-static bool MayGo(const Work* work)
+MNAV_NODISCARD static bool MayGo(const Work* work)
 {
     if (RawArea(work) > 0)
     {
@@ -478,7 +478,7 @@ static bool MayGo(const Work* work)
 // Whether a hole of walls holds another region: one whose outline's bounds
 // lie inside the hole's, which it would cover if it went. Layers above or
 // below count too; a hole kept for one is only more exact.
-static bool HoldsAnother(const Work* work, uint32_t count)
+MNAV_NODISCARD static bool HoldsAnother(const Work* work, uint32_t count)
 {
     int32_t x0 = INT32_MAX;
     int32_t z0 = INT32_MAX;

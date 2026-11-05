@@ -106,8 +106,8 @@ static void Corners(const mnavTile* tile, const mnavDetailPart* part, int32_t t,
 // The height of the first triangle holding q, as the full scan finds it
 // when no triangle before it comes within rounding of q: only such a one
 // could reach q at distance 0 first. False when the scan must decide.
-static bool HoldingHeight(const mnavTile* tile, const mnavDetailPart* part, Flat q,
-                          double* heightOut)
+MNAV_NODISCARD static bool HoldingHeight(const mnavTile* tile, const mnavDetailPart* part, Flat q,
+                                         double* heightOut)
 {
     for (int32_t t = 0; t < part->triangleCount; ++t)
     {
@@ -208,7 +208,8 @@ typedef struct Search
 
 // Whether polygon p of a tile can lie in the box: its vertices' bounds on
 // the ground and its detail's heights.
-static bool InBox(const Search* s, const mnavFrame* f, const mnavTile* tile, int32_t p)
+MNAV_NODISCARD static bool InBox(const Search* s, const mnavFrame* f, const mnavTile* tile,
+                                 int32_t p)
 {
     const mnavPolygon* polygon = &tile->mesh.polygons[p];
     double minX = (double)INFINITY;
@@ -323,7 +324,7 @@ static int32_t FirstColumn(const mnavNavmesh* navmesh, int64_t x0)
     return low;
 }
 
-static bool Finite(double v)
+MNAV_NODISCARD static bool Finite(double v)
 {
     return isfinite(v);
 }
@@ -335,7 +336,7 @@ bool mnavGoodHalfExtents(mnavVec3 half)
 }
 
 // Whether a box is well formed: finite, with half sizes at least 0.
-static bool GoodBox(mnavPos3 point, mnavVec3 half)
+MNAV_NODISCARD static bool GoodBox(mnavPos3 point, mnavVec3 half)
 {
     return Finite(point.x) && Finite(point.y) && Finite(point.z) && mnavGoodHalfExtents(half);
 }

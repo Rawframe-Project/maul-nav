@@ -85,7 +85,7 @@ static mnavResult CollectTouching(Work* work, uint16_t vertex)
 }
 
 // Whether the polygons around the vertex share one area type.
-static bool SameArea(const Work* work)
+MNAV_NODISCARD static bool SameArea(const Work* work)
 {
     const mnavPolygon* polygons = work->mesh->polygons;
     for (int32_t t = 1; t < work->touchingCount; ++t)
@@ -207,7 +207,7 @@ static mnavResult CollectEdges(Work* work, uint16_t vertex)
 // Chains the edges into the hole's outline, each edge extending its end
 // or its start, the first fitting edge in order each time. Returns false
 // when the edges do not form one chain.
-static bool Chain(Work* work)
+MNAV_NODISCARD static bool Chain(Work* work)
 {
     HoleEdge* edges = work->edges;
     uint16_t* hole = work->hole;
@@ -260,7 +260,7 @@ static mnavContourVertex Ground(const mnavPolyMesh* mesh, uint16_t index)
 // a vertex inside the mesh; an open one must close across the vertex's
 // own place, the vertex lying on the segment from the chain's end back
 // to its start.
-static bool KeepsOutline(const Work* work, uint16_t vertex)
+MNAV_NODISCARD static bool KeepsOutline(const Work* work, uint16_t vertex)
 {
     if (work->closed)
     {

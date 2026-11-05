@@ -51,7 +51,7 @@ static void SetRange(const Grid* g, uint64_t* column, int32_t from, int32_t to)
     }
 }
 
-static bool Get(const uint64_t* column, int32_t y)
+MNAV_NODISCARD static bool Get(const uint64_t* column, int32_t y)
 {
     return (column[y / 64] >> (y % 64) & 1u) != 0;
 }
