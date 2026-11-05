@@ -602,13 +602,12 @@ extern "C"
     ///                 as the search gave it, before its context's next search.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
     /// corridor with no buffer or a capacity below 1, or a path with no
-    /// polygon or point, a NULL `polygons` or `points`, or a first or last
-    /// point that is not finite, or a path no search gave: arrays other than
-    /// its context's, or more polygons, points or links than the search
-    /// gave; `mnav_errorStale` for a path a later search of its context has
-    /// replaced; `mnav_errorCapacity`
-    /// when the path has more polygons than the corridor's buffer. The
-    /// corridor is unchanged on any failure.
+    /// polygon or point, a NULL `polygons` or `points`, or a path no search
+    /// gave: arrays other than its context's, or more polygons, points or
+    /// links than the search gave; `mnav_errorStale` for a path a later
+    /// search of its context has replaced; `mnav_errorCapacity` when the
+    /// path has more polygons than the corridor's buffer. The corridor is
+    /// unchanged on any failure.
     /// @par Thread safety
     /// Safe from any thread; the corridor is used by one thread at a time,
     /// and the path's context, which it reads, by no other thread meanwhile.

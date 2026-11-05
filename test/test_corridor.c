@@ -312,7 +312,9 @@ static void TestMalformedCorridors(void)
     CHECK(mnavSetCorridor(&noRoom, &path) == mnav_errorInvalid &&
               mnavSetCorridor(&stale, &path) == mnav_success && stale.polygonCount == 1,
           "loading refuses no room, and replaces any count");
-    // A path's arrays and ends are the caller's fields too.
+    // A path's array pointers are the caller's fields too. Points of the
+    // caller's own, here with an end not finite, are no search's: the ends
+    // a search gave lie only in its context's points.
     mnavPos3 notFinite[3] = {a.point, {a.point.x, (double)NAN, a.point.z}, a.point};
     mnavPath forged[4] = {path, path, path, path};
     forged[0].polygons = nullptr;
@@ -328,7 +330,8 @@ static void TestMalformedCorridors(void)
         loaded = loaded || mnavSetCorridor(&c, &forged[k]) != mnav_errorInvalid ||
                  c.polygonCount != 1 || c.position.y != a.point.y || c.target.y != a.point.y;
     }
-    CHECK(!loaded, "loading refuses NULL arrays and ends not finite, the corridor unchanged");
+    CHECK(!loaded, "loading refuses NULL arrays and points of the caller's own, the corridor "
+                   "unchanged");
     free(buffer);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
