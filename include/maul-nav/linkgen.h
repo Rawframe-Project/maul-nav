@@ -112,11 +112,12 @@ extern "C"
     /// surface between the agent's step height and `dropMax` below, and a
     /// jump, landing from `2 * radius` to `jumpMax` out at the nearest
     /// distance where a surface lies within the step height of the start,
-    /// the radius, step height and cell size being the navmesh's. A link is
-    /// kept when the clearance test, if any, passes it, when the navmesh
-    /// does not already walk from its start to its landing within `detour`
-    /// times the straight distance, and when no earlier link in the buffer
-    /// has both ends within `filterDistance` of its own. The order is tile
+    /// the radius, step height and cell size being the navmesh's. Neither
+    /// lands on the polygon it starts from. A link is kept when the
+    /// clearance test, if any, passes it, when the navmesh does not already
+    /// walk from its start to its landing within `detour` times the
+    /// straight distance, and when no earlier link in the buffer has both
+    /// ends within `filterDistance` of its own. The order is tile
     /// place, polygon, edge, sample; the same navmesh gives the same links.
     /// A buffer too short holds the same first links as a longer one, but
     /// links past it are not filtered against each other, since the

@@ -8,6 +8,7 @@
 #include "defs_for.h"
 #include "stored_tiles.h"
 #include "test_harness.h"
+#include "trench.h"
 
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
@@ -24,7 +25,8 @@
 
 enum
 {
-    LINKS = 512
+    LINKS = 512,
+    TILE_CAPACITY = 1 << 14
 };
 
 static mnavLinkDef s_links[LINKS];
@@ -372,6 +374,69 @@ static void TestPathThroughLinks(mnavNavmesh* navmesh)
     mnavDestroyQuery(query);
 }
 
+// With no agent radius the walkable area reaches the gap's sides, and the
+// first jump box lies on the takeoff's own edge. The trench baked so
+// (fresh, so checked exactly and not hashed) still jumps the gap both
+// ways, and every jump crosses it.
+static void TestNoRadius(void)
+{
+    mnavBakeDef bake = mnavDefaultBakeDef();
+    bake.agent.radius = 0.0f;
+    mnavNavmeshDef meshDef = NavmeshDefFor(&bake);
+    mnavBaker* baker = nullptr;
+    mnavNavmesh* navmesh = nullptr;
+    CHECK(mnavCreateBaker(&bake, &baker).result == mnav_success &&
+              mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success,
+          "a baker and a navmesh with no radius");
+    const mnavTriangleMesh trench = Trench();
+    const mnavBakeInput input = {&trench, 1, nullptr, 0, nullptr, 0, nullptr};
+    static uint8_t bytes[TILE_CAPACITY];
+    for (int32_t t = 0; t < 2; ++t)
+    {
+        size_t size = 0;
+        CHECK(mnavBaker_BakeTile(baker, &input, t, 0, nullptr) == mnav_success &&
+                  mnavBaker_CopyTile(baker, bytes, TILE_CAPACITY, &size) == mnav_success &&
+                  mnavNavmesh_StageTile(navmesh, bytes, size).result == mnav_success,
+              "a tile baked and staged");
+    }
+    CHECK(mnavNavmesh_Commit(navmesh) == mnav_success, "committed");
+    mnavQuery* query = Query();
+    mnavLinkGenDef def = Def();
+    int32_t count = 0;
+    CHECK(mnavQuery_GenerateLinks(query, navmesh, &def, nullptr, nullptr, s_links, LINKS, &count) ==
+              mnav_success,
+          "generated");
+    int32_t across = 0;
+    int32_t back = 0;
+    int32_t wrong = 0;
+    for (int32_t i = 0; i < count; ++i)
+    {
+        const mnavLinkDef* l = &s_links[i];
+        if (l->kind != mnav_linkJump)
+        {
+            continue;
+        }
+        // Slab A ends at x = 30 and slab B starts at 31.2.
+        if (l->start.x < 30.1 && l->end.x > 31.1)
+        {
+            across += 1;
+        }
+        else if (l->start.x > 31.1 && l->end.x < 30.1)
+        {
+            back += 1;
+        }
+        else
+        {
+            wrong += 1;
+        }
+    }
+    printf("no radius: jumps across %d and back %d, others %d\n", across, back, wrong);
+    CHECK(across > 10 && back > 10 && wrong == 0, "jumps both ways across the gap, nothing else");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+    mnavDestroyBaker(baker);
+}
+
 int main(void)
 {
     mnavNavmesh* navmesh = Load();
@@ -380,5 +445,6 @@ int main(void)
     TestChecksAndBuffer(navmesh);
     TestPathThroughLinks(navmesh);
     mnavDestroyNavmesh(navmesh);
+    TestNoRadius();
     return s_failures == 0 ? 0 : 1;
 }
