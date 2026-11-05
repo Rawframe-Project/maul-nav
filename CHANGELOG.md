@@ -7,11 +7,42 @@ may change the API, the ABI and the tile formats.
 
 ## [1.1.2](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.1...v1.1.2) (2026-11-05)
 
+This release stops `mnavQuery_FindShortestPath` from opening nodes past
+its path length toward an end far away, and marks every internal
+function that returns `bool` nodiscard. No result changes for a caller
+that keeps the contract.
+
+### Changed
+
+- `mnavSetCorridor`'s documented failures no longer list a path whose
+  first or last point is not finite. A path's points lie in its
+  context's memory, and only the context's searches write them, so a
+  path handed back as the contract allows never has one. A path whose
+  points are an array of the caller's own is still refused with
+  `mnav_errorInvalid`. No result changes for a caller that keeps the
+  contract.
+  ([#350](https://github.com/Rawframe-Project/maul-nav/pull/350))
 
 ### Fixed
 
-* mark every internal bool function nodiscard and check it ([#356](https://github.com/Rawframe-Project/maul-nav/issues/356)) ([a9d4c19](https://github.com/Rawframe-Project/maul-nav/commit/a9d4c19a9bc6bea6ea33497469d8ce29fddb9ff7)), closes [#355](https://github.com/Rawframe-Project/maul-nav/issues/355)
-* **query:** open no node past the length toward a far end ([#354](https://github.com/Rawframe-Project/maul-nav/issues/354)) ([99f04fa](https://github.com/Rawframe-Project/maul-nav/commit/99f04fa955f5c6a1a02f42e11010849bb0f4f1bc)), closes [#351](https://github.com/Rawframe-Project/maul-nav/issues/351)
+- `mnavQueryLimits.pathLength` promises that no node is opened whose way
+  from the start and on to the end is longer, but
+  `mnavQuery_FindShortestPath` opened such nodes toward a finite end
+  past about 1e308 m. Its estimate of the way through an interval
+  overflowed to NaN there, and a NaN estimate passed the length test.
+  The estimate is now infinite for a root or end more than about 1e154 m
+  from the interval's end. That is past `MNAV_MAX_PATH_LENGTH`, which
+  caps every search's length, so no node within a limit is turned away.
+  No result changes: the path given was already right.
+  ([#354](https://github.com/Rawframe-Project/maul-nav/pull/354))
+- The library's internal functions that return `bool` carried no
+  nodiscard mark, so a dropped result went unwarned. Dropping one goes
+  on past a refusal, or reads an out value that was never set. 191
+  declarations now carry `MNAV_NODISCARD`, and a check run by CI keeps
+  it so. The library, tools, tests, samples and benchmarks build with it
+  under Clang 20 and GCC 14 with `-Werror`, with no result dropped. No
+  result changes.
+  ([#356](https://github.com/Rawframe-Project/maul-nav/pull/356))
 
 ## [1.1.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.0...v1.1.1) (2026-11-05)
 
