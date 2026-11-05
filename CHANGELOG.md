@@ -7,10 +7,24 @@ may change the API, the ABI and the tile formats.
 
 ## [1.2.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.3...v1.2.0) (2026-11-05)
 
+This release makes `mnavQuery_GenerateLinks` find jumps across gaps on
+a navmesh baked with an agent radius of 0. Links change only on such a
+navmesh; at any radius above 0 they are the same.
 
-### Added
+### Changed
 
-* **links:** land no jump on the polygon it starts from ([#365](https://github.com/Rawframe-Project/maul-nav/issues/365)) ([4bdbd5d](https://github.com/Rawframe-Project/maul-nav/commit/4bdbd5d0f973cf1f13205ae88bbbc412fa4fe678)), closes [#363](https://github.com/Rawframe-Project/maul-nav/issues/363)
+- `mnavQuery_GenerateLinks` lands neither a drop nor a jump on the
+  polygon it starts from. On a navmesh baked with an agent radius of 0,
+  which `mnavAgentProfile` allows, the jump search's first landing box
+  lay on the edge itself, where only the takeoff's polygon is, so the
+  search stopped there and never reached the far side of a gap: with
+  `detour` on, the link was dropped, and with `detour` 0 it was kept as
+  a jump of two cells onto the polygon it starts from. On the trench of
+  the link generation tests (a 1.2 m gap), baked with radius 0, there
+  were no jumps across the gap, or 105 jumps onto the slab they start
+  from with `detour` 0; there are now 16 jumps across and 18 back. At
+  any radius above 0, the links are the same as 1.1.3's.
+  ([#365](https://github.com/Rawframe-Project/maul-nav/pull/365))
 
 ## [1.1.3](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.2...v1.1.3) (2026-11-05)
 
