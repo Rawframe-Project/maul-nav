@@ -5,6 +5,34 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.1.3](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.2...v1.1.3) (2026-11-05)
+
+This release gives the navmesh queries a range: a point, end, center or
+radius more than `MNAV_MAX_QUERY_DISTANCE` (1e100 m) from the navmesh's
+origin is now refused with `mnav_errorLimit`. Such input used to give
+wrong results. Results within the range do not change.
+
+### Fixed
+
+- The navmesh queries took any finite point, end, center or radius,
+  and far from the navmesh their arithmetic overflowed:
+  `mnavQuery_MoveAlongSurface` toward an end near ±1e308 reported
+  `mnav_moveReached` at the end itself, off the navmesh;
+  `mnavQuery_FindWallDistance` and `mnavQuery_FindWalls` found no wall
+  from a center 1e154 m away with a radius that covers every wall; and
+  `mnavQuery_FindRandomPointAround` from a center 1e155 m or more away
+  returned the center itself, off the navmesh. The queries now have a
+  range, as the bake has an extent. `MNAV_MAX_QUERY_DISTANCE`, 1e100 m,
+  is how far a query's points, ends, centers and radii may reach from
+  the navmesh's origin (its bake def's origin) on each axis; within it,
+  no query's arithmetic overflows. Every navmesh query that takes a
+  point, end, center or radius refuses one past it with
+  `mnav_errorLimit`, after its checks for NULL and non-finite input, and
+  every corridor call that takes the navmesh refuses a corridor whose
+  position or target lies past it. The end of `mnavQuery_Raycast` and
+  `mnavQuery_MoveAlongSurface` is measured by its x and z.
+  ([#359](https://github.com/Rawframe-Project/maul-nav/pull/359))
+
 ## [1.1.2](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.1...v1.1.2) (2026-11-05)
 
 This release stops `mnavQuery_FindShortestPath` from opening nodes past
