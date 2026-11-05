@@ -459,34 +459,45 @@ static bool SameLink(const mnavLinkDef* a, const mnavLinkDef* b)
 
 static mnavLinkDef s_links[2][GENERATED];
 
-// Whether a link lands off the polygon it starts from, where that is
-// plain: the one polygon whose surface holds its start exactly. A link
-// whose start lies on an edge two polygons share is taken as it is.
-static bool OffTakeoff(const mnavNavmesh* navmesh, const mnavLinkDef* link)
+// The polygon whose surface holds a point exactly, when one alone does:
+// how many do, and that one.
+static int32_t Holder(const mnavNavmesh* navmesh, mnavPos3 point, mnavPolygonId* holderOut)
 {
     mnavPolygonId ids[16];
     mnavFound found;
-    if (mnavNavmesh_FindPolygons(navmesh, link->start, (mnavVec3){0.01f, 0.01f, 0.01f}, nullptr,
-                                 ids, 16, &found) != mnav_success)
+    if (mnavNavmesh_FindPolygons(navmesh, point, (mnavVec3){0.01f, 0.01f, 0.01f}, nullptr, ids, 16,
+                                 &found) != mnav_success)
     {
-        return true;
+        return 0;
     }
     int32_t holding = 0;
-    mnavPolygonId takeoff = {0, 0, 0};
     for (int32_t i = 0; i < found.polygonCount; ++i)
     {
         double h = 0.0;
-        if (mnavPolygon_GetHeight(navmesh, ids[i], link->start.x, link->start.z, &h) ==
-                mnav_success &&
-            h == link->start.y)
+        if (mnavPolygon_GetHeight(navmesh, ids[i], point.x, point.z, &h) == mnav_success &&
+            h == point.y)
         {
             holding += 1;
-            takeoff = ids[i];
+            *holderOut = ids[i];
         }
     }
-    double h = 0.0;
-    return holding != 1 || mnavPolygon_GetHeight(navmesh, takeoff, link->end.x, link->end.z, &h) ==
-                               mnav_errorOutside;
+    return holding;
+}
+
+// Whether a link lands off the polygon it starts from, where both are
+// plain: the one polygon whose surface holds each end exactly. A link
+// with an end on an edge two polygons share, or on no surface exactly, is
+// taken as it is.
+static bool OffTakeoff(const mnavNavmesh* navmesh, const mnavLinkDef* link)
+{
+    mnavPolygonId takeoff = {0, 0, 0};
+    mnavPolygonId landing = {0, 0, 0};
+    if (Holder(navmesh, link->start, &takeoff) != 1 || Holder(navmesh, link->end, &landing) != 1)
+    {
+        return true;
+    }
+    return takeoff.slot != landing.slot || takeoff.generation != landing.generation ||
+           takeoff.polygon != landing.polygon;
 }
 
 static void Generate(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
