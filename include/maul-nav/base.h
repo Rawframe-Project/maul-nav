@@ -26,10 +26,10 @@ extern "C"
 #define MNAV_VERSION_MAJOR 1
 // x-release-please-end
 // x-release-please-start-minor
-#define MNAV_VERSION_MINOR 1
+#define MNAV_VERSION_MINOR 2
 // x-release-please-end
 // x-release-please-start-patch
-#define MNAV_VERSION_PATCH 3
+#define MNAV_VERSION_PATCH 0
 // x-release-please-end
 
 // The binary interface a program is built for: the whole version before

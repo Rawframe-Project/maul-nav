@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.2.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.3...v1.2.0) (2026-11-05)
+
+
+### Added
+
+* **links:** land no jump on the polygon it starts from ([#365](https://github.com/Rawframe-Project/maul-nav/issues/365)) ([4bdbd5d](https://github.com/Rawframe-Project/maul-nav/commit/4bdbd5d0f973cf1f13205ae88bbbc412fa4fe678)), closes [#363](https://github.com/Rawframe-Project/maul-nav/issues/363)
+
 ## [1.1.3](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.2...v1.1.3) (2026-11-05)
 
 This release gives the navmesh queries a range: a point, end, center or
