@@ -20,6 +20,7 @@
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
+#include <float.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -60,12 +61,26 @@ static double Raw(Reader* r)
     return d;
 }
 
-// A coordinate: one time in sixteen raw bits, otherwise a quarter meter
-// step from -4 to 67.75 m.
+// A value at the edge of the query range: its bound, the next double past
+// it, the largest double, or a power of two from 2^333 to 2^1023, either
+// sign.
+static double Edge(Reader* r)
+{
+    uint8_t pick = Byte(r);
+    double v = pick % 4 == 0   ? MNAV_MAX_QUERY_DISTANCE
+               : pick % 4 == 1 ? nextafter(MNAV_MAX_QUERY_DISTANCE, (double)INFINITY)
+               : pick % 4 == 2 ? DBL_MAX
+                               : ldexp(1.0, 333 + Byte(r) % 691);
+    return (pick & 4) != 0 ? -v : v;
+}
+
+// A coordinate: one time in sixteen raw bits, one time in sixteen at the
+// edge of the query range, otherwise a quarter meter step from -4 to
+// 67.75 m.
 static double Coordinate(Reader* r)
 {
     uint8_t pick = Byte(r);
-    return pick % 16 == 0 ? Raw(r) : (double)Byte(r) * 0.28125 - 4.0;
+    return pick % 16 == 0 ? Raw(r) : pick % 16 == 1 ? Edge(r) : (double)Byte(r) * 0.28125 - 4.0;
 }
 
 static mnavPos3 Point(Reader* r)
@@ -73,16 +88,42 @@ static mnavPos3 Point(Reader* r)
     return (mnavPos3){Coordinate(r), Coordinate(r) * 0.0625, Coordinate(r)};
 }
 
-// A length from 0 to 16 m, or raw bits.
+// A length from 0 to 16 m, or raw bits, or at the edge of the query range.
 static double Length(Reader* r)
 {
     uint8_t pick = Byte(r);
-    return pick % 16 == 0 ? Raw(r) : (double)(Byte(r) % 64) * 0.25;
+    return pick % 16 == 0 ? Raw(r) : pick % 16 == 1 ? fabs(Edge(r)) : (double)(Byte(r) % 64) * 0.25;
 }
 
 static bool Finite(mnavPos3 p)
 {
     return isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
+}
+
+// Whether a finite value lies past the query range; the world's origin is
+// (0, 0, 0).
+static bool Beyond(double v)
+{
+    return isfinite(v) && fabs(v) > MNAV_MAX_QUERY_DISTANCE;
+}
+
+// Whether a finite point lies past the query range on an axis, or on the
+// ground alone for an end whose height is never read.
+static bool Past(mnavPos3 p)
+{
+    return Finite(p) && (Beyond(p.x) || Beyond(p.y) || Beyond(p.z));
+}
+
+static bool PastGround(mnavPos3 p)
+{
+    return isfinite(p.x) && isfinite(p.z) && (Beyond(p.x) || Beyond(p.z));
+}
+
+// A call given finite input of which some lies past the query range is
+// refused with mnav_errorLimit, before anything else it would refuse.
+static void ExpectRange(bool finite, bool past, mnavResult result)
+{
+    Expect(!(finite && past) || result == mnav_errorLimit);
 }
 
 static bool Typed(mnavResult result)
@@ -178,14 +219,20 @@ static void FindPath(Reader* r, const mnavQueryFilter* filter, bool sliced)
     mnavPos3 start = Point(r);
     mnavPos3 end = Point(r);
     mnavPath path;
+    bool finite = Finite(start) && Finite(end);
+    bool past = Past(start) || Past(end);
     if (!sliced)
     {
-        CheckPath(mnavQuery_FindPath(s_query, s_navmesh, a, start, b, end, filter, &path), &path);
-        CheckPath(mnavQuery_FindShortestPath(s_query, s_navmesh, a, start, b, end, filter, &path),
-                  &path);
+        mnavResult found = mnavQuery_FindPath(s_query, s_navmesh, a, start, b, end, filter, &path);
+        ExpectRange(finite, past, found);
+        CheckPath(found, &path);
+        found = mnavQuery_FindShortestPath(s_query, s_navmesh, a, start, b, end, filter, &path);
+        ExpectRange(finite, past, found);
+        CheckPath(found, &path);
         return;
     }
     mnavResult result = mnavQuery_BeginPath(s_query, s_navmesh, a, start, b, end, filter);
+    ExpectRange(finite, past, result);
     Expect(Typed(result));
     int32_t budget = 1 + Byte(r) % 64;
     bool ended = false;
@@ -207,18 +254,23 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
     {
         mnavRay ray;
         result = mnavQuery_Raycast(s_query, s_navmesh, id, a, b, filter, &ray);
+        ExpectRange(Finite(a) && isfinite(b.x) && isfinite(b.z), Past(a) || PastGround(b), result);
         Expect(result != mnav_success || (ray.polygonCount >= 0 && isfinite(ray.normal.x)));
     }
     else if (op == 1)
     {
         mnavMove move;
         result = mnavQuery_MoveAlongSurface(s_query, s_navmesh, id, a, b, filter, &move);
+        ExpectRange(Finite(a) && isfinite(b.x) && isfinite(b.z), Past(a) || PastGround(b), result);
         Expect(result != mnav_success || Finite(move.point));
     }
     else if (op == 2 && Byte(r) % 2 == 0)
     {
         mnavNearestWall wall;
-        result = mnavQuery_FindWallDistance(s_query, s_navmesh, id, a, Length(r), filter, &wall);
+        double radius = Length(r);
+        result = mnavQuery_FindWallDistance(s_query, s_navmesh, id, a, radius, filter, &wall);
+        ExpectRange(Finite(a) && isfinite(radius) && radius >= 0.0, Past(a) || Beyond(radius),
+                    result);
         Expect(result != mnav_success || !wall.found || isfinite(wall.wall.distance));
     }
     else if (op == 2)
@@ -226,8 +278,11 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
         mnavWall walls[16];
         int32_t capacity = Byte(r) % 17;
         mnavWallsFound found;
-        result = mnavQuery_FindWalls(s_query, s_navmesh, id, a, Length(r), filter, walls, capacity,
-                                     &found);
+        double radius = Length(r);
+        result =
+            mnavQuery_FindWalls(s_query, s_navmesh, id, a, radius, filter, walls, capacity, &found);
+        ExpectRange(Finite(a) && isfinite(radius) && radius >= 0.0, Past(a) || Beyond(radius),
+                    result);
         bool listed = result == mnav_success || result == mnav_errorCapacity;
         Expect(!listed || (found.wallCount >= 0 &&
                            (result == mnav_errorCapacity) == (found.wallCount > capacity)));
@@ -241,6 +296,7 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
     {
         double height = 0.0;
         result = mnavPolygon_GetHeight(s_navmesh, id, a.x, a.z, &height);
+        ExpectRange(isfinite(a.x) && isfinite(a.z), PastGround(a), result);
         Expect(result != mnav_success || isfinite(height));
     }
     else if (op == 4)
@@ -249,17 +305,34 @@ static void Spatial(Reader* r, const mnavQueryFilter* filter, uint8_t op)
         double bits = Raw(r);
         uint64_t seed;
         memcpy(&seed, &bits, sizeof(seed));
-        result = Byte(r) % 2 == 0 ? mnavNavmesh_FindRandomPoint(s_navmesh, seed, filter, &point)
-                                  : mnavQuery_FindRandomPointAround(
-                                        s_query, s_navmesh, id, a, Length(r), seed, filter, &point);
+        if (Byte(r) % 2 == 0)
+        {
+            result = mnavNavmesh_FindRandomPoint(s_navmesh, seed, filter, &point);
+        }
+        else
+        {
+            double radius = Length(r);
+            result = mnavQuery_FindRandomPointAround(s_query, s_navmesh, id, a, radius, seed,
+                                                     filter, &point);
+            ExpectRange(Finite(a) && isfinite(radius) && radius >= 0.0, Past(a) || Beyond(radius),
+                        result);
+        }
         Expect(result != mnav_success || Finite(point.point));
     }
     else
     {
         mnavPathEnd end;
         result = mnavQuery_CheckReachable(s_query, s_navmesh, id, a, Id(r), b, filter, &end);
+        ExpectRange(Finite(a) && Finite(b), Past(a) || Past(b), result);
     }
     Expect(Typed(result));
+}
+
+// Whether half extents are finite and at least 0.
+static bool Good(mnavVec3 half)
+{
+    return isfinite(half.x) && isfinite(half.y) && isfinite(half.z) && half.x >= 0.0f &&
+           half.y >= 0.0f && half.z >= 0.0f;
 }
 
 static void Boxes(Reader* r, const mnavQueryFilter* filter)
@@ -270,6 +343,7 @@ static void Boxes(Reader* r, const mnavQueryFilter* filter)
     {
         mnavNearest nearest;
         mnavResult result = mnavNavmesh_FindNearest(s_navmesh, center, half, filter, &nearest);
+        ExpectRange(Finite(center) && Good(half), Past(center), result);
         Expect(Typed(result) && (result != mnav_success || Finite(nearest.point)));
         return;
     }
@@ -278,6 +352,7 @@ static void Boxes(Reader* r, const mnavQueryFilter* filter)
     mnavFound found;
     mnavResult result =
         mnavNavmesh_FindPolygons(s_navmesh, center, half, filter, polygons, capacity, &found);
+    ExpectRange(Finite(center) && Good(half), Past(center), result);
     Expect(Typed(result) && (result != mnav_success || found.polygonCount <= capacity));
 }
 
@@ -394,18 +469,32 @@ static void Corridor(Reader* r, const mnavQueryFilter* filter)
         mnavCorners corners;
         int32_t valid = 0;
         bool shortened = false;
+        // A corridor past the range is refused by every call that takes
+        // the navmesh; a wanted or toward point past it on the ground by
+        // the moves and the shortcut.
+        bool far = Past(corridor.position) || Past(corridor.target);
+        mnavPos3 wanted = Point(r);
+        bool toward = op == 0 || op == 1 || op == 4;
         result =
-            op == 0 ? mnavQuery_MoveCorridor(s_query, &corridor, s_navmesh, Point(r), filter, &move)
-            : op == 1 ? mnavQuery_MoveCorridorTarget(s_query, &corridor, s_navmesh, Point(r),
-                                                     filter, &move)
+            op == 0 ? mnavQuery_MoveCorridor(s_query, &corridor, s_navmesh, wanted, filter, &move)
+            : op == 1
+                ? mnavQuery_MoveCorridorTarget(s_query, &corridor, s_navmesh, wanted, filter, &move)
             : op == 2 ? mnavQuery_FindCorridorCorners(s_query, &corridor, s_navmesh, &corners)
             : op == 3 ? mnavNavmesh_CheckCorridor(s_navmesh, &corridor, filter, &valid)
-            : op == 4 ? mnavQuery_ShortcutCorridor(s_query, &corridor, s_navmesh, Point(r), filter,
+            : op == 4 ? mnavQuery_ShortcutCorridor(s_query, &corridor, s_navmesh, wanted, filter,
                                                    &shortened)
             : op == 5 ? mnavQuery_ReplanCorridor(s_query, &corridor, s_navmesh, (mnavVec3){1, 1, 1},
                                                  filter, &path)
             : op == 6 ? Areas(r, &corridor)
                       : Steer(r, &corridor);
+        if (op < 7)
+        {
+            ExpectRange(true, far, result);
+        }
+        if (toward && !far)
+        {
+            ExpectRange(isfinite(wanted.x) && isfinite(wanted.z), PastGround(wanted), result);
+        }
         Expect(Typed(result) && corridor.polygonCount >= 1 &&
                corridor.polygonCount <= corridor.capacity);
     }
