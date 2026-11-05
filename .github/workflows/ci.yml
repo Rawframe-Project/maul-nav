@@ -352,9 +352,12 @@ jobs:
           cmake --build out/linux-gcc-14 --target differential -j 4
       - name: Report
         # The summary page is the build cell's; this run writes the file only.
+        # Every executable lands in the preset's binary directory; the test
+        # runs from its own directory, as ctest runs it.
         run: |
           cd out/linux-gcc-14/test/differential
-          GITHUB_STEP_SUMMARY= ./differential > "$GITHUB_WORKSPACE/out/differential-report.txt"
+          GITHUB_STEP_SUMMARY= "$GITHUB_WORKSPACE/out/linux-gcc-14/differential" \
+            > "$GITHUB_WORKSPACE/out/differential-report.txt"
       - name: Keep the report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
