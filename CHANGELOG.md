@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.1.3](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.2...v1.1.3) (2026-11-05)
+
+
+### Fixed
+
+* **query:** refuse query points past MNAV_MAX_QUERY_DISTANCE ([#359](https://github.com/Rawframe-Project/maul-nav/issues/359)) ([9c887f2](https://github.com/Rawframe-Project/maul-nav/commit/9c887f2b3d897ec31e542272f5a35abc5c5f527c)), closes [#358](https://github.com/Rawframe-Project/maul-nav/issues/358)
+
 ## [1.1.2](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.1...v1.1.2) (2026-11-05)
 
 This release stops `mnavQuery_FindShortestPath` from opening nodes past
