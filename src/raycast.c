@@ -47,7 +47,7 @@ static double Leaves(const Walk* w, mnavPos3 a, mnavPos3 b)
 // The polygon the ray enters through edge j at parameter t: true with the
 // walk moved there, false at a wall; notLoaded is set at a side with no
 // tile beyond.
-static bool Follow(Walk* w, int32_t j, double t, bool* notLoaded)
+MNAV_NODISCARD static bool Follow(Walk* w, int32_t j, double t, bool* notLoaded)
 {
     const mnavSlot* slot = &w->navmesh->slots[w->slot];
     const mnavTile* tile = slot->tile;

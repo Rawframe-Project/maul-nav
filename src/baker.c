@@ -509,7 +509,8 @@ static mnavResult Encode(mnavBaker* baker, int32_t tileX, int32_t tileZ, const S
 // Starts a bake or a rebuild: a fresh report, the last tile dropped and
 // the input stage begun. False, with the report given out, for a NULL
 // baker.
-static bool Start(mnavBaker* baker, mnavBakeReport* report, mnavBakeReport* reportOut)
+MNAV_NODISCARD static bool Start(mnavBaker* baker, mnavBakeReport* report,
+                                 mnavBakeReport* reportOut)
 {
     *report = (mnavBakeReport){0};
     report->input = mnavInputElementResult(mnav_success, mnav_elementNone, -1);

@@ -85,15 +85,15 @@ typedef struct mnavFlowSearch
 } mnavFlowSearch;
 
 // Whether grid cell (x, y) lies in the region and may be walked.
-bool mnavFlowOpen(const mnavFlowSearch* s, int32_t x, int32_t y);
+MNAV_NODISCARD bool mnavFlowOpen(const mnavFlowSearch* s, int32_t x, int32_t y);
 
 // The area cost of a cell of the region.
 double mnavFlowAreaCost(const mnavFlowSearch* s, int32_t cell);
 
 // Whether a cell may step in direction d, 0 to 7, to the 8 neighbours;
 // the neighbour and the step's length.
-bool mnavFlowNeighbor(const mnavFlowSearch* s, int32_t cell, int32_t d, int32_t* other,
-                      double* length);
+MNAV_NODISCARD bool mnavFlowNeighbor(const mnavFlowSearch* s, int32_t cell, int32_t d,
+                                     int32_t* other, double* length);
 
 // A step's cost from one cell to a neighbour, as the search adds it.
 double mnavFlowStepCost(const mnavFlowSearch* s, int32_t from, int32_t to, double length);
@@ -103,7 +103,7 @@ double mnavFlowStepCost(const mnavFlowSearch* s, int32_t from, int32_t to, doubl
 void mnavFlowLower(mnavGridFlow* f, int32_t cell, double cost, int32_t next);
 
 // Whether the grid is the one the work began on.
-bool mnavFlowSameGrid(const mnavGridFlow* f, const mnavGrid* grid);
+MNAV_NODISCARD bool mnavFlowSameGrid(const mnavGridFlow* f, const mnavGrid* grid);
 
 // Chooses the next cell of up to budget touched cells and their
 // neighbours; returns how many it did, and ends the repair after the

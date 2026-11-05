@@ -163,7 +163,8 @@ static mnavTileResult Accept(void)
 }
 
 // Whether FLHT's settings are the def's and its shape the shape.
-static bool SameSettings(mnavByteReader* r, const mnavFlightDef* def, const mnavFlightShape* shape)
+MNAV_NODISCARD static bool SameSettings(mnavByteReader* r, const mnavFlightDef* def,
+                                        const mnavFlightShape* shape)
 {
     bool same = mnavGetU16(r) == (uint64_t)def->tileVoxels;
     same &= mnavGetU16(r) == (def->enableGroundFill ? FLAG_GROUND_BELOW : 0u);
@@ -266,7 +267,7 @@ static int32_t Ones(uint32_t bits)
 
 // Whether a node's mask is a mixed block's: no child both mixed and
 // solid, and neither every child empty nor every child solid.
-static bool MixedMask(uint32_t mask)
+MNAV_NODISCARD static bool MixedMask(uint32_t mask)
 {
     uint32_t mixed = mask & 0xFFu;
     uint32_t solid = mask >> 8;

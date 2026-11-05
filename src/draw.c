@@ -16,7 +16,7 @@
 // The most a list may hold: indices stay within 32 unsigned bits.
 #define MOST INT32_MAX
 
-static bool GoodList(const void* items, int32_t capacity, int32_t count)
+MNAV_NODISCARD static bool GoodList(const void* items, int32_t capacity, int32_t count)
 {
     return capacity >= 0 && count >= 0 && (capacity == 0 || items != nullptr);
 }

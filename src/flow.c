@@ -171,7 +171,7 @@ double mnavFlowAreaCost(const mnavFlowSearch* s, int32_t cell)
 }
 
 // The heap, by cost, then by cell index.
-static bool Sooner(const mnavGridFlow* f, int32_t a, int32_t b)
+MNAV_NODISCARD static bool Sooner(const mnavGridFlow* f, int32_t a, int32_t b)
 {
     return f->costs[a] != f->costs[b] ? f->costs[a] < f->costs[b] : a < b;
 }
@@ -321,13 +321,13 @@ static void Expand(const mnavFlowSearch* s, int32_t cell)
     }
 }
 
-static bool GoodGrid(const mnavGrid* grid)
+MNAV_NODISCARD static bool GoodGrid(const mnavGrid* grid)
 {
     return grid->areas != nullptr && grid->width >= 1 && grid->height >= 1 &&
            isfinite(grid->cellSize) && grid->cellSize > 0.0f;
 }
 
-static bool GoodGoals(const mnavGrid* grid, const mnavCell* goals, int32_t count)
+MNAV_NODISCARD static bool GoodGoals(const mnavGrid* grid, const mnavCell* goals, int32_t count)
 {
     for (int32_t i = 0; i < count; ++i)
     {
@@ -340,7 +340,7 @@ static bool GoodGoals(const mnavGrid* grid, const mnavCell* goals, int32_t count
     return true;
 }
 
-static bool GoodRegion(const mnavGrid* grid, const mnavCellRange* r)
+MNAV_NODISCARD static bool GoodRegion(const mnavGrid* grid, const mnavCellRange* r)
 {
     return r->x0 >= 0 && r->y0 >= 0 && r->x0 <= r->x1 && r->y0 <= r->y1 && r->x1 < grid->width &&
            r->y1 < grid->height;

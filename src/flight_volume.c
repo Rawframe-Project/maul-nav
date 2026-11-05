@@ -411,7 +411,7 @@ mnavResult mnavFlightVolume_GetTile(const mnavFlightVolume* volume, int32_t tile
 
 // The voxel holding a distance from the origin; false past
 // MNAV_MAX_FLIGHT_VOXELS.
-static bool VoxelOf(double meters, double voxel, int64_t* voxelOut)
+MNAV_NODISCARD static bool VoxelOf(double meters, double voxel, int64_t* voxelOut)
 {
     double q = floor(meters / voxel);
     if (!(fabs(q) <= (double)MNAV_MAX_FLIGHT_VOXELS))

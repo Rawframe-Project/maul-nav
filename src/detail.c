@@ -254,7 +254,7 @@ static int32_t Simplify(const Part* part, int32_t segments, int32_t error, int32
 }
 
 // Whether a comes after b in lexical (x, z) order.
-static bool After(const mnavDetailVertex* a, const mnavDetailVertex* b)
+MNAV_NODISCARD static bool After(const mnavDetailVertex* a, const mnavDetailVertex* b)
 {
     return a->x != b->x ? a->x > b->x : a->z > b->z;
 }
@@ -333,7 +333,8 @@ static void TriangulateOutline(Builder* builder)
 // Whether p lies inside the polygon's first n vertices at least half a
 // sample distance from every edge: strictly on each edge's inner side,
 // with 4 area^2 at least sample^2 length^2.
-static bool WellInside(const Part* part, int32_t n, const mnavDetailVertex* p, int64_t sample)
+MNAV_NODISCARD static bool WellInside(const Part* part, int32_t n, const mnavDetailVertex* p,
+                                      int64_t sample)
 {
     for (int32_t j = n - 1, i = 0; i < n; j = i++)
     {

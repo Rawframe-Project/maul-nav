@@ -26,7 +26,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-static bool Within(float v, float low, float high)
+MNAV_NODISCARD static bool Within(float v, float low, float high)
 {
     return isfinite(v) && v >= low && v <= high;
 }
@@ -100,8 +100,8 @@ static double Distance(mnavPos3 a, mnavPos3 b)
 // box there: the highest from low to high when highest is set, else the
 // one nearest the height; whether one was found. A box meeting more
 // polygons than the landings stops generation.
-static bool Landing(Gen* g, double x, double z, double low, double high, double height,
-                    bool highest, Spot* out)
+MNAV_NODISCARD static bool Landing(Gen* g, double x, double z, double low, double high,
+                                   double height, bool highest, Spot* out)
 {
     mnavPolygonId ids[MNAV_MAX_LINK_LANDINGS];
     mnavFound found;
@@ -135,7 +135,7 @@ static bool Landing(Gen* g, double x, double z, double low, double high, double 
 // Whether the navmesh walks from one spot to the other within the def's
 // detour times the straight distance: the straight path's length, since
 // the search's own runs through portal midpoints and may be far longer.
-static bool Walks(const Gen* g, Spot from, Spot to)
+MNAV_NODISCARD static bool Walks(const Gen* g, Spot from, Spot to)
 {
     if (g->def->detour == 0.0f)
     {
@@ -158,7 +158,7 @@ static bool Walks(const Gen* g, Spot from, Spot to)
 
 // Whether both ends of a link lie near an earlier link's in the buffer;
 // links past it are not held anywhere to compare with.
-static bool Near(const Gen* g, mnavPos3 start, mnavPos3 end)
+MNAV_NODISCARD static bool Near(const Gen* g, mnavPos3 start, mnavPos3 end)
 {
     double d = (double)g->def->filterDistance;
     int32_t held = g->count < g->capacity ? g->count : g->capacity;
@@ -177,7 +177,7 @@ static bool Near(const Gen* g, mnavPos3 start, mnavPos3 end)
 // into either that would change what generation reads is refused; the
 // navmesh is only read, and its mark is the one field this writes
 // through it.
-static bool Clear(const Gen* g, mnavPos3 from, mnavPos3 to)
+MNAV_NODISCARD static bool Clear(const Gen* g, mnavPos3 from, mnavPos3 to)
 {
     const mnavLinkGenDef* d = g->def;
     if (d->clearance == nullptr)

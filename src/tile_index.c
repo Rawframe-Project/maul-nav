@@ -383,8 +383,8 @@ uint64_t mnavTileIndex_GetMisuse(const mnavTileIndex* index)
 
 // Whether an index was made for the def's grid, of this kind of input and
 // this many of it.
-static bool FitsGrid(const mnavTileIndex* index, const mnavBakeDef* def, const mnavBakeCells* cells,
-                     bool outlines, int32_t count)
+MNAV_NODISCARD static bool FitsGrid(const mnavTileIndex* index, const mnavBakeDef* def,
+                                    const mnavBakeCells* cells, bool outlines, int32_t count)
 {
     return index->tileCells == def->tileCells && index->cellSize == def->cellSize &&
            index->border == cells->border && index->outlines == outlines &&

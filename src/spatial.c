@@ -271,7 +271,7 @@ typedef struct Ring
 } Ring;
 
 // The open list, by cost, then by node index.
-static bool Sooner(const mnavQuery* q, int32_t a, int32_t b)
+MNAV_NODISCARD static bool Sooner(const mnavQuery* q, int32_t a, int32_t b)
 {
     double ca = q->nodes[a].cost;
     double cb = q->nodes[b].cost;
@@ -469,7 +469,7 @@ static mnavPos3 Between(mnavPos3 a, mnavPos3 b, double t)
 }
 
 // Whether a link crosses edge j into a polygon the filter includes.
-static bool Crosses(const Ring* r, const mnavLink* link, int32_t j)
+MNAV_NODISCARD static bool Crosses(const Ring* r, const mnavLink* link, int32_t j)
 {
     const mnavTile* target = r->navmesh->slots[link->target.slot - 1].tile;
     return link->edge == j &&
@@ -624,8 +624,8 @@ static mnavResult BeginRing(Ring* r, mnavPolygonId polygon)
     return mnav_success;
 }
 
-static bool GoodRing(const mnavQuery* query, const mnavNavmesh* navmesh, mnavPos3 center,
-                     double radius)
+MNAV_NODISCARD static bool GoodRing(const mnavQuery* query, const mnavNavmesh* navmesh,
+                                    mnavPos3 center, double radius)
 {
     return query != nullptr && navmesh != nullptr && isfinite(center.x) && isfinite(center.y) &&
            isfinite(center.z) && isfinite(radius) && radius >= 0.0;

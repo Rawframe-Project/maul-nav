@@ -124,7 +124,7 @@ static void Offer(const mnavFlowSearch* s, int32_t cell)
 }
 
 // Whether grid cell (x, y) is open: in the region and walkable.
-static bool OpenCell(const mnavFlowSearch* s, int32_t cell)
+MNAV_NODISCARD static bool OpenCell(const mnavFlowSearch* s, int32_t cell)
 {
     const mnavGridFlow* f = s->field;
     return mnavFlowOpen(s, f->region.x + cell % f->region.width,
@@ -149,7 +149,7 @@ static void OfferAround(const mnavFlowSearch* s, int32_t x, int32_t y)
 }
 
 // Whether every cell of a list lies in the grid.
-static bool InGrid(const mnavGrid* grid, const mnavCell* cells, int32_t count)
+MNAV_NODISCARD static bool InGrid(const mnavGrid* grid, const mnavCell* cells, int32_t count)
 {
     for (int32_t i = 0; i < count; ++i)
     {

@@ -230,13 +230,13 @@ typedef struct Counts
     int64_t detailTriangles;
 } Counts;
 
-static bool Finite(double v)
+MNAV_NODISCARD static bool Finite(double v)
 {
     return isfinite(v);
 }
 
 // Checks the settings the TILE field records.
-static bool ValidInfo(const mnavTileInfo* info)
+MNAV_NODISCARD static bool ValidInfo(const mnavTileInfo* info)
 {
     int32_t reach = MNAV_MAX_EXTENT_CELLS / (info->tileCells > 0 ? info->tileCells : 1);
     bool grid = info->tileCells >= MNAV_MIN_TILE_CELLS && info->tileCells <= MNAV_MAX_TILE_CELLS &&
@@ -401,8 +401,8 @@ static mnavTileResult ReadVertices(mnavByteReader* r, mnavPolyMesh* mesh, int32_
 }
 
 // Reads one polygon's head and edges and checks each value alone.
-static bool ReadPolygon(mnavByteReader* r, const mnavPolyMesh* mesh, int32_t polygons,
-                        mnavPolygon* polygon)
+MNAV_NODISCARD static bool ReadPolygon(mnavByteReader* r, const mnavPolyMesh* mesh,
+                                       int32_t polygons, mnavPolygon* polygon)
 {
     *polygon = (mnavPolygon){0};
     memset(polygon->vertices, 0xFF, sizeof(polygon->vertices));
@@ -441,7 +441,7 @@ static int64_t Area2(const mnavMeshVertex* a, const mnavMeshVertex* b, const mna
 // Whether the polygon is convex with a positive area: no edge of zero
 // length, and every vertex on the inner side of every edge or on it. A
 // vertex used twice fails it too, as the edges round it double back.
-static bool Convex(const mnavPolyMesh* mesh, const mnavPolygon* polygon)
+MNAV_NODISCARD static bool Convex(const mnavPolyMesh* mesh, const mnavPolygon* polygon)
 {
     int64_t area = 0;
     for (int32_t k = 0; k < polygon->count; ++k)
@@ -486,7 +486,7 @@ static uint8_t SideOf(const mnavMeshVertex* a, const mnavMeshVertex* b, int32_t 
 // Whether each edge's neighbor runs the same edge back to it, and each
 // edge without one carries exactly the tile side it lies on. A polygon
 // naming itself fails, as it never runs its own edge backward.
-static bool Linked(const mnavPolyMesh* mesh, int32_t p)
+MNAV_NODISCARD static bool Linked(const mnavPolyMesh* mesh, int32_t p)
 {
     const mnavPolygon* polygon = &mesh->polygons[p];
     for (int32_t k = 0; k < polygon->count; ++k)

@@ -120,7 +120,7 @@ static Ground At(const Edge* e, double u)
 }
 
 // Whether a link of edge j leads to a polygon the filter includes.
-static bool Open(const Mover* m, const mnavLink* link, int32_t j)
+MNAV_NODISCARD static bool Open(const Mover* m, const mnavLink* link, int32_t j)
 {
     const mnavTile* across = m->navmesh->slots[link->target.slot - 1].tile;
     return link->edge == j &&
@@ -129,8 +129,8 @@ static bool Open(const Mover* m, const mnavLink* link, int32_t j)
 
 // Whether u lies on a wall of edge j: in the closure of the part of the
 // side no open link covers.
-static bool OnWall(const Mover* m, const mnavTile* tile, int32_t polygon, int32_t j, const Edge* e,
-                   double u)
+MNAV_NODISCARD static bool OnWall(const Mover* m, const mnavTile* tile, int32_t polygon, int32_t j,
+                                  const Edge* e, double u)
 {
     bool below = u <= (e->au < e->bu ? e->au : e->bu);
     bool above = u >= (e->au < e->bu ? e->bu : e->au);
@@ -185,7 +185,7 @@ static void Side(Mover* m, int32_t n, const mnavTile* tile, int32_t polygon, int
 }
 
 // Whether the wanted point lies in a polygon, its edges included.
-static bool Holds(const Ground* corners, int32_t count, Ground p)
+MNAV_NODISCARD static bool Holds(const Ground* corners, int32_t count, Ground p)
 {
     for (int32_t k = 0; k < count; ++k)
     {
@@ -201,7 +201,7 @@ static bool Holds(const Ground* corners, int32_t count, Ground p)
 
 // Walks node n's polygon: true when it holds the wanted point; otherwise
 // visits its open neighbours and offers its walls.
-static bool Walk(Mover* m, int32_t n)
+MNAV_NODISCARD static bool Walk(Mover* m, int32_t n)
 {
     const mnavSearchNode* node = &m->query->nodes[n];
     const mnavSlot* slot = &m->navmesh->slots[node->slot];

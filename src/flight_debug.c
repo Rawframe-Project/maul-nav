@@ -18,7 +18,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-static bool HasNaN(mnavPos3 p)
+MNAV_NODISCARD static bool HasNaN(mnavPos3 p)
 {
     return isnan(p.x) || isnan(p.y) || isnan(p.z);
 }

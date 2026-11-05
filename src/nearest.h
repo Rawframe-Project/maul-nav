@@ -34,7 +34,7 @@ mnavPos3 mnavDetailWorld(const mnavNavmesh* navmesh, int32_t slot, const mnavDet
 
 // Whether a box's half sizes are finite and at least 0, as every call
 // taking a box checks them.
-bool mnavGoodHalfExtents(mnavVec3 half);
+MNAV_NODISCARD bool mnavGoodHalfExtents(mnavVec3 half);
 
 // The calls without the misuse count, for calls inside the library,
 // which run in its floating-point environment already.
