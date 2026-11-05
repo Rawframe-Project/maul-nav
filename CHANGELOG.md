@@ -7,10 +7,23 @@ may change the API, the ABI and the tile formats.
 
 ## [1.1.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.0...v1.1.1) (2026-11-05)
 
+This release makes `MNAV_NODISCARD` the `[[nodiscard]]` attribute in
+GCC 14's C23 mode, so that a C program built with GCC 14 is warned
+when it drops a status the library returns.
 
 ### Fixed
 
-* make MNAV_NODISCARD the attribute under GCC 14's C23 too ([#346](https://github.com/Rawframe-Project/maul-nav/issues/346)) ([910d57e](https://github.com/Rawframe-Project/maul-nav/commit/910d57e950b9eb434d16bf038776ee43d31605f8)), closes [#345](https://github.com/Rawframe-Project/maul-nav/issues/345)
+- `MNAV_NODISCARD` is meant to make every function that returns a
+  status warn when its result is dropped. In C, it expanded to
+  `[[nodiscard]]` only when `__STDC_VERSION__` was at least `202311L`.
+  GCC 14 has the attribute in its C23 mode but reports
+  `__STDC_VERSION__` as `202000L` there, so under GCC the macro was
+  empty, and a program built with GCC 14 could drop any status from
+  the library without a warning. Clang 20 reports `202311L`. In C,
+  the macro is now the attribute in any dialect after C17 whose
+  compiler defines `__has_c_attribute` and reports `nodiscard`. C17
+  and older dialects keep the empty expansion, and C++ is unchanged.
+  ([#346](https://github.com/Rawframe-Project/maul-nav/pull/346))
 
 ## [1.1.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.0.1...v1.1.0) (2026-11-04)
 
