@@ -104,10 +104,6 @@ static MNAV_NOINLINE mnavResult SetCorridorWork(mnavCorridor* corridor, const mn
     {
         return checked;
     }
-    if (!Finite(path->points[0]) || !Finite(path->points[path->pointCount - 1]))
-    {
-        return mnav_errorInvalid;
-    }
     if (path->polygonCount > corridor->capacity)
     {
         return mnav_errorCapacity;
