@@ -10,7 +10,9 @@
 // bytes, load into a navmesh, and every byte taken must come back. A 3D
 // input's last volumes are also taken as obstacles: the tile cached from
 // the input without them and rebuilt with them must give the
-// full bake's result and bytes.
+// full bake's result and bytes. Now and then the def's cells, agent and
+// simplification come from the bytes too, at the ends of their ranges and
+// past them, which the baker must refuse with a typed status.
 
 #include "counting_allocator.h"
 #include "defs_for.h"
@@ -58,6 +60,15 @@ static uint8_t Byte(Reader* r)
     return r->at < r->size ? r->data[r->at++] : 0;
 }
 
+static float RawFloat(Reader* r)
+{
+    uint32_t bits = (uint32_t)Byte(r) | (uint32_t)Byte(r) << 8 | (uint32_t)Byte(r) << 16 |
+                    (uint32_t)Byte(r) << 24;
+    float f;
+    memcpy(&f, &bits, sizeof(f));
+    return f;
+}
+
 // A float: one time in eight its raw bits, otherwise a quarter meter step
 // from -16 to 16 m.
 static float Float(Reader* r)
@@ -65,13 +76,44 @@ static float Float(Reader* r)
     uint8_t pick = Byte(r);
     if (pick % 8 == 0)
     {
-        uint32_t bits = (uint32_t)Byte(r) | (uint32_t)Byte(r) << 8 | (uint32_t)Byte(r) << 16 |
-                        (uint32_t)Byte(r) << 24;
-        float f;
-        memcpy(&f, &bits, sizeof(f));
-        return f;
+        return RawFloat(r);
     }
     return ((float)Byte(r) - 64.0f) * 0.25f;
+}
+
+// A def value: one time in sixteen its raw bits, otherwise one of eight
+// from a table that holds the ends of its range and values past them.
+static float Pick(Reader* r, const float table[8])
+{
+    uint8_t pick = Byte(r);
+    return pick % 16 == 0 ? RawFloat(r) : table[pick % 8];
+}
+
+// The def's cells, agent and simplification from the bytes.
+static void ReadDef(Reader* r, mnavBakeDef* def)
+{
+    static const float cells[8] = {MNAV_MIN_CELL_SIZE, 0.05f,  0.1f, 0.25f, 0.5f, 1.0f,
+                                   MNAV_MAX_CELL_SIZE, 0.0005f};
+    static const float radii[8] = {0.0f, 0.0f, 0.1f, 0.3f, 0.5f, 1.0f, 2.0f, -0.25f};
+    static const float heights[8] = {0.1f, 0.5f, 1.0f, 2.0f, 2.0f, 4.0f, 0.0f, -1.0f};
+    static const float steps[8] = {0.0f, 0.1f, 0.25f, 0.75f, 0.75f, 1.5f, 4.0f, -0.5f};
+    static const float slopes[8] = {0.0f, 20.0f, 45.0f, 45.0f, 60.0f, 89.9f, 90.0f, -1.0f};
+    static const float areas[8] = {0.0f, 0.0f, 0.5f, 2.0f, 2.0f, 8.0f, 64.0f, -1.0f};
+    static const float errors[8] = {0.0f, 0.1f, 0.3f, 0.3f, 1.3f, 4.0f, MNAV_MAX_EDGE_ERROR, -0.1f};
+    static const float lengths[8] = {0.0f, 0.1f, 1.0f, 12.0f, 12.0f, 40.0f, 1e9f, -1.0f};
+    static const float samples[8] = {0.0f, 0.05f, 0.5f, 1.5f, 1.5f, 6.0f, 1e9f, -1.0f};
+    static const float details[8] = {0.0f, 0.01f, 0.125f, 0.125f, 0.5f, 2.0f, 1e9f, -1.0f};
+    def->cellSize = Pick(r, cells);
+    def->cellHeight = Pick(r, cells);
+    def->agent.radius = Pick(r, radii);
+    def->agent.height = Pick(r, heights);
+    def->agent.stepHeight = Pick(r, steps);
+    def->agent.maxSlopeDegrees = Pick(r, slopes);
+    def->minRegionArea = Pick(r, areas);
+    def->maxEdgeError = Pick(r, errors);
+    def->maxEdgeLength = Pick(r, lengths);
+    def->detailSampleDistance = Pick(r, samples);
+    def->detailMaxError = Pick(r, details);
 }
 
 // An area: one time in sixteen past the last type, often walkable.
@@ -233,8 +275,18 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     def.allocator = CountingAllocator();
     def.tileCells = 32;
     def.limits.memoryBytes = (uint64_t)64 << 20;
+    if ((mode & 2) != 0)
+    {
+        ReadDef(&r, &def);
+    }
     mnavBaker* baker = nullptr;
-    Expect(mnavCreateBaker(&def, &baker).result == mnav_success);
+    mnavResult created = mnavCreateBaker(&def, &baker).result;
+    if (created != mnav_success)
+    {
+        Expect((mode & 2) != 0 && (created == mnav_errorInvalid || created == mnav_errorLimit) &&
+               baker == nullptr && s_held == 0);
+        return 0;
+    }
     int32_t meshes = Byte(&r) % 3;
     for (int32_t m = 0; m < meshes; ++m)
     {
