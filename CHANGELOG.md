@@ -5,6 +5,36 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.1.2](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.1...v1.1.2) (2026-11-05)
+
+This release stops `mnavQuery_FindShortestPath` from opening nodes past
+its path length toward an end far away. No result changes for a caller
+that keeps the contract.
+
+### Changed
+
+- `mnavSetCorridor`'s documented failures no longer list a path whose
+  first or last point is not finite. A path's points lie in its
+  context's memory, and only the context's searches write them, so a
+  path handed back as the contract allows never has one. A path whose
+  points are an array of the caller's own is still refused with
+  `mnav_errorInvalid`. No result changes for a caller that keeps the
+  contract.
+  ([#350](https://github.com/Rawframe-Project/maul-nav/pull/350))
+
+### Fixed
+
+- `mnavQueryLimits.pathLength` promises that no node is opened whose way
+  from the start and on to the end is longer, but
+  `mnavQuery_FindShortestPath` opened such nodes toward a finite end
+  past about 1e308 m. Its estimate of the way through an interval
+  overflowed to NaN there, and a NaN estimate passed the length test.
+  The estimate is now infinite for a root or end more than about 1e154 m
+  from the interval's end. That is past `MNAV_MAX_PATH_LENGTH`, which
+  caps every search's length, so no node within a limit is turned away.
+  No result changes: the path given was already right.
+  ([#354](https://github.com/Rawframe-Project/maul-nav/pull/354))
+
 ## [1.1.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.0...v1.1.1) (2026-11-05)
 
 This release makes `MNAV_NODISCARD` the `[[nodiscard]]` attribute in
