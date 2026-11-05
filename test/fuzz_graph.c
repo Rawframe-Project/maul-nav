@@ -2,14 +2,16 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Fuzzes the inputs of the searches over the whole navmesh: a navmesh of some of the test world's
-// tiles with point and edge links read from the bytes, then a hierarchy,
+// tiles, as stored or baked for an agent of no radius, with point and edge
+// links read from the bytes, then a hierarchy,
 // a navmesh flow field and link generation over it, with defs, filters,
 // goals, regions, budgets and ends from the bytes, now and then out of
 // range. Every call must end in a typed status. A hierarchy brought up to
 // date after an area change must hold the graph a build makes and give
 // the same paths; a field built in budgeted steps must be the one built
 // at once, its costs never rising along its ways; links generated twice
-// must be the same; everything given back when destroyed.
+// must be the same, none landing on the polygon it starts from;
+// everything given back when destroyed.
 
 #include "counting_allocator.h"
 #include "defs_for.h"
@@ -163,22 +165,55 @@ static mnavLinkDef Link(Reader* r)
     return link;
 }
 
-// The navmesh: the world's tiles a byte picks, links from the bytes.
-static mnavNavmesh* Navmesh(Reader* r)
+// The world's four tiles baked for an agent of no radius, whose walkable
+// area reaches the walls: the stored tiles' def otherwise.
+static uint8_t s_bare[4][TILE_CAPACITY];
+static size_t s_bareSizes[4];
+
+static mnavBakeDef BareDef(void)
 {
     mnavBakeDef def = mnavDefaultBakeDef();
+    def.agent.radius = 0.0f;
+    return def;
+}
+
+static void BakeBareTiles(void)
+{
+    mnavBakeDef def = BareDef();
+    mnavBaker* baker = nullptr;
+    Expect(mnavCreateBaker(&def, &baker).result == mnav_success);
+    mnavTriangleMesh world = World();
+    const mnavBakeInput input = {&world, 1, nullptr, 0, nullptr, 0, nullptr};
+    for (int32_t t = 0; t < 4; ++t)
+    {
+        Expect(mnavBaker_BakeTile(baker, &input, t & 1, t >> 1, nullptr) == mnav_success &&
+               mnavBaker_CopyTile(baker, s_bare[t], TILE_CAPACITY, &s_bareSizes[t]) ==
+                   mnav_success);
+    }
+    mnavDestroyBaker(baker);
+}
+
+// The navmesh: the world's tiles a byte picks, as stored or bare, links
+// from the bytes.
+static mnavNavmesh* Navmesh(Reader* r)
+{
+    int32_t linkLimit = 1 + Byte(r) % 128;
+    uint8_t tiles = Byte(r);
+    bool bare = (tiles & 16) != 0;
+    mnavBakeDef def = bare ? BareDef() : mnavDefaultBakeDef();
     def.allocator = CountingAllocator();
     mnavNavmesh* navmesh = nullptr;
     mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     meshDef.tier = mnav_tierDynamic;
-    meshDef.limits.links = 1 + Byte(r) % 128;
+    meshDef.limits.links = linkLimit;
     Expect(mnavCreateNavmesh(&meshDef, &navmesh).result == mnav_success);
-    uint8_t tiles = Byte(r);
     for (int32_t t = 0; t < 4; ++t)
     {
         if ((tiles >> t & 1) == 0 || t == 0)
         {
-            Expect(mnavNavmesh_StageTile(navmesh, s_tiles[t], s_sizes[t]).result == mnav_success);
+            Expect(mnavNavmesh_StageTile(navmesh, bare ? s_bare[t] : s_tiles[t],
+                                         bare ? s_bareSizes[t] : s_sizes[t])
+                       .result == mnav_success);
         }
     }
     int32_t links = Byte(r) % (MOST_LINKS + 1);
@@ -424,6 +459,36 @@ static bool SameLink(const mnavLinkDef* a, const mnavLinkDef* b)
 
 static mnavLinkDef s_links[2][GENERATED];
 
+// Whether a link lands off the polygon it starts from, where that is
+// plain: the one polygon whose surface holds its start exactly. A link
+// whose start lies on an edge two polygons share is taken as it is.
+static bool OffTakeoff(const mnavNavmesh* navmesh, const mnavLinkDef* link)
+{
+    mnavPolygonId ids[16];
+    mnavFound found;
+    if (mnavNavmesh_FindPolygons(navmesh, link->start, (mnavVec3){0.01f, 0.01f, 0.01f}, nullptr,
+                                 ids, 16, &found) != mnav_success)
+    {
+        return true;
+    }
+    int32_t holding = 0;
+    mnavPolygonId takeoff = {0, 0, 0};
+    for (int32_t i = 0; i < found.polygonCount; ++i)
+    {
+        double h = 0.0;
+        if (mnavPolygon_GetHeight(navmesh, ids[i], link->start.x, link->start.z, &h) ==
+                mnav_success &&
+            h == link->start.y)
+        {
+            holding += 1;
+            takeoff = ids[i];
+        }
+    }
+    double h = 0.0;
+    return holding != 1 || mnavPolygon_GetHeight(navmesh, takeoff, link->end.x, link->end.z, &h) ==
+                               mnav_errorOutside;
+}
+
 static void Generate(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
                      const mnavQueryFilter* filter)
 {
@@ -469,7 +534,7 @@ static void Generate(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
     for (int32_t i = 0; i < written; ++i)
     {
         Expect(SameLink(&s_links[0][i], &s_links[1][i]) && Finite(s_links[0][i].start) &&
-               Finite(s_links[0][i].end));
+               Finite(s_links[0][i].end) && OffTakeoff(navmesh, &s_links[0][i]));
     }
     // The links proposed are links the navmesh takes.
     for (int32_t i = 0; i < written && i < 8; ++i)
@@ -486,6 +551,7 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     if (!baked)
     {
         LoadWorldTiles();
+        BakeBareTiles();
         baked = true;
     }
     Reader r = {data, size, 0};
