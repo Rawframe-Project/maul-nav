@@ -137,7 +137,7 @@ static bool Nearest(const DiffMaul* maul, const float at[3], mnavNearest* n)
 }
 
 int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double* length,
-                     int32_t* nodes)
+                     int32_t* nodes, DiffRoute* route)
 {
     mnavNearest s;
     mnavNearest e;
@@ -165,6 +165,17 @@ int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double*
             sqrt((q.x - p.x) * (q.x - p.x) + (q.y - p.y) * (q.y - p.y) + (q.z - p.z) * (q.z - p.z));
     }
     *length = sum;
+    if (route != nullptr)
+    {
+        route->cornerCount = path.pointCount;
+        route->polygonCount = path.polygonCount;
+        for (int32_t i = 0; i < path.pointCount && i < route->capacity; ++i)
+        {
+            route->corners[i * 3 + 0] = (float)path.points[i].x;
+            route->corners[i * 3 + 1] = (float)path.points[i].y;
+            route->corners[i * 3 + 2] = (float)path.points[i].z;
+        }
+    }
     return 1;
 }
 
