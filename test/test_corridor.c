@@ -312,23 +312,34 @@ static void TestMalformedCorridors(void)
     CHECK(mnavSetCorridor(&noRoom, &path) == mnav_errorInvalid &&
               mnavSetCorridor(&stale, &path) == mnav_success && stale.polygonCount == 1,
           "loading refuses no room, and replaces any count");
-    // A path's arrays and ends are the caller's fields too.
-    mnavPos3 notFinite[3] = {a.point, {a.point.x, (double)NAN, a.point.z}, a.point};
+    // A path's arrays and ends are the caller's fields too. The ends are
+    // forged in the context's own points, the only ones a path loads
+    // from, written through the path and put back after.
     mnavPath forged[4] = {path, path, path, path};
     forged[0].polygons = nullptr;
     forged[1].points = nullptr;
-    forged[2].points = notFinite;
-    forged[2].pointCount = 2;
-    forged[3].points = &notFinite[1];
-    forged[3].pointCount = 2;
+    mnavPos3* points = (mnavPos3*)path.points;
+    int32_t ends[4] = {-1, -1, 0, path.pointCount - 1};
     bool loaded = false;
     for (int32_t k = 0; k < 4; ++k)
     {
+        mnavPos3 kept = ends[k] >= 0 ? points[ends[k]] : a.point;
+        if (ends[k] >= 0)
+        {
+            points[ends[k]].y = k == 2 ? (double)NAN : (double)INFINITY;
+        }
         mnavCorridor c = {a.point, a.point, buffer, 1, 2};
         loaded = loaded || mnavSetCorridor(&c, &forged[k]) != mnav_errorInvalid ||
                  c.polygonCount != 1 || c.position.y != a.point.y || c.target.y != a.point.y;
+        if (ends[k] >= 0)
+        {
+            points[ends[k]] = kept;
+        }
     }
     CHECK(!loaded, "loading refuses NULL arrays and ends not finite, the corridor unchanged");
+    mnavCorridor restored = {a.point, a.point, buffer, 1, 2};
+    CHECK(mnavSetCorridor(&restored, &path) == mnav_success && restored.polygonCount == 1,
+          "the path loads once its ends are put back");
     free(buffer);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
