@@ -22,6 +22,7 @@
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
+#include <float.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -72,12 +73,34 @@ static double Raw(Reader* r)
     return d;
 }
 
-// A coordinate: one time in sixteen raw bits, otherwise a step of 0.28 m
-// from -4 to 67.7 m.
+// A value at the edge of the query range: its bound, the next double past
+// it, the largest double, or a power of two from 2^333 to 2^1023, either
+// sign.
+static double Edge(Reader* r)
+{
+    uint8_t pick = Byte(r);
+    double v = pick % 4 == 0   ? MNAV_MAX_QUERY_DISTANCE
+               : pick % 4 == 1 ? nextafter(MNAV_MAX_QUERY_DISTANCE, (double)INFINITY)
+               : pick % 4 == 2 ? DBL_MAX
+                               : ldexp(1.0, 333 + Byte(r) % 691);
+    return (pick & 4) != 0 ? -v : v;
+}
+
+// A coordinate: one time in sixteen raw bits, one time in sixteen at the
+// edge of the query range, otherwise a step of 0.28 m from -4 to 67.7 m.
 static double Coordinate(Reader* r)
 {
     uint8_t pick = Byte(r);
-    return pick % 16 == 0 ? Raw(r) : (double)Byte(r) * 0.28125 - 4.0;
+    return pick % 16 == 0 ? Raw(r) : pick % 16 == 1 ? Edge(r) : (double)Byte(r) * 0.28125 - 4.0;
+}
+
+// Whether a finite point lies past the query range on an axis; the
+// world's origin is (0, 0, 0).
+static bool Past(mnavPos3 p)
+{
+    bool finite = isfinite(p.x) && isfinite(p.y) && isfinite(p.z);
+    return finite && (fabs(p.x) > MNAV_MAX_QUERY_DISTANCE || fabs(p.y) > MNAV_MAX_QUERY_DISTANCE ||
+                      fabs(p.z) > MNAV_MAX_QUERY_DISTANCE);
 }
 
 static mnavPos3 Point(Reader* r)
@@ -180,7 +203,7 @@ static mnavPolygonId Near(const mnavNavmesh* navmesh, mnavPos3 at, mnavPos3* poi
     mnavNearest nearest = {0};
     mnavResult result =
         mnavNavmesh_FindNearest(navmesh, at, (mnavVec3){3.0f, 4.0f, 3.0f}, nullptr, &nearest);
-    Expect(Typed(result));
+    Expect(Typed(result) && (!Past(at) || result == mnav_errorLimit));
     *pointOut = nearest.point;
     return nearest.polygon;
 }
@@ -239,9 +262,14 @@ static void Hierarchies(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
     mnavPos3 end;
     mnavPolygonId from = Near(navmesh, Point(r), &start);
     mnavPolygonId to = Near(navmesh, Point(r), &end);
+    // Now and then an end as given, which may lie past the query range.
+    start = Byte(r) % 8 == 0 ? Point(r) : start;
+    end = Byte(r) % 8 == 0 ? Point(r) : end;
     mnavPath path = {0};
     mnavResult first =
         mnavQuery_FindHierarchicalPath(query, h, navmesh, from, start, to, end, &path);
+    Expect(h == nullptr || !Finite(start) || !Finite(end) || !(Past(start) || Past(end)) ||
+           first == mnav_errorLimit);
     CheckPath(first, &path);
     KeepPoints(first, &path, 0);
     int32_t count = path.pointCount;
@@ -326,7 +354,13 @@ static void Fields(Reader* r, const mnavNavmesh* navmesh, const mnavQueryFilter*
         goals[g].point = Byte(r) % 8 == 0 ? Point(r) : goals[g].point;
     }
     mnavResult built = mnavNavFlow_Build(whole, navmesh, goals, goalCount, filter);
-    Expect(Typed(built));
+    // A goal past the query range is refused, whatever else is.
+    bool past = false;
+    for (int32_t g = 0; g < goalCount; ++g)
+    {
+        past = past || Past(goals[g].point);
+    }
+    Expect(Typed(built) && (!past || built != mnav_success));
     mnavResult begun = mnavNavFlow_Begin(stepped, navmesh, nullptr, goals, goalCount, filter);
     Expect(begun == built);
     bool ended = begun != mnav_success;
