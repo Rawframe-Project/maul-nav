@@ -11,6 +11,7 @@
 #include "defs_for.h"
 #include "hand_tiles.h"
 #include "query.h"
+#include "shortest_geometry.h"
 #include "test_harness.h"
 #include "world.h"
 
@@ -19,6 +20,7 @@
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -113,19 +115,31 @@ static void TestEveryWayToAnUnreachableEnd(void)
 
 static void TestNoNodePastTheLengthToAFarEnd(void)
 {
-    // An end 1.5e308 m north, on the start's side of the portals at x = 10
-    // and 15, which run along z: no way to it is within the path length,
-    // so the search opens no node but the start's.
+    // An end as far north as a query takes, on the start's side of the
+    // portals at x = 10 and 15, which run along z: no way to it is within
+    // the path length, so the search opens no node but the start's. One
+    // 1.5e308 m north is refused before any search.
     mnavNavmesh* navmesh = Make(s_handRowAndGap, sizeof(s_handRowAndGap), nullptr, 0);
     mnavQuery* query = MakeQuery(256, 1000.0f);
     mnavNearest a = On(navmesh, 7.0, 7.0);
     mnavNearest b = On(navmesh, 18.0, 7.0);
     mnavPath path = {0};
     CHECK(mnavQuery_FindShortestPath(query, navmesh, a.polygon, a.point, b.polygon,
-                                     (mnavPos3){7.0, 0.0, 1.5e308}, nullptr,
+                                     (mnavPos3){7.0, 0.0, MNAV_MAX_QUERY_DISTANCE}, nullptr,
                                      &path) == mnav_success &&
               path.end == mnav_pathTooLong && path.pointCount == 1 && query->nodeCount == 1,
           "too long, the start's node alone opened");
+    CHECK(mnavQuery_FindShortestPath(query, navmesh, a.polygon, a.point, b.polygon,
+                                     (mnavPos3){7.0, 0.0, 1.5e308}, nullptr,
+                                     &path) == mnav_errorLimit,
+          "an end past the query range refused");
+    // The estimate through an interval along z, 0.25 m long, stays
+    // infinite toward an end that far, rather than a NaN that would pass
+    // the length test.
+    mnavPos3 r = {7.0, 0.0, 7.0};
+    double ahead = mnavThrough(r, (mnavPos3){10.0, 0.0, 7.0}, (mnavPos3){10.0, 0.0, 7.25},
+                               (mnavPos3){7.0, 0.0, 1.5e308});
+    CHECK(isinf(ahead) && ahead > 0.0, "the way through to a far end is infinite");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }

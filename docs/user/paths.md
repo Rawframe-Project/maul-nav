@@ -23,6 +23,7 @@ mnavResult searched =
 - **Ends.** Every search starts and ends on a polygon, so snap both ends with `mnavNavmesh_FindNearest` first. A point found with `incomplete` set may have a nearer polygon on a tile not yet loaded.
 - **How a search ended.** `path.end` is `mnav_pathFound`, `mnav_pathOutOfNodes` or `mnav_pathTooLong` (a partial path toward the polygon nearest the end), `mnav_pathNotLoaded` (it ran into a place with no tile) or `mnav_pathNone`. A partial path is a useful start: walk it and search again from its end.
 - **Memory.** The polygons, points and links a query returns live in the context until its next query. Copy what must outlive it.
+- **Range.** Every point, end, center and radius a navmesh query takes must be finite and within `MNAV_MAX_QUERY_DISTANCE` (1e100 m) of the navmesh's origin on each axis, which keeps every difference and its square a finite double. Past it, the query is refused with `mnav_errorLimit`, and so is a corridor whose position or target lies past it.
 
 ## Filters
 

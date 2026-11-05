@@ -421,6 +421,10 @@ mnavResult mnavBeginPathWork(mnavQuery* query, const mnavNavmesh* navmesh,
     {
         return mnav_errorInvalid;
     }
+    if (!mnavInQueryReach(navmesh, start) || !mnavInQueryReach(navmesh, end))
+    {
+        return mnav_errorLimit;
+    }
     mnavResult result = mnavCheckPolygon(navmesh, startPolygon);
     result = result == mnav_success ? mnavCheckPolygon(navmesh, endPolygon) : result;
     const mnavQueryFilter* usable = nullptr;

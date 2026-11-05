@@ -884,6 +884,10 @@ static MNAV_NOINLINE mnavResult FindShortestPathWork(mnavQuery* query, const mna
     {
         return mnav_errorInvalid;
     }
+    if (!mnavInQueryReach(navmesh, start) || !mnavInQueryReach(navmesh, end))
+    {
+        return mnav_errorLimit;
+    }
     Shortest s = {.query = query, .navmesh = navmesh, .end = end, .found = MNAV_NO_NODE};
     mnavResult result = Begin(&s, filter, startPolygon, start, endPolygon);
     if (result != mnav_success)

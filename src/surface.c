@@ -287,6 +287,10 @@ mnavResult mnavMoveAlongSurfaceWork(mnavQuery* query, const mnavNavmesh* navmesh
     {
         return mnav_errorInvalid;
     }
+    if (!mnavInQueryReach(navmesh, start) || !mnavInQueryReachGround(navmesh, end.x, end.z))
+    {
+        return mnav_errorLimit;
+    }
     const mnavQueryFilter* usable = nullptr;
     mnavResult result = mnavCheckPolygon(navmesh, startPolygon);
     result = result == mnav_success ? mnavCheckFilter(filter, &usable) : result;
