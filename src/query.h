@@ -141,6 +141,9 @@ typedef struct mnavSearch
     // The nodes whose closing ends the search, its tag -1 for none: a
     // slot, a tag and a range of lows, as nodes'.
     int32_t goal[4];
+    // Whether nodes stand on portals at their point toward the end; a
+    // search with no end stands them at the portals' midpoints.
+    bool toward;
 } mnavSearch;
 
 // A flight search in progress, in plain data so that the

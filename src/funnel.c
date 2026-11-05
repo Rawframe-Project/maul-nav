@@ -49,7 +49,8 @@ int32_t mnavPathPolygons(mnavQuery* query, const mnavNavmesh* navmesh, int32_t l
 }
 
 // Writes the portals from the start point to node last, and the end point
-// or, short of it, the last portal's midpoint as a portal of one point.
+// or, short of it, the point the search stood at on the last portal as a
+// portal of one point.
 static int32_t Portals(mnavQuery* query, int32_t last)
 {
     int32_t count = 0;

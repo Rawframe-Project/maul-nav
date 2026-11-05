@@ -236,9 +236,10 @@ extern "C"
     typedef struct mnavPath
     {
         mnavPathEnd end;
-        // The cost of the way searched, through the midpoints of the edges
-        // the corridor crosses: each step's length times the cost of the
-        // area it lies in.
+        // The cost of the way searched, through the points where it crossed
+        // the edges of the corridor: each step's length times the cost of
+        // the area it lies in. Each point is chosen toward the end point, so
+        // the cost from a to b may differ from the cost from b to a.
         double cost;
         // That way's length in meters; the straight path is never longer.
         double length;
@@ -249,8 +250,8 @@ extern "C"
         int32_t polygonCount;
         // The straight path from the start point, the corridor pulled
         // tight: its corners and, last, the end point or, short of it, the
-        // midpoint of the last edge crossed. In the context's memory until
-        // its next search; never cut short.
+        // point where the way searched crossed the last edge. In the
+        // context's memory until its next search; never cut short.
         const mnavPos3* points;
         int32_t pointCount;
         // The off-mesh links crossed, in order, in the context's memory
@@ -333,14 +334,17 @@ extern "C"
     /// Searches for the shortest way from a point on one polygon to a point
     /// on another: A* over the edges between polygons, its
     /// heuristic the straight distance to the end point; ties go to the
-    /// node made first. A step costs its length times the cost of the area
-    /// it crosses, and the heuristic is scaled by the cheapest included
-    /// area's cost; polygons of excluded areas other than the start
-    /// polygon are not entered. Attached off-mesh links of included kinds are
-    /// crossed at their declared cost, the heuristic scaled down to the
-    /// lowest cost per meter among them. The corridor found is pulled
-    /// tight into a straight path with the funnel algorithm, stretch by
-    /// stretch between links.
+    /// node made first. The way crosses each edge at the edge's point on
+    /// the shortest way from the point before to the end point, so it
+    /// searches toward the end and is not exact: its straight path is close
+    /// to the shortest, which mnavQuery_FindShortestPath gives exactly. A
+    /// step costs its length times the cost of the area it crosses, and the
+    /// heuristic is scaled by the cheapest included area's cost; polygons of
+    /// excluded areas other than the start polygon are not entered. Attached
+    /// off-mesh links of included kinds are crossed at their declared cost,
+    /// the heuristic scaled down to the lowest cost per meter among them.
+    /// The corridor found is pulled tight into a straight path with the
+    /// funnel algorithm, stretch by stretch between links.
     ///
     /// @param query        The context; its memory holds the result.
     /// @param navmesh      The navmesh.

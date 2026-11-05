@@ -115,6 +115,43 @@ static mnavPos3 Midpoint(mnavPos3 a, mnavPos3 b)
     return (mnavPos3){(a.x + b.x) * 0.5, (a.y + b.y) * 0.5, (a.z + b.z) * 0.5};
 }
 
+// Where a node stands on portal ab, seen from its parent's point p: the
+// point of the portal on the shortest way on the ground from p through it
+// to the end point e, a straight line, or folded at the portal when both
+// lie on one side, held to the portal's ends; its height is the portal's
+// there.
+static mnavPos3 Toward(mnavPos3 p, mnavPos3 a, mnavPos3 b, mnavPos3 e)
+{
+    double dx = b.x - a.x;
+    double dz = b.z - a.z;
+    double span = dx * dx + dz * dz;
+    if (span == 0.0)
+    {
+        return a;
+    }
+    // Sides of p and e against the portal's line, and e folded over it to
+    // p's other side when they share one.
+    double sp = dx * (p.z - a.z) - dz * (p.x - a.x);
+    double se = dx * (e.z - a.z) - dz * (e.x - a.x);
+    double ex = e.x;
+    double ez = e.z;
+    if ((sp > 0.0 && se > 0.0) || (sp < 0.0 && se < 0.0))
+    {
+        ex += 2.0 * se / span * dz;
+        ez -= 2.0 * se / span * dx;
+    }
+    double wx = ex - p.x;
+    double wz = ez - p.z;
+    double across = wx * dz - wz * dx;
+    double t = 0.5;
+    if (across != 0.0)
+    {
+        t = (wx * (p.z - a.z) - wz * (p.x - a.x)) / across;
+        t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+    }
+    return (mnavPos3){a.x + t * dx, a.y + t * (b.y - a.y), a.z + t * dz};
+}
+
 // What names a node: the polygon entered, its slot, the portal's tag and
 // the link's start along the side. Only these four, so that a key costs
 // no more to make than they do.
@@ -126,8 +163,9 @@ typedef struct Key
     int32_t low;
 } Key;
 
-// Opens the node behind a portal from node from, or lowers its cost when
-// this way is cheaper; closed nodes are final.
+// Opens the node behind a portal from node from, or, when this way is
+// cheaper, lowers its cost and moves it to this way's point; closed nodes
+// are final.
 static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPos3 b,
                  double linkCost)
 {
@@ -139,9 +177,13 @@ static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPo
     const mnavSearchNode* parent = &query->nodes[from];
     bool offMesh = key->tag == MNAV_TAG_OFFMESH;
     // Where the walk in the parent's polygon goes, and where the node
-    // stands: a portal's midpoint, the end point, or an off-mesh link's
-    // takeoff and landing points.
-    mnavPos3 via = key->tag == MNAV_TAG_END ? s->end : (offMesh ? a : Midpoint(a, b));
+    // stands: a portal's point toward the end, or its midpoint in a search
+    // with no end; the end point; or an off-mesh link's takeoff and landing
+    // points.
+    mnavPos3 via = key->tag == MNAV_TAG_END ? s->end
+                   : offMesh                ? a
+                   : s->toward              ? Toward(parent->at, a, b, s->end)
+                                            : Midpoint(a, b);
     mnavPos3 at = offMesh ? b : via;
     // The walk lies in the parent's polygon, which is convex.
     const mnavPolygon* crossed =
@@ -166,6 +208,8 @@ static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPo
         MNAV_ASSERT(node->heap == MNAV_NO_NODE || query->heap[node->heap].node == n);
         if (node->heap != MNAV_NO_NODE && cost < node->cost)
         {
+            node->at = at;
+            node->remaining = toEnd * s->cheapest;
             node->cost = cost;
             node->length = length;
             node->parent = from;
@@ -457,7 +501,8 @@ mnavResult mnavBeginPathWork(mnavQuery* query, const mnavNavmesh* navmesh,
                       -1,
                       false,
                       false,
-                      {-1, -1, -1, -1}};
+                      {-1, -1, -1, -1},
+                      true};
     query->nodes[0] = (mnavSearchNode){start,
                                        start,
                                        start,
@@ -508,6 +553,7 @@ void mnavConfineSearch(mnavQuery* query, const int32_t* clusterOf, int32_t clust
     s->beyond = beyond;
     if (noEnd)
     {
+        s->toward = false;
         s->endSlot = -1;
         s->cheapest = 0.0;
         query->nodes[0].remaining = 0.0;
@@ -533,6 +579,7 @@ void mnavAimSearch(mnavQuery* query, mnavPos3 end, int32_t endSlot, int32_t endP
     s->end = end;
     s->endSlot = endSlot;
     s->endPolygon = endPolygon;
+    s->toward = true;
 }
 
 // The rank of node index v among the sorted indices.
