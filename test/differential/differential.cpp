@@ -109,6 +109,8 @@ constexpr double kReachFloor = 0.97;
 constexpr double kLengthFloor = 0.90;
 constexpr double kNotLongerFloor = 0.95;
 constexpr double kSumBound = 0.02;
+// The corners a printed path shows at most.
+constexpr int kCorners = 64;
 
 struct Detour
 {
@@ -234,7 +236,8 @@ bool Build(const DiffScene& scene, Detour& out)
 }
 
 // Detour's answer, as DiffMaulPath gives Maul Nav's.
-int DetourPath(const Detour& d, const float a[3], const float b[3], double* length, int* nodes)
+int DetourPath(const Detour& d, const float a[3], const float b[3], double* length, int* nodes,
+               DiffRoute* route = nullptr)
 {
     dtQueryFilter filter;
     const float extents[3] = {0.5f, 2.0f, 0.5f};
@@ -274,6 +277,18 @@ int DetourPath(const Detour& d, const float a[3], const float b[3], double* leng
         sum += std::sqrt(dx * dx + dy * dy + dz * dz);
     }
     *length = sum;
+    if (route != nullptr)
+    {
+        route->cornerCount = pointCount;
+        route->polygonCount = count;
+        for (int i = 0; i < pointCount && i < route->capacity; ++i)
+        {
+            for (int k = 0; k < 3; ++k)
+            {
+                route->corners[i * 3 + k] = points[i * 3 + k];
+            }
+        }
+    }
     return 1;
 }
 
@@ -1046,7 +1061,22 @@ struct Tally
     double detourSum = 0.0;
 };
 
-void Compare(DiffMaul* maul, const Detour& d, Tally& t)
+// A path's corners, on a line of their own.
+void SayCorners(const char* scene, int i, const char* who, const DiffRoute& route)
+{
+    Say("path %s %d %s:", scene, i, who);
+    for (int k = 0; k < route.cornerCount && k < route.capacity; ++k)
+    {
+        const float* c = &route.corners[k * 3];
+        Say(" (%.4f %.4f %.4f)", static_cast<double>(c[0]), static_cast<double>(c[1]),
+            static_cast<double>(c[2]));
+    }
+    Say("%s\n", route.cornerCount > route.capacity ? " and more" : "");
+}
+
+// Every pair both reach whose lengths lie apart is printed, with both
+// paths' corners, as longer when Maul Nav's is the longer one.
+void Compare(const char* scene, DiffMaul* maul, const Detour& d, Tally& t)
 {
     for (int i = 0; i < kPairs; ++i)
     {
@@ -1059,8 +1089,12 @@ void Compare(DiffMaul* maul, const Detour& d, Tally& t)
         }
         double ml = 0.0;
         double dl = 0.0;
-        int m = DiffMaulPath(maul, a, b, &ml, nullptr);
-        int r = DetourPath(d, a, b, &dl, nullptr);
+        float mc[kCorners * 3];
+        float dc[kCorners * 3];
+        DiffRoute mr = {mc, kCorners, 0, 0};
+        DiffRoute dr = {dc, kCorners, 0, 0};
+        int m = DiffMaulPath(maul, a, b, &ml, nullptr, &mr);
+        int r = DetourPath(d, a, b, &dl, nullptr, &dr);
         if (m < 0 || r < 0)
         {
             t.unsnapped += 1;
@@ -1075,6 +1109,17 @@ void Compare(DiffMaul* maul, const Detour& d, Tally& t)
             double bound = std::fmax(0.05 * std::fmax(ml, dl), 0.25);
             t.lengthAgree += gap <= bound ? 1 : 0;
             t.notLonger += ml - dl <= bound ? 1 : 0;
+            if (gap > bound)
+            {
+                auto D = [](float v) { return static_cast<double>(v); };
+                Say("path %s %d: (%.4f %.4f %.4f) to (%.4f %.4f %.4f): maul %.4f m, %d corners, "
+                    "%d polygons, detour %.4f m, %d corners, %d polygons, ratio %.4f, %s\n",
+                    scene, i, D(a[0]), D(a[1]), D(a[2]), D(b[0]), D(b[1]), D(b[2]), ml,
+                    mr.cornerCount, mr.polygonCount, dl, dr.cornerCount, dr.polygonCount,
+                    dl > 0.0 ? ml / dl : 0.0, ml - dl > bound ? "longer" : "apart");
+                SayCorners(scene, i, "maul", mr);
+                SayCorners(scene, i, "detour", dr);
+            }
             t.maulSum += ml;
             t.detourSum += dl;
         }
@@ -1165,7 +1210,7 @@ std::vector<std::vector<float>> Pairs(DiffMaul* maul, const Detour& d)
         double length = 0.0;
         if (DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 1u, p.data()) &&
             DiffMaulPoint(maul, 2u * static_cast<uint64_t>(i) + 2u, p.data() + 3) &&
-            DiffMaulPath(maul, p.data(), p.data() + 3, &length, nullptr) >= 0 &&
+            DiffMaulPath(maul, p.data(), p.data() + 3, &length, nullptr, nullptr) >= 0 &&
             DetourPath(d, p.data(), p.data() + 3, &length, nullptr) >= 0)
         {
             pairs.push_back(p);
@@ -1205,20 +1250,21 @@ void Costs(const Counter& counter, const DiffScene& scene, DiffMaul* maul, const
         double length = 0.0;
         int32_t mn = 0;
         int dn = 0;
-        DiffMaulPath(maul, p.data(), p.data() + 3, &length, &mn);
+        DiffMaulPath(maul, p.data(), p.data() + 3, &length, &mn, nullptr);
         DetourPath(d, p.data(), p.data() + 3, &length, &dn);
         maulNodes += mn;
         detourNodes += dn;
     }
-    Cost maulPaths = Measure(counter,
-                             [&]
-                             {
-                                 double length = 0.0;
-                                 for (const std::vector<float>& p : pairs)
-                                 {
-                                     DiffMaulPath(maul, p.data(), p.data() + 3, &length, nullptr);
-                                 }
-                             });
+    Cost maulPaths =
+        Measure(counter,
+                [&]
+                {
+                    double length = 0.0;
+                    for (const std::vector<float>& p : pairs)
+                    {
+                        DiffMaulPath(maul, p.data(), p.data() + 3, &length, nullptr, nullptr);
+                    }
+                });
     Cost detourPaths = Measure(counter,
                                [&]
                                {
@@ -1282,7 +1328,7 @@ int main()
             return 1;
         }
         Tally t;
-        Compare(maul, d, t);
+        Compare(scene.name, maul, d, t);
         DiffMaulDestroy(maul);
         double reach = t.snapped > 0 ? static_cast<double>(t.reachAgree) / t.snapped : 0.0;
         double both = t.bothReached > 0 ? static_cast<double>(t.bothReached) : 1.0;

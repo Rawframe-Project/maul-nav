@@ -45,12 +45,24 @@ extern "C"
     // A random point on the navmesh from a seed; false when there is none.
     bool DiffMaulPoint(DiffMaul* maul, uint64_t seed, float out[3]);
 
+    // A reached path's shape: its corners, three floats each, up to
+    // capacity; how many it has, which may be more; and how many polygons
+    // its corridor crosses.
+    typedef struct DiffRoute
+    {
+        float* corners;
+        int32_t capacity;
+        int32_t cornerCount;
+        int32_t polygonCount;
+    } DiffRoute;
+
     // A path between the polygons nearest two points, within 0.5 m across
     // and 2 m up or down: 1 reached, with the straight path's length; 0
     // not reached; -1 when a point has no polygon near. nodes, which may
-    // be NULL, receives the nodes the search made.
+    // be NULL, receives the nodes the search made, and route, which may be
+    // NULL, a reached path's shape.
     int32_t DiffMaulPath(DiffMaul* maul, const float a[3], const float b[3], double* length,
-                         int32_t* nodes);
+                         int32_t* nodes, DiffRoute* route);
 
     // A ray on the ground from the point on the polygon nearest a, as
     // DiffMaulPath finds it, toward b: 1 stopped by a wall, with how far
