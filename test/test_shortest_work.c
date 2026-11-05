@@ -111,6 +111,25 @@ static void TestEveryWayToAnUnreachableEnd(void)
     mnavDestroyNavmesh(navmesh);
 }
 
+static void TestNoNodePastTheLengthToAFarEnd(void)
+{
+    // An end 1.5e308 m north, on the start's side of the portals at x = 10
+    // and 15, which run along z: no way to it is within the path length,
+    // so the search opens no node but the start's.
+    mnavNavmesh* navmesh = Make(s_handRowAndGap, sizeof(s_handRowAndGap), nullptr, 0);
+    mnavQuery* query = MakeQuery(256, 1000.0f);
+    mnavNearest a = On(navmesh, 7.0, 7.0);
+    mnavNearest b = On(navmesh, 18.0, 7.0);
+    mnavPath path = {0};
+    CHECK(mnavQuery_FindShortestPath(query, navmesh, a.polygon, a.point, b.polygon,
+                                     (mnavPos3){7.0, 0.0, 1.5e308}, nullptr,
+                                     &path) == mnav_success &&
+              path.end == mnav_pathTooLong && path.pointCount == 1 && query->nodeCount == 1,
+          "too long, the start's node alone opened");
+    mnavDestroyQuery(query);
+    mnavDestroyNavmesh(navmesh);
+}
+
 // The nodes an exhaustive search makes from a point to an island it
 // cannot reach, on squares beside the island (a tile of hand_tiles.h).
 static int32_t Exhaust(const uint8_t* tile, size_t size, double x, double z)
@@ -202,6 +221,7 @@ int main(void)
     LoadWorldTiles();
     TestFromAVertex();
     TestEveryWayToAnUnreachableEnd();
+    TestNoNodePastTheLengthToAFarEnd();
     TestPrunesAsItGoes();
     TestTheWorldsWork();
     return s_failures == 0 ? 0 : 1;

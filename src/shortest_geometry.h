@@ -43,9 +43,20 @@ static inline mnavPos3 mnavNearestOn(mnavPos3 p, mnavPos3 a, mnavPos3 b)
 // The shortest distance on the ground from root r through the interval
 // from a to b to point e: an e on r's side of the interval's line is
 // mirrored through it first, then the way is straight when it meets the
-// interval and turns at the nearer end otherwise.
+// interval and turns at the nearer end otherwise. Infinite when r or e
+// lies too far from a for its distance's square to be a double, past
+// about 1e154 m: the way is no shorter than that distance less the
+// interval's length, past MNAV_MAX_PATH_LENGTH, which caps every search's
+// length, and the mirror's t could overflow there and make e NaN through
+// a 0 times it.
 static inline double mnavThrough(mnavPos3 r, mnavPos3 a, mnavPos3 b, mnavPos3 e)
 {
+    double toA = mnavFlat(r, a);
+    double fromA = mnavFlat(a, e);
+    if (isinf(toA) || isinf(fromA))
+    {
+        return (double)INFINITY;
+    }
     double side = mnavCross(a, b, r);
     double eSide = mnavCross(a, b, e);
     double dx = b.x - a.x;
@@ -61,7 +72,7 @@ static inline double mnavThrough(mnavPos3 r, mnavPos3 a, mnavPos3 b, mnavPos3 e)
     {
         return mnavFlat(r, e);
     }
-    double viaA = mnavFlat(r, a) + mnavFlat(a, e);
+    double viaA = toA + mnavFlat(a, e);
     double viaB = mnavFlat(r, b) + mnavFlat(b, e);
     return viaA < viaB ? viaA : viaB;
 }
