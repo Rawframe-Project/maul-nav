@@ -96,12 +96,17 @@ static double Distance(mnavPos3 a, mnavPos3 b)
     return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
+MNAV_NODISCARD static bool SameId(mnavPolygonId a, mnavPolygonId b)
+{
+    return a.slot == b.slot && a.generation == b.generation && a.polygon == b.polygon;
+}
+
 // The surface nearest a height at a ground point, among the polygons in a
-// box there: the highest from low to high when highest is set, else the
-// one nearest the height; whether one was found. A box meeting more
-// polygons than the landings stops generation.
-MNAV_NODISCARD static bool Landing(Gen* g, double x, double z, double low, double high,
-                                   double height, bool highest, Spot* out)
+// box there but the takeoff's: the highest from low to high when highest
+// is set, else the one nearest the height; whether one was found. A box
+// meeting more polygons than the landings stops generation.
+MNAV_NODISCARD static bool Landing(Gen* g, mnavPolygonId takeoff, double x, double z, double low,
+                                   double high, double height, bool highest, Spot* out)
 {
     mnavPolygonId ids[MNAV_MAX_LINK_LANDINGS];
     mnavFound found;
@@ -118,7 +123,10 @@ MNAV_NODISCARD static bool Landing(Gen* g, double x, double z, double low, doubl
     for (int32_t i = 0; i < found.polygonCount; ++i)
     {
         double h = 0.0;
-        if (mnavGetHeightWork(g->navmesh, ids[i], x, z, &h) != mnav_success || h < low || h > high)
+        // With no radius, the first jump box lies on the edge itself, which
+        // only the takeoff's polygon holds: a landing there is no jump.
+        if (SameId(ids[i], takeoff) ||
+            mnavGetHeightWork(g->navmesh, ids[i], x, z, &h) != mnav_success || h < low || h > high)
         {
             continue;
         }
@@ -231,7 +239,7 @@ static void Sample(Gen* g, Spot from, mnavPos3 edge, double nx, double nz)
     {
         double out = 2.0 * g->radius + 4.0 * g->cell;
         Spot to = {{0, 0, 0}, {0.0, -(double)INFINITY, 0.0}};
-        if (Landing(g, edge.x + nx * out, edge.z + nz * out, top - (double)d->dropMax,
+        if (Landing(g, from.polygon, edge.x + nx * out, edge.z + nz * out, top - (double)d->dropMax,
                     top - g->step, top, true, &to))
         {
             Keep(g, from, to, true);
@@ -242,8 +250,8 @@ static void Sample(Gen* g, Spot from, mnavPos3 edge, double nx, double nz)
          out += g->cell)
     {
         Spot to = {{0, 0, 0}, {0.0, (double)INFINITY, 0.0}};
-        if (Landing(g, edge.x + nx * out, edge.z + nz * out, top - g->step, top + g->step, top,
-                    false, &to))
+        if (Landing(g, from.polygon, edge.x + nx * out, edge.z + nz * out, top - g->step,
+                    top + g->step, top, false, &to))
         {
             Keep(g, from, to, false);
             break;
