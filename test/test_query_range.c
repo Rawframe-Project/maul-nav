@@ -203,8 +203,10 @@ static void TestEveryCallTakesTheBoundAndRefusesPastIt(void)
     queryDef.limits.transitions = 1024;
     mnavQuery* query = nullptr;
     CHECK(mnavCreateQuery(&queryDef, &query) == mnav_success, "query");
-    Callees c = {query,   navmesh, {0}, On(navmesh, 7.5, 7.5), On(navmesh, 17.5, 7.5),
-                 nullptr, nullptr};
+    Callees c = {.query = query,
+                 .navmesh = navmesh,
+                 .a = On(navmesh, 7.5, 7.5),
+                 .b = On(navmesh, 17.5, 7.5)};
     static mnavPolygonId buffer[64];
     mnavPath path;
     CHECK(mnavResetCorridor(&c.corridor, buffer, 64, c.a.polygon, c.a.point) == mnav_success &&
