@@ -43,6 +43,16 @@ MNAV_NODISCARD static bool WellFormed(const mnavCorridor* corridor)
            corridor->polygonCount >= 1 && corridor->polygonCount <= corridor->capacity;
 }
 
+// Whether a well formed corridor's ends lie within MNAV_MAX_QUERY_DISTANCE
+// of the navmesh's origin: every call that takes a navmesh refuses one
+// that does not with mnav_errorLimit. A NULL navmesh passes here, for the
+// call to refuse as invalid.
+MNAV_NODISCARD static bool InReach(const mnavNavmesh* navmesh, const mnavCorridor* corridor)
+{
+    return navmesh == nullptr || (mnavInQueryReach(navmesh, corridor->position) &&
+                                  mnavInQueryReach(navmesh, corridor->target));
+}
+
 static MNAV_NOINLINE mnavResult ResetCorridorWork(mnavCorridor* corridor, mnavPolygonId* buffer,
                                                   int32_t capacity, mnavPolygonId polygon,
                                                   mnavPos3 position)
@@ -260,6 +270,10 @@ static MNAV_NOINLINE mnavResult CheckCorridorWork(const mnavNavmesh* navmesh,
     {
         return mnav_errorInvalid;
     }
+    if (!InReach(navmesh, corridor))
+    {
+        return mnav_errorLimit;
+    }
     const mnavQueryFilter* usable = nullptr;
     mnavResult result = mnavCheckFilter(filter, &usable);
     if (result != mnav_success)
@@ -302,6 +316,10 @@ static MNAV_NOINLINE mnavResult CorridorCornersWork(mnavQuery* query, const mnav
     if (query == nullptr || navmesh == nullptr || cornersOut == nullptr || !WellFormed(corridor))
     {
         return mnav_errorInvalid;
+    }
+    if (!InReach(navmesh, corridor))
+    {
+        return mnav_errorLimit;
     }
     if (corridor->polygonCount > query->limits.nodes)
     {
@@ -595,6 +613,10 @@ static MNAV_NOINLINE mnavResult MoveCorridorWork(mnavQuery* query, const mnavNav
     {
         return mnav_errorInvalid;
     }
+    if (!InReach(navmesh, corridor))
+    {
+        return mnav_errorLimit;
+    }
     mnavMove move;
     mnavResult result = mnavMoveAlongSurfaceWork(query, navmesh, filter, corridor->polygons[0],
                                                  corridor->position, wanted, &move);
@@ -647,6 +669,10 @@ static MNAV_NOINLINE mnavResult MoveCorridorTargetWork(mnavQuery* query, const m
     if (!WellFormed(corridor))
     {
         return mnav_errorInvalid;
+    }
+    if (!InReach(navmesh, corridor))
+    {
+        return mnav_errorLimit;
     }
     mnavMove move;
     mnavResult result = mnavMoveAlongSurfaceWork(query, navmesh, filter,
@@ -703,6 +729,10 @@ static MNAV_NOINLINE mnavResult ShortcutCorridorWork(mnavQuery* query, const mna
     if (!WellFormed(corridor) || shortenedOut == nullptr)
     {
         return mnav_errorInvalid;
+    }
+    if (!InReach(navmesh, corridor))
+    {
+        return mnav_errorLimit;
     }
     *shortenedOut = false;
     mnavRay ray;
@@ -792,6 +822,10 @@ static MNAV_NOINLINE mnavResult ReplanCorridorWork(mnavQuery* query, const mnavN
         !mnavGoodHalfExtents(halfExtents))
     {
         return mnav_errorInvalid;
+    }
+    if (!InReach(navmesh, corridor))
+    {
+        return mnav_errorLimit;
     }
     mnavPos3 start = corridor->position;
     mnavPos3 end = corridor->target;

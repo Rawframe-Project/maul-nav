@@ -85,6 +85,10 @@ mnavResult mnavGetHeightWork(const mnavNavmesh* navmesh, mnavPolygonId polygon, 
     {
         return mnav_errorInvalid;
     }
+    if (!mnavInQueryReachGround(navmesh, x, z))
+    {
+        return mnav_errorLimit;
+    }
     mnavResult result = mnavCheckPolygon(navmesh, polygon);
     if (result != mnav_success)
     {
@@ -631,6 +635,13 @@ MNAV_NODISCARD static bool GoodRing(const mnavQuery* query, const mnavNavmesh* n
            isfinite(center.z) && isfinite(radius) && radius >= 0.0;
 }
 
+// Whether a well formed ring's center and radius lie within
+// MNAV_MAX_QUERY_DISTANCE: refused with mnav_errorLimit when not.
+MNAV_NODISCARD static bool InReach(const mnavNavmesh* navmesh, mnavPos3 center, double radius)
+{
+    return mnavInQueryReach(navmesh, center) && radius <= MNAV_MAX_QUERY_DISTANCE;
+}
+
 static MNAV_NOINLINE mnavResult FindWallDistanceWork(mnavQuery* query, const mnavNavmesh* navmesh,
                                                      const mnavQueryFilter* filter,
                                                      mnavPolygonId polygon, mnavPos3 center,
@@ -643,6 +654,10 @@ static MNAV_NOINLINE mnavResult FindWallDistanceWork(mnavQuery* query, const mna
     if (nearestOut == nullptr || !GoodRing(query, navmesh, center, radius))
     {
         return mnav_errorInvalid;
+    }
+    if (!InReach(navmesh, center, radius))
+    {
+        return mnav_errorLimit;
     }
     Ring r = {
         query, navmesh,           filter,          center, radius, false, {0}, false, nullptr, 0,
@@ -702,6 +717,10 @@ static MNAV_NOINLINE mnavResult FindWallsWork(mnavQuery* query, const mnavNavmes
     {
         return mnav_errorInvalid;
     }
+    if (!InReach(navmesh, center, radius))
+    {
+        return mnav_errorLimit;
+    }
     Ring r = {query,           navmesh,  filter, center,
               radius,          false,    {0},    true,
               wallsOut,        capacity, 0,      -(double)INFINITY,
@@ -758,6 +777,10 @@ static MNAV_NOINLINE mnavResult FindRandomPointAroundWork(
     if (pointOut == nullptr || !GoodRing(query, navmesh, center, radius))
     {
         return mnav_errorInvalid;
+    }
+    if (!InReach(navmesh, center, radius))
+    {
+        return mnav_errorLimit;
     }
     Ring r = {
         query, navmesh,           filter,          center, radius, false, {0}, false, nullptr, 0,

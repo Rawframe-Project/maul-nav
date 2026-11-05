@@ -491,6 +491,10 @@ static mnavResult Seed(mnavNavFlow* f, const mnavNavFlowGoal* goals, int32_t goa
         {
             return mnav_errorInvalid;
         }
+        if (!mnavInQueryReach(f->navmesh, p))
+        {
+            return mnav_errorLimit;
+        }
         mnavResult result = mnavCheckPolygon(f->navmesh, goals[i].polygon);
         if (result != mnav_success)
         {

@@ -361,6 +361,10 @@ mnavResult mnavFindPolygonsWork(const mnavNavmesh* navmesh, const mnavQueryFilte
     {
         return mnav_errorInvalid;
     }
+    if (!mnavInQueryReach(navmesh, center))
+    {
+        return mnav_errorLimit;
+    }
     const mnavQueryFilter* usable = nullptr;
     mnavResult checked = mnavCheckFilter(filter, &usable);
     if (checked != mnav_success)
@@ -435,6 +439,10 @@ mnavResult mnavFindNearestWork(const mnavNavmesh* navmesh, const mnavQueryFilter
     if (navmesh == nullptr || nearestOut == nullptr || !GoodBox(point, halfExtents))
     {
         return mnav_errorInvalid;
+    }
+    if (!mnavInQueryReach(navmesh, point))
+    {
+        return mnav_errorLimit;
     }
     const mnavQueryFilter* usable = nullptr;
     mnavResult checked = mnavCheckFilter(filter, &usable);

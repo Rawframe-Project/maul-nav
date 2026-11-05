@@ -17,6 +17,7 @@
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
+#include "maul-nav/query.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -914,4 +915,16 @@ mnavResult mnavCheckPolygon(const mnavNavmesh* navmesh, mnavPolygonId id)
         return mnav_errorStale;
     }
     return id.polygon < (uint32_t)slot->tile->mesh.polygonCount ? mnav_success : mnav_errorInvalid;
+}
+
+bool mnavInQueryReachGround(const mnavNavmesh* navmesh, double x, double z)
+{
+    const mnavPos3* o = &navmesh->def.bake.origin;
+    return fabs(x - o->x) <= MNAV_MAX_QUERY_DISTANCE && fabs(z - o->z) <= MNAV_MAX_QUERY_DISTANCE;
+}
+
+bool mnavInQueryReach(const mnavNavmesh* navmesh, mnavPos3 p)
+{
+    return mnavInQueryReachGround(navmesh, p.x, p.z) &&
+           fabs(p.y - navmesh->def.bake.origin.y) <= MNAV_MAX_QUERY_DISTANCE;
 }

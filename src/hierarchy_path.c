@@ -346,6 +346,10 @@ static mnavResult CheckQuery(const mnavQuery* query, const mnavHierarchy* h,
     {
         return mnav_errorInvalid;
     }
+    if (!mnavInQueryReach(navmesh, start) || !mnavInQueryReach(navmesh, end))
+    {
+        return mnav_errorLimit;
+    }
     if (h->navmesh == nullptr)
     {
         return mnav_errorState;

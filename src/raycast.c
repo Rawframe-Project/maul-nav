@@ -150,6 +150,10 @@ static mnavResult CheckRay(mnavQuery* query, const mnavNavmesh* navmesh,
     {
         return mnav_errorInvalid;
     }
+    if (!mnavInQueryReach(navmesh, start) || !mnavInQueryReachGround(navmesh, end.x, end.z))
+    {
+        return mnav_errorLimit;
+    }
     mnavResult result = mnavCheckPolygon(navmesh, startPolygon);
     return result == mnav_success ? mnavCheckFilter(filter, usable) : result;
 }

@@ -217,11 +217,12 @@ extern "C"
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a point
     /// that is not finite, or a hierarchy built for another navmesh;
     /// `mnav_errorState` for a hierarchy with no graph, or a navmesh committed
-    /// since the build; `mnav_errorCapacity` for a hierarchy of more
-    /// transitions than the context's transitions limit; the errors of
-    /// mnavQuery_FindPath otherwise. Also
-    /// `mnav_errorBusy` when called back in from host code a call using the
-    /// context runs (a link generation's clearance test, a hierarchy's
+    /// since the build; `mnav_errorLimit` for a point more than
+    /// MNAV_MAX_QUERY_DISTANCE from the navmesh's origin on an axis;
+    /// `mnav_errorCapacity` for a hierarchy of more transitions than the
+    /// context's transitions limit; the errors of mnavQuery_FindPath otherwise.
+    /// Also `mnav_errorBusy` when called back in from host code a call using
+    /// the context runs (a link generation's clearance test, a hierarchy's
     /// allocator as it builds), one misuse counted.
     /// @par Thread safety
     /// Safe from any thread; the context is used by one thread at a time.

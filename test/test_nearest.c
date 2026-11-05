@@ -119,8 +119,8 @@ static void TestBadArgumentsAreRefused(void)
     CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){0, 0, 0}, (mnavVec3){1, 1, 1}, nullptr,
                                   nullptr) == mnav_errorInvalid,
           "nowhere to put it");
-    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){1.0e300, 0, 0}, (mnavVec3){1.0e30f, 1, 1},
-                                  nullptr, &n) == mnav_success,
+    CHECK(mnavNavmesh_FindNearest(navmesh, (mnavPos3){MNAV_MAX_QUERY_DISTANCE, 0, 0},
+                                  (mnavVec3){1.0e30f, 1, 1}, nullptr, &n) == mnav_success,
           "a huge box past the extent is clamped to it");
     mnavDestroyNavmesh(navmesh);
 }
