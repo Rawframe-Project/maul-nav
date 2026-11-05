@@ -8,8 +8,7 @@ may change the API, the ABI and the tile formats.
 ## [1.1.2](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.1...v1.1.2) (2026-11-05)
 
 This release stops `mnavQuery_FindShortestPath` from opening nodes past
-its path length toward an end far away, and marks every internal
-function that returns `bool` nodiscard. No result changes for a caller
+its path length toward an end far away. No result changes for a caller
 that keeps the contract.
 
 ### Changed
@@ -35,14 +34,6 @@ that keeps the contract.
   caps every search's length, so no node within a limit is turned away.
   No result changes: the path given was already right.
   ([#354](https://github.com/Rawframe-Project/maul-nav/pull/354))
-- The library's internal functions that return `bool` carried no
-  nodiscard mark, so a dropped result went unwarned. Dropping one goes
-  on past a refusal, or reads an out value that was never set. 191
-  declarations now carry `MNAV_NODISCARD`, and a check run by CI keeps
-  it so. The library, tools, tests, samples and benchmarks build with it
-  under Clang 20 and GCC 14 with `-Werror`, with no result dropped. No
-  result changes.
-  ([#356](https://github.com/Rawframe-Project/maul-nav/pull/356))
 
 ## [1.1.1](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.0...v1.1.1) (2026-11-05)
 
