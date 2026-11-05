@@ -262,9 +262,14 @@ static void Hierarchies(Reader* r, mnavNavmesh* navmesh, mnavQuery* query,
     mnavPos3 end;
     mnavPolygonId from = Near(navmesh, Point(r), &start);
     mnavPolygonId to = Near(navmesh, Point(r), &end);
+    // Now and then an end as given, which may lie past the query range.
+    start = Byte(r) % 8 == 0 ? Point(r) : start;
+    end = Byte(r) % 8 == 0 ? Point(r) : end;
     mnavPath path = {0};
     mnavResult first =
         mnavQuery_FindHierarchicalPath(query, h, navmesh, from, start, to, end, &path);
+    Expect(h == nullptr || !Finite(start) || !Finite(end) || !(Past(start) || Past(end)) ||
+           first == mnav_errorLimit);
     CheckPath(first, &path);
     KeepPoints(first, &path, 0);
     int32_t count = path.pointCount;
