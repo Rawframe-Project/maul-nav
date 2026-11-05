@@ -23,6 +23,7 @@
 #include "polymesh.h"
 #include "query.h"
 #include "query_filter.h"
+#include "shortest_geometry.h"
 
 #include "maul-nav/base.h"
 #include "maul-nav/navmesh.h"
@@ -92,20 +93,6 @@ typedef struct Piece
     int32_t entry;
 } Piece;
 
-// Twice the signed area of triangle o, a, b on the ground: positive when
-// b lies left of the way from o to a.
-static double Cross(mnavPos3 o, mnavPos3 a, mnavPos3 b)
-{
-    return (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x);
-}
-
-static double Flat(mnavPos3 a, mnavPos3 b)
-{
-    double dx = a.x - b.x;
-    double dz = a.z - b.z;
-    return sqrt(dx * dx + dz * dz);
-}
-
 static double Distance(mnavPos3 a, mnavPos3 b)
 {
     double dx = a.x - b.x;
@@ -114,50 +101,9 @@ static double Distance(mnavPos3 a, mnavPos3 b)
     return sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-static mnavPos3 Lerp(mnavPos3 a, mnavPos3 b, double t)
-{
-    return (mnavPos3){a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t};
-}
-
 static bool Same(mnavPos3 a, mnavPos3 b)
 {
     return a.x == b.x && a.y == b.y && a.z == b.z;
-}
-
-// The point of segment a, b nearest p on the ground.
-static mnavPos3 Nearest(mnavPos3 p, mnavPos3 a, mnavPos3 b)
-{
-    double dx = b.x - a.x;
-    double dz = b.z - a.z;
-    double length2 = dx * dx + dz * dz;
-    double t = length2 > 0.0 ? ((p.x - a.x) * dx + (p.z - a.z) * dz) / length2 : 0.0;
-    return Lerp(a, b, t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t));
-}
-
-// The shortest distance on the ground from root r through the interval
-// from a to b to point e: an e on r's side of the interval's line is
-// mirrored through it first, then the way is straight when it meets the
-// interval and turns at the nearer end otherwise.
-static double Through(mnavPos3 r, mnavPos3 a, mnavPos3 b, mnavPos3 e)
-{
-    double side = Cross(a, b, r);
-    double eSide = Cross(a, b, e);
-    double dx = b.x - a.x;
-    double dz = b.z - a.z;
-    double length2 = dx * dx + dz * dz;
-    if (length2 > 0.0 && ((side > 0.0 && eSide > 0.0) || (side < 0.0 && eSide < 0.0)))
-    {
-        double t = ((e.x - a.x) * dx + (e.z - a.z) * dz) / length2;
-        e.x = 2.0 * (a.x + t * dx) - e.x;
-        e.z = 2.0 * (a.z + t * dz) - e.z;
-    }
-    if (Cross(r, a, e) >= 0.0 && Cross(r, b, e) <= 0.0)
-    {
-        return Flat(r, e);
-    }
-    double viaA = Flat(r, a) + Flat(a, e);
-    double viaB = Flat(r, b) + Flat(b, e);
-    return viaA < viaB ? viaA : viaB;
 }
 
 // The table cell for a root's position: the one holding a node with that
@@ -239,9 +185,9 @@ static bool Cheapest(const mnavQuery* query, uint32_t cell, double cost)
 // end, a way of its own.
 static bool Repeats(const mnavQuery* query, int32_t parent, const mnavSearchNode* made)
 {
-    double span = Flat(made->a, made->b);
-    if (made->tag < 0 || fabs(Cross(made->a, made->b, made->at)) > 1e-9 * (1.0 + span * span) ||
-        Flat(made->at, made->a) > span || Flat(made->at, made->b) > span)
+    double span = mnavFlat(made->a, made->b);
+    if (made->tag < 0 || fabs(mnavCross(made->a, made->b, made->at)) > 1e-9 * (1.0 + span * span) ||
+        mnavFlat(made->at, made->a) > span || mnavFlat(made->at, made->b) > span)
     {
         return false;
     }
@@ -294,7 +240,8 @@ static void Open(Shortest* s, int32_t parent, mnavSearchNode made, double ahead)
         query->table[cell] = n;
     }
     mnavPushNode(query, n);
-    double toEnd = made.tag == KIND_END ? 0.0 : Flat(Nearest(s->end, made.a, made.b), s->end);
+    double toEnd =
+        made.tag == KIND_END ? 0.0 : mnavFlat(mnavNearestOn(s->end, made.a, made.b), s->end);
     if (toEnd < s->bestAhead || (toEnd == s->bestAhead && made.cost < query->nodes[s->best].cost))
     {
         s->best = n;
@@ -313,10 +260,10 @@ static bool Toward(const Shortest* s, const mnavSearchNode* node, Seen* seen, bo
         return true;
     }
     // A point on a side of the cone, to within rounding, is in it.
-    double sideA = Cross(seen->root, node->a, p);
-    double sideB = Cross(seen->root, node->b, p);
-    double slackA = 1e-9 * Flat(seen->root, node->a) * (1.0 + Flat(node->a, p));
-    double slackB = 1e-9 * Flat(seen->root, node->b) * (1.0 + Flat(node->b, p));
+    double sideA = mnavCross(seen->root, node->a, p);
+    double sideB = mnavCross(seen->root, node->b, p);
+    double slackA = 1e-9 * mnavFlat(seen->root, node->a) * (1.0 + mnavFlat(node->a, p));
+    double slackB = 1e-9 * mnavFlat(seen->root, node->b) * (1.0 + mnavFlat(node->b, p));
     if (sideA >= -slackA && sideB <= slackB)
     {
         return true;
@@ -327,7 +274,7 @@ static bool Toward(const Shortest* s, const mnavSearchNode* node, Seen* seen, bo
         return false;
     }
     mnavPos3 corner = viaB ? node->b : node->a;
-    double step = Flat(seen->root, corner);
+    double step = mnavFlat(seen->root, corner);
     *seen = (Seen){corner, seen->cost + step * s->cost, seen->length + step};
     return true;
 }
@@ -340,7 +287,7 @@ static void ReachEnd(Shortest* s, int32_t n, Seen seen, bool full)
     {
         return;
     }
-    double rest = Flat(seen.root, s->end);
+    double rest = mnavFlat(seen.root, s->end);
     mnavSearchNode made = {s->end,         s->end,      seen.root,     seen.cost, seen.length,
                            rest * s->cost, node->slot,  node->polygon, KIND_END,  0,
                            MNAV_NO_NODE,   MNAV_NO_NODE};
@@ -372,8 +319,8 @@ static void ReachTakeoffs(Shortest* s, int32_t n, Seen seen, bool full)
         {
             continue;
         }
-        double walk = Flat(way.root, takeoff);
-        double after = Flat(land, s->end);
+        double walk = mnavFlat(way.root, takeoff);
+        double after = mnavFlat(land, s->end);
         double remaining = walk * s->cost + (double)link->def.cost + after * s->scale;
         mnavSearchNode made = {takeoff,      takeoff,
                                way.root,     way.cost,
@@ -381,7 +328,7 @@ static void ReachTakeoffs(Shortest* s, int32_t n, Seen seen, bool full)
                                node->slot,   node->polygon,
                                KIND_TAKEOFF, attachment.link * 2 + (attachment.reverse ? 1 : 0),
                                MNAV_NO_NODE, MNAV_NO_NODE};
-        Open(s, n, made, walk + Flat(takeoff, land) + after);
+        Open(s, n, made, walk + mnavFlat(takeoff, land) + after);
     }
 }
 
@@ -395,9 +342,9 @@ static void Land(Shortest* s, int32_t n)
     bool reverse = (node->low & 1) != 0;
     mnavPolygonId landing = reverse ? state->startPolygon : state->endPolygon;
     mnavPos3 land = reverse ? state->start : state->end;
-    double walk = Flat(node->at, node->a);
-    double span = Flat(node->a, land);
-    double after = Flat(land, s->end);
+    double walk = mnavFlat(node->at, node->a);
+    double span = mnavFlat(node->a, land);
+    double after = mnavFlat(land, s->end);
     mnavSearchNode made = {land,
                            land,
                            land,
@@ -438,11 +385,11 @@ static bool AtLeastZero(double f0, double f1, double* lo, double* hi)
 // interval's a lies toward p1.
 static void Emit(Shortest* s, int32_t n, const Piece* piece, Seen seen, double u0, double u1)
 {
-    mnavPos3 a = Lerp(piece->p0, piece->p1, u1);
-    mnavPos3 b = Lerp(piece->p0, piece->p1, u0);
+    mnavPos3 a = mnavLerp(piece->p0, piece->p1, u1);
+    mnavPos3 b = mnavLerp(piece->p0, piece->p1, u0);
     int32_t tag =
         piece->entry | (u1 == piece->t1 ? CORNER_A : 0) | (u0 == piece->t0 ? CORNER_B : 0);
-    double ahead = Through(seen.root, a, b, s->end);
+    double ahead = mnavThrough(seen.root, a, b, s->end);
     mnavSearchNode made = {a,
                            b,
                            seen.root,
@@ -470,15 +417,15 @@ static void Spread(Shortest* s, int32_t n, const Piece* piece, Seen seen, bool f
     }
     const mnavSearchNode* node = &s->query->nodes[n];
     mnavPos3 r = seen.root;
-    double a0 = Cross(r, node->a, piece->p0);
-    double a1 = Cross(r, node->a, piece->p1);
-    double b0 = Cross(r, node->b, piece->p0);
-    double b1 = Cross(r, node->b, piece->p1);
+    double a0 = mnavCross(r, node->a, piece->p0);
+    double a1 = mnavCross(r, node->a, piece->p1);
+    double b0 = mnavCross(r, node->b, piece->p0);
+    double b1 = mnavCross(r, node->b, piece->p1);
     double lo = piece->t0;
     double hi = piece->t1;
     if ((node->tag & CORNER_B) != 0 && AtLeastZero(b0, b1, &lo, &hi))
     {
-        double step = Flat(r, node->b);
+        double step = mnavFlat(r, node->b);
         Emit(s, n, piece, (Seen){node->b, seen.cost + step * s->cost, seen.length + step}, lo, hi);
     }
     lo = piece->t0;
@@ -491,7 +438,7 @@ static void Spread(Shortest* s, int32_t n, const Piece* piece, Seen seen, bool f
     hi = piece->t1;
     if ((node->tag & CORNER_A) != 0 && AtLeastZero(-a0, -a1, &lo, &hi))
     {
-        double step = Flat(r, node->a);
+        double step = mnavFlat(r, node->a);
         Emit(s, n, piece, (Seen){node->a, seen.cost + step * s->cost, seen.length + step}, lo, hi);
     }
 }
@@ -625,15 +572,15 @@ static bool Facing(const Shortest* s, int32_t n, Seen* seen, bool* full)
     {
         return true;
     }
-    double span = Flat(node->a, node->b);
-    double side = Cross(node->a, node->b, seen->root);
+    double span = mnavFlat(node->a, node->b);
+    double side = mnavCross(node->a, node->b, seen->root);
     if (fabs(side) > 1e-9 * (1.0 + span * span))
     {
         return true;
     }
     *full = true;
-    double toA = Flat(seen->root, node->a);
-    double toB = Flat(seen->root, node->b);
+    double toA = mnavFlat(seen->root, node->a);
+    double toB = mnavFlat(seen->root, node->b);
     if (toA <= span && toB <= span)
     {
         return true;
@@ -709,7 +656,7 @@ static bool Touches(const mnavNavmesh* navmesh, mnavPolygonId id, mnavPos3 p)
         const mnavMeshVertex* vertices = slot->tile->mesh.vertices;
         mnavPos3 a = mnavVertexWorld(&f, &vertices[polygon->vertices[k]]);
         mnavPos3 b = mnavVertexWorld(&f, &vertices[polygon->vertices[(k + 1) % polygon->count]]);
-        if (Cross(a, b, p) == 0.0 && (p.x - a.x) * (p.x - b.x) <= 0.0 &&
+        if (mnavCross(a, b, p) == 0.0 && (p.x - a.x) * (p.x - b.x) <= 0.0 &&
             (p.z - a.z) * (p.z - b.z) <= 0.0)
         {
             return true;
@@ -806,7 +753,7 @@ static int32_t Points(Shortest* s, int32_t last, int32_t* linkCount, double* lin
     int32_t count = 0;
     *linkCount = 0;
     *linkCost = 0.0;
-    Push(query, &count, tail->tag < 0 ? tail->a : Nearest(s->end, tail->a, tail->b));
+    Push(query, &count, tail->tag < 0 ? tail->a : mnavNearestOn(s->end, tail->a, tail->b));
     for (int32_t n = last; n != MNAV_NO_NODE; n = query->nodes[n].parent)
     {
         const mnavSearchNode* node = &query->nodes[n];
@@ -896,7 +843,7 @@ static mnavResult Begin(Shortest* s, const mnavQueryFilter* filter, mnavPolygonI
     mnavClearTable(query);
     s->made = query->madeTable;
     memset(s->made, 0xFF, ((size_t)query->tableMask + 1) * sizeof(int32_t));
-    double ahead = Flat(start, s->end);
+    double ahead = mnavFlat(start, s->end);
     query->nodes[0] = (mnavSearchNode){start,
                                        start,
                                        start,
