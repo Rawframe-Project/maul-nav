@@ -329,6 +329,41 @@ jobs:
           path: out/corpus/${{ matrix.target }}
           key: corpus-${{ matrix.target }}-${{ github.run_id }}
 
+  # The differential harness's report against Recast and Detour, kept as an
+  # artifact. The linux-gcc-14 build cell runs the harness and gates on it,
+  # but its report reaches only that job's summary page, which the API does
+  # not return; this job builds the harness alone with the same preset and
+  # keeps its text report for a week, so that an audit can read it.
+  differential-report:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container: ghcr.io/rawframe-project/ci-cpp:2026.10.7@sha256:08c846597243dc000c83d6c008d078a8c3fabf8633d83963d46c0e6d02c2577e
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build
+        run: |
+          cmake --preset linux-gcc-14
+          cmake --build out/linux-gcc-14 --target differential -j 4
+      - name: Report
+        # The summary page is the build cell's; this run writes the file only.
+        run: |
+          cd out/linux-gcc-14/test/differential
+          GITHUB_STEP_SUMMARY= ./differential > "$GITHUB_WORKSPACE/out/differential-report.txt"
+      - name: Keep the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: differential-report
+          path: out/differential-report.txt
+          if-no-files-found: error
+          retention-days: 7
+
   # Every night, what the pull request check leaves out: the large scenes
   # (the 1,000-agent doorway crowd, with its golden value), and the suites'
   # dense forms under AddressSanitizer, which every other cell runs on a
@@ -386,7 +421,7 @@ jobs:
   required:
     if: always()
     needs: [changes, docs, zizmor, checks, build, msvc-headers, web, fuzz, fuzz-targets, fuzz-night,
-            scenes, prune-caches]
+            scenes, differential-report, prune-caches]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     permissions: {}
