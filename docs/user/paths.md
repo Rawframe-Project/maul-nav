@@ -31,7 +31,7 @@ mnavResult searched =
 
 ## The shortest way
 
-`mnavQuery_FindPath` picks its corridor by costs through points on the polygon edges, each chosen toward the end, then pulls the path tight within it. The path comes out close to the shortest, not always the shortest: among pillars, MEAN% longer on average and up to MAX%. Since the points are chosen toward the end, the way from a to b and the way back may differ in cost. `mnavQuery_FindShortestPath` takes the same arguments and gives the same kind of result, but its path is the shortest the ground allows, and it often costs fewer instructions. It needs every area the filter includes at one cost (`mnav_errorInvalid` otherwise), so use it for agents with no area preferences.
+`mnavQuery_FindPath` picks its corridor by costs through points on the polygon edges, each chosen toward the end, then pulls the path tight within it. The path comes out close to the shortest, not always the shortest: on a terrain of hills and boxes less than 1% longer, and on a world of long walls with gaps 4% longer on average and up to 9%. Since the points are chosen toward the end, the way from a to b and the way back may differ in cost. `mnavQuery_FindShortestPath` takes the same arguments and gives the same kind of result, but its path is the shortest the ground allows, and it often costs fewer instructions. It needs every area the filter includes at one cost (`mnav_errorInvalid` otherwise), so use it for agents with no area preferences.
 
 ## Spreading searches over frames
 

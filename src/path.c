@@ -90,6 +90,28 @@ static void CheckHeapAt(const mnavQuery* query, int32_t at)
     (void)at;
 }
 
+// Puts open node n where its new total belongs. Its point may have moved,
+// so the total may rise as well as fall.
+static void Resift(mnavQuery* query, int32_t n)
+{
+    int32_t at = query->nodes[n].heap;
+    mnavHeapEntry e = EntryOf(query, n);
+    bool rose = Sooner(query->heap[at], e);
+    query->heap[at] = e;
+    if (rose)
+    {
+        SiftDown(query, at, e);
+    }
+    else
+    {
+        SiftUp(query, at);
+    }
+    if (MNAV_INVARIANTS)
+    {
+        CheckHeapAt(query, query->nodes[n].heap);
+    }
+}
+
 static int32_t Pop(mnavQuery* query)
 {
     MNAV_ASSERT(query->heapCount > 0);
@@ -231,23 +253,7 @@ static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPo
             node->cost = cost;
             node->length = length;
             node->parent = from;
-            // The node's point moved, so its total may rise as well as
-            // fall.
-            mnavHeapEntry e = EntryOf(query, n);
-            bool rose = Sooner(query->heap[node->heap], e);
-            query->heap[node->heap] = e;
-            if (rose)
-            {
-                SiftDown(query, node->heap, e);
-            }
-            else
-            {
-                SiftUp(query, node->heap);
-            }
-            if (MNAV_INVARIANTS)
-            {
-                CheckHeapAt(query, node->heap);
-            }
+            Resift(query, n);
         }
         return;
     }
