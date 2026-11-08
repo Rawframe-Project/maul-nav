@@ -75,19 +75,21 @@ static void TestCostsChooseTheWay(void)
     CHECK(path.end == mnav_pathFound && path.polygonCount == 3 && path.cost == 10.0 &&
               path.length == 10.0 && path.pointCount == 2,
           "over the bridge, 10 m");
-    // The bridge at 2 per meter: 2.5 + 2 * 5 + 2.5 = 15, still cheaper than
-    // the 20 m round it.
+    // The bridge at 1.25 per meter: 2.5 + 1.25 * 5 + 2.5 = 11.25, still
+    // cheaper than the 12.07 m round it.
     mnavQueryFilter filter = mnavDefaultQueryFilter();
+    filter.costs[2] = 1.25f;
+    path = Walk(query, navmesh, &filter);
+    CHECK(path.polygonCount == 3 && path.cost == 11.25 && path.length == 10.0, "dearer, still");
+    // At 2 per meter the bridge costs 15: round it, through five squares,
+    // 5 + 2 * sqrt(12.5) m by the corners (10, 10) and (15, 10).
     filter.costs[2] = 2.0f;
     path = Walk(query, navmesh, &filter);
-    CHECK(path.polygonCount == 3 && path.cost == 15.0 && path.length == 10.0, "dearer, still");
-    // At 4 per meter the bridge costs 25: round it, through five squares,
-    // 5 + 5 + 2 * sqrt(12.5) m through the edges' midpoints.
-    filter.costs[2] = 4.0f;
-    path = Walk(query, navmesh, &filter);
-    double round = 10.0 + 2.0 * sqrt(12.5);
+    double round = 5.0 + 2.0 * sqrt(12.5);
     CHECK(path.end == mnav_pathFound && path.polygonCount == 5 && path.cost == path.length &&
-              fabs(path.length - round) < 1.0e-12 && path.pointCount == 4,
+              fabs(path.length - round) < 1.0e-12 && path.pointCount == 4 &&
+              path.points[1].x == 10.0 && path.points[1].z == 10.0 && path.points[2].x == 15.0 &&
+              path.points[2].z == 10.0,
           "round it");
     // Excluded, the same way round; the end square alone, nothing.
     filter = mnavDefaultQueryFilter();
@@ -109,28 +111,30 @@ static void TestCheapAreasKeepTheSearchExact(void)
     {
         filter.costs[a] = 0.25f;
     }
-    filter.costs[2] = 0.5f;
+    filter.costs[2] = 0.3125f;
     mnavPath path = Walk(query, navmesh, &filter);
-    CHECK(path.end == mnav_pathFound && path.polygonCount == 3 && path.cost == 3.75 &&
+    CHECK(path.end == mnav_pathFound && path.polygonCount == 3 && path.cost == 2.8125 &&
               path.length == 10.0,
-          "the cheapest way, 0.625 + 2.5 + 0.625");
-    // The bridge at 0.62: 1.25 + 3.1 = 4.35 against 0.25 * 17.07 = 4.27
+          "the cheapest way, 0.625 + 1.5625 + 0.625");
+    // The bridge at 0.36: 1.25 + 1.8 = 3.05 against 0.25 * 12.07 = 3.02
     // round it. A heuristic scaled by 1 rather than 0.25 would overstate
     // what is left four times over and take the direct way.
-    filter.costs[2] = 0.62f;
+    filter.costs[2] = 0.36f;
     path = Walk(query, navmesh, &filter);
     CHECK(path.end == mnav_pathFound && path.polygonCount == 5, "round it, cheaper by a hair");
-    // The length limit counts meters, not cost: 12 m allows the bridge
-    // even at a cost of 1,000 per meter.
+    // The length limit counts meters, not cost: 11 m allows the bridge
+    // alone even at a cost of 1,000 per meter. The way round is 12.07 m,
+    // and the shortest that keeps off the bridge's middle cuts its corner
+    // at (15, 10) in 11.79 m.
     mnavQueryDef def = mnavDefaultQueryDef();
-    def.limits.pathLength = 12.0f;
+    def.limits.pathLength = 11.0f;
     mnavQuery* tight = nullptr;
     CHECK(mnavCreateQuery(&def, &tight) == mnav_success, "tight query");
     filter = mnavDefaultQueryFilter();
     filter.costs[2] = 1000.0f;
     path = Walk(tight, navmesh, &filter);
     CHECK(path.end == mnav_pathFound && path.polygonCount == 3 && path.length == 10.0,
-          "within 12 m");
+          "within 11 m");
     mnavDestroyQuery(tight);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);

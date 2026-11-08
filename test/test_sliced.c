@@ -121,8 +121,8 @@ static void TestSlicesChangeNothing(void)
         int32_t slices = 0;
         CHECK(Sliced(small, navmesh, a, b, 2, &slices) == expected, "small, in slices");
     }
-    // 48 of the 200 take more than ten slices of one node.
-    CHECK(searches == 200 && manySlices >= 40, "searches long enough to slice");
+    // 34 of the 200 take more than ten slices of one node.
+    CHECK(searches == 200 && manySlices >= 30, "searches long enough to slice");
     mnavDestroyQuery(small);
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);

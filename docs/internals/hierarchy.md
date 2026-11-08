@@ -17,7 +17,7 @@ The search writes nothing in the hierarchy. The A* over the transitions keeps it
 - Ends within a cluster's side of each other try the plain search first and take the hierarchy only when it runs out of nodes, since a short way forced through entrances can be much longer.
 - A start and end in one cluster, an end the graph does not reach, or a step that finds no way fall back on the plain search.
 
-Paths cost near the cheapest, not always the cheapest: on a test world of 64 tiles, forty random pairs came out at most 4.8% longer than the plain search's, most within 2%.
+Paths cost near the cheapest, not always the cheapest: on a test world of 64 tiles, forty random pairs came out 5.4% longer than the shortest on average and at most 23%, against the plain search's 4.1% and 8.7%. The plain search stands its nodes toward the end, while a step here aims at a transition in the middle of its entrance; 28 of the 40 came within 2% of the plain search's length, and 15 shorter.
 
 ## Updates
 

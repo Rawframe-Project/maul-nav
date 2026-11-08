@@ -155,8 +155,8 @@ static void TestAcrossATileSide(void)
 
 static void TestShortOfTheEnd(void)
 {
-    // Out of nodes in the U, the path ends at the midpoint of the last edge
-    // crossed.
+    // Out of nodes in the U, the path ends where the search stood on the
+    // last edge it crossed toward the end.
     mnavNavmesh* navmesh = Make(s_handU, sizeof(s_handU), nullptr, 0);
     mnavQuery* query = MakeQuery(3);
     mnavNearest a = On(navmesh, 2.5, 1.0);
@@ -166,10 +166,12 @@ static void TestShortOfTheEnd(void)
                              &path) == mnav_success,
           "searched");
     // Three nodes reach the edge into the third square, at x = 5 from
-    // z = 5 to 10; the line to its midpoint clears the first edge.
-    CHECK(path.end == mnav_pathOutOfNodes && path.polygonCount == 3 && path.pointCount == 2 &&
-              At(&path, 1, 5.0, 7.5),
-          "to the middle of the edge into the third square");
+    // z = 5 to 10. The nodes past the start both stand toward the end at
+    // the corner (5, 5), as far from it at the same cost, so the one made
+    // first, in the second square, ends the path.
+    CHECK(path.end == mnav_pathOutOfNodes && path.polygonCount == 2 && path.pointCount == 2 &&
+              At(&path, 1, 5.0, 5.0),
+          "to the corner nearest the end, in the second square");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
 }
@@ -208,7 +210,7 @@ static void TestTiesGoToTheNodeMadeFirst(void)
                                    path.polygonCount * (int64_t)sizeof(mnavPolygonId));
     printf("TIES diagonal=%d across=%d corridor=%016llx\n", diagonal, across,
            (unsigned long long)corridor);
-    CHECK(diagonal == 26 && across == 8 && corridor == 0x564019609892cfd3ull, "the pinned ties");
+    CHECK(diagonal == 30 && across == 8 && corridor == 0x564019609892cfd3ull, "the pinned ties");
     CHECK(path.pointCount == 2, "a straight line through the grid");
     mnavDestroyQuery(query);
     mnavDestroyNavmesh(navmesh);
@@ -269,7 +271,7 @@ static void WalkLayout(mnavQuery* query, const uint8_t* tile, size_t size, uint3
 }
 
 // The hash of the straight paths through the stored layouts.
-#define LAYOUTS_HASH 0x31ed5521849ea3e4ull
+#define LAYOUTS_HASH 0xdd0a5a097c873641ull
 
 static void TestLayoutsArePinned(void)
 {
@@ -288,7 +290,7 @@ static void TestLayoutsArePinned(void)
 #if defined(TEST_DENSE_WHITEBOX)
 // The hash of the straight paths through all HAND_LAYOUT_COUNT layouts, as
 // the suite pinned it while it built them all.
-#define EVERY_LAYOUT_HASH 0x3fa695aa6c894494ull
+#define EVERY_LAYOUT_HASH 0x17c7dfdd38443abdull
 
 static void TestEveryLayoutIsPinned(void)
 {

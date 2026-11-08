@@ -331,7 +331,7 @@ extern "C"
     /// code the object runs calls back in.
     MNAV_API uint64_t mnavQuery_GetMisuse(const mnavQuery* query);
 
-    /// Searches for the shortest way from a point on one polygon to a point
+    /// Searches for a short way from a point on one polygon to a point
     /// on another: A* over the edges between polygons, its
     /// heuristic the straight distance to the end point; ties go to the
     /// node made first. The way crosses each edge at the edge's point on
@@ -381,7 +381,8 @@ extern "C"
     /// root, the start, a corner turned at or an off-mesh link's landing
     /// point. Every included area must have the same cost: a step costs its
     /// length times that cost, so the way found is the shortest the navmesh
-    /// allows, measured in x and z, not a way through portal midpoints.
+    /// allows, measured in x and z, not a way through points chosen portal
+    /// by portal.
     /// Polygons of excluded areas other than the start polygon are not
     /// entered. Attached off-mesh links of included kinds are crossed at
     /// their declared cost, from the takeoff point to the landing point.

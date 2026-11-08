@@ -53,15 +53,10 @@ static void SiftUp(mnavQuery* query, int32_t at)
     Place(query, at, e);
 }
 
-static int32_t Pop(mnavQuery* query)
+// Moves entry e down from slot at to where it belongs.
+static void SiftDown(mnavQuery* query, int32_t at, mnavHeapEntry e)
 {
-    MNAV_ASSERT(query->heapCount > 0);
-    int32_t top = query->heap[0].node;
-    MNAV_ASSERT(query->nodes[top].heap == 0);
-    query->nodes[top].heap = MNAV_NO_NODE;
-    mnavHeapEntry last = query->heap[--query->heapCount];
-    int32_t at = 0;
-    while (query->heapCount > 0)
+    while (true)
     {
         int32_t child = 2 * at + 1;
         if (child >= query->heapCount)
@@ -72,16 +67,39 @@ static int32_t Pop(mnavQuery* query)
         {
             child += 1;
         }
-        if (!Sooner(query->heap[child], last))
+        if (!Sooner(query->heap[child], e))
         {
             break;
         }
         Place(query, at, query->heap[child]);
         at = child;
     }
+    Place(query, at, e);
+}
+
+// Checks the heap's order around slot at: its parent leaves no later, and
+// neither child sooner.
+static void CheckHeapAt(const mnavQuery* query, int32_t at)
+{
+    MNAV_ASSERT(at == 0 || !Sooner(query->heap[at], query->heap[(at - 1) / 2]));
+    for (int32_t child = 2 * at + 1; child <= 2 * at + 2 && child < query->heapCount; ++child)
+    {
+        MNAV_ASSERT(!Sooner(query->heap[child], query->heap[at]));
+    }
+    (void)query;
+    (void)at;
+}
+
+static int32_t Pop(mnavQuery* query)
+{
+    MNAV_ASSERT(query->heapCount > 0);
+    int32_t top = query->heap[0].node;
+    MNAV_ASSERT(query->nodes[top].heap == 0);
+    query->nodes[top].heap = MNAV_NO_NODE;
+    mnavHeapEntry last = query->heap[--query->heapCount];
     if (query->heapCount > 0)
     {
-        Place(query, at, last);
+        SiftDown(query, 0, last);
     }
     return top;
 }
@@ -213,8 +231,23 @@ static void Open(mnavSearch* s, int32_t from, const Key* key, mnavPos3 a, mnavPo
             node->cost = cost;
             node->length = length;
             node->parent = from;
-            query->heap[node->heap] = EntryOf(query, n);
-            SiftUp(query, node->heap);
+            // The node's point moved, so its total may rise as well as
+            // fall.
+            mnavHeapEntry e = EntryOf(query, n);
+            bool rose = Sooner(query->heap[node->heap], e);
+            query->heap[node->heap] = e;
+            if (rose)
+            {
+                SiftDown(query, node->heap, e);
+            }
+            else
+            {
+                SiftUp(query, node->heap);
+            }
+            if (MNAV_INVARIANTS)
+            {
+                CheckHeapAt(query, node->heap);
+            }
         }
         return;
     }
