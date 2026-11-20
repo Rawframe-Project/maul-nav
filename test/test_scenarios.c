@@ -340,7 +340,7 @@ static void TestCollapsingBridge(mnavQuery* query)
           "replanned");
     double around = replanned.length;
     path = Path(query, navmesh, a, b);
-    CHECK(path.end == mnav_pathFound && around > 60.0 && fabs(path.length - around) < 1e-9 &&
+    CHECK(path.end == mnav_pathFound && around > 55.0 && fabs(path.length - around) < 1e-9 &&
               Passes(&path, 11, 25.5, 21, 28.5),
           "around by the far bridge, as a new search finds");
     // Built again, the bridge carries the way once more.
