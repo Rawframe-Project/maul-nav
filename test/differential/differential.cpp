@@ -1063,33 +1063,19 @@ struct PathAllowed
     double detour;
 };
 constexpr PathAllowed kPathAllowed[] = {
-    // Maul Nav's corridor, the cheapest through portal midpoints, is not
-    // the one the shortest way crosses; mnavQuery_FindShortestPath gives
-    // Detour's length (#373).
-    {"world", 11, true, 38.4472, 35.3378},
-    {"world", 23, true, 27.9402, 24.9526},
-    {"world", 24, true, 30.568, 28.2308},
-    {"world", 83, true, 43.1098, 39.4813},
-    {"world", 94, true, 43.9169, 41.4633},
-    {"world", 97, true, 41.6317, 39.5166},
-    {"world", 106, true, 31.7099, 29.888},
-    {"building", 27, true, 22.8962, 21.5887},
-    {"building", 49, true, 16.4262, 11.7783},
-    {"building", 68, true, 27.1944, 24.8442},
-    {"building", 101, true, 20.6427, 18.9784},
-    {"building", 130, true, 13.0413, 12.1361},
-    {"building", 149, true, 17.2596, 15.5931},
-    {"building", 172, true, 31.6469, 29.8633},
-    {"building", 188, true, 12.8339, 10.4326},
-    {"building", 191, true, 25.2086, 23.8839},
-    // Maul Nav's path is the shorter, within 0.1% of
-    // mnavQuery_FindShortestPath's.
+    // Maul Nav's path is the shortest the navmesh holds:
+    // mnavQuery_FindShortestPath gives the same length. Detour's search
+    // stands its nodes at portal midpoints, so its corridor is not always
+    // the one the shortest way crosses.
     {"world", 22, false, 28.5867, 30.664},
-    {"world", 30, false, 61.2339, 66.2816},
+    {"world", 30, false, 61.1735, 66.2816},
+    {"world", 88, false, 39.2283, 41.9297},
     {"world", 110, false, 51.2881, 54.9029},
     {"world", 144, false, 37.9018, 41.0339},
     {"world", 159, false, 25.0595, 26.7795},
+    {"building", 16, false, 19.7564, 20.8475},
     {"building", 47, false, 29.5382, 33.3984},
+    {"building", 51, false, 14.2831, 15.3751},
     {"building", 56, false, 27.2584, 32.8044},
 };
 constexpr int kPathAllowedCount = static_cast<int>(sizeof(kPathAllowed) / sizeof(kPathAllowed[0]));
