@@ -543,11 +543,12 @@ static mnavResult SplitLongWalls(mnavMemory* memory, Work* work, int32_t edgeLen
         int32_t bi = work->kept[(i + 1) % work->keptCount];
         const RawVertex* a = &work->raw[ai];
         const RawVertex* b = &work->raw[bi];
-        int32_t dx = b->x - a->x;
-        int32_t dz = b->z - a->z;
+        int64_t dx = b->x - a->x;
+        int64_t dz = b->z - a->z;
         int32_t between = bi < ai ? bi + n - ai : bi - ai;
         bool wall = work->raw[(ai + 1) % n].neighbor == 0;
-        if (wall && dx * dx + dz * dz > edgeLength * edgeLength && between > 1)
+        // A length of up to 2^30 cells squares past 32 bits.
+        if (wall && dx * dx + dz * dz > (int64_t)edgeLength * edgeLength && between > 1)
         {
             int32_t half = LexicallyAfter(b, a) ? between / 2 : (between + 1) / 2;
             result = Keep(memory, work, i, (ai + half) % n);

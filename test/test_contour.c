@@ -296,11 +296,15 @@ static void TestLongWallsAreSplit(void)
     // Area 7 from x = 4 on: walls of 3, 4 and 7 cells and a border of 7
     // between the areas. At most 2 cells long, the walls of 3 and 4 cells
     // split in two and those of 7 in four; the border is not a wall and
-    // stays whole. With no limit nothing is split.
-    for (int32_t pass = 0; pass < 2; ++pass)
+    // stays whole. With no limit nothing is split, nor with limits of
+    // 46,341 and 65,536 cells, whose squares pass 32 bits (to a negative
+    // number and to 0 when cut to them).
+    const float lengths[4] = {0.5f, 0.0f, 46341.0f * 0.25f, 65536.0f * 0.25f};
+    for (int32_t pass = 0; pass < 4; ++pass)
     {
         mnavBakeDef def = Exact();
-        def.maxEdgeLength = pass == 0 ? 0.5f : 0.0f;
+        CHECK(def.cellSize == 0.25f, "cells of a quarter meter");
+        def.maxEdgeLength = lengths[pass];
         UseDef(&def);
         Scene scene = Flat(0, false);
         for (int32_t z = 0; z < SIDE; ++z)

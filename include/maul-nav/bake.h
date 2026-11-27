@@ -551,7 +551,7 @@ extern "C"
 // other tile bytes for the same def and input, and only then, so a tile a
 // host keeps by its fingerprint goes stale exactly when a bake would
 // differ, not at every release.
-#define MNAV_BAKE_GENERATOR 6
+#define MNAV_BAKE_GENERATOR 7
 
     // A baker: the def it was made with, its memory, and the last tile it
     // baked. Made by mnavCreateBaker.

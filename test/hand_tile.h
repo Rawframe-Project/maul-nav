@@ -23,7 +23,11 @@
 
 enum
 {
-    HAND_SQUARES = 16
+    HAND_SQUARES = 16,
+    // The generation the hand tiles carry. They are not baked, so a new
+    // bake generation leaves their bytes, and the query goldens on them,
+    // as they were.
+    HAND_GENERATION = 6
 };
 
 // A square from cell (x0, z0) to (x1, z1); heights in cell heights above
@@ -136,7 +140,7 @@ static inline size_t HandTileBytesWith(uint8_t* out, int32_t place, const HandSq
     mnavDetailMesh detail = {parts,     count,     detailVertices,   count * 4, HAND_SQUARES * 4,
                              triangles, count * 2, HAND_SQUARES * 2, 0,         0,
                              0};
-    mnavTileInfo info = {MNAV_BAKE_GENERATOR,
+    mnavTileInfo info = {HAND_GENERATION,
                          0,
                          place,
                          0,
