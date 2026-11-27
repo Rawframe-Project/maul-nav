@@ -193,7 +193,9 @@ jobs:
   # The library and its tests under Emscripten and Node, and the size of the
   # static library. The CI image has no Emscripten, so this job uses the
   # runner and the emsdk action; it checks for skipped tests and keeps the
-  # logs of a failure as cpp.yml does.
+  # logs of a failure as cpp.yml does. Emscripten is pinned, the family's
+  # version, and moves in a pull request of its own, so a new release
+  # cannot change the compiler under main.
   web:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -206,6 +208,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
+        with:
+          version: 7.0.1
       - name: Configure
         run: cmake --preset web-emscripten
       - name: Build
