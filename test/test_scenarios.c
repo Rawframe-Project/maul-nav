@@ -32,7 +32,7 @@
 #include <string.h>
 
 // The hash of the terrain's sixteen tiles.
-#define TERRAIN_HASH 0x67a8835a7529d2a0ull
+#define TERRAIN_HASH 0xd7324f3e82aa2299ull
 
 // The hash of the group's final places.
 #define GROUP_HASH 0xc0da4df76e807955ull
