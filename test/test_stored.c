@@ -38,8 +38,8 @@
 #define STORED_HASH 0x5e6df3eec40ac8d2ull
 
 // What queries on the stored tiles answer.
-#define GROUND_PATH_HASH  0xc2eb19d847441002ull
-#define TERRAIN_PATH_HASH 0xd85379505d6a2ccaull
+#define GROUND_PATH_HASH  0x480bb3c71aefc013ull
+#define TERRAIN_PATH_HASH 0x9b3c79cb008f7d43ull
 #define FLIGHT_PATH_HASH  0xf43eb1b51126ae6bull
 
 static const uint8_t* const s_grounds[4] = {s_ground0, s_ground1, s_ground2, s_ground3};

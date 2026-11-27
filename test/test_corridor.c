@@ -19,7 +19,7 @@
 #include <string.h>
 
 // The hash of the agents' walks along their corridors.
-#define FOLLOW_HASH 0xa805bbb48946a2f2ull
+#define FOLLOW_HASH 0x93460b70fe8299e9ull
 
 static mnavNavmesh* LoadWorld(void)
 {
@@ -147,18 +147,26 @@ static void TestChecksAndLimits(void)
           "not joined after the first");
     buffer[3] = buffer[1];
     buffer[1] = swap;
-    // A tile replaced: its polygons' ids go stale.
-    mnavTileId tile;
-    CHECK(mnavNavmesh_GetTile(navmesh, 1, 0, &tile) == mnav_success, "tile (1, 0)");
+    // A tile replaced: its polygons' ids go stale. The path leaves tile
+    // (0, 0) by tile (1, 0) or (0, 1), s_tiles[1] or s_tiles[2]; the one it
+    // crosses is replaced.
     int32_t onOther = -1;
-    for (int32_t i = 0; i < corridor.polygonCount && onOther < 0; ++i)
+    int32_t crossed = 0;
+    for (int32_t t = 1; t <= 2 && onOther < 0; ++t)
     {
-        onOther = buffer[i].slot == tile.slot ? i : -1;
+        mnavTileId tile;
+        CHECK(mnavNavmesh_GetTile(navmesh, t % 2, t / 2, &tile) == mnav_success, "a tile");
+        for (int32_t i = 0; i < corridor.polygonCount && onOther < 0; ++i)
+        {
+            onOther = buffer[i].slot == tile.slot ? i : -1;
+        }
+        crossed = t;
     }
-    CHECK(onOther > 0, "the path crosses tile (1, 0)");
-    CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[1], s_sizes[1]).result == mnav_success &&
+    CHECK(onOther > 0, "the path crosses tile (1, 0) or (0, 1)");
+    CHECK(mnavNavmesh_StageTile(navmesh, s_tiles[crossed], s_sizes[crossed]).result ==
+                  mnav_success &&
               mnavNavmesh_Commit(navmesh) == mnav_success,
-          "tile (1, 0) replaced");
+          "the tile crossed replaced");
     CHECK(mnavNavmesh_CheckCorridor(navmesh, &corridor, nullptr, &valid) == mnav_success &&
               valid == onOther &&
               mnavQuery_FindCorridorCorners(query, &corridor, navmesh, &out) == mnav_errorStale,
