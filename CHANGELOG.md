@@ -5,6 +5,14 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.3.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.2.0...v1.3.0) (2026-11-27)
+
+
+### Added
+
+* **bake:** split walls by length without overflow past 46,340 cells ([#380](https://github.com/Rawframe-Project/maul-nav/issues/380)) ([49d7182](https://github.com/Rawframe-Project/maul-nav/commit/49d718209705f981f59ee3e2b491be7e5ad70f29)), closes [#379](https://github.com/Rawframe-Project/maul-nav/issues/379)
+* **query:** stand path search nodes toward the end ([#375](https://github.com/Rawframe-Project/maul-nav/issues/375)) ([7a29745](https://github.com/Rawframe-Project/maul-nav/commit/7a29745955913f8a897ce16d16e0e929d6b3b1c6)), closes [#373](https://github.com/Rawframe-Project/maul-nav/issues/373)
+
 ## [1.2.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.3...v1.2.0) (2026-11-05)
 
 This release makes `mnavQuery_GenerateLinks` find jumps across gaps on
