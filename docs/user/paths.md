@@ -55,6 +55,10 @@ mnavResult searched =
 
 For tile maps, `mnavQuery_FindGridPath` searches an `mnavGrid` of area types in a query context, under the same filters: eight neighbors, no corner cut past a blocked cell. It runs jump point search when every included area costs the same and A* otherwise.
 
+## Graphs
+
+For waypoints, road or rail networks and level graphs of rooms and doors, an `mnavGraph` holds points and edges the host lays out itself, with no navmesh. Make one with the most points and edges it will hold, give it its points and edges with `mnavGraph_Set` as often as they change, and search it with `mnavQuery_FindGraphPath` in a query context, under the same filters. Each edge has an area, whose cost per meter the filter applies and which the filter may leave out, a length that defaults to the distance between its points, and may be one-way. A length below that distance, as of a lift or a teleport, is allowed and the path found stays a cheapest one. The path gives its points by index, its cost and its length, and ends as a navmesh search does: found, or the way to the point nearest the end when the context's node limit or path length stops it or no way exists. Any number of contexts may search one graph at once.
+
 ## Following a path
 
 A path corridor keeps an agent's path valid as the agent and its target move. It is a plain struct over a polygon buffer the caller owns.

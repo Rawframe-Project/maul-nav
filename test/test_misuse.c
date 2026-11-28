@@ -18,6 +18,7 @@
 #include "maul-nav/base.h"
 #include "maul-nav/flight.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/linkgen.h"
 #include "maul-nav/navflow.h"
@@ -195,6 +196,19 @@ static void TestOthers(void)
               mnavGridFlow_GetMisuse(flow) == 1,
           "outside the region counts none");
     mnavDestroyGridFlow(flow);
+    mnavGraphDef graphDef = mnavDefaultGraphDef();
+    mnavGraph* graph = nullptr;
+    const mnavPos3 point = {0.0, 0.0, 0.0};
+    const mnavPos3 far = {0.0, 2.0e100, 0.0};
+    CHECK(mnavCreateGraph(&graphDef, &graph) == mnav_success &&
+              mnavGraph_Set(graph, nullptr, 1, nullptr, 0) == mnav_errorInvalid &&
+              mnavGraph_GetMisuse(graph) == 1,
+          "a graph's set counts once");
+    CHECK(mnavGraph_Set(graph, &point, 1, nullptr, 0) == mnav_success &&
+              mnavGraph_Set(graph, &far, 1, nullptr, 0) == mnav_errorLimit &&
+              mnavGraph_GetMisuse(graph) == 1,
+          "a point past the bound counts none");
+    mnavDestroyGraph(graph);
     mnavNavmesh* navmesh = Trench2();
     mnavNavFlowDef navDef = mnavDefaultNavFlowDef();
     navDef.limits.polygons = 256;

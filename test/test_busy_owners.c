@@ -21,6 +21,7 @@
 #include "maul-nav/base.h"
 #include "maul-nav/flight.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/navflow.h"
 #include "maul-nav/navmesh.h"
@@ -41,14 +42,15 @@ enum
     FLIGHT_BAKER,
     VOLUME,
     NAVMESH,
+    GRAPH,
     QUERY,
     KINDS,
     TILE_MOST = 1 << 20
 };
 
 static const char* const s_names[KINDS] = {
-    "baker",         "tile cache",   "tile index",    "hierarchy", "flow field",   "nav flow",
-    "avoidance set", "flight baker", "flight volume", "navmesh",   "query context"};
+    "baker",         "tile cache",   "tile index",    "hierarchy", "flow field", "nav flow",
+    "avoidance set", "flight baker", "flight volume", "navmesh",   "graph",      "query context"};
 
 // The reentrant allocator's allocations and releases so far; s_held
 // (counting_allocator.h) counts the bytes it holds.
@@ -201,6 +203,14 @@ static void CallNavmesh(void* object)
     s_made += 1;
 }
 
+static void CallGraph(void* object)
+{
+    mnavGraph* graph = object;
+    Count(mnavGraph_Set(graph, nullptr, 0, nullptr, 0));
+    mnavDestroyGraph(graph);
+    s_made += 1;
+}
+
 // One search call stands for every one: test_busy makes them all.
 static void CallQuery(void* object)
 {
@@ -213,13 +223,13 @@ static void CallQuery(void* object)
 }
 
 static void (*const s_calls[KINDS])(void*) = {
-    CallBaker,     CallCache,       CallIndex,  CallHierarchy, CallFlow, CallNavFlow,
-    CallAvoidance, CallFlightBaker, CallVolume, CallNavmesh,   CallQuery};
+    CallBaker,     CallCache,       CallIndex,  CallHierarchy, CallFlow,  CallNavFlow,
+    CallAvoidance, CallFlightBaker, CallVolume, CallNavmesh,   CallGraph, CallQuery};
 
 // How many calls each kind's call back in makes, and how many of them
 // return nothing.
-static const int32_t s_callCounts[KINDS] = {5, 4, 1, 3, 5, 4, 7, 2, 4, 8, 2};
-static const int32_t s_voidCounts[KINDS] = {1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+static const int32_t s_callCounts[KINDS] = {5, 4, 1, 3, 5, 4, 7, 2, 4, 8, 2, 2};
+static const int32_t s_voidCounts[KINDS] = {1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 static uint64_t Misuse(int32_t kind, const void* object)
 {
@@ -245,6 +255,8 @@ static uint64_t Misuse(int32_t kind, const void* object)
         return mnavFlightVolume_GetMisuse(object);
     case NAVMESH:
         return mnavNavmesh_GetMisuse(object);
+    case GRAPH:
+        return mnavGraph_GetMisuse(object);
     default:
         return mnavQuery_GetMisuse(object);
     }
@@ -421,6 +433,21 @@ static void* MakeNavmesh(void)
     return navmesh;
 }
 
+static void* MakeGraph(void)
+{
+    mnavGraphDef def = mnavDefaultGraphDef();
+    def.allocator = s_reentrant;
+    def.limits.points = 4;
+    def.limits.edges = 4;
+    mnavGraph* graph = nullptr;
+    const mnavPos3 points[2] = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+    const mnavGraphEdge edge = {0, 1, 0.0, mnav_areaWalkable, false};
+    CHECK(mnavCreateGraph(&def, &graph) == mnav_success &&
+              mnavGraph_Set(graph, points, 2, &edge, 1) == mnav_success,
+          "a graph with an edge");
+    return graph;
+}
+
 static void* MakeQuery(void)
 {
     mnavQueryDef def = mnavDefaultQueryDef();
@@ -431,8 +458,8 @@ static void* MakeQuery(void)
 }
 
 static void* (*const s_makes[KINDS])(void) = {
-    MakeBaker,     MakeCache,       MakeIndex,  MakeHierarchy, MakeFlow, MakeNavFlow,
-    MakeAvoidance, MakeFlightBaker, MakeVolume, MakeNavmesh,   MakeQuery};
+    MakeBaker,     MakeCache,       MakeIndex,  MakeHierarchy, MakeFlow,  MakeNavFlow,
+    MakeAvoidance, MakeFlightBaker, MakeVolume, MakeNavmesh,   MakeGraph, MakeQuery};
 
 static void Destroy(int32_t kind, void* object)
 {
@@ -467,6 +494,9 @@ static void Destroy(int32_t kind, void* object)
         break;
     case NAVMESH:
         mnavDestroyNavmesh(object);
+        break;
+    case GRAPH:
+        mnavDestroyGraph(object);
         break;
     default:
         mnavDestroyQuery(object);

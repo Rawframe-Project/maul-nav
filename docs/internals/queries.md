@@ -12,6 +12,7 @@ How the searches and spatial queries over a committed navmesh work, and the choi
 - [Rays and surface moves](#rays-and-surface-moves)
 - [Corridors and steering](#corridors-and-steering)
 - [Walls and random points](#walls-and-random-points)
+- [Graphs](#graphs)
 - [Grids](#grids)
 
 ## Common rules
@@ -62,6 +63,12 @@ Standing nodes toward the end keeps A* cheap and its straight path close to the 
 `mnavQuery_FindWallDistance` and `mnavQuery_FindWalls` (`spatial.c`) search from the center's polygon through the edges within a radius, as Detour's findDistanceToWall does, with one difference. Detour narrows its radius to each wall it finds and enters no edge farther, which on stacked floors also keeps it, mostly, from walking up a stair to the floor above; these keep the whole radius, which `mnavQuery_FindWalls` needs to list every wall, and count a wall only on the center's floor: its point nearest the center no more than the agent's step height below the center's height on its polygon and no more than the agent's height above. An edge with nothing included across it is a wall, an unloaded tile side included, and so are the parts of a tile side no polygon beyond covers. Off-mesh links are left aside. `mnavQuery_FindWalls` keeps the nearest walls when its buffer is short, as Detour's crowd keeps a local boundary. Both give a wall as one `mnavWall`: its ends, its point nearest the center, the edge's normal toward the walkable side and the distance, so the nearest wall `mnavQuery_FindWallDistance` gives is, field for field, the first `mnavQuery_FindWalls` lists.
 
 `mnavNavmesh_FindRandomPoint` picks uniformly over the ground area of every included polygon from a 64-bit seed through SplitMix64, where Detour picks a tile first and so favors sparse tiles. `mnavQuery_FindRandomPointAround` samples the polygons the wall search reaches by the area each shares with the circle, an inscribed 32-gon written out as constants, so the point lies in the circle, where Detour's may lie a polygon away.
+
+## Graphs
+
+`mnavGraph` (`graph.c`) takes its memory for its limits when it is made, and `mnavGraph_Set` checks the points and edges whole before it keeps any, so a refused set leaves the graph as it was. It lays the edges out by the point each leaves, every point's in the order given, a two-way edge once from each of its points, and keeps the least ratio of an edge's length to the distance between its points, at most 1.
+
+`mnavQuery_FindGraphPath` (`graph_path.c`) is A* in the query context's nodes, open list and node table, like the grid search. A step costs the edge's length times its area's cost. The heuristic is the straight distance to the end times the cheapest included area's cost times that least ratio, so it never expects more than the way left costs: an edge shorter than its points' distance, such as a lift, only weakens it. The open list takes the least total, then the node made first; edges are tried in the order the graph keeps them, so the same graph gives the same path everywhere. A closed node is final, as in the navmesh search. The search keeps the context's node limit and path length, a path's length being the sum of its edges' lengths, and when the end is not reached returns the way to the node nearest it by the heuristic, then the cost, then the index. The graph module reaches no navmesh module; the search writes nothing in the graph, so any number of contexts search one graph at once (`test_shared_reads`).
 
 ## Grids
 

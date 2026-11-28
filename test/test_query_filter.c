@@ -12,6 +12,7 @@
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/linkgen.h"
 #include "maul-nav/navflow.h"
@@ -246,9 +247,12 @@ typedef struct Callees
     mnavGrid grid;
 } Callees;
 
+// A graph of two points and an edge, which the graph search takes.
+static mnavGraph* s_graph;
+
 enum
 {
-    FILTER_CALLS = 24
+    FILTER_CALLS = 25
 };
 
 // Calls every call that takes a filter with this one and counts those
@@ -279,6 +283,7 @@ static int32_t Refusing(const Callees* c, const mnavQueryFilter* f, mnavResult w
     mnavLinkDef links[4];
     int32_t count = 0;
     mnavGridPath gridPath;
+    mnavGraphPath graphPath;
     const mnavNavFlowGoal goal = {b.polygon, b.point};
     const mnavCell cells[2] = {{0, 0}, {3, 3}};
     const mnavResult got[FILTER_CALLS] = {
@@ -302,6 +307,7 @@ static int32_t Refusing(const Callees* c, const mnavQueryFilter* f, mnavResult w
         mnavQuery_FindRandomPointAround(query, navmesh, a.polygon, a.point, 5.0, 7, f, &point),
         mnavQuery_GenerateLinks(query, navmesh, &gen, nullptr, f, links, 4, &count),
         mnavQuery_FindGridPath(query, &c->grid, cells[0], cells[1], f, &gridPath),
+        mnavQuery_FindGraphPath(query, s_graph, 0, 1, f, &graphPath),
         mnavHierarchy_Build(c->hierarchy, query, navmesh, f, nullptr),
         mnavNavFlow_Build(c->navFlow, navmesh, &goal, 1, f),
         mnavNavFlow_Begin(c->navFlow, navmesh, &(mnavTileRange){0, 0, 0, 0}, &goal, 1, f),
@@ -349,11 +355,18 @@ static void TestEveryCallChecksItsFilter(void)
     navFlowDef.limits.links = 16;
     mnavGridFlowDef gridFlowDef = mnavDefaultGridFlowDef();
     gridFlowDef.cells = 16;
+    mnavGraphDef graphDef = mnavDefaultGraphDef();
+    const mnavPos3 ends[2] = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+    const mnavGraphEdge edge = {0, 1, 0.0, mnav_areaWalkable, false};
+    CHECK(mnavCreateGraph(&graphDef, &s_graph) == mnav_success &&
+              mnavGraph_Set(s_graph, ends, 2, &edge, 1) == mnav_success,
+          "a graph");
     CHECK(mnavCreateHierarchy(&hierarchyDef, &c.hierarchy) == mnav_success &&
               mnavCreateNavFlow(&navFlowDef, &c.navFlow) == mnav_success &&
               mnavCreateGridFlow(&gridFlowDef, &c.gridFlow) == mnav_success,
           "the objects built over the navmesh and the grid");
-    // Area 5 is on no polygon of the bridge nor cell of the grid: its cost
+    // Area 5 is on no polygon of the bridge, cell of the grid nor edge of
+    // the graph: its cost
     // is checked all the same.
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     filter.costs[5] = 0.0f;
@@ -375,6 +388,7 @@ static void TestEveryCallChecksItsFilter(void)
     // The same calls with no filter are made: the refusals above are the
     // filters'.
     CHECK(Refusing(&c, nullptr, mnav_success) == 0, "no filter: every call made");
+    mnavDestroyGraph(s_graph);
     mnavDestroyGridFlow(c.gridFlow);
     mnavDestroyNavFlow(c.navFlow);
     mnavDestroyHierarchy(c.hierarchy);

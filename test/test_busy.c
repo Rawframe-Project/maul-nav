@@ -16,6 +16,7 @@
 
 #include "maul-nav/base.h"
 #include "maul-nav/flight.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/linkgen.h"
 #include "maul-nav/navmesh.h"
@@ -33,7 +34,7 @@ enum
     // Those a clearance test may make: staging a tile and its removal.
     STAGING_CALLS = 2,
     // The calls that take a query context to search with.
-    QUERY_CALLS = 27,
+    QUERY_CALLS = 28,
 };
 
 static mnavLinkDef s_links[LINKS];
@@ -81,6 +82,7 @@ typedef struct Outputs
     int32_t count;
     bool shortened;
     mnavGridPath gridPath;
+    mnavGraphPath graphPath;
     mnavNearestWall wall;
     mnavWallsFound walls;
     mnavPathEnd end;
@@ -196,6 +198,7 @@ static void CallQuery(mnavQuery* q, const mnavNavmesh* n)
                                              &s_out.path));
     CALL_WITH(gridPath, mnavQuery_FindGridPath(q, nullptr, (mnavCell){0, 0}, (mnavCell){0, 0},
                                                nullptr, &s_out.gridPath));
+    CALL_WITH(graphPath, mnavQuery_FindGraphPath(q, nullptr, 0, 0, nullptr, &s_out.graphPath));
     CALL_WITH(wall, mnavQuery_FindWallDistance(q, n, p, a, 1.0, nullptr, &s_out.wall));
     CALL_WITH_ARRAY(
         walls, wallItems,

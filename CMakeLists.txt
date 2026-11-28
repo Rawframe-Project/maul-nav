@@ -81,6 +81,8 @@ add_library(maul-nav ${MAUL_LIBRARY_KIND}
     src/funnel.c
     src/flow.c
     src/flow_repair.c
+    src/graph.c
+    src/graph_path.c
     src/grid.c
     src/modifiers.c
     src/height_patch.c
@@ -219,6 +221,7 @@ if(MAUL_NAV_BUILD_TESTS)
     maul_add_test(tiers)
     maul_add_test(resnap)
     maul_add_test(bake2d)
+    maul_add_test(graph)
     maul_add_test(grid)
     maul_add_test(flow)
     maul_add_test(hierarchy)

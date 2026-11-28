@@ -12,7 +12,7 @@ Agents in a game need to know where they can walk, how to get somewhere, and how
 - **Baking** navmesh tiles from triangle meshes, terrains and 2D outlines, shaped by include, exclude and area volumes. Each tile is an independent call the host runs on its own workers, with the same bytes at any worker count.
 - **A tile format** that is loaded as hostile input: every byte is checked, and a damaged tile is refused with the section and element at fault.
 - **Streaming and runtime changes:** tiles load and unload while queries run, changes commit all at once, areas and links toggle, and obstacles are carved into cached tiles in a third of a bake.
-- **Queries:** nearest points, A* paths and exact shortest paths, sliced and hierarchical searches, rays, surface moves, walls, random points and grid paths, each under named limits.
+- **Queries:** nearest points, A* paths and exact shortest paths, sliced and hierarchical searches, rays, surface moves, walls, random points, grid paths and paths over a host's own graph, each under named limits.
 - **Path corridors and steering**, and **off-mesh links** (jumps, drops, ladders, doors, teleports, or the host's own kinds), placed by hand or generated.
 - **Flow fields** over grids and navmeshes, for many agents sharing goals.
 - **Flight volumes** for agents that fly or swim: sparse voxel octree tiles with any-angle paths, rays and nearest open points.

@@ -20,6 +20,7 @@
 #include "maul-nav/base.h"
 #include "maul-nav/flight.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/linkgen.h"
 #include "maul-nav/navflow.h"
@@ -70,6 +71,7 @@ typedef struct Outputs
     mnavWallsFound walls;
     mnavRandomPoint point;
     mnavGridPath gridPath;
+    mnavGraphPath graphPath;
     mnavFlightPath flightPath;
     mnavFlightHit hit;
     mnavCellFlow flow;
@@ -244,6 +246,11 @@ static void TestNoOwner(void)
                                  &s_out.gridPath) == mnav_errorInvalid &&
               CLEARED(gridPath),
           "mnavQuery_FindGridPath");
+    FillAll();
+    CHECK(mnavQuery_FindGraphPath(nullptr, nullptr, 0, 0, nullptr, &s_out.graphPath) ==
+                  mnav_errorInvalid &&
+              CLEARED(graphPath),
+          "mnavQuery_FindGraphPath");
     FillAll();
     CHECK(mnavPolygon_GetHeight(nullptr, polygon, 1.0, 1.0, &s_out.height) == mnav_errorInvalid &&
               CLEARED(height),

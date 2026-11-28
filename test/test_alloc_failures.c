@@ -20,6 +20,7 @@
 #include "maul-nav/base.h"
 #include "maul-nav/flight.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/navflow.h"
 #include "maul-nav/navmesh.h"
@@ -547,6 +548,18 @@ static void DestroyFlowField(void* object)
     mnavDestroyGridFlow(object);
 }
 
+static mnavResult MakeGraph(void** out)
+{
+    mnavGraphDef def = mnavDefaultGraphDef();
+    def.allocator = Allocator();
+    return mnavCreateGraph(&def, (mnavGraph**)out);
+}
+
+static void DestroyGraph(void* object)
+{
+    mnavDestroyGraph(object);
+}
+
 static mnavResult MakeAvoidance(void** out)
 {
     mnavAvoidanceDef def = mnavDefaultAvoidanceDef();
@@ -587,6 +600,7 @@ static void TestObjects(void)
     CHECK(EachRefused(MakeHierarchy, DestroyHierarchy), "hierarchies");
     CHECK(EachRefused(MakeNavFlow, DestroyNavFlow), "navmesh flow fields");
     CHECK(EachRefused(MakeFlowField, DestroyFlowField), "flow fields");
+    CHECK(EachRefused(MakeGraph, DestroyGraph), "graphs");
     CHECK(EachRefused(MakeAvoidance, DestroyAvoidance), "avoidance sets");
     CHECK(EachRefused(MakeTileIndex, DestroyTileIndex), "tile indexes");
     CHECK(EachRefused(MakeTileIndex2D, DestroyTileIndex), "tile indexes of outlines");
