@@ -24,7 +24,8 @@ them. Tiles baked by 1.2.0 still load.
   paths were up to 17.6% longer than `mnavQuery_FindShortestPath`'s
   and are now within 0.8% (0.02% on average), and on the Recast
   differential's scenes no path is longer than Detour's by more than
-  5%, where 16 of 800 were. Searches also reach the end with fewer
+  5% of the longer path or 0.25 m, whichever is more, where 16 of 800
+  were. Searches also reach the end with fewer
   nodes: the benchmark runs about 2.6 times as many path queries a
   second. Paths,
   corridors and `mnavPath.cost` change; the cost is now the cost
