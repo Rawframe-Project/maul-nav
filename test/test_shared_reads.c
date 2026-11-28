@@ -2,8 +2,8 @@
 // Copyright (c) 2026 Sirac Ozmen
 //
 // Every read the documentation lets threads share, run on 8 threads at
-// once: one navmesh with links, one navmesh flow field, one grid and one
-// hierarchy, read by threads that each own their query context, corridor,
+// once: one navmesh with links, one navmesh flow field, one grid, one graph
+// and one hierarchy, read by threads that each own their query context, corridor,
 // debug buffers and fields. Each thread runs the same rounds of reads,
 // starting at a different round so that different reads meet, and must
 // get what one thread gets, round by round. Run under ThreadSanitizer,
@@ -16,6 +16,7 @@
 #include "maul-nav/base.h"
 #include "maul-nav/debug.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/linkgen.h"
 #include "maul-nav/navflow.h"
@@ -44,6 +45,7 @@ static mnavNavmesh* s_navmesh;
 static mnavNavFlow* s_field;
 static mnavAreaType s_areas[GRID_SIDE * GRID_SIDE];
 static mnavGrid s_grid;
+static mnavGraph* s_graph;
 static mnavHierarchy* s_hierarchy;
 static mnavHierarchyReport s_report;
 
@@ -288,7 +290,8 @@ static uint64_t Flow(uint64_t hash, mnavResult result, const mnavPolygonFlow* fl
 }
 
 // The shared field read, a field of the thread's own built on the shared
-// navmesh, a grid path and a grid field on the shared grid, links
+// navmesh, a grid path and a grid field on the shared grid, a path over
+// the shared graph, links
 // generated, a hierarchical path, and the navmesh, its links and the
 // shared field drawn.
 static uint64_t Wide(Reader* reader, int32_t round, uint32_t* state, uint64_t hash)
@@ -319,6 +322,17 @@ static uint64_t Wide(Reader* reader, int32_t round, uint32_t* state, uint64_t ha
     hash = MixResult(hash, mnavGridFlow_GetFlow(reader->flow, start, &cell));
     hash = MixDouble(hash, cell.cost);
     hash = Mix(hash, &cell.next, sizeof(cell.next));
+    mnavGraphPath graphPath = {0};
+    mnavResult went =
+        mnavQuery_FindGraphPath(query, s_graph, start.y * GRID_SIDE + start.x,
+                                goalCell.y * GRID_SIDE + goalCell.x, nullptr, &graphPath);
+    hash = MixResult(hash, went);
+    if (went == mnav_success)
+    {
+        hash = MixInt(hash, graphPath.end);
+        hash = MixDouble(hash, graphPath.cost);
+        hash = Mix(hash, graphPath.points, (size_t)graphPath.pointCount * sizeof(int32_t));
+    }
     mnavLinkGenDef def = mnavDefaultLinkGenDef();
     int32_t generated = 0;
     hash = MixResult(hash, mnavQuery_GenerateLinks(query, s_navmesh, &def,
@@ -394,7 +408,9 @@ static void* Read(void* context)
 }
 
 // The navmesh of the world's four tiles with two links, a field toward
-// one goal on it, and a grid of walls and costs.
+// one goal on it, a grid of walls and costs, and a graph of the grid's
+// cells, each joined to the one past it on each axis by the farther one's
+// area.
 static void Share(void)
 {
     LoadWorldTiles();
@@ -433,6 +449,30 @@ static void Share(void)
         s_areas[c] = r < 4u ? mnav_areaNone : (mnavAreaType)(r < 14u ? 1u : 2u + r % 3u);
     }
     s_grid = (mnavGrid){s_areas, GRID_SIDE, GRID_SIDE, 1.0f};
+    static mnavPos3 points[GRID_SIDE * GRID_SIDE];
+    static mnavGraphEdge edges[2 * GRID_SIDE * GRID_SIDE];
+    int32_t edgeCount = 0;
+    for (int32_t c = 0; c < GRID_SIDE * GRID_SIDE; ++c)
+    {
+        int32_t x = c % GRID_SIDE;
+        int32_t y = c / GRID_SIDE;
+        points[c] = (mnavPos3){x + 0.5, 0.0, y + 0.5};
+        if (x + 1 < GRID_SIDE && s_areas[c] != mnav_areaNone && s_areas[c + 1] != mnav_areaNone)
+        {
+            edges[edgeCount++] = (mnavGraphEdge){c, c + 1, 0.0, s_areas[c + 1], false};
+        }
+        if (y + 1 < GRID_SIDE && s_areas[c] != mnav_areaNone &&
+            s_areas[c + GRID_SIDE] != mnav_areaNone)
+        {
+            edges[edgeCount++] =
+                (mnavGraphEdge){c, c + GRID_SIDE, 0.0, s_areas[c + GRID_SIDE], false};
+        }
+    }
+    mnavGraphDef graphDef = mnavDefaultGraphDef();
+    CHECK(mnavCreateGraph(&graphDef, &s_graph) == mnav_success &&
+              mnavGraph_Set(s_graph, points, GRID_SIDE * GRID_SIDE, edges, edgeCount) ==
+                  mnav_success,
+          "a graph");
     // The hierarchy every thread searches at once.
     mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
     hierarchyDef.clusterTiles = 1;
@@ -472,6 +512,7 @@ static void TestEveryReadOnManyThreads(void)
     }
     CHECK(same, "8 threads reading at once, one hierarchy among them, get what one thread gets");
     mnavDestroyHierarchy(s_hierarchy);
+    mnavDestroyGraph(s_graph);
     mnavDestroyNavFlow(s_field);
     mnavDestroyNavmesh(s_navmesh);
 }

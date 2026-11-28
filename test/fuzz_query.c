@@ -5,10 +5,9 @@
 // on the test world with one tile left unloaded and a link: paths, A* and
 // exact, walls, points, boxes and radii from a range around the world or
 // raw bits, polygon ids found or made up, filters with costs out of range,
-// seeds, budgets, corridors, and grids with paths and flow fields over
-// them. Each query must end in a typed status, give finite results when it
-// succeeds, and keep its counts within its limits; the query contexts give
-// back all they took.
+// seeds, budgets, corridors, grids with paths and flow fields over them,
+// and graphs with paths over them. Each query must end in a typed status, give finite results when
+// it succeeds, and keep its counts within its limits; the query contexts give back all they took.
 
 #include "counting_allocator.h"
 #include "defs_for.h"
@@ -17,6 +16,7 @@
 #include "maul-nav/bake.h"
 #include "maul-nav/base.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/navmesh.h"
 #include "maul-nav/query.h"
 
@@ -548,6 +548,59 @@ static void Grid(Reader* r, const mnavQueryFilter* filter)
     mnavDestroyGridFlow(field);
 }
 
+// A graph of up to 12 points and 24 edges from the bytes, some of them
+// past its limits or out of range, and a path over it between two points,
+// one of them perhaps outside it.
+static void Graph(Reader* r, const mnavQueryFilter* filter)
+{
+    mnavGraphDef def = mnavDefaultGraphDef();
+    def.allocator = CountingAllocator();
+    def.limits.points = 10;
+    def.limits.edges = 20;
+    mnavGraph* graph = nullptr;
+    Expect(mnavCreateGraph(&def, &graph) == mnav_success);
+    mnavPos3 points[12];
+    mnavGraphEdge edges[24];
+    int32_t pointCount = Byte(r) % 13;
+    int32_t edgeCount = Byte(r) % 25;
+    bool finite = true;
+    bool past = false;
+    for (int32_t p = 0; p < pointCount; ++p)
+    {
+        points[p] = Point(r);
+        finite = finite && Finite(points[p]);
+        past = past || Past(points[p]);
+    }
+    for (int32_t e = 0; e < edgeCount; ++e)
+    {
+        uint8_t pick = Byte(r);
+        int32_t from = (int32_t)(Byte(r) % 14) - 1;
+        int32_t to = (int32_t)(Byte(r) % 14) - 1;
+        double length = pick % 4 == 0 ? 0.0 : Length(r);
+        mnavAreaType area = (mnavAreaType)(pick % 32 == 1 ? Byte(r) : 1 + (pick >> 2) % 3);
+        edges[e] = (mnavGraphEdge){from, to, length, area, (pick & 2) != 0};
+    }
+    mnavResult result = mnavGraph_Set(graph, points, pointCount, edges, edgeCount);
+    ExpectRange(finite, past, result);
+    Expect(Typed(result));
+    int32_t start = (int32_t)(Byte(r) % 14) - 1;
+    int32_t end = (int32_t)(Byte(r) % 14) - 1;
+    mnavGraphPath path;
+    result = mnavQuery_FindGraphPath(s_query, graph, start, end, filter, &path);
+    Expect(Typed(result));
+    if (result == mnav_success)
+    {
+        Expect(path.pointCount >= 1 && path.points[0] == start && isfinite(path.cost) &&
+               path.cost >= 0.0 && isfinite(path.length) && path.length >= 0.0);
+        Expect(path.end != mnav_pathFound || path.points[path.pointCount - 1] == end);
+        for (int32_t k = 0; k < path.pointCount; ++k)
+        {
+            Expect(path.points[k] >= 0 && path.points[k] < 12);
+        }
+    }
+    mnavDestroyGraph(graph);
+}
+
 int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 {
     if (s_navmesh == nullptr)
@@ -577,9 +630,13 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         {
             Corridor(&r, f);
         }
-        else
+        else if (op == 10)
         {
             Grid(&r, f);
+        }
+        else
+        {
+            Graph(&r, f);
         }
     }
     Expect(s_held == s_baseline);

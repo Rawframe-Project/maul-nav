@@ -16,6 +16,7 @@
 #include "maul-nav/debug.h"
 #include "maul-nav/draw.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/linkgen.h"
 #include "maul-nav/navflow.h"
 #include "maul-nav/navmesh.h"
@@ -49,10 +50,12 @@ static void TestMaking(void)
     mnavBakeDef def = mnavDefaultBakeDef();
     mnavNavFlowDef navFlowDef = mnavDefaultNavFlowDef();
     mnavGridFlowDef flowDef = mnavDefaultGridFlowDef();
+    mnavGraphDef graphDef = mnavDefaultGraphDef();
     mnavNavmeshDef meshDef = NavmeshDefFor(&def);
     CHECK(mnavCreateNavmesh(&meshDef, nullptr).result == mnav_errorInvalid &&
               mnavCreateNavFlow(&navFlowDef, nullptr) == mnav_errorInvalid &&
-              mnavCreateGridFlow(&flowDef, nullptr) == mnav_errorInvalid,
+              mnavCreateGridFlow(&flowDef, nullptr) == mnav_errorInvalid &&
+              mnavCreateGraph(&graphDef, nullptr) == mnav_errorInvalid,
           "no place for the object");
     // An agent radius of 128.3 cells rounds up past the tile's 128.
     def.agent.radius = 128.3f * def.cellSize;

@@ -73,6 +73,19 @@ typedef struct mnavGridNode
     double remaining;
 } mnavGridNode;
 
+// A graph search's node: a point reached, its parent node, its cost and
+// length so far and the heuristic, and its place in the open list,
+// MNAV_NO_NODE before it enters it, or MNAV_CLOSED.
+typedef struct mnavGraphNode
+{
+    int32_t point;
+    int32_t parent;
+    int32_t heap;
+    double cost;
+    double length;
+    double remaining;
+} mnavGraphNode;
+
 // A flight search's node: an open block of the flight volume,
 // its lowest voxel and side; the point the path passes in it, in voxels
 // of the volume's frame; its length so far and the distance left, in
@@ -195,12 +208,13 @@ struct mnavQuery
     // runs.
     mnavHostCode host;
     mnavQueryLimits limits;
-    // One block of nodes serves a navmesh, grid or flight search,
-    // whichever ran last; grid and flight nodes are the smaller.
+    // One block of nodes serves a navmesh, grid, graph or flight search,
+    // whichever ran last; grid, graph and flight nodes are the smaller.
     union
     {
         mnavSearchNode* nodes;
         mnavGridNode* gridNodes;
+        mnavGraphNode* graphNodes;
         mnavFlightSearchNode* flightNodes;
     };
     int32_t nodeCount;
@@ -231,11 +245,13 @@ struct mnavQuery
         mnavPortal* portals;
         int32_t* madeTable;
     };
-    // The straight path's points, or a grid path's cells.
+    // The straight path's points, a grid path's cells or a graph path's
+    // points.
     union
     {
         mnavPos3* points;
         mnavCell* cells;
+        int32_t* graphPoints;
     };
     mnavPathLink* links;
     // The search, and its own copy of the filter it began with.

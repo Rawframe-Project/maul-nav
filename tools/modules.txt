@@ -66,6 +66,8 @@ surface: fpenv navmesh nearest outputs polymesh query query_filter
 corridor: fpenv funnel invariant navmesh nearest offmesh outputs polymesh query query_filter
 modifiers: allocator fpenv navmesh outputs
 grid: fpenv invariant outputs query query_filter
+graph: allocator fpenv host_code
+graph_path: fpenv graph invariant outputs query query_filter
 clip: polymesh
 spatial: clip fpenv invariant navmesh nearest outputs query query_filter
 linkgen: fpenv navmesh nearest outputs path query query_filter

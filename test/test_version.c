@@ -15,6 +15,7 @@
 #include "maul-nav/base.h"
 #include "maul-nav/flight.h"
 #include "maul-nav/flow.h"
+#include "maul-nav/graph.h"
 #include "maul-nav/hierarchy.h"
 #include "maul-nav/linkgen.h"
 #include "maul-nav/navflow.h"
@@ -46,6 +47,7 @@ static void TestStamp(void)
               mnavDefaultSteerDef().version == MNAV_ABI_VERSION &&
               mnavDefaultAvoidanceDef().version == MNAV_ABI_VERSION &&
               mnavDefaultGridFlowDef().version == MNAV_ABI_VERSION &&
+              mnavDefaultGraphDef().version == MNAV_ABI_VERSION &&
               mnavDefaultNavFlowDef().version == MNAV_ABI_VERSION &&
               mnavDefaultHierarchyDef().version == MNAV_ABI_VERSION &&
               mnavDefaultTileCacheDef().version == MNAV_ABI_VERSION &&
@@ -212,6 +214,14 @@ static void TestFieldsAndAvoidance(uint32_t other)
     mnavGridFlow* flow = nullptr;
     Refusals r = {mnavCreateGridFlow(&flowStale, &flow), mnavCreateGridFlow(&flowWrong, &flow)};
     CHECK(Refused(r) && flow == nullptr, "a flow field");
+
+    mnavGraphDef graphStale = mnavDefaultGraphDef();
+    graphStale.version = other;
+    mnavGraphDef graphWrong = graphStale;
+    graphWrong.cookie ^= 1u;
+    mnavGraph* graph = nullptr;
+    r = (Refusals){mnavCreateGraph(&graphStale, &graph), mnavCreateGraph(&graphWrong, &graph)};
+    CHECK(Refused(r) && graph == nullptr, "a graph");
 
     mnavAvoidanceDef avoidanceStale = mnavDefaultAvoidanceDef();
     avoidanceStale.version = other;
