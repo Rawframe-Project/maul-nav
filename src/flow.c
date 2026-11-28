@@ -256,7 +256,8 @@ void mnavFlowLower(mnavGridFlow* f, int32_t cell, double cost, int32_t next)
     }
 }
 
-// The eight directions, in the order a cell's neighbours are tried.
+// The eight directions, in the order a cell's neighbours are tried; the
+// four across a side come first.
 static const mnavCell s_steps[8] = {{1, 0}, {0, 1},  {-1, 0},  {0, -1},
                                     {1, 1}, {-1, 1}, {-1, -1}, {1, -1}};
 
@@ -296,7 +297,7 @@ static void Expand(const mnavFlowSearch* s, int32_t cell)
     int32_t x = f->region.x + cell % width;
     int32_t y = f->region.y + cell / width;
     double here = mnavFlowAreaCost(s, cell);
-    for (int32_t d = 0; d < 8; ++d)
+    for (int32_t d = 0; d < f->directions; ++d)
     {
         int32_t dx = s_steps[d].x;
         int32_t dy = s_steps[d].y;
@@ -324,7 +325,8 @@ static void Expand(const mnavFlowSearch* s, int32_t cell)
 MNAV_NODISCARD static bool GoodGrid(const mnavGrid* grid)
 {
     return grid->areas != nullptr && grid->width >= 1 && grid->height >= 1 &&
-           isfinite(grid->cellSize) && grid->cellSize > 0.0f;
+           isfinite(grid->cellSize) && grid->cellSize > 0.0f &&
+           (grid->moves == mnav_gridMovesEight || grid->moves == mnav_gridMovesFour);
 }
 
 MNAV_NODISCARD static bool GoodGoals(const mnavGrid* grid, const mnavCell* goals, int32_t count)
@@ -395,6 +397,8 @@ static MNAV_NOINLINE mnavResult BeginFlowFieldWork(mnavGridFlow* field, const mn
     field->gridWidth = grid->width;
     field->gridHeight = grid->height;
     field->cellSize = grid->cellSize;
+    field->moves = grid->moves;
+    field->directions = grid->moves == mnav_gridMovesFour ? 4 : 8;
     field->filter = *usable;
     mnavFlowSearch s = {field, grid->areas};
     int32_t cells = field->region.width * field->region.height;
@@ -452,7 +456,7 @@ mnavResult mnavGridFlow_Begin(mnavGridFlow* field, const mnavGrid* grid,
 bool mnavFlowSameGrid(const mnavGridFlow* f, const mnavGrid* grid)
 {
     return grid->areas != nullptr && grid->width == f->gridWidth && grid->height == f->gridHeight &&
-           grid->cellSize == f->cellSize;
+           grid->cellSize == f->cellSize && grid->moves == f->moves;
 }
 
 static MNAV_NOINLINE mnavResult ContinueFlowFieldWork(mnavGridFlow* field, const mnavGrid* grid,

@@ -150,7 +150,7 @@ static void TestNoOwner(void)
     mnavLinkDef linkDef = {at, at, 0.5f, 1.0f, mnav_linkJump, false, 0.0f};
     mnavLinkGenDef genDef = mnavDefaultLinkGenDef();
     mnavAreaType areas[4] = {1, 1, 1, 1};
-    mnavGrid grid = {areas, 2, 2, 1.0f};
+    mnavGrid grid = {areas, 2, 2, 1.0f, mnav_gridMovesEight};
     uint8_t bytes[ROOM];
 
     FillAll();
@@ -509,7 +509,7 @@ static void TestFlowOutside(void)
     CHECK(mnavCreateGridFlow(&def, &field) == mnav_success, "a field");
     mnavAreaType areas[16];
     memset(areas, 1, sizeof(areas));
-    mnavGrid grid = {areas, 4, 4, 1.0f};
+    mnavGrid grid = {areas, 4, 4, 1.0f, mnav_gridMovesEight};
     mnavCellRange region = {0, 0, 1, 1};
     mnavCell goal = {0, 0};
     bool ended = false;

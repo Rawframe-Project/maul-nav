@@ -504,7 +504,7 @@ static void TestSlices(const mnavFlightVolume* volume)
     // search is over.
     static const mnavAreaType areas[4] = {mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable,
                                           mnav_areaWalkable};
-    const mnavGrid grid = {areas, 2, 2, 1.0f};
+    const mnavGrid grid = {areas, 2, 2, 1.0f, mnav_gridMovesEight};
     mnavGridPath gridPath;
     CHECK(mnavQuery_BeginFlightPath(query, volume, from, to) == mnav_success &&
               mnavQuery_FindGridPath(query, &grid, (mnavCell){0, 0}, (mnavCell){1, 1}, nullptr,

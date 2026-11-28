@@ -935,6 +935,18 @@ extern "C"
     // The longest side a grid may have, in cells.
 #define MNAV_MAX_GRID_SIDE 32768
 
+    // The neighbours a grid search steps to from a cell.
+    typedef int32_t mnavGridMoves;
+
+    enum
+    {
+        // The 8 neighbours, a diagonal step only where both cells beside
+        // it are open, so that no step cuts a blocked corner.
+        mnav_gridMovesEight = 0,
+        // The 4 neighbours across a side.
+        mnav_gridMovesFour = 1,
+    };
+
     // A grid for grid pathfinding: cells in rows from (0, 0),
     // each an area; mnav_areaNone, and areas a filter leaves out, block a
     // cell.
@@ -947,6 +959,9 @@ extern "C"
         int32_t height;
         // A cell's side, in meters, more than 0.
         float cellSize;
+        // The neighbours a search steps to; mnav_gridMovesEight when left
+        // zeroed.
+        mnavGridMoves moves;
     } mnavGrid;
 
     // A cell of a grid.
@@ -978,13 +993,16 @@ extern "C"
     } mnavGridPath;
 
     /// Finds the cheapest path between two cells of a grid, moving to the
-    /// 8 neighbours and never across a blocked corner: a diagonal step
-    /// needs both cells beside it open. A step costs its length times the
-    /// mean of its two cells' area costs. When every area the filter
-    /// includes costs the same, the search is jump point search, else A*;
-    /// both keep the context's node limit and path length, and end as
-    /// mnavQuery_FindPath does, with the path to the cell nearest the end when
-    /// the end is not reached. A grid search ends any sliced search.
+    /// neighbours the grid's moves name: the 8 neighbours, never across a
+    /// blocked corner (a diagonal step needs both cells beside it open), or
+    /// the 4 across a side. A step costs its length times the mean of its
+    /// two cells' area costs. On 8 neighbours, when every area the filter
+    /// includes costs the same, the search is jump point search, else A*
+    /// with the octile distance; on 4 it is A* with the Manhattan
+    /// distance. Each keeps the context's node limit and path length, and
+    /// ends as mnavQuery_FindPath does, with the path to the cell nearest
+    /// the end when the end is not reached. A grid search ends any sliced
+    /// search.
     ///
     /// @param query   The context; its memory holds the path.
     /// @param grid    The grid.
@@ -995,8 +1013,9 @@ extern "C"
     ///                the start is blocked. Zeroed on any failure but
     ///                mnav_errorBusy, which leaves it as it was.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a grid
-    /// with no areas, a side below 1 or a cell size not more than 0 or not
-    /// finite, a cell outside the grid, or a filter not built from
+    /// with no areas, a side below 1, a cell size not more than 0 or not
+    /// finite or moves neither mnav_gridMovesEight nor mnav_gridMovesFour, a
+    /// cell outside the grid, or a filter not built from
     /// mnavDefaultQueryFilter or with a NaN cost; `mnav_errorLimit` for a side
     /// past MNAV_MAX_GRID_SIDE or a filter cost past MNAV_MIN_AREA_COST or
     /// MNAV_MAX_AREA_COST, an infinity included. Also `mnav_errorBusy` when

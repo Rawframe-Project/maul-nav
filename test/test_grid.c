@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Grid paths: jump point search and A*, their limits and ends.
+// Grid paths: jump point search and A*, on 8 neighbours and on 4, their
+// limits and ends.
 
 #include "defs_for.h"
 #include "test_harness.h"
@@ -38,7 +39,7 @@ static mnavQuery* MakeQuery(int32_t nodes, float pathLength)
 
 static mnavGrid Grid(int32_t width, int32_t height)
 {
-    return (mnavGrid){s_areas, width, height, 0.5f};
+    return (mnavGrid){s_areas, width, height, 0.5f, mnav_gridMovesEight};
 }
 
 // A filter under which area 1 costs 1 as before but area 2, which no
@@ -298,6 +299,173 @@ static void TestJumpsMatchAStar(void)
     mnavDestroyQuery(query);
 }
 
+// Whether every stretch of a path runs across sides only: its turning
+// cells share a row or a column with the next.
+static bool AcrossSides(const mnavGridPath* path)
+{
+    bool across = true;
+    for (int32_t i = 0; i + 1 < path->cellCount; ++i)
+    {
+        across = across && (path->cells[i].x == path->cells[i + 1].x ||
+                            path->cells[i].y == path->cells[i + 1].y);
+    }
+    return across;
+}
+
+static void TestFourNeighbours(void)
+{
+    memset(s_areas, mnav_areaWalkable, sizeof(s_areas));
+    mnavQuery* query = MakeQuery(4096, 1000.0f);
+    mnavGrid grid = Grid(10, 10);
+    grid.moves = mnav_gridMovesFour;
+    mnavQueryFilter weighted = Weighted();
+    mnavGridPath path;
+    // (0, 0) to (9, 4): 13 steps of 0.5 m across sides, by both searches.
+    CHECK(mnavQuery_FindGridPath(query, &grid, (mnavCell){0, 0}, (mnavCell){9, 4}, nullptr,
+                                 &path) == mnav_success &&
+              path.end == mnav_pathFound && path.length == 6.5 && path.cost == 6.5 &&
+              path.cells[path.cellCount - 1].x == 9 && path.cells[path.cellCount - 1].y == 4 &&
+              AcrossSides(&path),
+          "across sides only");
+    CHECK(mnavQuery_FindGridPath(query, &grid, (mnavCell){0, 0}, (mnavCell){9, 4}, &weighted,
+                                 &path) == mnav_success &&
+              path.end == mnav_pathFound && path.length == 6.5 && AcrossSides(&path),
+          "and with costs");
+    mnavDestroyQuery(query);
+    // Within 6 m: the 8 neighbours reach (9, 4) in 5.33 m, the 4 need
+    // 6.5 m and take no first step, as the Manhattan distance says.
+    query = MakeQuery(4096, 6.0f);
+    CHECK(mnavQuery_FindGridPath(query, &grid, (mnavCell){0, 0}, (mnavCell){9, 4}, nullptr,
+                                 &path) == mnav_success &&
+              path.end == mnav_pathTooLong && path.cellCount == 1,
+          "the Manhattan distance bounds the length");
+    grid.moves = mnav_gridMovesEight;
+    CHECK(mnavQuery_FindGridPath(query, &grid, (mnavCell){0, 0}, (mnavCell){9, 4}, nullptr,
+                                 &path) == mnav_success &&
+              path.end == mnav_pathFound,
+          "where the octile one does not");
+    // The 2 by 2 grid open on one diagonal has no way on 4 either.
+    memset(s_areas, mnav_areaNone, sizeof(s_areas));
+    s_areas[0] = 1;
+    s_areas[3] = 1;
+    grid = Grid(2, 2);
+    grid.moves = mnav_gridMovesFour;
+    CHECK(mnavQuery_FindGridPath(query, &grid, (mnavCell){0, 0}, (mnavCell){1, 1}, nullptr,
+                                 &path) == mnav_success &&
+              path.end == mnav_pathNone && path.cellCount == 1,
+          "no way round a diagonal");
+    grid.moves = 2;
+    CHECK(mnavQuery_FindGridPath(query, &grid, (mnavCell){0, 0}, (mnavCell){1, 1}, nullptr,
+                                 &path) == mnav_errorInvalid,
+          "moves neither 8 nor 4");
+    grid.moves = -1;
+    CHECK(mnavQuery_FindGridPath(query, &grid, (mnavCell){0, 0}, (mnavCell){1, 1}, nullptr,
+                                 &path) == mnav_errorInvalid,
+          "negative moves");
+    mnavDestroyQuery(query);
+}
+
+enum
+{
+    // The side of the grids the 4-neighbour search is checked on.
+    SMALL = 24
+};
+
+// The cheapest cost from a to every cell over 4 neighbours, by Dijkstra's
+// search with a scan for the cheapest open cell; INFINITY where none.
+static void FourCosts(const mnavQueryFilter* filter, mnavCell a, double costs[SMALL * SMALL])
+{
+    bool done[SMALL * SMALL];
+    for (int32_t c = 0; c < SMALL * SMALL; ++c)
+    {
+        costs[c] = (double)INFINITY;
+        done[c] = false;
+    }
+    costs[a.y * SMALL + a.x] = 0.0;
+    for (;;)
+    {
+        int32_t best = -1;
+        for (int32_t c = 0; c < SMALL * SMALL; ++c)
+        {
+            if (!done[c] && isfinite(costs[c]) && (best < 0 || costs[c] < costs[best]))
+            {
+                best = c;
+            }
+        }
+        if (best < 0)
+        {
+            return;
+        }
+        done[best] = true;
+        static const int32_t steps[4][2] = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+        for (int32_t d = 0; d < 4; ++d)
+        {
+            int32_t x = best % SMALL + steps[d][0];
+            int32_t y = best / SMALL + steps[d][1];
+            if (x < 0 || y < 0 || x >= SMALL || y >= SMALL ||
+                s_areas[y * SMALL + x] == mnav_areaNone)
+            {
+                continue;
+            }
+            double step = 0.5 *
+                          ((double)filter->costs[s_areas[best]] +
+                           (double)filter->costs[s_areas[y * SMALL + x]]) *
+                          0.5;
+            if (costs[best] + step < costs[y * SMALL + x])
+            {
+                costs[y * SMALL + x] = costs[best] + step;
+            }
+        }
+    }
+}
+
+static void TestFourMatchesDijkstra(void)
+{
+    // On random grids of open ground, a dearer area and walls, the search
+    // on 4 neighbours reaches exactly the cells Dijkstra's search reaches,
+    // at its cost, both with one cost for every area and with costs.
+    mnavQuery* query = MakeQuery(4096, 1000.0f);
+    mnavGrid grid = Grid(SMALL, SMALL);
+    grid.moves = mnav_gridMovesFour;
+    mnavQueryFilter costly = mnavDefaultQueryFilter();
+    costly.costs[2] = 3.5f;
+    uint32_t state = 7;
+    int32_t found = 0;
+    int32_t agree = 0;
+    static double costs[SMALL * SMALL];
+    for (int32_t trial = 0; trial < 60; ++trial)
+    {
+        for (int32_t i = 0; i < SMALL * SMALL; ++i)
+        {
+            state = state * 1664525u + 1013904223u;
+            uint32_t r = (state >> 8) % 16u;
+            s_areas[i] = r < 4u ? mnav_areaNone : (mnavAreaType)(r < 11u ? 1u : 2u);
+        }
+        state = state * 1664525u + 1013904223u;
+        mnavCell a = {(int32_t)(state >> 8) % SMALL, (int32_t)(state >> 16) % SMALL};
+        state = state * 1664525u + 1013904223u;
+        mnavCell b = {(int32_t)(state >> 8) % SMALL, (int32_t)(state >> 16) % SMALL};
+        s_areas[a.y * SMALL + a.x] = mnav_areaWalkable;
+        s_areas[b.y * SMALL + b.x] = mnav_areaWalkable;
+        const mnavQueryFilter* filter = trial % 2 == 0 ? &costly : nullptr;
+        mnavQueryFilter plain = mnavDefaultQueryFilter();
+        FourCosts(filter != nullptr ? filter : &plain, a, costs);
+        double want = costs[b.y * SMALL + b.x];
+        mnavGridPath path;
+        CHECK(mnavQuery_FindGridPath(query, &grid, a, b, filter, &path) == mnav_success, "search");
+        bool reached = path.end == mnav_pathFound;
+        found += reached ? 1 : 0;
+        agree += reached == isfinite(want) &&
+                         (!reached ||
+                          (fabs(path.cost - want) <= 1e-9 * (1.0 + want) && AcrossSides(&path)))
+                     ? 1
+                     : 0;
+    }
+    printf("four neighbours: found=%d agree=%d of 60\n", found, agree);
+    CHECK(agree == 60 && found > 30, "Dijkstra's ends and costs");
+    mnavDestroyQuery(query);
+}
+
 static void TestEndsASlicedSearch(void)
 {
     // A grid search in a context ends the navmesh search sliced in it.
@@ -339,6 +507,8 @@ int main(void)
     TestLimitsAndEnds();
     TestPathAsLongAsTheLimit();
     TestJumpsMatchAStar();
+    TestFourNeighbours();
+    TestFourMatchesDijkstra();
     TestEndsASlicedSearch();
     return s_failures == 0 ? 0 : 1;
 }

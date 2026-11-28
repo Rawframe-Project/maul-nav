@@ -108,9 +108,10 @@ extern "C"
 
     /// Begins building the field for a region of a grid and a set of goal
     /// cells: one search from all the goals, with the steps of
-    /// mnavQuery_FindGridPath, to the 8 neighbours, never across a blocked
-    /// corner, a step costing its length times the mean of its two cells'
-    /// area costs. Cells outside the region are as blocked. A cell's way
+    /// mnavQuery_FindGridPath, to the neighbours the grid's moves name (the
+    /// 8, never across a blocked corner, or the 4 across a side), a step
+    /// costing its length times the mean of its two cells' area costs.
+    /// Cells outside the region are as blocked. A cell's way
     /// to the goals is a cheapest one, ties going to the neighbour found
     /// first by cost, then by index; the same grid, region and goals give
     /// the same field on every platform, however the work is divided.
@@ -125,8 +126,9 @@ extern "C"
     /// @param goalCount How many, at least 0.
     /// @param filter    The areas usable and their costs, or NULL; copied.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument, a
-    /// negative count, a grid with no areas, a side below 1 or a cell size not
-    /// more than 0 or not finite, a region backward or not within the grid, a goal
+    /// negative count, a grid with no areas, a side below 1, a cell size not
+    /// more than 0 or not finite or moves neither mnav_gridMovesEight nor
+    /// mnav_gridMovesFour, a region backward or not within the grid, a goal
     /// outside the grid, or a filter not built from mnavDefaultQueryFilter or
     /// with a NaN cost; `mnav_errorLimit` for a side past MNAV_MAX_GRID_SIDE or
     /// a filter cost past MNAV_MIN_AREA_COST or MNAV_MAX_AREA_COST, an infinity
@@ -153,7 +155,8 @@ extern "C"
     ///                 was.
     /// @return `mnav_success`, also when the work had already ended;
     /// `mnav_errorInvalid` for a NULL field or grid, fewer than 1 cell, or a
-    /// grid of another size or cell size; `mnav_errorState` for no work begun.
+    /// grid of another size, cell size or moves; `mnav_errorState` for no work
+    /// begun.
     /// Also `mnav_errorBusy` when called back in from the field's allocator,
     /// one misuse counted.
     /// @par Thread safety
@@ -171,7 +174,7 @@ extern "C"
     ///
     /// @param field        The field; its work must have ended.
     /// @param grid         The grid the field was begun on, of the same
-    ///                     size and cell size, its areas already changed;
+    ///                     size, cell size and moves, its areas already changed;
     ///                     read until the work ends.
     /// @param goals        The goal cells now, in grid places.
     /// @param goalCount    How many, at least 0.
@@ -180,8 +183,8 @@ extern "C"
     ///                     those outside the region ignored.
     /// @param changedCount How many, at least 0.
     /// @return `mnav_success`; `mnav_errorInvalid` for a NULL argument with a
-    /// count, a negative count, a grid of another size or cell size or with no
-    /// areas, or a goal or changed cell outside the grid; `mnav_errorState` for
+    /// count, a negative count, a grid of another size, cell size or moves or
+    /// with no areas, or a goal or changed cell outside the grid; `mnav_errorState` for
     /// nothing begun, or while work on the field has not ended. Also
     /// `mnav_errorBusy` when called back in from the field's allocator, one
     /// misuse counted.

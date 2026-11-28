@@ -65,4 +65,4 @@ Standing nodes toward the end keeps A* cheap and its straight path close to the 
 
 ## Grids
 
-`mnavQuery_FindGridPath` (`grid.c`) searches a caller's grid of areas in a query context: eight neighbors, no blocked corner cut, a step costing its length times the mean of its cells' area costs. When every included area costs the same it runs jump point search, which needs uniform costs; otherwise A*. It shares the navmesh search's ends and limits, and returns the cells the path turns at.
+`mnavQuery_FindGridPath` (`grid.c`) searches a caller's grid of areas in a query context: eight neighbors with no blocked corner cut, or four across a side as the grid's `moves` say, a step costing its length times the mean of its cells' area costs. On eight neighbors, when every included area costs the same, it runs jump point search, which needs uniform costs and diagonal steps; otherwise A* with the octile distance. On four it runs A* with the Manhattan distance, the shortest way across sides and so exact on an open grid. It shares the navmesh search's ends and limits, and returns the cells the path turns at.

@@ -154,6 +154,7 @@ static void CheckWays(const mnavGridFlow* field, const mnavGrid* grid,
             int32_t dx = f.next.x - x;
             int32_t dy = f.next.y - y;
             Expect(dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1);
+            Expect(grid->moves == mnav_gridMovesEight || (dx == 0) != (dy == 0));
             mnavCellFlow next;
             Expect(mnavGridFlow_GetFlow(field, f.next, &next) == mnav_success);
             double length = (dx != 0 && dy != 0 ? DIAGONAL : 1.0) * (double)grid->cellSize;
@@ -172,11 +173,16 @@ int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     int32_t height = 1 + Byte(&r) % SIDE;
     uint8_t sizeByte = Byte(&r);
     float cellSize = sizeByte == 0 ? 0.0f : 0.25f + (float)(sizeByte % 16) * 0.25f;
+    // The size byte's high bits choose the moves: 8 or 4 neighbours, and
+    // now and then a value neither names.
+    mnavGridMoves moves = sizeByte >= 0xF8         ? (mnavGridMoves)(sizeByte - 0xF6)
+                          : (sizeByte & 0x10) != 0 ? mnav_gridMovesFour
+                                                   : mnav_gridMovesEight;
     for (int32_t c = 0; c < width * height; ++c)
     {
         areas[c] = Area(&r);
     }
-    mnavGrid grid = {areas, width, height, cellSize};
+    mnavGrid grid = {areas, width, height, cellSize, moves};
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     uint8_t leave = Byte(&r);
     if (leave % 3 == 0)

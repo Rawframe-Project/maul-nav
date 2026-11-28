@@ -432,7 +432,7 @@ static void Share(void)
         uint32_t r = (seed >> 16) % 20u;
         s_areas[c] = r < 4u ? mnav_areaNone : (mnavAreaType)(r < 14u ? 1u : 2u + r % 3u);
     }
-    s_grid = (mnavGrid){s_areas, GRID_SIDE, GRID_SIDE, 1.0f};
+    s_grid = (mnavGrid){s_areas, GRID_SIDE, GRID_SIDE, 1.0f, mnav_gridMovesEight};
     // The hierarchy every thread searches at once.
     mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
     hierarchyDef.clusterTiles = 1;

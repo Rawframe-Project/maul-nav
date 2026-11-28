@@ -183,7 +183,7 @@ static void TestOthers(void)
     mnavGridFlow* flow = nullptr;
     mnavAreaType areas[16];
     memset(areas, mnav_areaWalkable, sizeof(areas));
-    const mnavGrid grid = {areas, 4, 4, 1.0f};
+    const mnavGrid grid = {areas, 4, 4, 1.0f, mnav_gridMovesEight};
     const mnavCell goal = {0, 0};
     mnavCellFlow way;
     CHECK(mnavCreateGridFlow(&flowDef, &flow) == mnav_success &&

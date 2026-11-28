@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Sirac Ozmen
 //
-// Grid paths: A* over weighted grids, and jump point search
-// (Harabor and Grastien, 2011) when every included area costs the same,
-// with no blocked corner cut: a diagonal step needs both cells beside it
-// open. Nodes, the open list and the node table live in the query
-// context's memory, which serves one query at a time.
+// Grid paths over the 8 neighbours or the 4: A* over weighted grids, and
+// on 8 neighbours jump point search (Harabor and Grastien, 2011) when
+// every included area costs the same, with no blocked corner cut: a
+// diagonal step needs both cells beside it open. Nodes, the open list and
+// the node table live in the query context's memory, which serves one
+// query at a time.
 
 #include "fpenv.h"
 #include "invariant.h"
@@ -43,6 +44,8 @@ typedef struct Grid
     const mnavGrid* grid;
     const mnavQueryFilter* filter;
     mnavCell end;
+    // The neighbours tried, the first of s_steps: 8 or 4.
+    int32_t directions;
     // The cost of every included area, when they all cost the same; 0
     // otherwise.
     double uniform;
@@ -70,11 +73,16 @@ static double AreaCost(const Grid* g, int32_t x, int32_t y)
     return (double)g->filter->costs[g->grid->areas[(size_t)y * (size_t)g->grid->width + (size_t)x]];
 }
 
-// The octile distance between two cells, in meters.
-static double Octile(const Grid* g, int32_t x0, int32_t y0, int32_t x1, int32_t y1)
+// The shortest way between two cells on an open grid, in meters: the
+// octile distance on 8 neighbours, the Manhattan distance on 4.
+static double Distance(const Grid* g, int32_t x0, int32_t y0, int32_t x1, int32_t y1)
 {
     double dx = fabs((double)x1 - (double)x0);
     double dy = fabs((double)y1 - (double)y0);
+    if (g->directions == 4)
+    {
+        return (dx + dy) * (double)g->grid->cellSize;
+    }
     double low = dx < dy ? dx : dy;
     double high = dx < dy ? dy : dx;
     return ((high - low) + low * DIAGONAL) * (double)g->grid->cellSize;
@@ -169,7 +177,7 @@ static void Reach(Grid* g, int32_t from, int32_t x, int32_t y, double length, do
     // costs are at least MNAV_MIN_AREA_COST.
     MNAV_ASSERT(length > 0.0 && cost >= 0.0);
     const GridNode* parent = &g->nodes[from];
-    double remaining = Octile(g, x, y, g->end.x, g->end.y);
+    double remaining = Distance(g, x, y, g->end.x, g->end.y);
     if (parent->length + length + remaining > g->limit)
     {
         g->tooLong = true;
@@ -211,7 +219,8 @@ static void Reach(Grid* g, int32_t from, int32_t x, int32_t y, double length, do
     SiftUp(g, n->heap);
 }
 
-// The eight directions, in the order a node's neighbours are tried.
+// The eight directions, in the order a node's neighbours are tried; the
+// four across a side come first.
 static const Step s_steps[8] = {{1, 0}, {0, 1},  {-1, 0},  {0, -1},
                                 {1, 1}, {-1, 1}, {-1, -1}, {1, -1}};
 
@@ -230,7 +239,7 @@ static void ExpandAStar(Grid* g, int32_t node)
     int32_t x = g->nodes[node].x;
     int32_t y = g->nodes[node].y;
     double here = AreaCost(g, x, y);
-    for (int32_t d = 0; d < 8; ++d)
+    for (int32_t d = 0; d < g->directions; ++d)
     {
         int32_t dx = s_steps[d].dx;
         int32_t dy = s_steps[d].dy;
@@ -448,9 +457,10 @@ static mnavGridPath PathTo(const Grid* g, int32_t last, mnavPathEnd end)
 MNAV_NODISCARD static bool GoodGrid(const mnavGrid* grid, mnavCell a, mnavCell b)
 {
     return grid->areas != nullptr && grid->width >= 1 && grid->height >= 1 &&
-           isfinite(grid->cellSize) && grid->cellSize > 0.0f && a.x >= 0 && a.y >= 0 &&
-           a.x < grid->width && a.y < grid->height && b.x >= 0 && b.y >= 0 && b.x < grid->width &&
-           b.y < grid->height;
+           isfinite(grid->cellSize) && grid->cellSize > 0.0f &&
+           (grid->moves == mnav_gridMovesEight || grid->moves == mnav_gridMovesFour) && a.x >= 0 &&
+           a.y >= 0 && a.x < grid->width && a.y < grid->height && b.x >= 0 && b.y >= 0 &&
+           b.x < grid->width && b.y < grid->height;
 }
 
 static MNAV_NOINLINE mnavResult FindGridPathWork(mnavQuery* query, const mnavGrid* grid,
@@ -484,6 +494,7 @@ static MNAV_NOINLINE mnavResult FindGridPathWork(mnavQuery* query, const mnavGri
               grid,
               &query->filter,
               end,
+              grid->moves == mnav_gridMovesFour ? 4 : 8,
               Uniform(&query->filter),
               mnavCheapest(&query->filter),
               (double)query->limits.pathLength,
@@ -500,7 +511,7 @@ static MNAV_NOINLINE mnavResult FindGridPathWork(mnavQuery* query, const mnavGri
                             MNAV_NO_NODE,
                             0.0,
                             0.0,
-                            Octile(&g, start.x, start.y, end.x, end.y) * g.cheapest};
+                            Distance(&g, start.x, start.y, end.x, end.y) * g.cheapest};
     query->table[Slot(&g, start.x, start.y)] = 0;
     if (!Open(&g, start.x, start.y))
     {
@@ -517,7 +528,7 @@ static MNAV_NOINLINE mnavResult FindGridPathWork(mnavQuery* query, const mnavGri
             g.found = node;
             break;
         }
-        if (g.uniform > 0.0)
+        if (g.uniform > 0.0 && g.directions == 8)
         {
             ExpandJump(&g, node);
         }

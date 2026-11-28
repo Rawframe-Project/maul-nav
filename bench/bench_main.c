@@ -1042,7 +1042,7 @@ static void Flow(void)
             areas[y * SIDE + x] = wall ? mnav_areaNone : ((x * 7 + y * 3) % 16 == 0 ? 2u : 1u);
         }
     }
-    mnavGrid grid = {areas, SIDE, SIDE, 0.5f};
+    mnavGrid grid = {areas, SIDE, SIDE, 0.5f, mnav_gridMovesEight};
     mnavQueryFilter filter = mnavDefaultQueryFilter();
     filter.costs[2] = 3.0f;
     mnavGridFlowDef def = mnavDefaultGridFlowDef();
