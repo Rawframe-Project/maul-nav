@@ -5,6 +5,13 @@ Added, Changed, Fixed, Removed and Security. The project uses
 [Semantic Versioning](https://semver.org/). Before 1.0.0, any release
 may change the API, the ABI and the tile formats.
 
+## [1.4.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.3.0...v1.4.0) (2026-11-28)
+
+
+### Added
+
+* **query:** search grids on four neighbours as well as eight ([#387](https://github.com/Rawframe-Project/maul-nav/issues/387)) ([e78ccf5](https://github.com/Rawframe-Project/maul-nav/commit/e78ccf58dd2f4fbd434623a71b98c8f6eac65c50)), closes [#385](https://github.com/Rawframe-Project/maul-nav/issues/385)
+
 ## [1.3.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.2.0...v1.3.0) (2026-11-27)
 
 This release makes `mnavQuery_FindPath` find paths much closer to the
