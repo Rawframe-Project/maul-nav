@@ -407,10 +407,38 @@ static void* Read(void* context)
     return nullptr;
 }
 
+// A graph of the grid's cells, each joined to the one past it on each axis
+// by the farther one's area.
+static void ShareGraph(void)
+{
+    static mnavPos3 points[GRID_SIDE * GRID_SIDE];
+    static mnavGraphEdge edges[2 * GRID_SIDE * GRID_SIDE];
+    int32_t edgeCount = 0;
+    for (int32_t c = 0; c < GRID_SIDE * GRID_SIDE; ++c)
+    {
+        int32_t x = c % GRID_SIDE;
+        int32_t y = c / GRID_SIDE;
+        points[c] = (mnavPos3){x + 0.5, 0.0, y + 0.5};
+        if (x + 1 < GRID_SIDE && s_areas[c] != mnav_areaNone && s_areas[c + 1] != mnav_areaNone)
+        {
+            edges[edgeCount++] = (mnavGraphEdge){c, c + 1, 0.0, s_areas[c + 1], false};
+        }
+        if (y + 1 < GRID_SIDE && s_areas[c] != mnav_areaNone &&
+            s_areas[c + GRID_SIDE] != mnav_areaNone)
+        {
+            edges[edgeCount++] =
+                (mnavGraphEdge){c, c + GRID_SIDE, 0.0, s_areas[c + GRID_SIDE], false};
+        }
+    }
+    mnavGraphDef graphDef = mnavDefaultGraphDef();
+    CHECK(mnavCreateGraph(&graphDef, &s_graph) == mnav_success &&
+              mnavGraph_Set(s_graph, points, GRID_SIDE * GRID_SIDE, edges, edgeCount) ==
+                  mnav_success,
+          "a graph");
+}
+
 // The navmesh of the world's four tiles with two links, a field toward
-// one goal on it, a grid of walls and costs, and a graph of the grid's
-// cells, each joined to the one past it on each axis by the farther one's
-// area.
+// one goal on it, and a grid of walls and costs.
 static void Share(void)
 {
     LoadWorldTiles();
@@ -449,30 +477,6 @@ static void Share(void)
         s_areas[c] = r < 4u ? mnav_areaNone : (mnavAreaType)(r < 14u ? 1u : 2u + r % 3u);
     }
     s_grid = (mnavGrid){s_areas, GRID_SIDE, GRID_SIDE, 1.0f};
-    static mnavPos3 points[GRID_SIDE * GRID_SIDE];
-    static mnavGraphEdge edges[2 * GRID_SIDE * GRID_SIDE];
-    int32_t edgeCount = 0;
-    for (int32_t c = 0; c < GRID_SIDE * GRID_SIDE; ++c)
-    {
-        int32_t x = c % GRID_SIDE;
-        int32_t y = c / GRID_SIDE;
-        points[c] = (mnavPos3){x + 0.5, 0.0, y + 0.5};
-        if (x + 1 < GRID_SIDE && s_areas[c] != mnav_areaNone && s_areas[c + 1] != mnav_areaNone)
-        {
-            edges[edgeCount++] = (mnavGraphEdge){c, c + 1, 0.0, s_areas[c + 1], false};
-        }
-        if (y + 1 < GRID_SIDE && s_areas[c] != mnav_areaNone &&
-            s_areas[c + GRID_SIDE] != mnav_areaNone)
-        {
-            edges[edgeCount++] =
-                (mnavGraphEdge){c, c + GRID_SIDE, 0.0, s_areas[c + GRID_SIDE], false};
-        }
-    }
-    mnavGraphDef graphDef = mnavDefaultGraphDef();
-    CHECK(mnavCreateGraph(&graphDef, &s_graph) == mnav_success &&
-              mnavGraph_Set(s_graph, points, GRID_SIDE * GRID_SIDE, edges, edgeCount) ==
-                  mnav_success,
-          "a graph");
     // The hierarchy every thread searches at once.
     mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
     hierarchyDef.clusterTiles = 1;
@@ -484,6 +488,7 @@ static void Share(void)
                   mnav_success,
           "a hierarchy");
     mnavDestroyQuery(query);
+    ShareGraph();
 }
 
 static Reader s_readers[THREADS + 1];

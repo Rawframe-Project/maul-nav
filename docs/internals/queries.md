@@ -12,8 +12,8 @@ How the searches and spatial queries over a committed navmesh work, and the choi
 - [Rays and surface moves](#rays-and-surface-moves)
 - [Corridors and steering](#corridors-and-steering)
 - [Walls and random points](#walls-and-random-points)
-- [Grids](#grids)
 - [Graphs](#graphs)
+- [Grids](#grids)
 
 ## Common rules
 
@@ -64,12 +64,12 @@ Standing nodes toward the end keeps A* cheap and its straight path close to the 
 
 `mnavNavmesh_FindRandomPoint` picks uniformly over the ground area of every included polygon from a 64-bit seed through SplitMix64, where Detour picks a tile first and so favors sparse tiles. `mnavQuery_FindRandomPointAround` samples the polygons the wall search reaches by the area each shares with the circle, an inscribed 32-gon written out as constants, so the point lies in the circle, where Detour's may lie a polygon away.
 
-## Grids
-
-`mnavQuery_FindGridPath` (`grid.c`) searches a caller's grid of areas in a query context: eight neighbors, no blocked corner cut, a step costing its length times the mean of its cells' area costs. When every included area costs the same it runs jump point search, which needs uniform costs; otherwise A*. It shares the navmesh search's ends and limits, and returns the cells the path turns at.
-
 ## Graphs
 
 `mnavGraph` (`graph.c`) takes its memory for its limits when it is made, and `mnavGraph_Set` checks the points and edges whole before it keeps any, so a refused set leaves the graph as it was. It lays the edges out by the point each leaves, every point's in the order given, a two-way edge once from each of its points, and keeps the least ratio of an edge's length to the distance between its points, at most 1.
 
 `mnavQuery_FindGraphPath` (`graph_path.c`) is A* in the query context's nodes, open list and node table, like the grid search. A step costs the edge's length times its area's cost. The heuristic is the straight distance to the end times the cheapest included area's cost times that least ratio, so it never expects more than the way left costs: an edge shorter than its points' distance, such as a lift, only weakens it. The open list takes the least total, then the node made first; edges are tried in the order the graph keeps them, so the same graph gives the same path everywhere. A closed node is final, as in the navmesh search. The search keeps the context's node limit and path length, a path's length being the sum of its edges' lengths, and when the end is not reached returns the way to the node nearest it by the heuristic, then the cost, then the index. The graph module reaches no navmesh module; the search writes nothing in the graph, so any number of contexts search one graph at once (`test_shared_reads`).
+
+## Grids
+
+`mnavQuery_FindGridPath` (`grid.c`) searches a caller's grid of areas in a query context: eight neighbors, no blocked corner cut, a step costing its length times the mean of its cells' area costs. When every included area costs the same it runs jump point search, which needs uniform costs; otherwise A*. It shares the navmesh search's ends and limits, and returns the cells the path turns at.
