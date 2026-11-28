@@ -7,11 +7,54 @@ may change the API, the ABI and the tile formats.
 
 ## [1.3.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.2.0...v1.3.0) (2026-11-27)
 
+This release makes `mnavQuery_FindPath` find paths much closer to the
+shortest, and fixes the bake's wall split for very long
+`maxEdgeLength` values. Paths, corridors and path costs change, and
+every baked tile's bytes and fingerprint change with the new bake
+generation, so a host that keeps tiles by their fingerprint rebakes
+them. Tiles baked by 1.2.0 still load.
 
-### Added
+### Changed
 
-* **bake:** split walls by length without overflow past 46,340 cells ([#380](https://github.com/Rawframe-Project/maul-nav/issues/380)) ([49d7182](https://github.com/Rawframe-Project/maul-nav/commit/49d718209705f981f59ee3e2b491be7e5ad70f29)), closes [#379](https://github.com/Rawframe-Project/maul-nav/issues/379)
-* **query:** stand path search nodes toward the end ([#375](https://github.com/Rawframe-Project/maul-nav/issues/375)) ([7a29745](https://github.com/Rawframe-Project/maul-nav/commit/7a29745955913f8a897ce16d16e0e929d6b3b1c6)), closes [#373](https://github.com/Rawframe-Project/maul-nav/issues/373)
+- `mnavQuery_FindPath`, the sliced path search and the corridor's
+  replanning stand each search node where the shortest way from the
+  node before it toward the end crosses the portal, instead of at the
+  portal's midpoint. The corridor they choose is much closer to the
+  one the shortest way crosses: on the benchmark's terrain, straight
+  paths were up to 17.6% longer than `mnavQuery_FindShortestPath`'s
+  and are now within 0.8% (0.02% on average), and on the Recast
+  differential's scenes no path is longer than Detour's by more than
+  5%, where 16 of 800 were. Searches also reach the end with fewer
+  nodes: the benchmark runs about 2.6 times as many path queries a
+  second. Paths,
+  corridors and `mnavPath.cost` change; the cost is now the cost
+  through the points where the way crossed the corridor's edges, and
+  may differ between a to b and b to a. A path that stops short of
+  its end ends at the search's point on the last portal crossed, no
+  longer at that portal's midpoint. `mnavQuery_FindHierarchicalPath`
+  may now return a shorter path than `FindPath` for the same ends,
+  since neither is exact. Tile bytes, flow fields, avoidance and
+  `mnavQuery_FindShortestPath` do not change.
+  ([#375](https://github.com/Rawframe-Project/maul-nav/pull/375))
+- `MNAV_BAKE_GENERATOR` rises from 6 to 7, so every baked tile's
+  generation and fingerprint change, and a host that skips rebaking
+  tiles whose fingerprint has not changed rebakes them once. Beyond
+  the generation, tile bytes change only for a def whose
+  `maxEdgeLength` is 46,341 cells or more (see Fixed). Flight tiles do
+  not change.
+  ([#380](https://github.com/Rawframe-Project/maul-nav/pull/380))
+- The paths guide (`docs/user/paths.md`) says how close `FindPath`
+  comes to the shortest path.
+
+### Fixed
+
+- A `maxEdgeLength` of 46,341 cells or more (11,585.25 m or more at the
+  default 0.25 m cells), which the def accepts up to 2^30 cells,
+  overflowed the bake's wall split. With such a limit, a value a host
+  may pass to mean "no limit", the bake could split every wall as if
+  the limit were one cell. Such a limit now splits no wall shorter
+  than it, as a limit is meant to.
+  ([#380](https://github.com/Rawframe-Project/maul-nav/pull/380))
 
 ## [1.2.0](https://github.com/Rawframe-Project/maul-nav/compare/v1.1.3...v1.2.0) (2026-11-05)
 
