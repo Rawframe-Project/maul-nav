@@ -53,7 +53,7 @@ mnavResult searched =
 
 ## Grids
 
-For tile maps, `mnavQuery_FindGridPath` searches an `mnavGrid` of area types in a query context, under the same filters: eight neighbors, no corner cut past a blocked cell. It runs jump point search when every included area costs the same and A* otherwise.
+For tile maps, `mnavQuery_FindGridPath` searches an `mnavGrid` of area types in a query context, under the same filters. The grid's `moves` choose the neighbors: eight (`mnav_gridMovesEight`, the default when left zeroed), no corner cut past a blocked cell, or four across a side (`mnav_gridMovesFour`) for games with no diagonal movement. On eight neighbors it runs jump point search when every included area costs the same and A* otherwise; on four, A*.
 
 ## Following a path
 

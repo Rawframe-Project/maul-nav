@@ -107,7 +107,7 @@ static void RaiseSubtrees(mnavGridFlow* f)
 static void Offer(const mnavFlowSearch* s, int32_t cell)
 {
     mnavGridFlow* f = s->field;
-    for (int32_t d = 0; d < 8; ++d)
+    for (int32_t d = 0; d < f->directions; ++d)
     {
         int32_t n = 0;
         double length = 0.0;
@@ -307,7 +307,7 @@ static int32_t NextOf(const mnavFlowSearch* s, int32_t cell)
         return cell;
     }
     int32_t best = cell;
-    for (int32_t d = 0; d < 8; ++d)
+    for (int32_t d = 0; d < f->directions; ++d)
     {
         int32_t n = 0;
         double length = 0.0;

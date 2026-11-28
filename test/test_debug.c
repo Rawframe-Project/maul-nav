@@ -353,7 +353,7 @@ static void TestFlowAndAvoidance(void)
     // an arrow of three lines.
     mnavAreaType areas[12];
     memset(areas, 1, sizeof(areas));
-    mnavGrid grid = {areas, 4, 3, 2.0f};
+    mnavGrid grid = {areas, 4, 3, 2.0f, mnav_gridMovesEight};
     mnavGridFlowDef def = mnavDefaultGridFlowDef();
     def.cells = 12;
     mnavGridFlow* field = nullptr;

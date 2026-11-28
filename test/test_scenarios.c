@@ -562,7 +562,7 @@ static void TestGroup(void)
             s_field[y * FIELD + x] = InWall((mnavPos2){x + 0.5, y + 0.5}) ? 0 : 1;
         }
     }
-    mnavGrid grid = {s_field, FIELD, FIELD, 1.0f};
+    mnavGrid grid = {s_field, FIELD, FIELD, 1.0f, mnav_gridMovesEight};
     mnavCell goals[25];
     for (int32_t i = 0; i < 25; ++i)
     {

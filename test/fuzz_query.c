@@ -512,7 +512,10 @@ static void Grid(Reader* r, const mnavQueryFilter* filter)
         uint8_t pick = Byte(r);
         areas[i] = (mnavAreaType)(pick % 5 == 0 ? 0 : 1 + pick % 3);
     }
-    mnavGrid grid = {areas, width, height, Byte(r) % 8 == 0 ? (float)Raw(r) : 0.5f};
+    mnavGrid grid = {areas, width, height, Byte(r) % 8 == 0 ? (float)Raw(r) : 0.5f,
+                     mnav_gridMovesEight};
+    uint8_t moves = Byte(r);
+    grid.moves = moves % 16 == 15 ? (mnavGridMoves)moves : (mnavGridMoves)(moves % 2);
     mnavCell a = {(int32_t)(Byte(r) % 14) - 1, (int32_t)(Byte(r) % 14) - 1};
     mnavCell b = {(int32_t)(Byte(r) % 14) - 1, (int32_t)(Byte(r) % 14) - 1};
     mnavGridPath path;

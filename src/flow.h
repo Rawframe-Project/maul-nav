@@ -68,11 +68,14 @@ struct mnavGridFlow
     int32_t touchedCount;
     int32_t fixed;
     bool repairing;
-    // The work's region, its grid's size and cell size, and the filter.
+    // The work's region, its grid's size, cell size and moves, the
+    // neighbours tried (the first 8 or 4 of the steps), and the filter.
     mnavFlowWindow region;
     int32_t gridWidth;
     int32_t gridHeight;
     float cellSize;
+    mnavGridMoves moves;
+    int32_t directions;
     mnavQueryFilter filter;
     int32_t state;
 };

@@ -340,7 +340,8 @@ static void TestEveryCallChecksItsFilter(void)
         mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable,
         mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable,
         mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable, mnav_areaWalkable};
-    Callees c = {query, navmesh, &corridor, a, b, nullptr, nullptr, nullptr, {areas, 4, 4, 1.0f}};
+    const mnavGrid grid = {areas, 4, 4, 1.0f, mnav_gridMovesEight};
+    Callees c = {query, navmesh, &corridor, a, b, nullptr, nullptr, nullptr, grid};
     mnavHierarchyDef hierarchyDef = mnavDefaultHierarchyDef();
     hierarchyDef.limits = (mnavHierarchyLimits){128, 1024, 8192};
     mnavNavFlowDef navFlowDef = mnavDefaultNavFlowDef();

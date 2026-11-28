@@ -15,6 +15,7 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 // The hash of the random grid's field, the same on every platform.
@@ -27,10 +28,12 @@ enum
 };
 
 static mnavAreaType s_areas[WIDTH * HEIGHT];
+// The moves of the grids Grid gives.
+static mnavGridMoves s_moves = mnav_gridMovesEight;
 
 static mnavGrid Grid(void)
 {
-    return (mnavGrid){s_areas, WIDTH, HEIGHT, 0.5f};
+    return (mnavGrid){s_areas, WIDTH, HEIGHT, 0.5f, s_moves};
 }
 
 // Walls, three dearer areas and open ground, from a fixed seed.
@@ -69,10 +72,12 @@ static mnavCellFlow At(const mnavGridFlow* field, int32_t x, int32_t y)
     return flow;
 }
 
-static void TestAgainstGridPaths(void)
+static void AgainstGridPaths(mnavGridMoves moves)
 {
     // Every cell's cost is the cost of the cheapest grid path from it to
-    // the goal, and following the field from it reaches the goal.
+    // the goal on the same moves, and following the field from it reaches
+    // the goal, on 4 neighbours across a side only.
+    s_moves = moves;
     RandomAreas(7u);
     mnavCell goal = {30, 20};
     s_areas[goal.y * WIDTH + goal.x] = 1u;
@@ -118,6 +123,8 @@ static void TestAgainstGridPaths(void)
                     break;
                 }
                 CHECK(At(field, here.next.x, here.next.y).cost < here.cost, "downhill");
+                int32_t across = abs(here.next.x - at.x) + abs(here.next.y - at.y);
+                CHECK(moves == mnav_gridMovesEight || across == 1, "across a side");
                 at = here.next;
             }
             lost += at.x == goal.x && at.y == goal.y ? 0 : 1;
@@ -128,6 +135,13 @@ static void TestAgainstGridPaths(void)
     CHECK(lost == 0, "every way ends at the goal, every other cell stays");
     mnavDestroyQuery(query);
     mnavDestroyGridFlow(field);
+    s_moves = mnav_gridMovesEight;
+}
+
+static void TestAgainstGridPaths(void)
+{
+    AgainstGridPaths(mnav_gridMovesEight);
+    AgainstGridPaths(mnav_gridMovesFour);
 }
 
 static void TestSeveralGoals(void)
@@ -188,7 +202,7 @@ static void TestCornersAndBlocks(void)
     areas[1 * 4 + 2] = mnav_areaNone;
     areas[2 * 4 + 1] = mnav_areaNone;
     areas[0 * 4 + 1] = mnav_areaNone;
-    mnavGrid grid = {areas, 4, 3, 1.0f};
+    mnavGrid grid = {areas, 4, 3, 1.0f, mnav_gridMovesEight};
     mnavGridFlow* field = Make(12);
     const mnavCell goal = {2, 2};
     CHECK(mnavGridFlow_Build(field, &grid, &goal, 1, nullptr) == mnav_success, "built");
@@ -276,6 +290,9 @@ static void TestChecks(void)
     bad.cellSize = 0.0f;
     CHECK(mnavGridFlow_Build(field, &bad, &goal, 1, nullptr) == mnav_errorInvalid, "cell size");
     bad = grid;
+    bad.moves = 2;
+    CHECK(mnavGridFlow_Build(field, &bad, &goal, 1, nullptr) == mnav_errorInvalid, "moves");
+    bad = grid;
     bad.areas = nullptr;
     CHECK(mnavGridFlow_Build(field, &bad, &goal, 1, nullptr) == mnav_errorInvalid, "no areas");
     bad = grid;
@@ -351,7 +368,7 @@ static void TestRegion(void)
     {
         memcpy(&s_window[y * r.width], &s_areas[(r.y + y) * WIDTH + r.x], (size_t)r.width);
     }
-    const mnavGrid window = {s_window, r.width, r.height, grid.cellSize};
+    const mnavGrid window = {s_window, r.width, r.height, grid.cellSize, grid.moves};
     // One goal outside the region, left out.
     const mnavCell goals[3] = {{12, 7}, {30, 20}, {2, 2}};
     const mnavCell local[2] = {{3, 2}, {21, 15}};
@@ -453,13 +470,16 @@ static void TestSteps(void)
               mnavGridFlow_Continue(field, &grid, 100, nullptr) == mnav_success,
           "a first step");
     memcpy(s_window, s_areas, sizeof(s_areas));
-    mnavGrid moved = {s_window, WIDTH, HEIGHT, grid.cellSize};
+    mnavGrid moved = {s_window, WIDTH, HEIGHT, grid.cellSize, grid.moves};
     CHECK(mnavGridFlow_Continue(field, &moved, INT32_MAX, &ended) == mnav_success && ended &&
               RegionHash(field, whole) == FIELD_HASH,
           "the grid moved");
     mnavGrid other = grid;
     other.height = HEIGHT - 1;
     CHECK(mnavGridFlow_Continue(field, &other, 1, &ended) == mnav_errorInvalid, "another size");
+    other = grid;
+    other.moves = mnav_gridMovesFour;
+    CHECK(mnavGridFlow_Continue(field, &other, 1, &ended) == mnav_errorInvalid, "other moves");
     other = grid;
     other.cellSize = 1.0f;
     CHECK(mnavGridFlow_Continue(field, &other, 1, &ended) == mnav_errorInvalid &&
@@ -595,6 +615,10 @@ static void TestRepairChecks(void)
           "work not ended");
     CHECK(mnavGridFlow_Continue(field, &grid, INT32_MAX, nullptr) == mnav_success, "ended");
     mnavGrid other = grid;
+    other.moves = mnav_gridMovesFour;
+    CHECK(mnavGridFlow_Update(field, &other, &goal, 1, nullptr, 0) == mnav_errorInvalid,
+          "other moves");
+    other = grid;
     other.width = WIDTH - 1;
     CHECK(mnavGridFlow_Update(field, &other, &goal, 1, nullptr, 0) == mnav_errorInvalid &&
               mnavGridFlow_Update(field, &grid, &off, 1, nullptr, 0) == mnav_errorInvalid &&
@@ -659,6 +683,11 @@ static void TestRepairs(void)
     RepairHistory(nullptr, 99u);
     const mnavCellRange r = {5, 4, 37, 28};
     RepairHistory(&r, 12u);
+    // On 4 neighbours too.
+    s_moves = mnav_gridMovesFour;
+    RepairHistory(nullptr, 3u);
+    RepairHistory(&r, 12u);
+    s_moves = mnav_gridMovesEight;
 }
 
 int main(void)

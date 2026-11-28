@@ -4,7 +4,7 @@ A flow field answers every agent's way to a set of goals from one search, for un
 
 ## Grid fields
 
-- **The search.** `mnavGridFlow_Build` searches from every goal at once with Dijkstra's algorithm and the grid path's steps: eight neighbors, never across a blocked corner, a step costing its length times the mean of its two cells' area costs. The rule is symmetric, so a cell's cost from the goals is the cost of its way to them.
+- **The search.** `mnavGridFlow_Build` searches from every goal at once with Dijkstra's algorithm and the grid path's steps on the grid's `moves`: eight neighbors, never across a blocked corner, or four across a side, a step costing its length times the mean of its two cells' area costs. The rule is symmetric, so a cell's cost from the goals is the cost of its way to them.
 - **What a cell holds.** Its cost to the nearest goal, infinite where none is reached, and its next cell, itself at a goal. Following next cells walks a cheapest grid path, each step strictly downhill.
 - **Order.** The open list is a heap by cost, then by cell index, so ties go the same way on every platform and in any goal order.
 - **Memory.** A field owns arrays for its `cells` limit (cost, next cell, heap place and entry, a goal list, a repair's touched list and marks, 29 bytes a cell), up to `MNAV_MAX_GRID_FLOW_CELLS`. A region of more cells is refused, and a failed begin leaves nothing to read.
